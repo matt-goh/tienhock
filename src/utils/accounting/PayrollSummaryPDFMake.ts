@@ -314,5 +314,8 @@ export const generatePayrollSummaryPDF = async (
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {
     pdfMake.createPdf(docDefinition).getBlob(resolve);
   });
-  printPdfBlob(pdfBlob, `payroll summary ${data.periodLabel}`);
+  printPdfBlob(
+    pdfBlob,
+    `Payroll Summary ${data.periodLabel} - ${TIENHOCK_INFO.name}`
+  );
 };

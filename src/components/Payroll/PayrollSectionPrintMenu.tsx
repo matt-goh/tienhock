@@ -98,7 +98,7 @@ const PayrollSectionPrintMenuContent: React.FC<
 > = ({
   payrolls,
   midMonthPayrollsMap,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   size = "sm",
   disabled = false,
   buttonLabel = "Print Payslips",

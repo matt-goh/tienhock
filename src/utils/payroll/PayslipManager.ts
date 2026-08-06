@@ -52,7 +52,7 @@ export interface DownloadOptions {
 const generatePayslipPDF = async (
   payroll: EmployeePayroll,
   staffDetails?: StaffDetails,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   midMonthPayroll?: MidMonthPayroll | null,
   mode: PayslipPrintMode = "both"
 ): Promise<Blob> => {
@@ -170,7 +170,7 @@ const fetchCompanyEmployeePayrollDetailsBatch = async (
 const generateBatchPayslipPDF = async (
   payrolls: EmployeePayroll[],
   staffDetailsMap?: Record<string, StaffDetails>,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   midMonthPayrollsMap?: Record<string, MidMonthPayroll | null>,
   mode: PayslipPrintMode = "both"
 ): Promise<Blob> => {
@@ -190,7 +190,7 @@ export const downloadPayslip = async (
   options?: DownloadOptions
 ): Promise<void> => {
   const {
-    companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
     company = "tienhock",
     fileName,
     midMonthPayroll,
@@ -258,7 +258,7 @@ export const downloadBatchPayslips = async (
   }
 ): Promise<void> => {
   const {
-    companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
     company = "tienhock",
     fileName,
     midMonthPayrollsMap,
@@ -394,7 +394,7 @@ export const printPayslip = async (
   options?: PrintOptions
 ): Promise<void> => {
   const {
-    companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
     company = "tienhock",
     midMonthPayroll,
     mode = "individual",
@@ -449,7 +449,13 @@ export const printPayslip = async (
         // Use a slight delay to ensure content is fully loaded
         setTimeout(() => {
           if (printFrame && pdfUrl) {
-            printPdfFrameWithFallback(printFrame, pdfUrl);
+            printPdfFrameWithFallback(printFrame, pdfUrl, {
+              documentTitle: `Payslip ${
+                completePayroll.employee_id || "unknown"
+              } ${completePayroll.year ?? new Date().getFullYear()}-${String(
+                completePayroll.month ?? new Date().getMonth() + 1
+              ).padStart(2, "0")}`,
+            });
           }
         }, 500);
         
@@ -481,7 +487,7 @@ export const printBatchPayslips = async (
   }
 ): Promise<void> => {
   const {
-    companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
     company = "tienhock",
     midMonthPayrollsMap,
     mode = "individual",
@@ -592,7 +598,13 @@ export const printBatchPayslips = async (
         // Use a slight delay to ensure content is fully loaded
         setTimeout(() => {
           if (printFrame && pdfUrl) {
-            printPdfFrameWithFallback(printFrame, pdfUrl);
+            printPdfFrameWithFallback(printFrame, pdfUrl, {
+              documentTitle: `Payslips ${
+                completePayrolls.length
+              } ${completePayrolls[0]?.year ?? new Date().getFullYear()}-${String(
+                completePayrolls[0]?.month ?? new Date().getMonth() + 1
+              ).padStart(2, "0")}`,
+            });
           }
         }, 500);
 

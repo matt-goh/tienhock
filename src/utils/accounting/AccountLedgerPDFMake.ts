@@ -421,6 +421,7 @@ export const generateAccountLedgerPDF = async (
     if (printFrame.contentWindow) {
       printPdfFrameWithFallback(printFrame, url, {
         logLabel: `${reportTitle.toLowerCase()} PDF`,
+        documentTitle: `${reportTitle} ${data.account.code} ${periodLabel}`,
       });
       const cleanup = () => {
         if (document.body.contains(printFrame)) {

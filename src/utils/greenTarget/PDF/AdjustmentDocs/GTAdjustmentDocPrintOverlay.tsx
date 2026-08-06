@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 import LoadingSpinner from "../../../../components/LoadingSpinner";
 import { GTAdjustmentDocFull } from "../../../../services/gt-adjustment-doc-pdf.service";
 import { generateGTAdjustmentDocPDFBlob } from "./GTAdjustmentDocPDFHandler";
+import { generateGTAdjustmentDocPDFFilename } from "./generateGTAdjustmentDocPDFFilename";
 import { printPdfFrameWithFallback } from "../../../pdfPrintFallback";
 
 const GTAdjustmentDocPrintOverlay = ({
@@ -66,6 +67,9 @@ const GTAdjustmentDocPrintOverlay = ({
             setTimeout(() => {
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "Green Target adjustment document PDF",
+                documentTitle: generateGTAdjustmentDocPDFFilename(
+                  docs
+                ).replace(".pdf", ""),
               });
               cleanup();
             }, 500);

@@ -27,7 +27,7 @@ export interface CompanyInfo {
 
 export const TIENHOCK_INFO: CompanyInfo = {
   // Common fields
-  name: "TIEN HOCK FOOD INDUSTRIES S/B",
+  name: "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   tin: "C21636482050",
   reg_no: "201101025173",
   msic_code: "10741",

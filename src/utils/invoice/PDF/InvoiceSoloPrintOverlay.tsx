@@ -161,6 +161,10 @@ const InvoiceSoloPrintOverlay: React.FC<InvoiceSoloPrintOverlayProps> = ({
             setTimeout(() => {
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "invoice PDF",
+                documentTitle: generatePDFFilename(
+                  invoices,
+                  companyContext
+                ).replace(".pdf", ""),
               });
               cleanup(); // Hide loading dialog only
             }, 500);

@@ -1178,7 +1178,7 @@ const SalaryReportPDF: React.FC<SalaryReportPDFProps> = ({
   grandTotals,
   locationMap,
   locationOrder,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B (953309-T)",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)",
   showLocationCodes = true,
   mergeCommissionLocations = true,
 }) => {
@@ -1315,6 +1315,11 @@ export const generateSalaryReportPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "salary report PDF",
+            documentTitle: `Salary Report ${
+              periodType === "yearly"
+                ? year
+                : `${getMonthName(month || 1)} ${year}`
+            }`,
           });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {

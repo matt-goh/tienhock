@@ -289,7 +289,9 @@ const GTBalanceSheetPDFDocument: React.FC<GTBalanceSheetPDFDocumentProps> = ({
   };
 
   return (
-    <Document>
+    <Document
+      title={`Balance Sheet as at ${data.period.as_of_date} - ${GREENTARGET_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -387,5 +389,8 @@ export const generateGTBalanceSheetPDF = async (
 ): Promise<void> => {
   const blob = await pdf(<GTBalanceSheetPDFDocument data={data} />).toBlob();
 
-  printPdfBlob(blob, "balance sheet PDF");
+  printPdfBlob(
+    blob,
+    `Balance Sheet as at ${data.period.as_of_date} - ${GREENTARGET_INFO.name}`
+  );
 };

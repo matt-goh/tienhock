@@ -242,7 +242,9 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
   data,
 }) => {
   return (
-    <Document>
+    <Document
+      title={`Balance Sheet as at ${data.period.as_of_date} - ${TIENHOCK_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -458,5 +460,8 @@ export const generateBalanceSheetPDF = async (
     <BalanceSheetPDFDocument data={data} />
   ).toBlob();
 
-  printPdfBlob(blob, "balance sheet PDF");
+  printPdfBlob(
+    blob,
+    `Balance Sheet as at ${data.period.as_of_date} - ${TIENHOCK_INFO.name}`
+  );
 };
