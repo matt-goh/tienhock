@@ -30,6 +30,37 @@ requires separate approval).
 
 ---
 
+## Removed 6 Aug 2026 — 2 files (June 2026 legacy reclassification: moves + E8–E11, then E1–E7 + MRM/MGT offsets)
+
+Applied to **dev and production** on 2026-08-06 (dev via the Phase 2 execution, prod by the user),
+then removed per the project convention. Both existed at commit **`8bd5e45f`** — recover either
+with `git show 8bd5e45f:dev/migrations/<filename>`.
+
+Full narrative: [Account/JUNE_RECLASS_DESIGN.md](Account/JUNE_RECLASS_DESIGN.md) (Phase 1 design +
+Phase 2 execution note). Evidence: `JUNE_MRM&MGT.pdf` at repo root (printed 06 AUG 2026 — the
+coworker's legacy June ledgers for MRM/MGT), the boss-annotated `CORRECTED_JUNE_TRIAL_BALANCE.pdf`,
+and the `dev/import/legacy-june-tb/june-2026-legacy-ledgers.json` fixture. Run in this order — file
+2 has a prerequisite guard that aborts unless file 1's move #14 is already present.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-05_june_legacy_reclass.sql` | June 2026 legacy reclassification — SAFE SCOPE ONLY. Applied the **14 fixture-verified account_code moves** on manual source-less June C/B journals (PCE002/06, PCE004/06, PCE007/06, PCE008/06, PBE054/06) plus amount edits **E8–E11**. Moves: PCE004/06 MBOR→BRM 482.31 (JING XIAN YOU BIHUN food-grade rubber), MBOR→MBC 5.50 (EMART leg), MBSM_K→MBC 40.00 (KFC LINTAS), MBSM_K→MBOR 29.00 (LIDO MARKET), MBSM_O→MBSM_K 26.50 (HO KEE), OIL9698→OIL6323 30.00 (SHELL BUNDUSAN #01001886), BRM→MRM 9.05 (SHUANG MEI HARDWARE); PCE007/06 MBSM_K→MBSM_O 107.70 (ORIENTAL COFFEE), OILOTH→OIL920 40.00 (SHELL BUNDUSAN #01002075, inferred — no legacy OIL920 detail); PCE008/06 MBSM_K→MBOR 12.90 (MIX STORE), MBRM→MBRMF 400.00 (HV ELECTRICAL SINO copper cable), OIL9882→OIL9922 80.00 (SHELL SYT. EXCEL); PCE002/06 OIL9698→R9698 23.00 (KK SEAL) and 100.00 (DIGNITY BRAND). Edits: PCE008/06 MBRM 43.85→43.90 and 629.50→629.45; PBE054/06 MBRMF 565.00→465.00 + MBSAF 144.00→244.00 (one PAUMIN receipt, total 709.00 unchanged). **E1–E7 deliberately excluded** — they net +0.38 on PCE004/06 and only land together with the MRM (−0.32)/MGT (−0.06) offsets in file 2. Lines resolved by (journal reference, account, amount, particulars), never dev jel.id, so the file ports to prod unchanged. Post-assertions: every journal header total unchanged and still footing, 24 accounts at expected June movement (six with inline PENDING deltas), untouched controls, June TB stays 17,102,880.87/side. CR_LD +40.00 remains out of scope (source-document anomaly, design §d.3). Data correction only, no schema change. | dev ✓, prod ✓ (both 2026-08-06) |
+| `2026-08-06_june_legacy_reclass_e1_e7_mrm_mgt.sql` | Follow-up: **13 amount edits** landing E1–E7 together with the MRM/MGT offsets, once `JUNE_MRM&MGT.pdf` confirmed the legacy detail. E1–E7 on PCE004/06 (net +0.38): MBC 46.60→46.65, MBRM 13.60→13.55, MBSAF 160.56→160.55, MBSM_K 54.00→54.40 and 19.30→19.29, BRM 26.70→26.71, BRM 482.31→482.30 (move #1's line). MRM offsets (−0.32 total): PCE004/06 21.29→21.25 (HU HAO), 89.10→89.12 (SHUANG MEI #511494253448), 23.00→22.65 (FOSHAN NAN FANG) = −0.37; PCE008/06 24.55→24.60 (ZHE JIANG SHEN HONG) = +0.05. MGT offsets (−0.06 total): PCE004/06 88.21→88.20 = −0.01; PCE008/06 80.50→80.45 = −0.05. PCE004/06 nets 0.00 (+0.38 −0.38) and PCE008/06 nets 0.00, so both vouchers stay total-neutral and CASH never drifts. The legacy MRM ledger shows SHUANG MEI keyed at exactly 9.05, disproving the design's "8.73 variant" and making move #14 fixture-verified. Post-assertions: journal totals unchanged and footing, **all 24 accounts at exact legacy June movement, all 17 affected accounts' 2026-06-30 YTD tie the legacy printed June TB to the cent**. `dump-bihun-june.mjs` lands every boss target (MBC 479.55 · MBOR 799.40 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10 · VRE-Diesel 1,555.67 · VRE-Repair 1,753.50 · expenses 64,238.82 · machine repair 2,319.22 · FINAL 14.0504). No account moves, no credit lines touched; guarded, idempotent, fail-closed; data correction only. | dev ✓, prod ✓ (both 2026-08-06) |
+
+---
+
+## Removed 6 Aug 2026 — 1 file (Green Target rentals optional fields)
+
+Applied to **dev and production** on 2026-08-06, then removed per the project convention. The file
+existed at commit **`8bd5e45f`** — recover with
+`git show 8bd5e45f:dev/migrations/2026-08-06_greentarget_rentals_optional_fields.sql`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-06_greentarget_rentals_optional_fields.sql` | Made `greentarget.rentals.date_placed` nullable. GT rentals no longer track physical tong movement (that is kept in Excel) — a rental now exists to hold the customer's site/address and carry the invoice → payment → journal chain, so the dumpster and both dates are optional metadata. `tong_no` was already nullable; `date_placed` was the only remaining `NOT NULL` column. Single guarded, idempotent `ALTER TABLE greentarget.rentals ALTER COLUMN date_placed DROP NOT NULL` (skips when already nullable), one transaction, no data written. The rental form already treats the fields as optional (empty values are sent as explicit `null`s). | dev ✓, prod ✓ (both 2026-08-06) |
+
+---
+
 ## Removed 5 Aug 2026 — 2 files (TH PCE002/06 reclass + GT employee pay rates)
 
 Both existed at commit **`a92104dd`** — recover either with
