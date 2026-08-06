@@ -20,6 +20,19 @@ interface SelectOption {
 // "I"/"C" are the invoice-number prefixes; they map to INVOICE/CASH.
 type InvoiceTypeCode = "I" | "C";
 
+// Thin vertical rule between two fields on the same line. It stretches to the
+// row height so it reads as one continuous separator, and disappears below sm
+// where the fields stack and a rule between them would be meaningless.
+// Deliberately absent within a pair that describes one thing - Date/Time are
+// two halves of one timestamp, Customer/Customer ID are two halves of one
+// customer - so each pair reads as a group rather than as separate fields.
+const FieldDivider: React.FC = (): React.ReactElement => (
+  <div
+    aria-hidden="true"
+    className="hidden sm:block self-stretch w-px bg-default-200 dark:bg-gray-700"
+  />
+);
+
 interface InvoiceHeaderProps {
   invoice: ExtendedInvoiceData;
   onInputChange: (field: keyof ExtendedInvoiceData, value: any) => void;
@@ -140,12 +153,16 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
     }
   };
 
+  // Two wrapping rows - the document itself, then who it is for. Every control
+  // is sized to the value it holds rather than to the card, because a column
+  // grid on a wide screen just spreads seven short fields from edge to edge.
+  // Flowing them left with one gap keeps the group compact and readable, and
+  // they wrap onto further lines by themselves as the window narrows.
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-      {/* Column 1 (Invoice No, Type, Date, Time) */}
-      <div className="space-y-3">
-        {/* Invoice No */}
-        <div className="relative">
+    <div className="space-y-4">
+      {/* Invoice No, Type, Date, Time */}
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
+        <div className="w-36">
           <FormInput
             name="invoiceno"
             label={t("Invoice No")}
@@ -163,68 +180,67 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
           />
         </div>
 
-        {/* Type, Date & Time. The pills and the navigator size themselves to
-            their content, so all three share one row instead of each leaving a
-            wide empty gap beside it. They wrap on narrow screens. */}
-        <div className="flex flex-wrap items-end gap-4">
-          {/* Type */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-              {t("type", { ns: "common" })}
-            </label>
-            <PillSelect<InvoiceTypeCode>
-              value={invoice.paymenttype === "CASH" ? "C" : "I"}
-              onChange={(value: InvoiceTypeCode) => {
-                const newType = value === "C" ? "CASH" : "INVOICE";
-                onInputChange("paymenttype", newType);
-                if (invoice.id) {
-                  onInputChange("id", invoice.id);
-                }
-              }}
-              options={invoiceTypeOptions}
-              disabled={readOnly} // Use readOnly
-              ariaLabel={t("Invoice type")}
-              size="md"
-            />
-          </div>
+        <FieldDivider />
 
-          {/* Date */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-              {t("date", { ns: "common" })}
-            </label>
-            <TimeNavigator
-              range={{ start: invoiceDate, end: invoiceDate }}
-              onChange={handleDatePick}
-              modes={["day"]}
-              presets={false}
-              allowFuture
-              size="md"
-              disabled={readOnly}
-            />
-          </div>
-
-          {/* Time */}
-          <div className="w-32">
-            <FormInput
-              name="time"
-              label={t("Time")}
-              type="time"
-              value={
-                parseDatabaseTimestamp(invoice.createddate).formattedTime?.slice(
-                  0,
-                  5
-                ) ?? ""
+        {/* Type */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            {t("type", { ns: "common" })}
+          </label>
+          <PillSelect<InvoiceTypeCode>
+            value={invoice.paymenttype === "CASH" ? "C" : "I"}
+            onChange={(value: InvoiceTypeCode) => {
+              const newType = value === "C" ? "CASH" : "INVOICE";
+              onInputChange("paymenttype", newType);
+              if (invoice.id) {
+                onInputChange("id", invoice.id);
               }
-              onChange={(e) => handleDateTimeChange("time", e.target.value)}
-              disabled={readOnly} // Use readOnly
-            />
-          </div>
+            }}
+            options={invoiceTypeOptions}
+            disabled={readOnly} // Use readOnly
+            ariaLabel={t("Invoice type")}
+            size="md"
+          />
+        </div>
+
+        <FieldDivider />
+
+        {/* Date */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            {t("date", { ns: "common" })}
+          </label>
+          <TimeNavigator
+            range={{ start: invoiceDate, end: invoiceDate }}
+            onChange={handleDatePick}
+            modes={["day"]}
+            presets={false}
+            allowFuture
+            size="md"
+            disabled={readOnly}
+          />
+        </div>
+
+        {/* Time */}
+        <div className="w-32">
+          <FormInput
+            name="time"
+            label={t("Time")}
+            type="time"
+            value={
+              parseDatabaseTimestamp(invoice.createddate).formattedTime?.slice(
+                0,
+                5
+              ) ?? ""
+            }
+            onChange={(e) => handleDateTimeChange("time", e.target.value)}
+            disabled={readOnly} // Use readOnly
+          />
         </div>
       </div>
 
-      {/* Column 2 */}
-      <div className="space-y-3">
+      {/* Salesman, Customer, Customer ID */}
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-4">
         {/* Salesman. The picker only ever lists active staff holding the
             SALESMAN job (4 of them today) and shows their short id, so the
             whole set fits in one pill row. An empty salespersonid matches no
@@ -245,33 +261,33 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
           />
         </div>
 
-        {/* Customer & Customer ID. The id is short and read-only, so it sits
-            beside the picker rather than on a row of its own. */}
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex-1 min-w-[16rem]">
-            <CustomerCombobox
-              name="customer"
-              label={t("customer", { ns: "common" })}
-              value={selectedOptionForCombobox} // Pass SelectOption | null
-              onChange={handleComboboxChange} // Use updated handler
-              options={customerOptionsForCombobox} // Pass mapped options
-              query={customerQuery}
-              setQuery={setCustomerQuery}
-              onLoadMore={onLoadMoreCustomers}
-              hasMore={hasMoreCustomers}
-              isLoading={isFetchingCustomers}
-            />
-          </div>
+        <FieldDivider />
 
-          {/* Customer ID (Read Only) */}
-          <div className="w-44">
-            <FormInput
-              name="customerId"
-              label={t("Customer ID")}
-              value={invoice.customerid || ""}
-              disabled // Always disabled
-            />
-          </div>
+        {/* Customer. The only field that earns real width - customer names run
+            long - but it is capped so it never stretches across the card. */}
+        <div className="w-full sm:w-80 lg:w-96">
+          <CustomerCombobox
+            name="customer"
+            label={t("customer", { ns: "common" })}
+            value={selectedOptionForCombobox} // Pass SelectOption | null
+            onChange={handleComboboxChange} // Use updated handler
+            options={customerOptionsForCombobox} // Pass mapped options
+            query={customerQuery}
+            setQuery={setCustomerQuery}
+            onLoadMore={onLoadMoreCustomers}
+            hasMore={hasMoreCustomers}
+            isLoading={isFetchingCustomers}
+          />
+        </div>
+
+        {/* Customer ID (Read Only) */}
+        <div className="w-40">
+          <FormInput
+            name="customerId"
+            label={t("Customer ID")}
+            value={invoice.customerid || ""}
+            disabled // Always disabled
+          />
         </div>
       </div>
     </div>

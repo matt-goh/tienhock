@@ -304,6 +304,13 @@ export interface InvoiceData {
   totalamountpayable: number;
   tax_amount: number;
   balance_due: number;
+  /**
+   * How much a payment may still be recorded against this invoice.
+   * A credit INVOICE exposes its outstanding balance. A CASH bill is always
+   * fully settled, so this is the counter cash still held in CH_REV1 that a
+   * bank/online receipt can re-classify as banked money.
+   */
+  settleable_amount?: number;
 
   // E-invoice fields
   uuid: string | null; // UUID from e-invoice system
@@ -333,6 +340,17 @@ export interface ExtendedInvoiceData extends InvoiceData {
   payment_method?: Payment["payment_method"];
   payment_reference?: string;
   payment_notes?: string;
+  /**
+   * What was tendered when a CASH bill was settled at the counter — one entry
+   * per way the customer paid, together summing to the bill total. Lets a bill
+   * be part cash and part transfer/online/cheque. The single `payment_method`
+   * above remains the one-line shorthand.
+   */
+  payments?: {
+    payment_method: Payment["payment_method"];
+    amount: number;
+    payment_reference?: string;
+  }[];
   consolidated_part_of?: ConsolidatedInfo | null;
   adjustmentDocs?: AdjustmentDocument[];
   // Display-only classification from the invoice list API explaining why a bill

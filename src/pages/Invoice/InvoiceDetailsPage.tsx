@@ -1795,6 +1795,14 @@ const InvoiceDetailsPage: React.FC = () => {
   const ConsolidatedIcon = consolidatedStatusInfo?.icon;
   const isCancelled = invoiceData.invoice_status === "cancelled";
   const isPaid = !isCancelled && invoiceData.balance_due <= 0; // Check balance only if not cancelled
+  const isCashBill: boolean = invoiceData.paymenttype === "CASH";
+  // A cash bill is settled the moment it is issued, but the counter cash it
+  // collected can still be re-classified as banked money (part paid online /
+  // by transfer on the same day), so it can accept a payment while "Paid".
+  const settleableAmount: number = isCashBill
+    ? Number(invoiceData.settleable_amount ?? invoiceData.totalamountpayable)
+    : Number(invoiceData.balance_due);
+  const canRecordPayment: boolean = !isCancelled && settleableAmount > 0;
   const hasActiveAdjustmentDocs: boolean = adjustmentDocs.some(
     (doc: AdjustmentDocument) =>
       doc.status === "active" && !doc.is_consolidated
@@ -2032,7 +2040,7 @@ const InvoiceDetailsPage: React.FC = () => {
               disabled={isLoading}
             />
           )}
-          {!isCancelled && !isPaid && (
+          {canRecordPayment && (
             <Button
               onClick={() => setShowPaymentForm(!showPaymentForm)}
               icon={IconCash}
@@ -2193,14 +2201,16 @@ const InvoiceDetailsPage: React.FC = () => {
       {/* Unified Content Card */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
         {/* Payment Form Section (collapsible) */}
-        {showPaymentForm && !isCancelled && !isPaid && (
+        {showPaymentForm && canRecordPayment && (
           <>
             <div className="p-6 bg-sky-50/50 dark:bg-sky-900/20">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-lg font-semibold text-sky-900 dark:text-sky-200">Record Payment</h2>
                   <p className="text-sm text-sky-700 dark:text-sky-400 mt-0.5">
-                    Outstanding Balance: {formatCurrency(invoiceData.balance_due)}
+                    {isCashBill
+                      ? `Cash collected: ${formatCurrency(settleableAmount)} — record the part received by transfer or online instead`
+                      : `Outstanding Balance: ${formatCurrency(settleableAmount)}`}
                   </p>
                 </div>
                 <button
