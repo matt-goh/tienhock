@@ -378,7 +378,11 @@ const generateLineItems = (invoice: InvoiceGT): LineItem[] => {
       });
     });
 
-    return lineItems;
+    // The dumpster is optional, so an invoice can be linked only to rentals
+    // with no tong. Fall through to the generic line rather than print none.
+    if (lineItems.length > 0) {
+      return lineItems;
+    }
   }
   
   // Fallback to legacy single rental fields for backward compatibility

@@ -637,8 +637,9 @@ export interface JobCategory {
 
 export interface RentalDetail {
   rental_id: number;
-  tong_no?: string;
-  date_placed: string;
+  // The dumpster and both dates are optional Green Target metadata.
+  tong_no?: string | null;
+  date_placed?: string | null;
   date_picked?: string | null;
   driver?: string;
   location_address?: string;

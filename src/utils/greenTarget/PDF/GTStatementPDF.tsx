@@ -306,7 +306,11 @@ const generateStatementDescription = (invoice: InvoiceGT): string[] => {
       descriptions.push(desc);
     });
 
-    return descriptions;
+    // The dumpster is optional, so an invoice can be linked only to rentals
+    // with no tong. Fall through to the generic description rather than none.
+    if (descriptions.length > 0) {
+      return descriptions;
+    }
   }
   
   // Fallback to legacy single rental fields for backward compatibility (only for regular invoices)

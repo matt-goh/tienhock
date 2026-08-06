@@ -720,7 +720,8 @@ const InvoiceCard = ({
                 size={14}
                 className="inline mr-1 mt-[3px] align-top flex-shrink-0"
               />
-              {invoice.driver}, {invoice.tong_no}
+              {invoice.driver}
+              {invoice.tong_no ? `, ${invoice.tong_no}` : ""}
             </p>
           )}
 

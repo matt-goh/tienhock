@@ -2862,8 +2862,10 @@ const InvoiceDetailsPage: React.FC = () => {
                               </div>
                               <div>
                                 <div className="font-medium text-gray-900 dark:text-gray-100">
-                                  Rental #{rental.rental_id} - Dumpster{" "}
-                                  {rental.tong_no}
+                                  Rental #{rental.rental_id}
+                                  {rental.tong_no
+                                    ? ` - Dumpster ${rental.tong_no}`
+                                    : ""}
                                 </div>
                                 <div className="text-sm text-gray-500 dark:text-gray-400">
                                   Placed: {formatDate(rental.date_placed)}

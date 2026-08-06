@@ -104,8 +104,10 @@ export default function (pool) {
             SELECT
               r.rental_id as id,
               'rental' as type,
+              -- tong_no is optional, and NULL would swallow the whole concat.
               CASE
-                WHEN r.date_picked IS NOT NULL THEN 'Dumpster ' || r.tong_no || ' picked up from ' || c.name
+                WHEN r.date_picked IS NOT NULL THEN 'Dumpster ' || COALESCE(r.tong_no, '-') || ' picked up from ' || c.name
+                WHEN r.tong_no IS NULL THEN 'New rental for ' || c.name
                 ELSE 'New dumpster rental for ' || c.name || ' (Tong ' || r.tong_no || ')'
               END as description,
               COALESCE(r.date_picked, r.date_placed)::timestamp as activity_date,
@@ -116,7 +118,7 @@ export default function (pool) {
               END as status
             FROM greentarget.rentals r
             JOIN greentarget.customers c ON r.customer_id = c.customer_id
-            ORDER BY COALESCE(r.date_picked, r.date_placed) DESC
+            ORDER BY COALESCE(r.date_picked, r.date_placed) DESC NULLS LAST
             LIMIT $1
           )
           UNION ALL
