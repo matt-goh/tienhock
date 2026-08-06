@@ -9,7 +9,6 @@ import toast from "react-hot-toast";
 import { generateAdjustmentDocPDFFilename } from "./generateAdjustmentDocPDFFilename";
 import { prepareAdjustmentDocPDFData } from "../../../services/adjustment-doc-pdf.service";
 import { generateQRDataUrl } from "../../invoice/einvoice/generateQRCode";
-import type { PdfPaperSize } from "../../pdf/paperSize";
 
 type CompanyContext = "tienhock" | "jellypolly";
 
@@ -27,8 +26,7 @@ const detectCompanyContext = (): CompanyContext =>
  */
 export const buildAdjustmentDocPDFDocument = async (
   docs: AdjustmentDocument[],
-  companyContext: CompanyContext,
-  paperSize?: PdfPaperSize
+  companyContext: CompanyContext
 ): Promise<React.ReactElement> => {
   const prepared = await Promise.all(
     docs.map(async (doc) => {
@@ -62,7 +60,6 @@ export const buildAdjustmentDocPDFDocument = async (
           data={data}
           qrCodeData={qrCodeData}
           companyContext={companyContext}
-          paperSize={paperSize}
         />
       ))}
     </Document>
@@ -75,14 +72,9 @@ export const buildAdjustmentDocPDFDocument = async (
  */
 export const generateAdjustmentDocPDFBlob = async (
   docs: AdjustmentDocument[],
-  companyContext: CompanyContext,
-  paperSize?: PdfPaperSize
+  companyContext: CompanyContext
 ): Promise<Blob> => {
-  const document = await buildAdjustmentDocPDFDocument(
-    docs,
-    companyContext,
-    paperSize
-  );
+  const document = await buildAdjustmentDocPDFDocument(docs, companyContext);
   return pdf(document).toBlob();
 };
 

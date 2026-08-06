@@ -17,11 +17,6 @@ import {
   GTUnmappedAccount,
   GTOverrideAuditEntry,
 } from "./GTIncomeStatementPDF";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  type PdfPaperSize,
-} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -268,14 +263,11 @@ const formatLineItemLabel = (item: GTStatementItem): string => {
 
 interface GTBalanceSheetPDFDocumentProps {
   data: GTBalanceSheetData;
-  paperSize?: PdfPaperSize;
 }
 
 const GTBalanceSheetPDFDocument: React.FC<GTBalanceSheetPDFDocumentProps> = ({
   data,
-  paperSize,
 }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const renderAfterBlockFigure = (
     figure: GTBSAfterBlockFigure
   ): React.ReactNode => {
@@ -298,7 +290,7 @@ const GTBalanceSheetPDFDocument: React.FC<GTBalanceSheetPDFDocumentProps> = ({
 
   return (
     <Document>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={GreenTargetLogo} style={styles.logo} />
@@ -391,12 +383,9 @@ const GTBalanceSheetPDFDocument: React.FC<GTBalanceSheetPDFDocumentProps> = ({
 };
 
 export const generateGTBalanceSheetPDF = async (
-  data: GTBalanceSheetData,
-  paperSize?: PdfPaperSize
+  data: GTBalanceSheetData
 ): Promise<void> => {
-  const blob = await pdf(
-    <GTBalanceSheetPDFDocument data={data} paperSize={paperSize} />
-  ).toBlob();
+  const blob = await pdf(<GTBalanceSheetPDFDocument data={data} />).toBlob();
 
   printPdfBlob(blob, "balance sheet PDF");
 };

@@ -9,11 +9,6 @@ import {
   pdf,
 } from "@react-pdf/renderer";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  type PdfPaperSize,
-} from "../pdf/paperSize";
 
 // Types for the general statement data
 interface CustomerRow {
@@ -241,9 +236,7 @@ const DataRow: React.FC<{ customer: CustomerRow }> = ({ customer }) => (
 const GeneralStatementPDF: React.FC<{
   data: GeneralStatementData;
   companyName?: string;
-  paperSize?: PdfPaperSize;
-}> = ({ data, companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)", paperSize }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
+}> = ({ data, companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)" }) => {
   const { statement_date, report_datetime, customers, totals } = data;
 
   // Format report date for header
@@ -285,7 +278,7 @@ const GeneralStatementPDF: React.FC<{
   return (
     <Document title={`Trade Debtor List as at ${statement_date}`}>
       {pages.map((pageCustomers, pageIndex) => (
-        <Page key={pageIndex} size={getReactPdfPageSize(effectivePaperSize, true)} orientation="landscape" style={styles.page}>
+        <Page key={pageIndex} size="A4" orientation="landscape" style={styles.page}>
           {/* Page Header */}
           <PageHeader
             statement_date={statement_date}
@@ -339,12 +332,11 @@ const GeneralStatementPDF: React.FC<{
 export const generateGeneralStatementPDF = async (
   data: GeneralStatementData,
   action: "download" | "print",
-  options: GeneralStatementPDFOptions = {},
-  paperSize?: PdfPaperSize
+  options: GeneralStatementPDFOptions = {}
 ): Promise<void> => {
   try {
     const doc = (
-      <GeneralStatementPDF data={data} companyName={options.companyName} paperSize={paperSize} />
+      <GeneralStatementPDF data={data} companyName={options.companyName} />
     );
     const pdfBlob = await pdf(doc).toBlob();
 

@@ -12,11 +12,6 @@ import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { CashReceiptVoucherData } from "../../types/types";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  type PdfPaperSize,
-} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -367,14 +362,11 @@ const formatPaymentMethod = (method: string): string => {
 
 interface CashReceiptVoucherDocumentProps {
   data: CashReceiptVoucherData;
-  paperSize?: PdfPaperSize;
 }
 
 const CashReceiptVoucherDocument: React.FC<CashReceiptVoucherDocumentProps> = ({
   data,
-  paperSize,
 }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const totalDebit = data.lines.reduce((sum, line) => sum + line.debit_amount, 0);
   const totalCredit = data.lines.reduce(
     (sum, line) => sum + line.credit_amount,
@@ -383,7 +375,7 @@ const CashReceiptVoucherDocument: React.FC<CashReceiptVoucherDocumentProps> = ({
 
   return (
     <Document>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={TienHockLogo} style={styles.logo} />
@@ -565,21 +557,17 @@ const CashReceiptVoucherDocument: React.FC<CashReceiptVoucherDocumentProps> = ({
 
 // Export for direct PDF generation/download
 export const generateCashReceiptVoucherPDF = async (
-  data: CashReceiptVoucherData,
-  paperSize?: PdfPaperSize
+  data: CashReceiptVoucherData
 ): Promise<Blob> => {
-  const blob = await pdf(
-    <CashReceiptVoucherDocument data={data} paperSize={paperSize} />
-  ).toBlob();
+  const blob = await pdf(<CashReceiptVoucherDocument data={data} />).toBlob();
   return blob;
 };
 
 // Export for downloading
 export const downloadCashReceiptVoucherPDF = async (
-  data: CashReceiptVoucherData,
-  paperSize?: PdfPaperSize
+  data: CashReceiptVoucherData
 ): Promise<void> => {
-  const blob = await generateCashReceiptVoucherPDF(data, paperSize);
+  const blob = await generateCashReceiptVoucherPDF(data);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -594,10 +582,9 @@ export const downloadCashReceiptVoucherPDF = async (
 // a hidden iframe, falling back to a new tab on mobile browsers (shared
 // printPdfFrameWithFallback contract; replaces the removed preview modal).
 export const printCashReceiptVoucherPDF = async (
-  data: CashReceiptVoucherData,
-  paperSize?: PdfPaperSize
+  data: CashReceiptVoucherData
 ): Promise<void> => {
-  const blob = await generateCashReceiptVoucherPDF(data, paperSize);
+  const blob = await generateCashReceiptVoucherPDF(data);
   const url = URL.createObjectURL(blob);
   const printFrame = document.createElement("iframe");
   printFrame.style.display = "none";

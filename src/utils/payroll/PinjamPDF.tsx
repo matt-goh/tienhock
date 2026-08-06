@@ -13,11 +13,6 @@ import {
   printPdfFrameWithFallback,
   type PrintPdfFrameResult,
 } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../pdf/paperSize";
 
 interface PinjamEmployee {
   employee_id: string;
@@ -191,13 +186,9 @@ const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
-const PinjamPDFDocument: React.FC<{
-  data: PinjamPDFData;
-  paperSize?: PdfPaperSize;
-}> = ({ data, paperSize }) => {
+const PinjamPDFDocument: React.FC<{ data: PinjamPDFData }> = ({ data }) => {
   const { employees, year, month } = data;
   const monthName = getMonthName(month);
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
 
   const renderEmployeeCard = (employee: PinjamEmployee) => {
     const hasMid = employee.midMonthPinjam > 0;
@@ -331,7 +322,7 @@ const PinjamPDFDocument: React.FC<{
 
   return (
     <Document title={`Pinjam Summary - ${monthName} ${year}`}>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page} wrap>
+      <Page size="A4" style={styles.page} wrap>
         {/* Card rows - react-pdf flows these across pages automatically, and
             wrap={false} keeps each row whole rather than splitting it across a
             page boundary. No company header: slips are cut out per worker. */}
@@ -351,12 +342,11 @@ const PinjamPDFDocument: React.FC<{
 
 export const generatePinjamPDF = async (
   data: PinjamPDFData,
-  action: "download" | "print",
-  paperSize?: PdfPaperSize
+  action: "download" | "print"
 ) => {
   try {
     const monthName = getMonthName(data.month);
-    const doc = <PinjamPDFDocument data={data} paperSize={paperSize} />;
+    const doc = <PinjamPDFDocument data={data} />;
     const pdfBlob = await pdf(doc).toBlob();
 
     if (action === "download") {
