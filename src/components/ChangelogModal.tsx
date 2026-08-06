@@ -21,6 +21,9 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-06",
+    ms: "Perakaunan → Opening Balances: halaman baharu yang memaparkan baki pembukaan semua akaun pada satu tarikh dalam satu helaian, disusun mengikut nota penyata kewangan seperti jadual juruaudit. Anda boleh menaip terus ke dalam ruangan Debit atau Kredit mana-mana baris dan menyimpan semua perubahan sekali gus, dan mengosongkan kedua-dua ruangan akan membuang baki pembukaan akaun itu semasa disimpan. Jumlah Debit dan Kredit dipaparkan di atas supaya anda nampak serta-merta jika baki tidak seimbang, dan butang Print mengeluarkan PDF dengan susun atur yang sama seperti jadual juruaudit. Cara lama (buka satu kod pada satu masa di halaman Account Ledger) masih berfungsi seperti biasa.",
+    en: "Accounting → Opening Balances: a new page showing every account's opening balance for one date on a single sheet, grouped by financial statement note like the auditor's schedule. You can type straight into the Debit or Credit column of any row and save all your changes at once, and clearing both columns removes that account's opening balance when you save. Debit and Credit totals are shown at the top so you can see immediately if they don't balance, and the Print button produces a PDF laid out the same way as the auditor's schedule. The old way (opening one code at a time from the Account Ledger page) still works as before.",
+  },
   {
     date: "2026-08-06",
     ms: "Borang invois (Tien Hock, Jelly Polly dan Green Target): ruangan Tarikh kini menggunakan pemilih kalendar dengan anak panah untuk ke hari sebelum atau selepas. Pada borang Tien Hock dan Jelly Polly, ruangan Jenis, Tarikh dan Masa kini berkongsi satu baris, begitu juga Pelanggan dan ID Pelanggan.",
