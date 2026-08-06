@@ -340,7 +340,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
   return (
     <div className="w-full">
       {/* Header: period + filters on the left, actions on the right */}
-      <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+      <div className="mb-2 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <MonthNavigator
             selectedMonth={selectedMonth}
@@ -461,7 +461,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
           <p className="text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
@@ -469,7 +469,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
       {/* Balance Status Banner */}
       {trialBalance && (
         <div
-          className={`mb-6 p-4 rounded-lg border ${
+          className={`mb-2 p-2 rounded-lg border ${
             trialBalance.totals.is_balanced
               ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800"
               : "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800"
