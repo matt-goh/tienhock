@@ -1,6 +1,6 @@
 # I18N (Multi-Language) Rollout Handover
 
-**Status:** Phase 0 **DONE 2026-08-04**. B1 (`common`) **DONE 2026-08-04**. B3 (`invoice`) **PART 1 of 2 DONE 2026-08-04** — 16 of 23 files converted; see §9. Next: **B3 part 2** (the 7 remaining Invoice files, listed in the Batch Log), then **B2**.
+**Status:** Phase 0 **DONE 2026-08-04**. B1 (`common`) **DONE 2026-08-04**. B3 (`invoice`) **DONE 2026-08-07** — all 23 files converted (16 in part 1, 7 in part 2); see §9. BM tone audit applied to all existing ms locales. Next: **B2** (`auth`, `nav`).
 **Created:** 2026-08-04
 **Owner of this document:** update it after EVERY phase/batch. It is the single source of truth for what is done and what is next.
 
@@ -176,6 +176,8 @@ Batch sizing notes: B9/B13–B16 are the big ones; split further at natural sub-
 
 ## 7. Terminology Glossary (use in EVERY batch — extend, don't contradict)
 
+**BM tone (locked 2026-08-07):** Bahasa Melayu translations deliberately prefer plain English loanwords for technical/formal terms (Konsolidasi, Submission, Cancellation, Confirmation, Pending, Eligible, History, Summary, Range, Results, Check, Window, Preview, Rounding, Subtotal, Journal Entry, Ledger, Debtor, Sync, Transfer, Override, Browser, Dashboard, Payroll, Production, Maintenance, etc.). Formal or 'university-level' Malay (e.g. Pembundaran, Penyatuan, Penghantaran, Pengesahan, Semakan, Tetingkap, Pratonton, Penghutang, Imbangan Duga, Muktamad, Nyahpilih) is avoided. Everyday Malay stays (Simpan, Batal, Padam, Cari, Tambah, Hantar, Bayaran, Jumlah, Baki, Amaun, Tarikh, Masa, Sah, Cek, Tunai). When unsure, use the English word. The table below follows this rule; the Chinese column is unaffected.
+
 | English | 简体中文 | Bahasa Melayu |
 |---|---|---|
 | Save | 保存 | Simpan |
@@ -195,7 +197,7 @@ Batch sizing notes: B9/B13–B16 are the big ones; split further at natural sub-
 | Stock | 库存 | Stok |
 | Product | 产品 | Produk |
 | Staff / Employee | 员工 | Kakitangan / Pekerja |
-| Payroll | 薪资处理 | Penggajian |
+| Payroll | 薪资处理 | Payroll |
 | Payslip | 工资单 | Slip Gaji |
 | Salary | 工资 | Gaji |
 | Leave | 请假 | Cuti |
@@ -204,27 +206,64 @@ Batch sizing notes: B9/B13–B16 are the big ones; split further at natural sub-
 | Allowance | 津贴 | Elaun |
 | Bonus | 花红 | Bonus |
 | Commission | 佣金 | Komisen |
-| Advance | 预支 | Pendahuluan |
+| Advance | 预支 | Advance |
 | Salesman | 销售员 | Jurujual |
 | Report | 报表 | Laporan |
-| Journal Entry | 日记账分录 | Catatan Jurnal |
-| Ledger | 分类账 | Lejar |
-| Trial Balance | 试算平衡表 | Imbangan Duga |
-| Debtor | 欠款客户 | Penghutang |
-| Creditor | 供应商欠款 | Pemiutang |
+| Journal Entry | 日记账分录 | Journal Entry |
+| Ledger | 分类账 | Ledger |
+| Trial Balance | 试算平衡表 | Trial Balance |
+| Debtor | 欠款客户 | Debtor |
+| Creditor | 供应商欠款 | Creditor |
 | Account Code | 会计科目代码 | Kod Akaun |
-| Chart of Accounts | 会计科目表 | Carta Akaun |
+| Chart of Accounts | 会计科目表 | Chart of Accounts |
 | Balance | 余额 | Baki |
 | Total | 总计 | Jumlah |
 | Date | 日期 | Tarikh |
 | Status | 状态 | Status |
 | Active / Inactive | 启用 / 停用 | Aktif / Tidak Aktif |
-| Confirm / Confirmation | 确认 | Sahkan / Pengesahan |
+| Confirm / Confirmation | 确认 | Sahkan / Confirmation |
 | Are you sure? | 确定吗？ | Adakah anda pasti? |
 | No records found | 未找到记录 | Tiada rekod ditemui |
-| Production | 生产 | Pengeluaran |
+| Production | 生产 | Production |
 | Packing | 包装 | Pembungkusan |
-| Delivery | 送货 | Penghantaran |
+| Delivery | 送货 | Delivery |
+
+| Consolidation | 合并 | Konsolidasi |
+| Rounding | 舍入 | Rounding |
+| Subtotal | 小计 | Subtotal |
+| Pending | 待处理 | Pending |
+| Eligible | 符合条件 | Eligible |
+| History | 历史 | History |
+| Summary | 摘要 | Summary |
+| Range | 范围 | Range |
+| Results | 结果 | Results |
+| Check | 检查 | Check |
+| Window | 窗口 | Window |
+| Preview | 预览 | Preview |
+| Online | 在线 | Online |
+| Zero Value | 零值 | Zero Value |
+| Returns | 退货 | Returns |
+| Difference | 差额 | Difference |
+| Deselect | 取消选择 | Deselect |
+| Collapse / Expand | 折叠 / 展开 | Collapse / Expand |
+| Browser | 浏览器 | Browser |
+| Dashboard | 仪表板 | Dashboard |
+| Maintenance | 维护 | Maintenance |
+| Generation | 生成 | Generation |
+| Setup | 设置 | Setup |
+| People | 人员 | People |
+| Dark Mode | 深色模式 | Dark Mode |
+| Billing | 计费 | Billing |
+| Transfer | 转账 | Transfer |
+| Outstanding | 未结清 | outstanding |
+| Statement | 报表 | Statement |
+| Balance Sheet | 资产负债表 | Balance Sheet |
+| Income Statement | 损益表 | Income Statement |
+| Sync | 同步 | Sync |
+| Skipped | 已跳过 | Skipped |
+| Rejected | 已拒绝 | Rejected |
+| Accepted | 已接受 | accepted |
+| Validation | 验证 | Validation |
 
 Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Malay accounting UI in this codebase already mixes English loanwords (e.g. "Backup", "Statement") — follow existing usage in `ChangelogModal.tsx` entries for tone.
 
@@ -246,8 +285,11 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 | Date | Batch | Files converted | Keys added (ms/zh-Hans) | Skipped | Notes |
 |---|---|---|---|---|---|
 | 2026-08-04 | Phase 0 | `src/i18n/**`, `src/index.tsx`, `Navbar*.tsx` (5), `NavbarUserMenu.tsx`, `HomePage.tsx`, `ChangelogModal.tsx`, `dev/i18n-report.mjs`, `AGENTS.md` rule 20 | common 48 + nav 155 + home 19 (each language) | — | Switcher live in user menu; sidebar/home translated; `npm run i18n:report` green; `tsc --noEmit` clean |
-| 2026-08-04 | B3 part 1 (`invoice`) | 16 of 23: `InvoiceGrid`, `PaymentCancellationErrorDialog`, `Pagination`, `ConsolidatedInfoTooltip`, `InvoiceTotals`, `CustomerCombobox`, `LinkedPaymentsTooltip`, `InvoiceSelectionTable`, `MultiCustomerCombobox`, `InvoiceHeader`, `InvoiceCard`, `LineItemsTable`, `InvoiceDailyPrintMenu`, `SubmissionResultsModal`, `InvoiceFilterMenu`, `ReceiptDetailsDialog` | new `invoice` namespace: 220 keys (ms + zh-Hans each) | **Still to do (B3 part 2):** `PaymentTable` (1,117 lines), `ConsolidatedInvoiceModal` (1,615), `PaymentForm` (1,770), `ConsolidatedInvoiceDetailsPage` (748), `InvoiceFormPage` (994), `InvoiceListPage` (2,038), `InvoiceDetailsPage` (3,742) | No PDF files exist under these globs, so §4.1 excluded nothing. `npm run i18n:report` green; `tsc --noEmit` clean. Every touched file is fully converted — none left half-done |
+| 2026-08-04 | B3 part 1 (`invoice`) | 16 of 23: `InvoiceGrid`, `PaymentCancellationErrorDialog`, `Pagination`, `ConsolidatedInfoTooltip`, `InvoiceTotals`, `CustomerCombobox`, `LinkedPaymentsTooltip`, `InvoiceSelectionTable`, `MultiCustomerCombobox`, `InvoiceHeader`, `InvoiceCard`, `LineItemsTable`, `InvoiceDailyPrintMenu`, `SubmissionResultsModal`, `InvoiceFilterMenu`, `ReceiptDetailsDialog` | new `invoice` namespace: 220 keys (ms + zh-Hans each) | None 窶・remaining 7 files shipped in B3 part 2 (see B3 part 2 row) | No PDF files exist under these globs, so §4.1 excluded nothing. `npm run i18n:report` green; `tsc --noEmit` clean. Every touched file is fully converted — none left half-done |
 | 2026-08-04 | B1 (`common`) | 13 of 22: `BackButton`, `BackupModal`, `ConfirmationDialog`, `ContributionListbox`, `DateNavigator`, `DateRangePicker`, `FormComponents`, `ListboxSelect`, `LoadingSpinner`, `MonthNavigator`, `StatusIndicator`, `StyledListbox`, `TimeNavigator` | common +115 (ms + zh-Hans each); `en/common.json` +2 semantic keys (`day`, `range`) | `Button`, `Checkbox`, `PillSelect`, `Tab`, `SafeLink`, `HoverTooltip`, `ToolTip`, `CompanySwitcher` (no own literals — all text arrives via props/DB); `ChangelogModal` (done in Phase 0) | Also fixed i18n init (see B1 notes). `npm run i18n:report` green; `tsc --noEmit` clean. No changelog entry — Phase 0's entry already announces staged page-by-page coverage |
+
+| 2026-08-07 | B3 part 2 (`invoice`) | `PaymentTable`, `ConsolidatedInvoiceModal`, `PaymentForm`, `ConsolidatedInvoiceDetailsPage`, `InvoiceFormPage`, `InvoiceListPage`, `InvoiceDetailsPage` | invoice +576 keys (ms + zh-Hans each; total 796) | None — no PDF files under the globs | All 7 remaining Invoice files fully converted; `npm run i18n:report` green; `tsc --noEmit` clean. `saleTenders.ts` gained an optional `t` parameter (backward-compatible) so its validation messages translate in the Tien Hock form. |
+| 2026-08-07 | BM tone audit (all ms locales) | `ms/common.json`, `ms/nav.json`, `ms/home.json`, `ms/invoice.json` (values only) | 0 new keys | 窶・| Replaced formal/university-level BM with plain English loanwords (Konsolidasi, Submission, Cancellation, Confirmation, Pending, Eligible, History, Summary, Range, Results, Check, Window, Preview, Rounding, Subtotal, Journal Entry, Ledger, Debtor, Sync, Transfer, Browser, Dashboard, Payroll, Production, etc.) per user decision; everyday BM kept. Keys/behaviour untouched; `npm run i18n:report` green |
 
 ### Phase 0 implementation notes (for batch workers)
 
@@ -255,7 +297,7 @@ Keep statutory acronyms untranslated (EPF, SOCSO, SIP, PCB, KWSP, PERKESO). Mala
 - `ChangelogModal` follows the app language on open (zh → English entries; the corpus stays ms/en per §8) but keeps its own BM/ENG toggle.
 - Several files (e.g. `NavbarUserMenu.tsx`, `NavbarMenu.tsx`, `NavbarDropdown.tsx`) have **mixed CRLF/LF line endings**; single-line edits match reliably, multi-line blocks across CRLF regions may not — keep edits small or check with `cat -A`.
 - The language switcher is in `NavbarUserMenu.tsx` (3-button segmented row). Detection: localStorage → browser locale; `zh-*` → `zh-Hans`, unmatched → `ms` (`resolveLanguage` in `src/i18n/index.ts`).
-### B3 implementation notes (read before B3 part 2)
+### B3 implementation notes (B3 complete 2026-08-07)
 
 - **Namespace registered:** `invoice` is wired into `src/i18n/index.ts` for `ms` and `zh-Hans`. Part 2 only adds keys — no init changes needed.
 - **Cross-namespace lookups use the options form**, never a colon: `t("cancel", { ns: "common" })`. `nsSeparator` is `false` (B1 note), so `t("common:cancel")` would be treated as a literal key and silently render the raw string.

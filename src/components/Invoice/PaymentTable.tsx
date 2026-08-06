@@ -31,6 +31,8 @@ import {
 } from "../../utils/invoice/InvoiceUtils";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 
 const BANK_ACCOUNT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
@@ -88,11 +90,20 @@ const resolveGroupReference = (payment: Payment): string | null =>
   payment.receipt_reference || payment.payment_reference || null;
 
 const formatPaymentMethodLabel = (
-  paymentMethod: Payment["payment_method"]
+  paymentMethod: Payment["payment_method"],
+  t: TFunction
 ): string =>
-  paymentMethod === "contra"
-    ? "Imported ledger match"
-    : paymentMethod.replace("_", " ");
+  paymentMethod === "cash"
+    ? t("Cash")
+    : paymentMethod === "cheque"
+      ? t("Cheque")
+      : paymentMethod === "bank_transfer"
+        ? t("Bank Transfer")
+        : paymentMethod === "online"
+          ? t("Online")
+          : paymentMethod === "contra"
+            ? t("Imported ledger match")
+            : t("Overpayment");
 
 const PaymentTable: React.FC<PaymentTableProps> = ({
   payments,
@@ -105,6 +116,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   paymentApiEndpoint = "/api/payments",
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("invoice");
   const [confirmingPaymentId, setConfirmingPaymentId] = useState<number | null>(
     null
   );
@@ -160,7 +172,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
 
     setConfirmingPaymentId(selectedPayment.payment_id);
     setShowConfirmDialog(false);
-    const toastId = toast.loading("Confirming payment(s)...");
+    const toastId = toast.loading(t("Confirming payment(s)..."));
 
     try {
       const confirmedPayments = await confirmPayment(
@@ -171,9 +183,15 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         requiresClearanceDate ? clearanceDate : undefined,
         paymentApiEndpoint
       );
-      let successMessage = "Payment confirmed successfully.";
+      let successMessage = t("Payment confirmed successfully.");
       if (confirmedPayments.length > 1) {
-        successMessage = `${confirmedPayments.length} payments with reference '${selectedPayment.payment_reference}' have been confirmed.`;
+        successMessage = t(
+          "{{total}} payments with reference '{{reference}}' have been confirmed.",
+          {
+            total: confirmedPayments.length,
+            reference: selectedPayment.payment_reference,
+          }
+        );
       }
       toast.success(successMessage, { id: toastId });
       onRefresh(); // This will refetch all payments and update the table
@@ -280,7 +298,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
           }
         );
       }
-      toast.success("Payment date updated.");
+      toast.success(t("Payment date updated."));
       closeDateDialog();
       onRefresh();
     } catch (error: unknown) {
@@ -288,7 +306,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       setPaymentDateError(
         error instanceof Error && error.message
           ? error.message
-          : "We couldn't update this payment date. Nothing was changed."
+          : t("We couldn't update this payment date. Nothing was changed.")
       );
     } finally {
       setSavingPaymentDate(false);
@@ -317,7 +335,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         showErrorToast: !onCancellationError,
         apiEndpoint: paymentApiEndpoint,
       });
-      toast.success("Payment cancelled successfully");
+      toast.success(t("Payment cancelled successfully"));
       onRefresh();
     } catch (error: unknown) {
       console.error("Error cancelling payment:", error);
@@ -335,7 +353,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     // legacy rows fall back to their own journal.
     const journalId = payment.voucher_journal_id ?? payment.journal_entry_id;
     if (!journalId) {
-      toast.error("No journal entry linked to this payment");
+      toast.error(t("No journal entry linked to this payment"));
       return;
     }
 
@@ -347,7 +365,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       await printCashReceiptVoucherPDF(data);
     } catch (error) {
       console.error("Error printing voucher:", error);
-      toast.error("Failed to print voucher");
+      toast.error(t("Failed to print voucher"));
     } finally {
       setLoadingVoucherId(null);
     }
@@ -365,10 +383,10 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         type="button"
         onClick={() => navigate(`/accounting/journal-entries/${journalEntryId}`)}
         className="inline-flex items-center gap-1 text-xs text-sky-600 hover:underline dark:text-sky-400"
-        title="View journal entry"
+        title={t("View journal entry")}
       >
         <IconReceipt size={14} className="flex-shrink-0" />
-        <span>View Journal</span>
+        <span>{t("View Journal")}</span>
       </button>
     );
   };
@@ -378,25 +396,25 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       case "pending":
         return (
           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-400">
-            Pending
+            {t("Pending")}
           </span>
         );
       case "overpaid":
         return (
           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-400">
-            Overpaid
+            {t("Overpaid")}
           </span>
         );
       case "cancelled":
         return (
           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400">
-            Cancelled
+            {t("Cancelled")}
           </span>
         );
       default:
         return (
           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400">
-            Settled
+            {t("Settled")}
           </span>
         );
     }
@@ -469,7 +487,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
         <p className="text-gray-500 dark:text-gray-400">
-          No payments found for the selected filters.
+          {t("No payments found for the selected filters.")}
         </p>
       </div>
     );
@@ -482,31 +500,31 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
           <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Date
+                {t("date", { ns: "common" })}
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Reference
+                {t("Reference")}
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Invoice(s)
+                {t("Invoice(s)")}
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Customer
+                {t("customer", { ns: "common" })}
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Method
+                {t("Method")}
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Status
+                {t("status", { ns: "common" })}
               </th>
               <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Journal
+                {t("Journal")}
               </th>
               <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Amount
+                {t("amount", { ns: "common" })}
               </th>
               <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                Actions
+                {t("actions", { ns: "common" })}
               </th>
             </tr>
           </thead>
@@ -564,8 +582,14 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   )
                                 }
                                 className="rounded p-0.5 text-gray-400 transition-colors hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-sky-900/50 dark:hover:text-sky-300"
-                                title={`Correct the date for all ${paymentGroup.length} payments under ${groupReference}`}
-                                aria-label="Correct payment date"
+                                title={t(
+                                  "Correct the date for all {{total}} payments under {{reference}}",
+                                  {
+                                    total: paymentGroup.length,
+                                    reference: groupReference,
+                                  }
+                                )}
+                                aria-label={t("Correct payment date")}
                               >
                                 <IconCalendarEvent size={15} stroke={1.75} />
                               </button>
@@ -577,7 +601,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                             {groupReference}
                           </div>
                           <span className="mt-1 inline-flex rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700 dark:bg-sky-900/50 dark:text-sky-300">
-                            {paymentGroup.length} invoices
+                            {t("{{total}} invoices", {
+                              total: paymentGroup.length,
+                            })}
                           </span>
                         </td>
                         <td
@@ -594,10 +620,12 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                     onViewPaymentGroup(manageableReceiptId)
                                   }
                                   className="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-white/70 px-2 py-1 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-100 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1 dark:border-sky-800 dark:bg-gray-900/40 dark:text-sky-300 dark:hover:bg-sky-900/50 dark:focus:ring-offset-gray-900"
-                                  title={`Manage payment group ${groupReference}`}
+                                  title={t("Manage payment group {{reference}}", {
+                                    reference: groupReference,
+                                  })}
                                 >
                                   <IconSettings size={14} stroke={1.75} />
-                                  <span>Manage Group</span>
+                                  <span>{t("Manage Group")}</span>
                                 </button>
                               )}
                           </div>
@@ -605,7 +633,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         <td className="px-3 py-3">
                           <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
                             {formatPaymentMethodLabel(
-                              firstPayment.payment_method
+                              firstPayment.payment_method,
+                              t
                             )}
                           </span>
                         </td>
@@ -631,9 +660,12 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   onClick={() =>
                                     onAddPaymentToGroup(groupTemplate)
                                   }
-                                  title={`Add another payment with reference ${groupReference}`}
+                                  title={t(
+                                    "Add another payment with reference {{reference}}",
+                                    { reference: groupReference }
+                                  )}
                                 >
-                                  Add Payment
+                                  {t("Add Payment")}
                                 </Button>
                               )}
                             {!canAddToGroup && "-"}
@@ -660,7 +692,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               aria-hidden="true"
                               className="absolute left-[17px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full border-2 border-sky-400 bg-white dark:border-sky-500 dark:bg-gray-800"
                             />
-                            <span className="sr-only">Grouped invoice</span>
+                            <span className="sr-only">{t("Grouped invoice")}</span>
                           </td>
                           <td className="px-3 py-3" />
                           <td className="px-3 py-3">
@@ -699,7 +731,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   color="default"
                                   onClick={() => handlePrintVoucher(payment)}
                                   disabled={loadingVoucherId === (payment.voucher_journal_id ?? payment.journal_entry_id)}
-                                  title="Print Voucher"
+                                  title={t("Print Voucher")}
                                 >
                                   <IconPrinter size={16} />
                                 </Button>
@@ -720,7 +752,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   disabled={
                                     confirmingPaymentId === payment.payment_id
                                   }
-                                  title="Confirm Payment"
+                                  title={t("Confirm Payment")}
                                 >
                                   <IconCircleCheck size={16} />
                                 </Button>
@@ -735,7 +767,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   disabled={
                                     cancellingPaymentId === payment.payment_id
                                   }
-                                  title="Cancel Payment"
+                                  title={t("Cancel Payment")}
                                 >
                                   <IconBan size={16} />
                                 </Button>
@@ -767,8 +799,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                 )
                               }
                               className="rounded p-0.5 text-gray-400 transition-colors hover:bg-sky-100 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:hover:bg-sky-900/50 dark:hover:text-sky-300"
-                              title="Correct payment date"
-                              aria-label="Correct payment date"
+                              title={t("Correct payment date")}
+                              aria-label={t("Correct payment date")}
                             >
                               <IconCalendarEvent size={15} stroke={1.75} />
                             </button>
@@ -785,7 +817,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               onViewPaymentGroup(paymentReceiptId)
                             }
                             className="block max-w-full truncate font-mono text-sm text-sky-600 hover:underline dark:text-sky-400"
-                            title={`Manage payment group ${payment.payment_reference}`}
+                            title={t("Manage payment group {{reference}}", {
+                              reference: payment.payment_reference,
+                            })}
                           >
                             {payment.payment_reference}
                           </button>
@@ -814,7 +848,10 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                       </td>
                       <td className="px-3 py-3">
                         <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-blue-50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-400 capitalize">
-                          {formatPaymentMethodLabel(payment.payment_method)}
+                          {formatPaymentMethodLabel(
+                            payment.payment_method,
+                            t
+                          )}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -835,7 +872,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               color="default"
                               onClick={() => handlePrintVoucher(payment)}
                               disabled={loadingVoucherId === (payment.voucher_journal_id ?? payment.journal_entry_id)}
-                              title="Print Voucher"
+                              title={t("Print Voucher")}
                             >
                               <IconPrinter size={16} />
                             </Button>
@@ -856,7 +893,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               disabled={
                                 confirmingPaymentId === payment.payment_id
                               }
-                              title="Confirm Payment"
+                              title={t("Confirm Payment")}
                             >
                               <IconCircleCheck size={16} />
                             </Button>
@@ -871,7 +908,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                               disabled={
                                 cancellingPaymentId === payment.payment_id
                               }
-                              title="Cancel Payment"
+                              title={t("Cancel Payment")}
                             >
                               <IconBan size={16} />
                             </Button>
@@ -899,28 +936,32 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
           onConfirm={() => void handleConfirmPayment()}
           title={
             selectedConfirmationGroupSize > 1
-              ? `Confirm payment group ${
-                  selectedPayment.payment_reference || ""
-                }?`
-              : "Confirm pending payment?"
+              ? t("Confirm payment group {{reference}}?", {
+                  reference: selectedPayment.payment_reference || "",
+                })
+              : t("Confirm pending payment?")
           }
           message={
             <div className="space-y-3">
               <p>
-                Confirm the pending{" "}
-                {formatPaymentMethodLabel(selectedPayment.payment_method)} payment of{" "}
-                <span className="font-semibold text-default-800 dark:text-gray-100">
-                  {formatCurrency(selectedPayment.amount_paid)}
-                </span>
-                ?
+                {t("Confirm the pending {{method}} payment of {{amount}}?", {
+                  method: formatPaymentMethodLabel(
+                    selectedPayment.payment_method,
+                    t
+                  ),
+                  amount: formatCurrency(selectedPayment.amount_paid),
+                })}
               </p>
 
               {selectedConfirmationGroupSize > 1 && (
                 <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
-                  Reference {selectedPayment.payment_reference} covers{" "}
-                  {selectedConfirmationGroupSize} payments. Every payment still
-                  marked Pending will be confirmed together; payments already
-                  confirmed will not change.
+                  {t(
+                    "Reference {{reference}} covers {{total}} payments. Every payment still marked Pending will be confirmed together; payments already confirmed will not change.",
+                    {
+                      reference: selectedPayment.payment_reference,
+                      total: selectedConfirmationGroupSize,
+                    }
+                  )}
                 </div>
               )}
 
@@ -928,34 +969,41 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               selectedConfirmationIsReceiptBacked ? (
                 <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                   <p className="text-xs text-default-500 dark:text-gray-400">
-                    Deposit to
+                    {t("Deposit to")}
                   </p>
                   <p className="mt-1 font-semibold text-default-800 dark:text-gray-100">
-                    {getPaymentBankAccountLabel(
-                      selectedPayment.bank_account || "BANK_PBB"
+                    {t(
+                      getPaymentBankAccountLabel(
+                        selectedPayment.bank_account || "BANK_PBB"
+                      )
                     )}
                   </p>
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                    This is the account recorded when the payment was entered.
+                    {t(
+                      "This is the account recorded when the payment was entered."
+                    )}
                   </p>
                 </div>
               ) : usesTienHockReceiptAccounting ? (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
-                    Deposit To
+                    {t("Deposit To")}
                   </label>
                   <PillSelect
                     value={selectedBankAccount}
                     onChange={(value: string): void =>
                       setSelectedBankAccount(value)
                     }
-                    options={BANK_ACCOUNT_OPTIONS}
+                    options={BANK_ACCOUNT_OPTIONS.map((option) => ({
+                      ...option,
+                      label: t(option.label),
+                    }))}
                     disabled={confirmingPaymentId !== null}
-                    ariaLabel="Deposit to"
+                    ariaLabel={t("Deposit to")}
                   size="md"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                    Choose the bank account for this older pending payment.
+                    {t("Choose the bank account for this older pending payment.")}
                   </p>
                 </div>
               ) : null}
@@ -963,7 +1011,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               {requiresClearanceDate && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
-                    Cheque Clearance Date
+                    {t("Cheque Clearance Date")}
                   </label>
                   <TimeNavigator
                     range={clearanceDateRange}
@@ -980,25 +1028,28 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     triggerClassName="w-full justify-between"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                    Use the date the bank statement shows the cheque as cleared.
-                    {usesTienHockReceiptAccounting
-                      ? " This date controls the bank and account-ledger reports."
-                      : " This date controls Jelly Polly debtor statements."}
+                    {t(
+                      usesTienHockReceiptAccounting
+                        ? "Use the date the bank statement shows the cheque as cleared. This date controls the bank and account-ledger reports."
+                        : "Use the date the bank statement shows the cheque as cleared. This date controls Jelly Polly debtor statements."
+                    )}
                   </p>
                 </div>
               )}
 
               <p className="text-xs text-default-500 dark:text-gray-400">
-                {usesTienHockReceiptAccounting
-                  ? "Confirming updates the related invoice balances and creates the payment journal entries."
-                  : "Confirming updates the related invoice balance using the clearance date above."}
+                {t(
+                  usesTienHockReceiptAccounting
+                    ? "Confirming updates the related invoice balances and creates the payment journal entries."
+                    : "Confirming updates the related invoice balance using the clearance date above."
+                )}
               </p>
             </div>
           }
           confirmButtonText={
             selectedConfirmationGroupSize > 1
-              ? "Confirm Pending Group"
-              : "Confirm Payment"
+              ? t("Confirm Pending Group")
+              : t("Confirm Payment")
           }
           variant="success"
           allowContentOverflow={requiresClearanceDate}
@@ -1010,30 +1061,34 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
           isOpen={showDateDialog}
           onClose={closeDateDialog}
           onConfirm={() => void handleSavePaymentDate()}
-          title="Correct payment date"
+          title={t("Correct payment date")}
           message={
             <div className="space-y-3">
               <p>
-                Change the date recorded for this{" "}
-                {formatPaymentMethodLabel(dateEditPayment.payment_method)}{" "}
-                payment of{" "}
-                <span className="font-semibold text-default-800 dark:text-gray-100">
-                  {formatCurrency(dateEditPayment.amount_paid)}
-                </span>
-                .
+                {t(
+                  "Change the date recorded for this {{method}} payment of {{amount}}.",
+                  {
+                    method: formatPaymentMethodLabel(
+                      dateEditPayment.payment_method,
+                      t
+                    ),
+                    amount: formatCurrency(dateEditPayment.amount_paid),
+                  }
+                )}
               </p>
 
               {dateEditGroupSize > 1 && (
                 <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
-                  Reference {dateEditPayment.payment_reference} covers more than
-                  one invoice. Every payment under it moves to the new date
-                  together, so the group stays on one row.
+                  {t(
+                    "Reference {{reference}} covers more than one invoice. Every payment under it moves to the new date together, so the group stays on one row.",
+                    { reference: dateEditPayment.payment_reference }
+                  )}
                 </div>
               )}
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
-                  Payment Date
+                  {t("Payment Date")}
                 </label>
                 <TimeNavigator
                   range={paymentDateRange}
@@ -1051,9 +1106,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               {accountingDateRange && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
-                    {dateEditPayment.payment_method === "cheque"
-                      ? "Cheque Clearance Date"
-                      : "Accounting Date"}
+                    {t(
+                      dateEditPayment.payment_method === "cheque"
+                        ? "Cheque Clearance Date"
+                        : "Accounting Date"
+                    )}
                   </label>
                   <TimeNavigator
                     range={accountingDateRange}
@@ -1069,8 +1126,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     triggerClassName="w-full justify-between"
                   />
                   <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                    This date controls Jelly Polly debtor statements and the
-                    account ledger. It cannot be before the payment date.
+                    {t(
+                      "This date controls Jelly Polly debtor statements and the account ledger. It cannot be before the payment date."
+                    )}
                   </p>
                 </div>
               )}
@@ -1082,13 +1140,17 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               )}
 
               <p className="text-xs text-default-500 dark:text-gray-400">
-                {usesTienHockReceiptAccounting
-                  ? "Amounts, invoice balances and the posted journal entry are not changed — a cheque is always posted on its clearance date."
-                  : "Amounts and invoice balances are not changed."}
+                {t(
+                  usesTienHockReceiptAccounting
+                    ? "Amounts, invoice balances and the posted journal entry are not changed – a cheque is always posted on its clearance date."
+                    : "Amounts and invoice balances are not changed."
+                )}
               </p>
             </div>
           }
-          confirmButtonText={savingPaymentDate ? "Saving..." : "Save Date"}
+          confirmButtonText={
+            savingPaymentDate ? t("Saving...") : t("Save Date")
+          }
           variant="success"
           allowContentOverflow
           isConfirming={savingPaymentDate}
@@ -1102,11 +1164,14 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
           setSelectedPayment(null);
         }}
         onConfirm={handleCancelPayment}
-        title="Cancel Payment"
-        message={`Are you sure you want to cancel this payment of ${formatCurrency(
-          selectedPayment?.amount_paid || 0
-        )}?`}
-        confirmButtonText="Cancel Payment"
+        title={t("Cancel Payment")}
+        message={t(
+          "Are you sure you want to cancel this payment of {{amount}}?",
+          {
+            amount: formatCurrency(selectedPayment?.amount_paid || 0),
+          }
+        )}
+        confirmButtonText={t("Cancel Payment")}
         variant="danger"
       />
 
