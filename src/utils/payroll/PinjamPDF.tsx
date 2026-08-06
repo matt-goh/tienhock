@@ -377,6 +377,7 @@ export const generatePinjamPDF = async (
               {
                 focusBeforePrint: true,
                 logLabel: "pinjam summary PDF",
+                documentTitle: `Pinjam Summary - ${monthName} ${data.year}`,
               }
             );
 

@@ -1098,6 +1098,7 @@ export const generateSingleCutiReportPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "leave report PDF",
+            documentTitle: `Leave Report ${data.employee.name} ${data.year}`,
           });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {
@@ -1146,6 +1147,7 @@ export const generateBatchCutiReportPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "batch leave report PDF",
+            documentTitle: `Batch Leave Report ${data.year}`,
           });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {

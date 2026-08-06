@@ -905,7 +905,11 @@ const EstimatedReportPDFDocument: React.FC<EstimatedReportPDFDocumentProps> = ({
   view,
   productLines,
 }) => (
-  <Document>
+  <Document
+    title={`${view === "pl" ? "Estimated P&L" : "Estimated Unit Cost"} ${
+      data.period.label
+    } - ${TIENHOCK_INFO.name}`}
+  >
     {productLines.flatMap((productLine) => {
       const line = data.reports[productLine];
       if (!line) return [];
@@ -931,5 +935,10 @@ export const generateEstimatedReportPDF = async (
     />
   ).toBlob();
 
-  printPdfBlob(blob, "estimated report PDF");
+  printPdfBlob(
+    blob,
+    `${view === "pl" ? "Estimated P&L" : "Estimated Unit Cost"} ${
+      data.period.label
+    } - ${TIENHOCK_INFO.name}`
+  );
 };

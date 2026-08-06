@@ -21,6 +21,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-06",
+    ms: "Nama syarikat Tien Hock pada semua dokumen dan PDF kini dieja \"TIEN HOCK FOOD INDUSTRIES SDN BHD\" dan bukannya \"S/B\". Ini terpakai pada laporan perakaunan, slip gaji, penyata, invois dan e-invois akan datang. Nama fail PDF yang disimpan juga kini menunjukkan SDN_BHD dan bukannya S_B.",
+    en: "Tien Hock's company name on all documents and PDFs is now spelled \"TIEN HOCK FOOD INDUSTRIES SDN BHD\" instead of \"S/B\". This applies to accounting reports, payslips, statements, invoices and future e-invoices. Saved PDF filenames now show SDN_BHD instead of S_B.",
+  },
+  {
+    date: "2026-08-06",
+    ms: "PDF laporan kini memaparkan nama yang lebih jelas semasa dicetak atau dibuka, dan fail PDF yang disimpan menggunakan nama yang sama, contohnya \"Trial Balance as at 2026-06-30 - Tien Hock\" dan bukannya nama tab generik seperti \"Trial Balance _ Tien Hock ERP\". Ini terpakai untuk semua laporan perakaunan, stok, gaji, penyata dan invois-e.",
+    en: "Report PDFs now show a clear title when printed or opened, and the saved PDF file uses the same name, for example \"Trial Balance as at 2026-06-30 - Tien Hock\" instead of the generic tab name like \"Trial Balance | Tien Hock ERP\". This applies to all accounting, stock, payroll, statement and e-invoice PDFs.",
+  },
+  {
+    date: "2026-08-06",
+    ms: "Trial Balance (Tien Hock): senarai akaun kini disusun mengikut abjad kod akaun dari A hingga Z dalam satu senarai, pada halaman dan dalam PDF. Sebelum ini akaun disusun mengikut kumpulan (Bank, Stok, GL, Pemiutang dan sebagainya), jadi akaun pemiutang seperti CR_BF dan CR_UN tercampak ke halaman akhir walaupun kodnya bermula dengan C. Susunan baharu meletakkan setiap akaun pada tempat abjadnya, jadi semua kod CR_* kini berada bersama kod C yang lain. Jumlah keseluruhan tidak berubah.",
+    en: "Trial Balance (Tien Hock): the account list is now sorted alphabetically by account code from A to Z in one sequence, on the page and in the PDF. Previously accounts were grouped by type (Bank, Stock, GL, Creditors and so on), which pushed creditor accounts such as CR_BF and CR_UN to the final pages even though their codes start with C. The new order puts every account at its alphabetical position, so all CR_* codes now sit together with the other C codes. Grand totals are unchanged.",
+  },
+  {
+    date: "2026-08-06",
     ms: "Pembetulan akaun Jun 2026 (Tien Hock): 31 baris buku tunai/bank bulan Jun telah dikelas semula mengikut rekod program lama (contohnya perbelanjaan yang salah masuk ke akaun Office Refreshment, Staff Messing, diesel atau repair kenderaan dipindahkan ke akaun yang betul, dan beberapa amaun dibaiki mengikut resit asal). Baki lejer Jun untuk akaun-akaun berkaitan (BRM, MBC, MBOR, MBRM, MBRMF, MBSAF, MBSM_K/O, OIL*, R9698, MRM, MGT) kini sepadan dengan cetakan lama sehingga ke sen, dan laporan Estimated Unit Cost BIHUN Jun kini mengikut angka yang telah dibetulkan (FINAL 14.0504). Jumlah keseluruhan Trial Balance Jun tidak berubah.",
     en: "June 2026 account corrections (Tien Hock): 31 June cash/bank voucher lines have been reclassified to match the legacy program's records (e.g. expenses wrongly keyed to Office Refreshment, Staff Messing, vehicle diesel or repair accounts were moved to the correct accounts, and a few amounts were corrected to the original receipts). June ledger balances for the affected accounts (BRM, MBC, MBOR, MBRM, MBRMF, MBSAF, MBSM_K/O, OIL*, R9698, MRM, MGT) now match the legacy printouts to the cent, and the June BIHUN Estimated Unit Cost report now shows the corrected figures (FINAL 14.0504). The June Trial Balance grand total is unchanged.",
   },

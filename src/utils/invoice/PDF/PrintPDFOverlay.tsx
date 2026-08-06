@@ -106,6 +106,10 @@ const PrintPDFOverlay = ({
             setTimeout(() => {
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "invoice PDF",
+                documentTitle: generatePDFFilename(
+                  invoices,
+                  isJellyPolly ? "jellypolly" : "tienhock"
+                ).replace(".pdf", ""),
               });
               cleanup(); // Hide loading dialog only
             }, 500);

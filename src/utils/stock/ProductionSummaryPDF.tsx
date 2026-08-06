@@ -175,7 +175,10 @@ const formatQuantity = (value: number): string =>
 const ProductionSummaryPDFDocument: React.FC<{
   data: ProductionSummaryData;
 }> = ({ data }) => (
-  <Document title={data.reportTitle} author={data.companyName}>
+  <Document
+    title={`${data.reportTitle} ${data.periodLabel}`}
+    author={data.companyName}
+  >
     <Page size="A4" style={styles.page}>
       <View style={styles.header}>
         <Image src={TienHockLogo} style={styles.logo} />
@@ -236,5 +239,8 @@ export const generateProductionSummaryPDF = async (
   const blob: Blob = await pdf(
     <ProductionSummaryPDFDocument data={data} />
   ).toBlob();
-  printPdfBlob(blob, "production summary PDF");
+  printPdfBlob(
+    blob,
+    `${data.reportTitle} ${data.periodLabel} - ${data.companyName}`
+  );
 };

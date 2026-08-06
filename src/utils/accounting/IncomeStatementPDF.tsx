@@ -25,7 +25,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 30,
     paddingLeft: 40,
     paddingRight: 40,
     fontFamily: "Helvetica",
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 7,
     gap: 12,
   },
   logo: {
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   majorTotalAmount: {
-    width: 100,
+    width: 120,
     textAlign: "right",
     fontSize: 10,
     fontFamily: "Courier-Bold",
@@ -159,14 +159,14 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   finalTotalAmount: {
-    width: 100,
+    width: 140,
     textAlign: "right",
     fontSize: 11,
     fontFamily: "Courier-Bold",
     paddingRight: 4,
   },
   generatedAt: {
-    marginTop: 15,
+    marginTop: 9,
     fontSize: 7,
     color: colors.textMuted,
     textAlign: "right",
@@ -217,7 +217,9 @@ const IncomeStatementPDFDocument: React.FC<IncomeStatementPDFDocumentProps> = ({
   data,
 }) => {
   return (
-    <Document>
+    <Document
+      title={`Income Statement ${data.period.start_date} to ${data.period.end_date} - ${TIENHOCK_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -348,5 +350,8 @@ export const generateIncomeStatementPDF = async (
     <IncomeStatementPDFDocument data={data} />
   ).toBlob();
 
-  printPdfBlob(blob, "income statement PDF");
+  printPdfBlob(
+    blob,
+    `Income Statement ${data.period.start_date} to ${data.period.end_date} - ${TIENHOCK_INFO.name}`
+  );
 };

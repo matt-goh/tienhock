@@ -658,7 +658,10 @@ export default function (pool) {
         rowsQuery += ` AND ABS(net) > 0.001`;
       }
 
-      rowsQuery += ` ORDER BY ledger_type, code`;
+      // One alphabetical A-Z sequence, except the grouped Trade Debtors row,
+      // which the legacy printout puts at the bottom (after all other codes).
+      // Itemised TD filtering keeps pure code order because every row is TD.
+      rowsQuery += ` ORDER BY (ledger_type = 'TD') ASC, code`;
 
       const limitNum = parseInt(limit);
       const offsetNum = parseInt(offset) || 0;

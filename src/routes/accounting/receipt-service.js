@@ -616,9 +616,18 @@ export async function createReceipt(client, payload, userId) {
 
   const description = (payload.description || "").trim() || defaultDescription(allocs);
   const descriptionOverridden = Boolean((payload.description || "").trim());
+  // The visible Journal No. Users normally key the real bank reference
+  // (TF060826, PBB029289, ...), but it is optional, and `reference_no` is the
+  // hidden internal REC-YYYYMM-NNNN id that must never surface — so when
+  // nothing is keyed we derive a user-facing value from the invoices settled.
+  // Cash keeps its legacy `C` prefix (C13414 = counter collection); a bank or
+  // online receipt gets the bare invoice number, because a `C` there would
+  // misread as cash taken at the counter.
   const displayReference =
     (payload.display_reference || payload.payment_reference || "").trim() ||
-    (method === "cash" && invoiceIds.length === 1 ? `C${invoiceIds[0]}` : null);
+    (invoiceIds.length > 0
+      ? `${method === "cash" ? "C" : ""}${invoiceIds.join("/")}`
+      : null);
 
   // Insert as 'pending' first — the posted-needs-journal CHECK requires the
   // journal to exist before the status can become 'posted'

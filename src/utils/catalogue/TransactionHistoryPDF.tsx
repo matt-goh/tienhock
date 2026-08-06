@@ -308,6 +308,7 @@ export const generateTransactionHistoryPDF = async (
       if (printFrame.contentWindow) {
         printPdfFrameWithFallback(printFrame, url, {
           logLabel: "transaction history PDF",
+          documentTitle: `Transaction History - ${data.customer.id} - ${data.periodLabel}`,
         });
         const cleanup = () => {
           if (document.body.contains(printFrame)) {
