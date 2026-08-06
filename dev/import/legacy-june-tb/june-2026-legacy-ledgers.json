@@ -1,0 +1,2877 @@
+[
+ {
+  "account": "BRM",
+  "account_name": "REPAIR AND MAINTENANCE (BIHUN)",
+  "pages": [
+   1
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 13476.62,
+  "closing_balance": 14890.36,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "CBN (EAST MALAYSIA) SB #215937-08/06/2026 (3/8\"-10 X 1.1/2\" UNC SS304 BOLT & 3/8\" X 16 UNC SS304 NUT @ 10PCS/EACH FOR MACHINE BIHUN)",
+    "cheque": "PB350780",
+    "debit": 8.5,
+    "credit": 0,
+    "balance": 13485.12
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TEO YUN FUNG-07/05/2026 (CLOTH COVER FOR BIHUN W/O HOLES(T) 3X30 & (N) 3X30)",
+    "cheque": "PB350781",
+    "debit": 180,
+    "credit": 0,
+    "balance": 13665.12
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TEO YUN FUNG -27/04/2026 (CLOTH COVER THICK 10X3/THIN 10X3)",
+    "cheque": "PB350781",
+    "debit": 600,
+    "credit": 0,
+    "balance": 14265.12
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KTS TRADING S/B #JCS84914-05/05/2026 (65 VALVE/65 SCREW PLUG FOR BIHUN WATERJET)",
+    "cheque": "PB350781",
+    "debit": 54.3,
+    "credit": 0,
+    "balance": 14319.42
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TAOBAO-JING XIAN YOU #51124865792222003605-28/04/2026 (BIHUN FOOD GRADE RUBBER 11MM X 19MM X 1.9MM X 20PCS)",
+    "cheque": "PB350781",
+    "debit": 482.3,
+    "credit": 0,
+    "balance": 14801.72
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TAOBAO-SHEN ZHEN KANG YE #5114942534480186007-09/05/2026 (304 TAP PACKING MACHINE X 2PCS)",
+    "cheque": "PB350781",
+    "debit": 61.93,
+    "credit": 0,
+    "balance": 14863.65
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TAOBAO-PIN SHANG MEI SHUO #5114942534480212835-08/05/2026 (304 TAPE PACKING MACHINE)",
+    "cheque": "PB350781",
+    "debit": 26.71,
+    "credit": 0,
+    "balance": 14890.36
+   }
+  ],
+  "june_movement": 1413.74,
+  "line_count": 7,
+  "total_debit": 1413.74,
+  "total_credit": 0
+ },
+ {
+  "account": "MBC",
+  "account_name": "CLEANING EXPENSES",
+  "pages": [
+   3
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 3995.75,
+  "closing_balance": 4954.85,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MINI PLASTIC TRADING #CT001-2603/01099-25/03/2026",
+    "cheque": "PB350781",
+    "debit": 61,
+    "credit": 0,
+    "balance": 4056.75
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "EMART (SABAH) S/B #LJP0920252503240991-24/03/2026",
+    "cheque": "PB350781",
+    "debit": 54.3,
+    "credit": 0,
+    "balance": 4111.05
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "YU SENG HOUSEWARES S/B #DGG03202604010081-01/04/2026 (BROOM W/HANDLE X 8SETS)",
+    "cheque": "PB350781",
+    "debit": 36.4,
+    "credit": 0,
+    "balance": 4147.45
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TCT  TRADING S/B #SMGL2202604010017-01/04/2026",
+    "cheque": "PB350781",
+    "debit": 19.7,
+    "credit": 0,
+    "balance": 4167.15
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "EMART (SABAH) S/B #LJP1602603360041-28/03/2026",
+    "cheque": "PB350781",
+    "debit": 7,
+    "credit": 0,
+    "balance": 4174.15
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "FAMILIA SUPERSTORE S/B #R0003580-07/04/2026",
+    "cheque": "PB350781",
+    "debit": 7.9,
+    "credit": 0,
+    "balance": 4182.05
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "BATARAS S/B #60426/61013/08/00128-06/04/2026",
+    "cheque": "PB350781",
+    "debit": 10.8,
+    "credit": 0,
+    "balance": 4192.85
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KFC LINTAS JAYA BOULEVARD #130134-14/03/2026",
+    "cheque": "PB350781",
+    "debit": 40,
+    "credit": 0,
+    "balance": 4232.85
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MR. D.I.Y (EM) S/B #R000665456-23/03/2026",
+    "cheque": "PB350781",
+    "debit": 9.2,
+    "credit": 0,
+    "balance": 4242.05
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TCT TRADING S/B #09/04/2026",
+    "cheque": "PB350781",
+    "debit": 74.7,
+    "credit": 0,
+    "balance": 4316.75
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "EMART (SABAH) S/B #LJP-28/03/2026",
+    "cheque": "PB350781",
+    "debit": 16.5,
+    "credit": 0,
+    "balance": 4333.25
+   },
+   {
+    "seq": 12,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TCT TRADING S/B #SMGL2202603230077-23/03/2026",
+    "cheque": "PB350781",
+    "debit": 12.15,
+    "credit": 0,
+    "balance": 4345.4
+   },
+   {
+    "seq": 13,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MR.D.I.Y (EM) S/B #R563164",
+    "cheque": "PB350781",
+    "debit": 26.4,
+    "credit": 0,
+    "balance": 4371.8
+   },
+   {
+    "seq": 14,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MR.D.I.Y (EM) S/B #R000372009-23/03/2026",
+    "cheque": "PB350781",
+    "debit": 20.2,
+    "credit": 0,
+    "balance": 4392
+   },
+   {
+    "seq": 15,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MR.D.I.Y (EM) S/B #R000002960-07/05/2026",
+    "cheque": "PB350781",
+    "debit": 9.6,
+    "credit": 0,
+    "balance": 4401.6
+   },
+   {
+    "seq": 16,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "BATARAS HYPERMARKET #180326/61004/02/00099-18/03/2026",
+    "cheque": "PB350781",
+    "debit": 15.5,
+    "credit": 0,
+    "balance": 4417.1
+   },
+   {
+    "seq": 17,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "WATSONS PERSONAL CARE STORES S/B #",
+    "cheque": "PB350781",
+    "debit": 302.1,
+    "credit": 0,
+    "balance": 4719.2
+   },
+   {
+    "seq": 18,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MR.D.I.Y (EM) S/B #R000103190-04/05/2026",
+    "cheque": "PB350781",
+    "debit": 9.5,
+    "credit": 0,
+    "balance": 4728.7
+   },
+   {
+    "seq": 19,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "EMART (SABAH) S/B #LPJ11202663280004-28/03/2026",
+    "cheque": "PB350781",
+    "debit": 37.5,
+    "credit": 0,
+    "balance": 4766.2
+   },
+   {
+    "seq": 20,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "100% SUPER SHOP #000024-15/05/2026",
+    "cheque": "PB350781",
+    "debit": 46.65,
+    "credit": 0,
+    "balance": 4812.85
+   },
+   {
+    "seq": 21,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SAMA MARKETING S/B #1214-29/04/2026 (HOT COLD FLEXI TUBE)",
+    "cheque": "PB350781",
+    "debit": 38,
+    "credit": 0,
+    "balance": 4850.85
+   },
+   {
+    "seq": 22,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MR.D.I.Y (EM) S/B #R000655902-12/05/2026",
+    "cheque": "PB350781",
+    "debit": 42.5,
+    "credit": 0,
+    "balance": 4893.35
+   },
+   {
+    "seq": 23,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "EASYWAY CO #C1-2606/01267-21/06/2026",
+    "cheque": "PB350784",
+    "debit": 35.9,
+    "credit": 0,
+    "balance": 4929.25
+   },
+   {
+    "seq": 24,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "SERVAY EXPRESS S/B #9X0420220260529 0066-29/05/2026",
+    "cheque": "PB350784",
+    "debit": 7.6,
+    "credit": 0,
+    "balance": 4936.85
+   },
+   {
+    "seq": 25,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "MINI PLASTIC TRADING #CT002-2606/01010-23/06/2026 (RUBBISH BAY)",
+    "cheque": "PB350785",
+    "debit": 18,
+    "credit": 0,
+    "balance": 4954.85
+   }
+  ],
+  "june_movement": 959.1,
+  "line_count": 25,
+  "total_debit": 959.1,
+  "total_credit": 0
+ },
+ {
+  "account": "MBOR",
+  "account_name": "OFFICE REFRESHMENT",
+  "pages": [
+   4,
+   5
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 6373.4,
+  "closing_balance": 7972.2,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "LILI MART WONG SHI MINIMART S/B #R000493784-29/04/2026 T)",
+    "cheque": "PB350779",
+    "debit": 5.65,
+    "credit": 0,
+    "balance": 6379.05
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "99 SPEED MART (EM) S/B #1201521331/102/T0121-26/05/2026",
+    "cheque": "PB350779",
+    "debit": 28.25,
+    "credit": 0,
+    "balance": 6407.3
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "BATARAS HYPERMARKET @070626/61004/05/00215-07/06/2026",
+    "cheque": "PB350780",
+    "debit": 207.75,
+    "credit": 0,
+    "balance": 6615.05
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "ZUS-COFFEE ITCC #NY015318447-10/04/2026",
+    "cheque": "PB350781",
+    "debit": 29.2,
+    "credit": 0,
+    "balance": 6644.25
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "HANDMADE BAO #00102420-22/04/2026",
+    "cheque": "PB350781",
+    "debit": 13.2,
+    "credit": 0,
+    "balance": 6657.45
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "OCTOBER COFFEE ROASTERS #101170-17/03/2026",
+    "cheque": "PB350781",
+    "debit": 25,
+    "credit": 0,
+    "balance": 6682.45
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KELAPA CAFE #16135-20/03/2026",
+    "cheque": "PB350781",
+    "debit": 14,
+    "credit": 0,
+    "balance": 6696.45
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KELAPACAFE#16124-20/03/2026",
+    "cheque": "PB350781",
+    "debit": 16,
+    "credit": 0,
+    "balance": 6712.45
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SUNLIGHT PHARMACY (KK) S/B #SJP1-1404118-08/04/2026",
+    "cheque": "PB350781",
+    "debit": 17.9,
+    "credit": 0,
+    "balance": 6730.35
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SUNNY SUPERMARKET S/B #00000165-+13/05/2026",
+    "cheque": "PB350781",
+    "debit": 14.9,
+    "credit": 0,
+    "balance": 6745.25
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SABANAH GROCER #CS/14792-15/03/2026",
+    "cheque": "PB350781",
+    "debit": 32.8,
+    "credit": 0,
+    "balance": 6778.05
+   },
+   {
+    "seq": 12,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "WATSONS PERSONAL CARE STORES S/B -25/05/2026",
+    "cheque": "PB350781",
+    "debit": 306.8,
+    "credit": 0,
+    "balance": 7084.85
+   },
+   {
+    "seq": 13,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "99 SPEED MART (EM) S/B #1041321280/102/T0121-05/04/2026",
+    "cheque": "PB350781",
+    "debit": 19.5,
+    "credit": 0,
+    "balance": 7104.35
+   },
+   {
+    "seq": 14,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KEDAI KOPI JIA HUA #-",
+    "cheque": "PB350781",
+    "debit": 9,
+    "credit": 0,
+    "balance": 7113.35
+   },
+   {
+    "seq": 15,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "THE PENTHOUSE SKY CAFE & LOONGE #PH-1-1001222-04/04/2026",
+    "cheque": "PB350781",
+    "debit": 95.7,
+    "credit": 0,
+    "balance": 7209.05
+   },
+   {
+    "seq": 16,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "PEZZO PIZZA #C1-305293-17/03/2026",
+    "cheque": "PB350781",
+    "debit": 10.05,
+    "credit": 0,
+    "balance": 7219.1
+   },
+   {
+    "seq": 17,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "CARING EVERGEEN S/B #C0471420-07/04/2026",
+    "cheque": "PB350781",
+    "debit": 28.9,
+    "credit": 0,
+    "balance": 7248
+   },
+   {
+    "seq": 18,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "UPPER STAR CAFE & BAR S/B #000070459-11/05/20263",
+    "cheque": "PB350781",
+    "debit": 23.85,
+    "credit": 0,
+    "balance": 7271.85
+   },
+   {
+    "seq": 19,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "WONG #A022-07/04/2026",
+    "cheque": "PB350781",
+    "debit": 45.05,
+    "credit": 0,
+    "balance": 7316.9
+   },
+   {
+    "seq": 20,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "LKS SUPERMARKET #SCH03202605060127-06/05/2026",
+    "cheque": "PB350781",
+    "debit": 35,
+    "credit": 0,
+    "balance": 7351.9
+   },
+   {
+    "seq": 21,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "LIDO MARKET #400256-15/05/2026 4/2026/2026",
+    "cheque": "PB350781",
+    "debit": 29,
+    "credit": 0,
+    "balance": 7380.9
+   },
+   {
+    "seq": 22,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SUSHI PANDA MEGALONG MALL #89240-12/05/2026",
+    "cheque": "PB350781",
+    "debit": 30.4,
+    "credit": 0,
+    "balance": 7411.3
+   },
+   {
+    "seq": 23,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "LKS SUPERMARKET #SCH01202605080145-08/05/2026",
+    "cheque": "PB350781",
+    "debit": 24.55,
+    "credit": 0,
+    "balance": 7435.85
+   },
+   {
+    "seq": 24,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "LKS SUPERMARKET #SCH0220260430030-30/04/2026",
+    "cheque": "PB350781",
+    "debit": 12.1,
+    "credit": 0,
+    "balance": 7447.95
+   },
+   {
+    "seq": 25,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "LKS SUPERMARKET #SCH01202605040149-04/05/2026",
+    "cheque": "PB350781",
+    "debit": 38.05,
+    "credit": 0,
+    "balance": 7486
+   },
+   {
+    "seq": 26,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A-9AVWWHWWWXXIUAV-11/05/2026",
+    "cheque": "PB350781",
+    "debit": 20.9,
+    "credit": 0,
+    "balance": 7506.9
+   },
+   {
+    "seq": 27,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A9AUVQQ4GXXIUAV-11/05/2026",
+    "cheque": "PB350781",
+    "debit": 20.9,
+    "credit": 0,
+    "balance": 7527.8
+   },
+   {
+    "seq": 28,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A-9AVWXQDWW59AV-11/05/2026",
+    "cheque": "PB350781",
+    "debit": 20.9,
+    "credit": 0,
+    "balance": 7548.7
+   },
+   {
+    "seq": 29,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "OWL TEA CENTRAL SHOPING PLAZA #",
+    "cheque": "PB350781",
+    "debit": 32.9,
+    "credit": 0,
+    "balance": 7581.6
+   },
+   {
+    "seq": 30,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-SUSHI PANDA #A-9A6UZW4W2AQLAV-05/05/2026",
+    "cheque": "PB350781",
+    "debit": 27.8,
+    "credit": 0,
+    "balance": 7609.4
+   },
+   {
+    "seq": 31,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A-9AUVUDTWXWT8AV-11/05/2026",
+    "cheque": "PB350781",
+    "debit": 22.4,
+    "credit": 0,
+    "balance": 7631.8
+   },
+   {
+    "seq": 32,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A-9CT74PGGXFXPAV-26/05/2026",
+    "cheque": "PB350781",
+    "debit": 21.5,
+    "credit": 0,
+    "balance": 7653.3
+   },
+   {
+    "seq": 33,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A9CT7WHXGW22BAV-26/05/2026",
+    "cheque": "PB350781",
+    "debit": 28.8,
+    "credit": 0,
+    "balance": 7682.1
+   },
+   {
+    "seq": 34,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "OWL TEA #Y15ZR-SYT2064-26/05/2026",
+    "cheque": "PB350781",
+    "debit": 35.3,
+    "credit": 0,
+    "balance": 7717.4
+   },
+   {
+    "seq": 35,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A9CT8SXAWWNCUAV-26/05/2026",
+    "cheque": "PB350781",
+    "debit": 21.5,
+    "credit": 0,
+    "balance": 7738.9
+   },
+   {
+    "seq": 36,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-OWL TEA #A-9CT9XBTWWSKUAV-26/05/2026",
+    "cheque": "PB350781",
+    "debit": 19.75,
+    "credit": 0,
+    "balance": 7758.65
+   },
+   {
+    "seq": 37,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "LKS SUPERMARKET #SCH01202605280027-28/05/2026",
+    "cheque": "PB350784",
+    "debit": 28.8,
+    "credit": 0,
+    "balance": 7787.45
+   },
+   {
+    "seq": 38,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "BATARAS HYPERMARKET #270526/61004/07/00069-27/05/2026",
+    "cheque": "PB350784",
+    "debit": 50.85,
+    "credit": 0,
+    "balance": 7838.3
+   },
+   {
+    "seq": 39,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "BATARAS HYPERMARKET #160526/61005/02/00193-16/05/2026",
+    "cheque": "PB350784",
+    "debit": 16.4,
+    "credit": 0,
+    "balance": 7854.7
+   },
+   {
+    "seq": 40,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "SERVAY EVERGREEN S/B #026H00107202606060029-06/06/2026",
+    "cheque": "PB350785",
+    "debit": 17.8,
+    "credit": 0,
+    "balance": 7872.5
+   },
+   {
+    "seq": 41,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "EMART (SABAH) S/B #LJP5202606060210-06/06/2026",
+    "cheque": "PB350785",
+    "debit": 35.7,
+    "credit": 0,
+    "balance": 7908.2
+   },
+   {
+    "seq": 42,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "HANDMADE BAO-00114468 -06/06/2026",
+    "cheque": "PB350785",
+    "debit": 51.1,
+    "credit": 0,
+    "balance": 7959.3
+   },
+   {
+    "seq": 43,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "MIX STORE #79002112261660070037-15/06/2026",
+    "cheque": "PB350785",
+    "debit": 12.9,
+    "credit": 0,
+    "balance": 7972.2
+   }
+  ],
+  "june_movement": 1598.8,
+  "line_count": 43,
+  "total_debit": 1598.8,
+  "total_credit": 0
+ },
+ {
+  "account": "MBRM",
+  "account_name": "REPAIR AND MAINTENANCE (MEE+BIHUN)",
+  "pages": [
+   2
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 3571.16,
+  "closing_balance": 5382.11,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-08",
+    "journal": "PBE021/06",
+    "particulars": "TECHWELD ENTERPRISE #00004659-16/04/2026 (OXYGEN X 4CYLS/ACETYLENE X 1CYL)",
+    "cheque": "PBE26060",
+    "debit": 550,
+    "credit": 0,
+    "balance": 4121.16
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "MR.D.I.Y (EM) S/B #R000002964-07/05/2026 (BATTERY FOR SCALE)",
+    "cheque": "PB350781",
+    "debit": 13.9,
+    "credit": 0,
+    "balance": 4135.06
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TAOBAO-260525-496500743803406-25/05/2026 (BEARING GREASE FILLING HOLE PARTS X 98PCS)",
+    "cheque": "PB350781",
+    "debit": 13.55,
+    "credit": 0,
+    "balance": 4148.61
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TAOBAO-ZHI CHENG ZHOU CHENG #5113021034617176825-30/04/2026 (BEARING 30210/)",
+    "cheque": "PB350781",
+    "debit": 60.5,
+    "credit": 0,
+    "balance": 4209.11
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TAOBAO-YOU FENG ZHOU CHENG #5113021034617030433-30/04/2026 (SEAL 50X72X8X10PCS)",
+    "cheque": "PB350781",
+    "debit": 26.3,
+    "credit": 0,
+    "balance": 4235.41
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "TAOBAO-BO ZHEN QI BAO #260525-496500743803406-25/05/2026 (GREASE PIN HOLE X 98PCS)",
+    "cheque": "PB350784",
+    "debit": 13.9,
+    "credit": 0,
+    "balance": 4249.31
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "TAOBAO-SHENG YU DIAN QI #260612-635279777403406-12/06/2026 (TEMPERATURE MONITOR CONTROL X 2PCS)",
+    "cheque": "PB350784",
+    "debit": 69.65,
+    "credit": 0,
+    "balance": 4318.96
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "100% SUPER SHOP #00092-10/06/2026 (BATTERY)",
+    "cheque": "PB350785",
+    "debit": 28.4,
+    "credit": 0,
+    "balance": 4347.36
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "TAOBAO-GU DE LI QI HANG COMPRESSOR AIR GUN)026-31/05/2026 (SPRING 65MM X 4MM X 40MM X 50MM X 5PCS)",
+    "cheque": "PB350785",
+    "debit": 43.9,
+    "credit": 0,
+    "balance": 4391.26
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "TAOBAO-YI NUO GONG YE #5119679666473003605-12/06/2026 (TEMPERATURE CONTROL DTK7272 R12 X 2PCS JP)",
+    "cheque": "PB350785",
+    "debit": 349.2,
+    "credit": 0,
+    "balance": 4740.46
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "TAOBAO-HANG ZHOU JIN XIN #260616-182997511803406-16/06/2026 (GEARBOX MTOR RV63 0.55KW 380V 1:100 X 2PCS)",
+    "cheque": "PB350785",
+    "debit": 629.45,
+    "credit": 0,
+    "balance": 5369.91
+   },
+   {
+    "seq": 12,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "TAOBAO-HUA YU SHI PIN #260618-600917952123406-18/06/2026 (SEALING MACHINE HEATING STRIP X 2M)",
+    "cheque": "PB350785",
+    "debit": 12.2,
+    "credit": 0,
+    "balance": 5382.11
+   }
+  ],
+  "june_movement": 1810.95,
+  "line_count": 12,
+  "total_debit": 1810.95,
+  "total_credit": 0
+ },
+ {
+  "account": "MBRMF",
+  "account_name": "REPAIR AND MAINTENANCE (FACTORY)",
+  "pages": [
+   6
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 31033.79,
+  "closing_balance": 36069.39,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PBE024/06",
+    "particulars": "TECHWELD ENTERPRISE #00004884-08/06/2026 (OXYGEN INDUDTRIAL H 7.2MM X 6CYLS/ACETYLENE 4.5M3 X 3CYLS)",
+    "cheque": "PBE26061",
+    "debit": 1230,
+    "credit": 0,
+    "balance": 32263.79
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "RIZMAL BIN JULA (IP-12241-420)#26472-29/05/2026(CUT GRASS/DIG/CLEAN WORKERS DRAINAGE-TO AVOID DENGGI/LAY CONCRETE TO BOILER/TO CUT TREES @ BACK OF FACTORY)",
+    "cheque": "PB350779",
+    "debit": 1479,
+    "credit": 0,
+    "balance": 33742.79
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "DIGIMATE S/B #DSB-228294-08/05/2026 (MIDEA 2 BURNER GLASS COOKER/PAN EXTRA HD BATTERY)",
+    "cheque": "PB350781",
+    "debit": 356,
+    "credit": 0,
+    "balance": 34098.79
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "K2 LIGHTING S/B #H91CS-1022079-12/05/2026 ( 56\"BK DC 2509)NATIONG FILM A4 LF220 X 1BOX)",
+    "cheque": "PB350781",
+    "debit": 129,
+    "credit": 0,
+    "balance": 34227.79
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "BEST MART HOLDING S/B #POSAS82605120006519-12/05/2026 (1/2 HEXAGONAL SOCKET /LITHIUM BATTERY)",
+    "cheque": "PB350781",
+    "debit": 14.1,
+    "credit": 0,
+    "balance": 34241.89
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-20",
+    "journal": "PBE048/06",
+    "particulars": "KESIGUI HARDWARE & TIMBER S/B #CS-208510-19/06/2026 (CEMENT 50KGS X 30BAGS)",
+    "cheque": "PBE26062",
+    "debit": 690,
+    "credit": 0,
+    "balance": 34931.89
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "168 HARDWARE CS-2606-072-10/06/2026 (WIRE NAIL 2.1/2\" & WIRE NAIL 3\" @ 2KGS/EACH)",
+    "cheque": "PB350783",
+    "debit": 34,
+    "credit": 0,
+    "balance": 34965.89
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "FURSE ELECTRIC (SABAH) S/B #CS2606/261-12/06/2026 (TAIAN METAL CLAD DOL MAGNETIC STARTER 5HP 415V/TAIAN METAL CLAD DO MAGNETIC STARTER 3HP 415V @ 2PCS/EACH)",
+    "cheque": "PB350783",
+    "debit": 226,
+    "credit": 0,
+    "balance": 35191.89
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "HV ELECTRICAL S/B #CS-260600426-09/06/2026 (SINO PVC TAPE X 25PCS)",
+    "cheque": "PB350784",
+    "debit": 12.5,
+    "credit": 0,
+    "balance": 35204.39
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-25",
+    "journal": "PBE054/06",
+    "particulars": "PAUMIN HARDWARE S/B #2606-2133-23/06/2026 (CUTTING DISC 4\"/GRINDING DISC 4\"/NON-WOVEN WHEEL 4\"/FLAP DISC 4\"/ROLLER REFILL 4\"/HSS DRILL BIT 9/32\" & 3/16\"/HARDWX SILICONE/PVC INSULATING TAPE/PVC INSULATING TAPE)",
+    "cheque": "PBE26062",
+    "debit": 465,
+    "credit": 0,
+    "balance": 35669.39
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "HV ELECTRICAL S/B #CS-260600975-18/06/2026 (SINO 70/0193 X 4C COPPER CABLE X 50M)",
+    "cheque": "PB350785",
+    "debit": 400,
+    "credit": 0,
+    "balance": 36069.39
+   }
+  ],
+  "june_movement": 5035.6,
+  "line_count": 11,
+  "total_debit": 5035.6,
+  "total_credit": 0
+ },
+ {
+  "account": "MBSAF",
+  "account_name": "SAFETY & HEALTH EXPENSES",
+  "pages": [
+   7
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 8127.46,
+  "closing_balance": 9557.01,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-04",
+    "journal": "PBE004/06",
+    "particulars": "SABAFIRE ENGINEERING #35092-26/05/2026 ( SERVICING OF FIRE EXTINGUISHER 9KGS ABC POWDER X 11UNITS/BOMBO STICKER X 10PCS/REFILLING OF ABC DRY POWDER 9KGS)",
+    "cheque": "PBE26060",
+    "debit": 425,
+    "credit": 0,
+    "balance": 8552.46
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TAOBAO-WEI ER DUN #5115334789011049614-09/05/2026 (SAFETY BOOTS 41X4/42&40 X 1PAIR EACH)",
+    "cheque": "PB350781",
+    "debit": 160.55,
+    "credit": 0,
+    "balance": 8713.01
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "LEBERI @ FRANCIS BIN MARIAM #0354/2026- (BEING PYMT FOR 2DAYS CONSTRUCTING HIRARC FOR ERCTING/DISMANTLE/FABRICATION OF CHIMNEY/SOP FOR ERECTING/DISMANTLE/FABRICATION WORKS ON CERTIFIED SPACE/WORKING @ HEIGHT/BOILER INSPECTION REPORT 11-12/0",
+    "cheque": "PB350783",
+    "debit": 600,
+    "credit": 0,
+    "balance": 9313.01
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-25",
+    "journal": "PBE054/06",
+    "particulars": "PAUMIN HARDWARE S/B #2606-2133-23/06/2026 (BATIK COTTON H.GLOVE 900G X 2BOXES & SPECTACLE KINGATE CLEAR X 12PCS)",
+    "cheque": "PBE26062",
+    "debit": 244,
+    "credit": 0,
+    "balance": 9557.01
+   }
+  ],
+  "june_movement": 1429.55,
+  "line_count": 4,
+  "total_debit": 1429.55,
+  "total_credit": 0
+ },
+ {
+  "account": "MBSM K",
+  "account_code_normalized": "MBSM_K",
+  "account_name": "KILANG",
+  "pages": [
+   9,
+   10,
+   11
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 12708.49,
+  "closing_balance": 15794.98,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "RESTORAN ILHAM-04/06/2026 (WORKERS MESSING BY ABSAL/BOY)",
+    "cheque": "PB350779",
+    "debit": 26,
+    "credit": 0,
+    "balance": 12734.49
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "DOVIST CHICKEN RICE #00033851-30/05/2026",
+    "cheque": "PB350779",
+    "debit": 13,
+    "credit": 0,
+    "balance": 12747.49
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "CATHAY ROASTED #20260602123929149027 7-02/06/2026 5/2026",
+    "cheque": "PB350779",
+    "debit": 29,
+    "credit": 0,
+    "balance": 12776.49
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "B1 SEAFOOD RESTAURANT #24332-31/05/2026",
+    "cheque": "PB350779",
+    "debit": 204.7,
+    "credit": 0,
+    "balance": 12981.19
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "WIN WIN SEAFOOD REST #01/TAB2/00024202-29/05/2026",
+    "cheque": "PB350779",
+    "debit": 142.85,
+    "credit": 0,
+    "balance": 13124.04
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "WORKER MESSING-08/06/2026 (RAMLIH OUSTATION LUNCH)",
+    "cheque": "PB350780",
+    "debit": 15,
+    "credit": 0,
+    "balance": 13139.04
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "WORKER MESSING-05/06/2026 (RAMLIH OUSTATION LUNCH)",
+    "cheque": "PB350780",
+    "debit": 15,
+    "credit": 0,
+    "balance": 13154.04
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "WORKER MESSING-04/06/2026 (RAMLIH OUSTATION LUNCH)",
+    "cheque": "PB350780",
+    "debit": 15,
+    "credit": 0,
+    "balance": 13169.04
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "DOJO KOLOMBONG GROWTH PINNACLE S/B #20260416150940965965110098-16/04/2026",
+    "cheque": "PB350781",
+    "debit": 24.25,
+    "credit": 0,
+    "balance": 13193.29
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "PENAMPANG NGIU CHAP 1#00380926-20/04/2026",
+    "cheque": "PB350781",
+    "debit": 63,
+    "credit": 0,
+    "balance": 13256.29
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "ZENITH EYEWEAR #KK05CS00098958-07/04/2026 2026",
+    "cheque": "PB350781",
+    "debit": 23.6,
+    "credit": 0,
+    "balance": 13279.89
+   },
+   {
+    "seq": 12,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KFC CITY MALL #110126-10/04/2026",
+    "cheque": "PB350781",
+    "debit": 70.45,
+    "credit": 0,
+    "balance": 13350.34
+   },
+   {
+    "seq": 13,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KFC CITY MALL #130154-14/03/2026",
+    "cheque": "PB350781",
+    "debit": 22.5,
+    "credit": 0,
+    "balance": 13372.84
+   },
+   {
+    "seq": 14,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SIMPLE3334315-14/03/2026",
+    "cheque": "PB350781",
+    "debit": 69.8,
+    "credit": 0,
+    "balance": 13442.64
+   },
+   {
+    "seq": 15,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "LOK TIEN RESTAURANT #LT092078-06/05/2026",
+    "cheque": "PB350781",
+    "debit": 129.2,
+    "credit": 0,
+    "balance": 13571.84
+   },
+   {
+    "seq": 16,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KOPI PING CAFE #KPK178238-04/05/2026",
+    "cheque": "PB350781",
+    "debit": 57.75,
+    "credit": 0,
+    "balance": 13629.59
+   },
+   {
+    "seq": 17,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "HAJAH TOMINAH #1-2536-02/05/2026",
+    "cheque": "PB350781",
+    "debit": 47.4,
+    "credit": 0,
+    "balance": 13676.99
+   },
+   {
+    "seq": 18,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "HO KEE HANINAMESE CHICKEN RICE #SLHQ01CT01202600008640-09/04/2026",
+    "cheque": "PB350781",
+    "debit": 26.5,
+    "credit": 0,
+    "balance": 13703.49
+   },
+   {
+    "seq": 19,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GERBANG ALAF RESTAURANTS S/B #103579700118399-08/05/2026",
+    "cheque": "PB350781",
+    "debit": 38.05,
+    "credit": 0,
+    "balance": 13741.54
+   },
+   {
+    "seq": 20,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "WELCOME SEAFOOD RESTAURANT #MI126958-01/05/2026",
+    "cheque": "PB350781",
+    "debit": 109.2,
+    "credit": 0,
+    "balance": 13850.74
+   },
+   {
+    "seq": 21,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KEDAI KOPITIAM ORIENTAL KOPI #SS01/00583-21/04/2026",
+    "cheque": "PB350781",
+    "debit": 154.75,
+    "credit": 0,
+    "balance": 14005.49
+   },
+   {
+    "seq": 22,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SUSHI ZANMAI #001-5382-02/04/2026",
+    "cheque": "PB350781",
+    "debit": 97.2,
+    "credit": 0,
+    "balance": 14102.69
+   },
+   {
+    "seq": 23,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "PHOENIX STAR CAFE S/B #POS260596-31/03/2026",
+    "cheque": "PB350781",
+    "debit": 87.45,
+    "credit": 0,
+    "balance": 14190.14
+   },
+   {
+    "seq": 24,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "ALIANG FISH NOODLE #145495-27/03/2026",
+    "cheque": "PB350781",
+    "debit": 59.35,
+    "credit": 0,
+    "balance": 14249.49
+   },
+   {
+    "seq": 25,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TIGA IKAN KOTITIAM #35195-19/04/2026",
+    "cheque": "PB350781",
+    "debit": 42,
+    "credit": 0,
+    "balance": 14291.49
+   },
+   {
+    "seq": 26,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "DUMPLING CAFE #855130223011411-05/04/2026",
+    "cheque": "PB350781",
+    "debit": 20.1,
+    "credit": 0,
+    "balance": 14311.59
+   },
+   {
+    "seq": 27,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "YI JIA -UPTOWN #KK235CSS00005322-07/05/2026",
+    "cheque": "PB350781",
+    "debit": 30.5,
+    "credit": 0,
+    "balance": 14342.09
+   },
+   {
+    "seq": 28,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TUK TUK THAI BOAT NOODLE RESTAURANT #IMGKK-01-1037332-16/04/2026",
+    "cheque": "PB350781",
+    "debit": 175.15,
+    "credit": 0,
+    "balance": 14517.24
+   },
+   {
+    "seq": 29,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "AI RECIPE S/B #100005-01/38114-14/04/2026",
+    "cheque": "PB350781",
+    "debit": 43.15,
+    "credit": 0,
+    "balance": 14560.39
+   },
+   {
+    "seq": 30,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "HAINAN CHICKEN RICE ANDREW WONG #CT010093-26/04/2026",
+    "cheque": "PB350781",
+    "debit": 27.5,
+    "credit": 0,
+    "balance": 14587.89
+   },
+   {
+    "seq": 31,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TEH DAUN KITCHEN #08/04/2026",
+    "cheque": "PB350781",
+    "debit": 27.5,
+    "credit": 0,
+    "balance": 14615.39
+   },
+   {
+    "seq": 32,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "WEY WEY XIANG FISH NOODLE 3POS078437-07/04/2026",
+    "cheque": "PB350781",
+    "debit": 72.3,
+    "credit": 0,
+    "balance": 14687.69
+   },
+   {
+    "seq": 33,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "TASTY PLACE #KK148CS00030020-04/02/2026",
+    "cheque": "PB350781",
+    "debit": 39.7,
+    "credit": 0,
+    "balance": 14727.39
+   },
+   {
+    "seq": 34,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "007 CAFE -29/04/2026",
+    "cheque": "PB350781",
+    "debit": 37,
+    "credit": 0,
+    "balance": 14764.39
+   },
+   {
+    "seq": 35,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "HONG JIA TING #20260428-0243-28/04/2026/2026",
+    "cheque": "PB350781",
+    "debit": 54.4,
+    "credit": 0,
+    "balance": 14818.79
+   },
+   {
+    "seq": 36,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "KEDAI KOPI JIA HUA -15/05/2026",
+    "cheque": "PB350781",
+    "debit": 10.4,
+    "credit": 0,
+    "balance": 14829.19
+   },
+   {
+    "seq": 37,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "CUAN YUE MALATANG #CSH-000002912-07/05/2026",
+    "cheque": "PB350781",
+    "debit": 28.85,
+    "credit": 0,
+    "balance": 14858.04
+   },
+   {
+    "seq": 38,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "NEW WK RESTAURANT #000035 L0002-09/05/2026",
+    "cheque": "PB350781",
+    "debit": 153.35,
+    "credit": 0,
+    "balance": 15011.39
+   },
+   {
+    "seq": 39,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "FRESH FLAVOR RESTAURANT #55935-05/05/2026",
+    "cheque": "PB350781",
+    "debit": 13.8,
+    "credit": 0,
+    "balance": 15025.19
+   },
+   {
+    "seq": 40,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "NANA RECIPES HOUSE #27039-02/05/2026",
+    "cheque": "PB350781",
+    "debit": 15,
+    "credit": 0,
+    "balance": 15040.19
+   },
+   {
+    "seq": 41,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-JR MEE PANGIST #13/05/2026",
+    "cheque": "PB350781",
+    "debit": 23,
+    "credit": 0,
+    "balance": 15063.19
+   },
+   {
+    "seq": 42,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-WIYA NSI AYAM DAN KEDAI KOPI #A-9AMN3MJWW96KAV-09/05/2026",
+    "cheque": "PB350781",
+    "debit": 28.8,
+    "credit": 0,
+    "balance": 15091.99
+   },
+   {
+    "seq": 43,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "BOWL &SUPERFOOD -28/05/2026",
+    "cheque": "PB350781",
+    "debit": 19.29,
+    "credit": 0,
+    "balance": 15111.28
+   },
+   {
+    "seq": 44,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "GRAB-JR MEE PANGSIT #A-9CL02JDGX8BBV-24/05/2026",
+    "cheque": "PB350781",
+    "debit": 52.7,
+    "credit": 0,
+    "balance": 15163.98
+   },
+   {
+    "seq": 45,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "WARUNG ANAK SAMAH #25128-15/06/2026 (WORKERS MESSING FOR ABSAL)",
+    "cheque": "PB350783",
+    "debit": 17,
+    "credit": 0,
+    "balance": 15180.98
+   },
+   {
+    "seq": 46,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "HONG JIA TING #20260526-0002-26/05/2026 9/05/2026",
+    "cheque": "PB350784",
+    "debit": 31,
+    "credit": 0,
+    "balance": 15211.98
+   },
+   {
+    "seq": 47,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "MEOW TALE CAFETERIA #1-1611-16/05/2026",
+    "cheque": "PB350784",
+    "debit": 18.5,
+    "credit": 0,
+    "balance": 15230.48
+   },
+   {
+    "seq": 48,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "YII SIANG HAINAM NGIU CHAP S/B #000141055-25/05/2026",
+    "cheque": "PB350784",
+    "debit": 103.5,
+    "credit": 0,
+    "balance": 15333.98
+   },
+   {
+    "seq": 49,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "GRAB-TECK KEE RESTAURANT -12/06/2026",
+    "cheque": "PB350784",
+    "debit": 45.4,
+    "credit": 0,
+    "balance": 15379.38
+   },
+   {
+    "seq": 50,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "GRAB-IKAN BOULU TANPA TULANG 3 -16/06/2026",
+    "cheque": "PB350784",
+    "debit": 22.9,
+    "credit": 0,
+    "balance": 15402.28
+   },
+   {
+    "seq": 51,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "GRAB-MINT PEPPERMINT -06/06/2026",
+    "cheque": "PB350784",
+    "debit": 42,
+    "credit": 0,
+    "balance": 15444.28
+   },
+   {
+    "seq": 52,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "WIYA NASI AYAM DAN KEDAI KOPI #00067484-07/06/2026",
+    "cheque": "PB350785",
+    "debit": 11,
+    "credit": 0,
+    "balance": 15455.28
+   },
+   {
+    "seq": 53,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "AI RECIPE S/B #100005 01/50465-14/06/2026",
+    "cheque": "PB350785",
+    "debit": 14.2,
+    "credit": 0,
+    "balance": 15469.48
+   },
+   {
+    "seq": 54,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "WIYA NASI AYAM DAN KEDAI KOPI #00067488-07/06/2026",
+    "cheque": "PB350785",
+    "debit": 52.5,
+    "credit": 0,
+    "balance": 15521.98
+   },
+   {
+    "seq": 55,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "KK FRESH PRORK NOODLE #48499-11/04/2026",
+    "cheque": "PB350785",
+    "debit": 42.5,
+    "credit": 0,
+    "balance": 15564.48
+   },
+   {
+    "seq": 56,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "PINGE #SLHQ01CT0120260020203-19/06/2026",
+    "cheque": "PB350785",
+    "debit": 17.8,
+    "credit": 0,
+    "balance": 15582.28
+   },
+   {
+    "seq": 57,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "RESTORAN TAUFIK 1 -26/06/2026 (WORKERS MESSING BY ABSAL/BOY)",
+    "cheque": "PB350785",
+    "debit": 22,
+    "credit": 0,
+    "balance": 15604.28
+   },
+   {
+    "seq": 58,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "SINSURAN SANG NYUK MEE #KK152CS00039022-10/06/2026",
+    "cheque": "PB350785",
+    "debit": 103.3,
+    "credit": 0,
+    "balance": 15707.58
+   },
+   {
+    "seq": 59,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "RESTAURANT KHONG KEE #1-00122209-13/06/2026",
+    "cheque": "PB350785",
+    "debit": 25,
+    "credit": 0,
+    "balance": 15732.58
+   },
+   {
+    "seq": 60,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "KOPI PING CAFE #20179351-22/06/2026 26",
+    "cheque": "PB350785",
+    "debit": 62.4,
+    "credit": 0,
+    "balance": 15794.98
+   }
+  ],
+  "june_movement": 3086.49,
+  "line_count": 60,
+  "total_debit": 3086.49,
+  "total_credit": 0
+ },
+ {
+  "account": "MBSM O",
+  "account_code_normalized": "MBSM_O",
+  "account_name": "OFFICE",
+  "pages": [
+   8
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 8990.3,
+  "closing_balance": 11242,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "RUSINI BINTI GASUN-04/06/2026(OFFICE LUNCH 04/06-06/06/2026)MENT/EVAPORATOR CLEANER/DIESEL INJECTOR CLEANING)",
+    "cheque": "PB350780",
+    "debit": 192,
+    "credit": 0,
+    "balance": 9182.3
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "RUSINI BINTI GASUN-08/06/2026 (OFFICE LUNCH 08/06-13/06/2026)",
+    "cheque": "PB350780",
+    "debit": 384,
+    "credit": 0,
+    "balance": 9566.3
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "WOORI BBQ S/B #220996-10/05/2026",
+    "cheque": "PB350781",
+    "debit": 480,
+    "credit": 0,
+    "balance": 10046.3
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "RUSINI BINTI GASUN-13/06/2026 (OFFICE LUNCH 15/06-20/06/2026)",
+    "cheque": "PB350783",
+    "debit": 384,
+    "credit": 0,
+    "balance": 10430.3
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "RUSINI BINTI GASUN-20/06/2026 (OFFICE LUNCH 22/06-27/06/2026)",
+    "cheque": "PB350783",
+    "debit": 320,
+    "credit": 0,
+    "balance": 10750.3
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-23",
+    "journal": "PV007/06",
+    "particulars": "ORIENTAL COFFEE (KL) S/B #SS04/06180-14/05/2026",
+    "cheque": "PB350784",
+    "debit": 107.7,
+    "credit": 0,
+    "balance": 10858
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "RUSINI BINTI GASUN -27/06/2026 (OFFICE LUNCH 29/06-04/04/2026)",
+    "cheque": "PB350785",
+    "debit": 384,
+    "credit": 0,
+    "balance": 11242
+   }
+  ],
+  "june_movement": 2251.7,
+  "line_count": 7,
+  "total_debit": 2251.7,
+  "total_credit": 0
+ },
+ {
+  "account": "OIL6323",
+  "account_name": "DIESEL SAB6323H",
+  "pages": [
+   12
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 388.15,
+  "closing_balance": 758.5,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #01001948-11/04/2026",
+    "cheque": "PB350781",
+    "debit": 30,
+    "credit": 0,
+    "balance": 418.15
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #635436-09/04/2026",
+    "cheque": "PB350781",
+    "debit": 20,
+    "credit": 0,
+    "balance": 438.15
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL STESEN MINYAK WAWASAN #01001992-16/04/2026",
+    "cheque": "PB350781",
+    "debit": 20,
+    "credit": 0,
+    "balance": 458.15
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #618945-28/03/2026",
+    "cheque": "PB350781",
+    "debit": 43.25,
+    "credit": 0,
+    "balance": 501.4
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL EQUITY MALIA S/B #01002550-25/03/2026",
+    "cheque": "PB350781",
+    "debit": 30,
+    "credit": 0,
+    "balance": 531.4
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #01001895-25/05/2026",
+    "cheque": "PB350781",
+    "debit": 30,
+    "credit": 0,
+    "balance": 561.4
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #01001996-27/04/2026",
+    "cheque": "PB350781",
+    "debit": 23.35,
+    "credit": 0,
+    "balance": 584.75
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #01001943-09/04/2026",
+    "cheque": "PB350781",
+    "debit": 20,
+    "credit": 0,
+    "balance": 604.75
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL COMSPACE CORPORATION S/B #01001826-01/03/2026",
+    "cheque": "PB350781",
+    "debit": 30,
+    "credit": 0,
+    "balance": 634.75
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "PETRON JALAN BUNDUSAN SS #13054734-24/06/2026",
+    "cheque": "PB350781",
+    "debit": 20,
+    "credit": 0,
+    "balance": 654.75
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #01001886-22/03/2026",
+    "cheque": "PB350781",
+    "debit": 30,
+    "credit": 0,
+    "balance": 684.75
+   },
+   {
+    "seq": 12,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL EQUITY MALIA S/B #01002478-07/03/2026",
+    "cheque": "PB350781",
+    "debit": 30,
+    "credit": 0,
+    "balance": 714.75
+   },
+   {
+    "seq": 13,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL EQUITY MALIA S/B #01002514-16/03/2026",
+    "cheque": "PB350781",
+    "debit": 30,
+    "credit": 0,
+    "balance": 744.75
+   },
+   {
+    "seq": 14,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #REFHZIL25-28/03/2026",
+    "cheque": "PB350781",
+    "debit": 13.75,
+    "credit": 0,
+    "balance": 758.5
+   }
+  ],
+  "june_movement": 370.35,
+  "line_count": 14,
+  "total_debit": 370.35,
+  "total_credit": 0
+ },
+ {
+  "account": "OIL9698",
+  "account_name": "DIESEL SAB9698C",
+  "pages": [
+   13
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 534.3,
+  "closing_balance": 849.8,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL COMSPACE CORPORATION S/B #02001394-08/01/2026",
+    "cheque": "PB350781",
+    "debit": 40,
+    "credit": 0,
+    "balance": 574.3
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL COMSPACE CORPORATION S/B #01001796-19/02/2026",
+    "cheque": "PB350781",
+    "debit": 50,
+    "credit": 0,
+    "balance": 624.3
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHEL STESEN MINYAK KOBUSAK #01002323-29/03/2026",
+    "cheque": "PB350781",
+    "debit": 62.9,
+    "credit": 0,
+    "balance": 687.2
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "BUNDUSAN SEVICE STATION #686492-11/05/2026",
+    "cheque": "PB350781",
+    "debit": 52.6,
+    "credit": 0,
+    "balance": 739.8
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #686492-11/05/2026",
+    "cheque": "PB350781",
+    "debit": 70,
+    "credit": 0,
+    "balance": 809.8
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL PEI SENG #01002466-09/03/2026",
+    "cheque": "PB350781",
+    "debit": 40,
+    "credit": 0,
+    "balance": 849.8
+   }
+  ],
+  "june_movement": 315.5,
+  "line_count": 6,
+  "total_debit": 315.5,
+  "total_credit": 0
+ },
+ {
+  "account": "OIL9897",
+  "account_name": "DIESEL SAB9897R",
+  "pages": [
+   14
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 1760,
+  "closing_balance": 2290,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "PETRON MININTOD SS EXCELWAY TRADING S/B #21860084-23/05/2026 (DELIVER BIHUN TO CUSTOMER TEO, LIDO)",
+    "cheque": "PB350780",
+    "debit": 50,
+    "credit": 0,
+    "balance": 1810
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL COMSPACE CORPORATION S/B #R8FIKNJ178-08/06/2026 (DELIVER BIHUN TO CUSTOMER)",
+    "cheque": "PB350780",
+    "debit": 50,
+    "credit": 0,
+    "balance": 1860
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #REFKHVAI-06/06/2026 (DELIVER BIHUN TO CUSTOMER TEO)",
+    "cheque": "PB350780",
+    "debit": 50,
+    "credit": 0,
+    "balance": 1910
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #REFIKCIR2-04/06/2026 (COLLECT PYMT FROM CUSTOMER)",
+    "cheque": "PB350780",
+    "debit": 40,
+    "credit": 0,
+    "balance": 1950
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL KIVATUSIN STATION #RXFIE9114L-25/05/2026 ABRO BLACK TRV SILICON SEALANT #CS-257995-05/06/2026 (ABRO BLACK RTV SILICONE SEALANT)",
+    "cheque": "PB350780",
+    "debit": 50,
+    "credit": 0,
+    "balance": 2000
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL KIVATUSIN STATION #RXFIEH9QC-28/05/2026 (DELIVER BIHUN TO CUSTOMER)",
+    "cheque": "PB350780",
+    "debit": 50,
+    "credit": 0,
+    "balance": 2050
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL KOLAM FUEL ENTERPRISE #SIFILFAEK-18/06/2026 (DELIVER BIHUN TO CUSTOMER MEE NGAR)",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 2100
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL STESEN MINYAK WAWASAN #QZFIL6YOH-15/06/2026 (DELIVE BIHUN TO CUSTOMER)",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 2150
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL KIVATUSIN STATION #RXFIL1DTN-13/06/2026 (DELIVER BIHUN TO CUSTOMBER TEO)",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 2200
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL KIVATUSIN STATION #RXFILKY19X-20/06/2026 (DELIVER BIHUN TO CUSTOMER)",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 2250
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "SHELL MUTIARA KLASIK #RTFILW4160-24/06/2026 (COLLECT PYMT FROM CUSTOMER @ KEPAYAN)",
+    "cheque": "PB350785",
+    "debit": 40,
+    "credit": 0,
+    "balance": 2290
+   }
+  ],
+  "june_movement": 530,
+  "line_count": 11,
+  "total_debit": 530,
+  "total_credit": 0
+ },
+ {
+  "account": "OIL9922",
+  "account_name": "DIESEL SD9922H",
+  "pages": [
+   15
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 3193.61,
+  "closing_balance": 3813.09,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-04",
+    "journal": "PBE002/06",
+    "particulars": "SHELL-JLN BUNDUSAN-02/05/2026",
+    "cheque": "PBE26060",
+    "debit": 127.71,
+    "credit": 0,
+    "balance": 3321.32
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-04",
+    "journal": "PBE002/06",
+    "particulars": "SHELL-JLN BUNDUSAN-06/05/2026",
+    "cheque": "PBE26060",
+    "debit": 130.52,
+    "credit": 0,
+    "balance": 3451.84
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-04",
+    "journal": "PBE002/06",
+    "particulars": "SHELL-JLN LINTAS-13/05/2026",
+    "cheque": "PBE26060",
+    "debit": 153.75,
+    "credit": 0,
+    "balance": 3605.59
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV004/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #651435-19/04/2026",
+    "cheque": "PB350781",
+    "debit": 127.5,
+    "credit": 0,
+    "balance": 3733.09
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "SHELL SYT.EXCEL SERVICE #01003038-03/06/2026",
+    "cheque": "PB350785",
+    "debit": 80,
+    "credit": 0,
+    "balance": 3813.09
+   }
+  ],
+  "june_movement": 619.48,
+  "line_count": 5,
+  "total_debit": 619.48,
+  "total_credit": 0
+ },
+ {
+  "account": "OILFORK",
+  "account_name": "DIESEL FORKLIFT",
+  "pages": [
+   16
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 1479,
+  "closing_balance": 1651,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL MEGA GAS STATION #SJFDPJXM-18/05/2026 26",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1522
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL OSCAJADI S/B #R5FIEKOGS-29/05/2026",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1565
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL MARKMAJU (SABAH) S/B #SKFIKYGFL-12/06/2026",
+    "cheque": "PB350783",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1608
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL MUTIARA KLASIK #RTFIKQ49T-09/06/2026",
+    "cheque": "PB350783",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1651
+   }
+  ],
+  "june_movement": 172,
+  "line_count": 4,
+  "total_debit": 172,
+  "total_credit": 0
+ },
+ {
+  "account": "OILHT15",
+  "account_name": "DIESEL HITACHI EX60-SAB9515M(B)",
+  "pages": [
+   17
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 937,
+  "closing_balance": 1283,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL MARKMAJU (SABAH) S/B #SKFIDUXDQ-20/05/2026",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 980
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "PETRONAS STESEN SERVIS JOHAN S/B #734092-26/05/2026",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1023
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL KIVATUSIN STATION #ERXFIL9OJ6-16/06/2026",
+    "cheque": "PB350783",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1066
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL MARKMAJU (SABAH) S/B #SKFIKTOPD-10/06/2026",
+    "cheque": "PB350783",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1109
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "PETRONAS SYT. JUTA HIDAYAH #F8B5BA-04/06/2026",
+    "cheque": "PB350783",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1152
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL COMSPACE CORPRORATION S/B #RBFIKHT13-06/06/2026",
+    "cheque": "PB350783",
+    "debit": 45,
+    "credit": 0,
+    "balance": 1197
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "SHELL KIVATUSIN STATION #RXFILYRP2-25/06/2026",
+    "cheque": "PB350785",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1240
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "SHELL KIVATUSIN STATION #R5FILVZMZ-24/06/2026",
+    "cheque": "PB350785",
+    "debit": 43,
+    "credit": 0,
+    "balance": 1283
+   }
+  ],
+  "june_movement": 346,
+  "line_count": 8,
+  "total_debit": 346,
+  "total_credit": 0
+ },
+ {
+  "account": "OILHT18",
+  "account_name": "DIESEL HITACHI EX60-SAB9518M(K)",
+  "pages": [
+   18
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 2379,
+  "closing_balance": 2687,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "SHELL SMS KG LIKAS(SABAH) S/B #QGFIEBOGN-26/05/2026 FOR MGT)",
+    "cheque": "PB350779",
+    "debit": 43,
+    "credit": 0,
+    "balance": 2422
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL MARKMAJU (SABAH) S/B #SKFIEJWC2-29/05/2026)",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 2465
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL STESEN MINYAK WAWASAN #QZFIDS9MP-19/05/2026",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 2508
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL MEGA GAS STATION #SJFIEH7HS-28/05/2026",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 2551
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL MEGA GAS STATION #SJFIEOJHY-22/05/2026",
+    "cheque": "PB350780",
+    "debit": 43,
+    "credit": 0,
+    "balance": 2594
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL KIVATUSIN STATION #RXFIYLF2-12/06/2026",
+    "cheque": "PB350783",
+    "debit": 43,
+    "credit": 0,
+    "balance": 2637
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL BUNDUSAN SERVICE STATION #REFIKT1H7-10/06/2026",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 2687
+   }
+  ],
+  "june_movement": 308,
+  "line_count": 7,
+  "total_debit": 308,
+  "total_credit": 0
+ },
+ {
+  "account": "OILOTH",
+  "account_name": "OIL OTHERS",
+  "pages": [
+   19
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 7919.4,
+  "closing_balance": 8369.4,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "PETRON MININTOD SS EXCELWAY TRADING S/B #11761186-04/06/2026 (WQM9340 BOY)",
+    "cheque": "PB350779",
+    "debit": 50,
+    "credit": 0,
+    "balance": 7969.4
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "PETRON ULAM SOUTH INANAM GAS SERVICE STATION #11062121-25/05/2026 (SA4536T ABSAL)",
+    "cheque": "PB350779",
+    "debit": 50,
+    "credit": 0,
+    "balance": 8019.4
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "PETRON MININTOD SS EXCELWAY TRADING SB #11761173-04/06/2026 (MBM6882 RAMLIH)",
+    "cheque": "PB350780",
+    "debit": 30,
+    "credit": 0,
+    "balance": 8049.4
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "PETRONAS NIGAJAYA S/B #8F8A07-24/05/2026 (MWM6883 RAMLIH)",
+    "cheque": "PB350780",
+    "debit": 30,
+    "credit": 0,
+    "balance": 8079.4
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "SHELL KG LIKAS (SABAH) S/B #QGFIKNJS7-08/06/2026 (SAA5254D)",
+    "cheque": "PB350780",
+    "debit": 40,
+    "credit": 0,
+    "balance": 8119.4
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL MARKMAJU (SABAH) S/B #SKFIL9NKV-16/06/2026 (ABSAL -SA4536T)",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 8169.4
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "PETRON INANAM GAS SS #23207231-15/06/2026 (ABSAL-SA4536T)",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 8219.4
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL KIVATUSIN STATION #02002125-09/06/2026 (ABSAL SA4536T)",
+    "cheque": "PB350783",
+    "debit": 50,
+    "credit": 0,
+    "balance": 8269.4
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "PETRONAS MINAS TRADING COMPANY #BEA28F-08/06/2026 (RAMLIH MBM6883)",
+    "cheque": "PB350783",
+    "debit": 30,
+    "credit": 0,
+    "balance": 8299.4
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL HOCK HOE HIN HONG KEE S/B #QEFILQ75D-22/06/2026 (SAA5254D ROSA)",
+    "cheque": "PB350783",
+    "debit": 30,
+    "credit": 0,
+    "balance": 8329.4
+   },
+   {
+    "seq": 11,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "SHELL HOCK HOE HIN HONG KEE S/B #QEFIL6Q4J-15/06/2026)",
+    "cheque": "PB350783",
+    "debit": 40,
+    "credit": 0,
+    "balance": 8369.4
+   }
+  ],
+  "june_movement": 450,
+  "line_count": 11,
+  "total_debit": 450,
+  "total_credit": 0
+ },
+ {
+  "account": "R9698",
+  "account_name": "REPAIR SAB9698C",
+  "pages": [
+   20
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 1247,
+  "closing_balance": 1870,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-04",
+    "journal": "PBE007/06",
+    "particulars": "YAYANG GARAGE #YG2026/06/01-04/06/2026 ( REPAIR/CHANGE PLUG & ORING)",
+    "cheque": "PBE26060",
+    "debit": 500,
+    "credit": 0,
+    "balance": 1747
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "K.K SEAL ENTERPRISE S/B #CSA-21897-04/06/2026 (128 VITON ORING/LONG AIR BLOWER GUN)",
+    "cheque": "PB350779",
+    "debit": 23,
+    "credit": 0,
+    "balance": 1770
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "DIGNITY BRAND S/B #CS-D081338-04/06/2026 (SPARK PLUG H/D CRV 2.0 16V X 4PCS)",
+    "cheque": "PB350779",
+    "debit": 100,
+    "credit": 0,
+    "balance": 1870
+   }
+  ],
+  "june_movement": 623,
+  "line_count": 3,
+  "total_debit": 623,
+  "total_credit": 0
+ },
+ {
+  "account": "R9922",
+  "account_name": "REPAIR SD9922H",
+  "pages": [
+   21
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 2277,
+  "closing_balance": 2839,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-04",
+    "journal": "PBE002/06",
+    "particulars": "PARKING FEE @ KPJ SABAH",
+    "cheque": "PBE26060",
+    "debit": 3,
+    "credit": 0,
+    "balance": 2280
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "FOOK HANG AUTO PARTS S/B #CBH209639-26/06/2026 (OIL FILTER/STABILIZER BAR BUSH 29MM)",
+    "cheque": "PB350785",
+    "debit": 76,
+    "credit": 0,
+    "balance": 2356
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "HUP SENG HEND PARTS S/B #CS2606/05098-26/06/2026 (ACSOBER TY KUN 25'05 REVO FR RS ULTRA X 2/STAB LINK TY-KUN25'15')",
+    "cheque": "PB350785",
+    "debit": 483,
+    "credit": 0,
+    "balance": 2839
+   }
+  ],
+  "june_movement": 562,
+  "line_count": 3,
+  "total_debit": 562,
+  "total_credit": 0
+ },
+ {
+  "account": "RBFORK",
+  "account_name": "REPAIR BATTERY FORKLIFT",
+  "pages": [
+   23
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 25,
+  "closing_balance": 440,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "KK FORKLIFT & PARTS SUPPLIES S/B #INV-50147-23/06/2026 (TILT CYL KIT X 2SETS)",
+    "cheque": "PB350785",
+    "debit": 240,
+    "credit": 0,
+    "balance": 265
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "KK FORKLIFT & PARTS SUPPLIES S/B #INV-50220-26/06/2026 (STUD BOLT C/W NUT/HUB NUT @ 5PCS/EACH)",
+    "cheque": "PB350785",
+    "debit": 175,
+    "credit": 0,
+    "balance": 440
+   }
+  ],
+  "june_movement": 415,
+  "line_count": 2,
+  "total_debit": 415,
+  "total_credit": 0
+ },
+ {
+  "account": "ROTH",
+  "account_name": "REPAIR OTHERS",
+  "pages": [
+   22
+  ],
+  "opening_date": "2026-06-01",
+  "opening_balance": 4023.05,
+  "closing_balance": 5930.05,
+  "balance_side": "DR",
+  "lines": [
+   {
+    "seq": 1,
+    "date": "2026-06-10",
+    "journal": "PV002/06",
+    "particulars": "VUN SENG AUTO PARTS S/B #CS-257902-04/06/2026 (SAA5254D -ROSA DRIVE SHAFT SAGA RH SHORT HS X 1)",
+    "cheque": "PB350779",
+    "debit": 155,
+    "credit": 0,
+    "balance": 4178.05
+   },
+   {
+    "seq": 2,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "HUP SENG HENG PARTS S/B #CS2605/05033-23/05/2026 (ABSAL VEHICLE SA4536-CLUTCH SET M PDN/1.8 EXEDY BRG(HD) EXORA)",
+    "cheque": "PB350780",
+    "debit": 395,
+    "credit": 0,
+    "balance": 4573.05
+   },
+   {
+    "seq": 3,
+    "date": "2026-06-10",
+    "journal": "PV003/06",
+    "particulars": "VUN SENG AUTO PATRS S/B#CS-257521-26/05/2026 (SAA5254D-ROSA FAN BLADE RAG SAGA/F/MOTOR FAN)",
+    "cheque": "PB350780",
+    "debit": 100,
+    "credit": 0,
+    "balance": 4673.05
+   },
+   {
+    "seq": 4,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "Q BEE MART S/B #CS-2606-075-15/06/2026 ( ABSAL -SA4536-V85V INVOUIC EL601 X 2/STICK WEIGHT X 4)SON-KUMING/JUNAS)",
+    "cheque": "PB350783",
+    "debit": 280,
+    "credit": 0,
+    "balance": 4953.05
+   },
+   {
+    "seq": 5,
+    "date": "2026-06-23",
+    "journal": "PV006/06",
+    "particulars": "HUP SENG HENG PARTS S/B #CS2606/03096-16/06/2026 (ABSAL SA4536T -MTG ASBER 12V FR/RD-RH-MNL(ATN)/REG.HANDLE SAGA-BROWN)",
+    "cheque": "PB350783",
+    "debit": 97,
+    "credit": 0,
+    "balance": 5050.05
+   },
+   {
+    "seq": 6,
+    "date": "2026-06-27",
+    "journal": "PBE060/06",
+    "particulars": "SUNRISE INTOP S/B #CS-0205844-26/06/2026 (POWER STEERING RACK ASSY WIRA X 1SET/TIMING BELT GEN-2 PESONA/O-RING OIL FILTER FOR RAMLIH VEHICLE MBM6883)",
+    "cheque": "PBE26062",
+    "debit": 630,
+    "credit": 0,
+    "balance": 5680.05
+   },
+   {
+    "seq": 7,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "K.K AUTOMATIC #37434-21/05/2026 (MBM6883 RAMLIH VEHICLE -SOLDERING CARBON/CARBON)",
+    "cheque": "PB350785",
+    "debit": 40,
+    "credit": 0,
+    "balance": 5720.05
+   },
+   {
+    "seq": 8,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "DOUBLE K #16206-25/06/2026 (SA4563T ABSAL VEHICLE -BIG LIGHT/SIGNAL LIGHT)",
+    "cheque": "PB350785",
+    "debit": 150,
+    "credit": 0,
+    "balance": 5870.05
+   },
+   {
+    "seq": 9,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "UNI SHIFU AUTO PARTS S/B #CS-121334-27/06/2026 (MBM6883 RAMLIH VEHICLE -LEFT STEERING BUSH/RIGHT STEERING BUSH)",
+    "cheque": "PB350785",
+    "debit": 24,
+    "credit": 0,
+    "balance": 5894.05
+   },
+   {
+    "seq": 10,
+    "date": "2026-06-30",
+    "journal": "PV008/06",
+    "particulars": "BUMIPUTRA AUTO PARTS #CB096483-27/06/2026 (HALOGEN BULB (HELLA) 12V60/55W X 2PCS FOR SAA5254D-ROSA VEHICLE LIGHTS)",
+    "cheque": "PB350785",
+    "debit": 36,
+    "credit": 0,
+    "balance": 5930.05
+   }
+  ],
+  "june_movement": 1907,
+  "line_count": 10,
+  "total_debit": 1907,
+  "total_credit": 0
+ }
+]

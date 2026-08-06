@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-06",
+    ms: "Pembetulan akaun Jun 2026 (Tien Hock): 31 baris buku tunai/bank bulan Jun telah dikelas semula mengikut rekod program lama (contohnya perbelanjaan yang salah masuk ke akaun Office Refreshment, Staff Messing, diesel atau repair kenderaan dipindahkan ke akaun yang betul, dan beberapa amaun dibaiki mengikut resit asal). Baki lejer Jun untuk akaun-akaun berkaitan (BRM, MBC, MBOR, MBRM, MBRMF, MBSAF, MBSM_K/O, OIL*, R9698, MRM, MGT) kini sepadan dengan cetakan lama sehingga ke sen, dan laporan Estimated Unit Cost BIHUN Jun kini mengikut angka yang telah dibetulkan (FINAL 14.0504). Jumlah keseluruhan Trial Balance Jun tidak berubah.",
+    en: "June 2026 account corrections (Tien Hock): 31 June cash/bank voucher lines have been reclassified to match the legacy program's records (e.g. expenses wrongly keyed to Office Refreshment, Staff Messing, vehicle diesel or repair accounts were moved to the correct accounts, and a few amounts were corrected to the original receipts). June ledger balances for the affected accounts (BRM, MBC, MBOR, MBRM, MBRMF, MBSAF, MBSM_K/O, OIL*, R9698, MRM, MGT) now match the legacy printouts to the cent, and the June BIHUN Estimated Unit Cost report now shows the corrected figures (FINAL 14.0504). The June Trial Balance grand total is unchanged.",
+  },
+  {
+    date: "2026-08-06",
     ms: "Senarai Journal Entries (Tien Hock dan Green Target): kini ada butang batal pada setiap baris, jadi anda boleh membatalkan catatan terus dari senarai tanpa membukanya. Butang batal dan butang padam tidak boleh ditekan bagi catatan yang dimiliki oleh dokumen sumbernya (invois, resit dan sebagainya) — batal atau buang dokumen itu sebaliknya, sama seperti di halaman butiran catatan. Tajuk halaman, tarikh dan penapis juga kekal di bahagian atas semasa anda menatal senarai.",
     en: "Journal Entries list (Tien Hock and Green Target): each row now has a cancel button, so you can cancel an entry straight from the list without opening it. Both the cancel and delete buttons are disabled for entries owned by their source document (invoice, receipt and so on) — cancel or remove that document instead, the same as on the entry details page. The page title, date and filters now also stay at the top while you scroll the list.",
   },
@@ -63,11 +68,6 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     date: "2026-08-06",
     ms: "Material Stock: membetulkan ralat \"Every product must be a BH product\" yang kadangkala muncul semasa menyimpan jadual Stock Kilang selepas bertukar antara tab Mee dan Bihun — senarai produk tab sebelumnya boleh terbawa sebentar. Jika ralat ini masih berlaku, mesej kini menyatakan produk mana yang bermasalah, senarai produk dimuat semula secara automatik (nombor yang anda taip dikekalkan), dan tiada apa-apa yang disimpan separuh jalan — sebelum ini baris bahan di atas sudah tersimpan walaupun jadual Stock Kilang gagal.",
     en: "Material Stock: fixed the \"Every product must be a BH product\" error that could appear when saving the Stock Kilang table after switching between the Mee and Bihun tabs — the previous tab's product list could briefly carry over. If the error still happens, the message now names the product causing it, the product list refreshes automatically (the figures you keyed are kept), and nothing is saved halfway — previously the material rows above were already saved even though the Stock Kilang table failed.",
-  },
-  {
-    date: "2026-08-05",
-    ms: "Cetakan: anda kini boleh memilih saiz kertas A4 atau borang komputer 9.5×11 dari menu pengguna (atas kanan). Dialog cetak invois dan pelarasan juga membolehkan anda menukar saiz dan mencetak semula.",
-    en: "Printing: you can now choose A4 or 9.5×11 computer form paper size from the user menu (top right). Invoice and adjustment print dialogs also let you switch size and reprint.",
   },
   {
     date: "2026-08-05",
