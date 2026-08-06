@@ -1,5 +1,5 @@
 // src/utils/invoice/einvoice/EInvoicePrintHandler.tsx
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import { IconPrinter } from "@tabler/icons-react";
 import Button from "../../../components/Button";
@@ -12,7 +12,10 @@ import { generateQRDataUrl } from "./generateQRCode";
 import EInvoicePDF from "./EInvoicePDF";
 import { ExtendedInvoiceData } from "../../../types/types";
 import { api } from "../../../routes/utils/api";
+import PaperSizePicker from "../../../components/PaperSizePicker";
+import { usePaperSizePreference } from "../../pdf/paperSize";
 import { printPdfFrameWithFallback } from "../../pdfPrintFallback";
+import { useTranslation } from "react-i18next";
 
 interface PrintHandlerProps {
   einvoice?: any; // Single einvoice in original format
@@ -29,27 +32,58 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
   size = "sm",
   onComplete,
 }) => {
+  const { t } = useTranslation("common");
+  const [paperSize, setPaperSize] = usePaperSizePreference();
   const [isPrinting, setIsPrinting] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isLoadingDialogVisible, setIsLoadingDialogVisible] = useState(false);
+  const [showPostPrint, setShowPostPrint] = useState(false);
+  const resourcesRef = useRef<{
+    printFrame: HTMLIFrameElement | null;
+    pdfUrl: string | null;
+  }>({
+    printFrame: null,
+    pdfUrl: null,
+  });
 
-  const cleanup = (
-    resourceFrame: HTMLIFrameElement | null,
-    pdfUrl: string | null
-  ) => {
-    if (pdfUrl) {
-      URL.revokeObjectURL(pdfUrl);
+  const releaseResources = () => {
+    if (resourcesRef.current.pdfUrl) {
+      URL.revokeObjectURL(resourcesRef.current.pdfUrl);
     }
-    if (resourceFrame && resourceFrame.parentNode) {
-      document.body.removeChild(resourceFrame);
+    if (
+      resourcesRef.current.printFrame &&
+      resourcesRef.current.printFrame.parentNode
+    ) {
+      document.body.removeChild(resourcesRef.current.printFrame);
     }
+    resourcesRef.current = { printFrame: null, pdfUrl: null };
+  };
+
+  // Full close: release the iframe/blob and notify the parent (replaces the
+  // old focus-return auto-close, which would shut the post-print panel).
+  const closeAfterPrint = () => {
+    releaseResources();
     setIsPrinting(false);
     setIsGenerating(false);
     setIsLoadingDialogVisible(false);
+    setShowPostPrint(false);
 
     if (onComplete) {
       onComplete();
     }
+  };
+
+  // Called once the print dialog has opened: keep a post-print panel (paper
+  // size + Print Again + Close) instead of closing silently.
+  const showPostPrintPanel = (
+    printFrame: HTMLIFrameElement,
+    pdfUrl: string
+  ) => {
+    resourcesRef.current = { printFrame, pdfUrl };
+    setIsGenerating(false);
+    setIsLoadingDialogVisible(false);
+    setIsPrinting(false);
+    setShowPostPrint(true);
   };
 
   const handlePrint = async () => {
@@ -118,6 +152,7 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
                 qrCodeData={qrDataUrl || ""}
                 isConsolidated={isConsolidated}
                 companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
+                paperSize={paperSize}
               />
             );
           } catch (innerError) {
@@ -148,22 +183,8 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "e-invoice PDF",
               });
-              setIsGenerating(false);
-              setIsLoadingDialogVisible(false);
               toast.success("Print dialog opened");
-
-              // Set a cleanup function when focus returns to window (print dialog closed)
-              const onFocus = () => {
-                window.removeEventListener("focus", onFocus);
-                cleanup(printFrame, pdfUrl);
-              };
-              window.addEventListener("focus", onFocus);
-
-              // Fallback cleanup after 60 seconds in case focus event doesn't fire
-              setTimeout(() => {
-                window.removeEventListener("focus", onFocus);
-                cleanup(printFrame, pdfUrl);
-              }, 60000);
+              showPostPrintPanel(printFrame, pdfUrl);
             }, 500);
           }
         };
@@ -192,6 +213,7 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
               qrCodeData={qrDataUrl}
               isConsolidated={isConsolidated}
               companyContext={isJellyPolly ? "jellypolly" : "tienhock"}
+              paperSize={paperSize}
             />
           </Document>
         );
@@ -210,20 +232,8 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "e-invoice PDF",
               });
-              setIsGenerating(false);
-              setIsLoadingDialogVisible(false);
               toast.success("Print dialog opened");
-
-              const onFocus = () => {
-                window.removeEventListener("focus", onFocus);
-                cleanup(printFrame, pdfUrl);
-              };
-              window.addEventListener("focus", onFocus);
-
-              setTimeout(() => {
-                window.removeEventListener("focus", onFocus);
-                cleanup(printFrame, pdfUrl);
-              }, 60000);
+              showPostPrintPanel(printFrame, pdfUrl);
             }, 500);
           }
         };
@@ -243,6 +253,13 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
       setIsGenerating(false);
       setIsLoadingDialogVisible(false);
     }
+  };
+
+  // Regenerate at the currently selected paper size and print again.
+  const handlePrintAgain = () => {
+    releaseResources();
+    setShowPostPrint(false);
+    handlePrint();
   };
 
   return (
@@ -281,6 +298,38 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPostPrint && (
+        <div className="fixed inset-0 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 min-w-[300px]">
+            <div className="flex flex-col items-center gap-3">
+              <p className="text-base font-medium text-default-900 dark:text-gray-100">
+                {t("Paper Size")}
+              </p>
+              <PaperSizePicker
+                value={paperSize}
+                onChange={setPaperSize}
+                compact
+              />
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  onClick={handlePrintAgain}
+                  className="px-3 py-1.5 text-sm font-medium rounded-md bg-sky-600 text-white hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 transition-colors duration-150"
+                >
+                  {t("Print Again")}
+                </button>
+                <button
+                  onClick={closeAfterPrint}
+                  className="px-3 py-1.5 text-sm font-medium rounded-md border border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors duration-150"
+                >
+                  {t("close")}
+                </button>
+              </div>
             </div>
           </div>
         </div>

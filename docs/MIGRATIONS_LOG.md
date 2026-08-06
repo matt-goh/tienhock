@@ -30,6 +30,18 @@ requires separate approval).
 
 ---
 
+## Removed 5 Aug 2026 — 2 files (TH PCE002/06 reclass + GT employee pay rates)
+
+Both existed at commit **`a92104dd`** — recover either with
+`git show a92104dd:dev/migrations/<filename>`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-05_pce002_acwj_sal_reclass.sql` | TH June 2026 TB reconciliation (boss-annotated `CORRECTED_JUNE_TRIAL_BALANCE.pdf`; full narrative in [ACCOUNTING_PROGRESS.md §7](Account/ACCOUNTING_PROGRESS.md)). Re-pointed the two settlement lines on manual C journal `PCE002/06` (id `2850`, display `PV002/06`, 10/06/2026) from `ACWJ_SAL` to `ACW_SAL`: DR 3,110.48 `INCENTIVES WORKERS(06/2026)` and DR 349.52 `ANNUAL LEAVE WORKRS(06/2026)`. `ACWJ_SAL` ("ACCRUAL THJ (SALARY PAYABLES)") is an account no voucher ever accrues to, so the debits had created a spurious 3,460.00 DR balance; the legacy program settled the same items against `ACW_SAL`. After the fix `ACWJ_SAL` has zero lines database-wide and both accounts match the legacy June TB exactly (`ACWJ_SAL` 0.00, `ACW_SAL` 59,027.75 CR at 2026-06-30); the June TB totals drop from 17,109,996.00 to 17,106,536.00 per side (legacy final 17,106,340.87 — the remaining 195.13/side residual is tracked separately in §7). Guarded, idempotent, fail-closed; data correction only, no schema change. Prod application independently re-verified over SSH after the run: journal 2850 lines correct and still balanced (17,462.00/17,462.00), zero `ACWJ_SAL` lines remain, June-30 balances exact. | dev ✓, prod ✓ (both) |
+| `2026-08-05_greentarget_employee_pay_rates.sql` | Created `greentarget.employee_pay_codes` and `greentarget.pay_rate_schedules` — GT-scoped per-employee pay-rate overrides layered over the SHARED `public.staffs` / `public.pay_codes` catalogue (exact column-shape mirrors of the public tables), so staff on both companies' payrolls can hold different rates per company. Rate precedence: GT schedule > GT override > public employee override > public job/base rate. Seeded the user-confirmed first overrides: directors GOH and WONG draw RM1,700/month `BULAN_BM` at Green Target versus the shared RM3,500 at Tien Hock (previously keyed manually into each GT monthly log); guarded to seed only while the shared RM3,500 override exists, `ON CONFLICT DO NOTHING`. Served by `/greentarget/api/employee-pay-codes` (`src/routes/greentarget/employee-pay-codes.js`). Prod application verified over SSH: both tables present, both seed rows at 1,700.00, schedules table empty. | dev ✓, prod ✓ (both) |
+
+---
+
 ## Removed 2 Aug 2026 — 6 files (GT-P5 v2 production rollout: invoice/receipt parity → debtor dimension)
 
 The **entire GT-P1…GT-P12 sequence** was applied to `tienhock_prod` on the Hetzner server on
