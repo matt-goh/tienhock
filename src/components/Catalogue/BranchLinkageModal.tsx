@@ -28,6 +28,7 @@ import {
   IconAlertTriangle,
   IconBuildingSkyscraper,
 } from "@tabler/icons-react";
+import { useTranslation, Trans } from "react-i18next";
 
 interface BranchGroup {
   id: number;
@@ -69,6 +70,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   onClose,
   initialCustomerId,
 }) => {
+  const { t } = useTranslation("catalogue");
   const { customers, isLoading: fetchingCustomers } = useCustomersCache();
 
   const [saving, setSaving] = useState(false);
@@ -322,33 +324,46 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
   ) => (
     <div className="space-y-3">
       <p>
-        {count} {count === 1 ? "customer" : "customers"} will be linked to{" "}
-        <span className="font-medium text-default-700 dark:text-gray-200">
-          {mainName}
-        </span>
-        .
+        <Trans
+          i18nKey={
+            count === 1
+              ? "{{total}} customer will be linked to <strong>{{name}}</strong>."
+              : "{{total}} customers will be linked to <strong>{{name}}</strong>."
+          }
+          ns="catalogue"
+          values={{ total: count, name: mainName }}
+          components={{
+            strong: (
+              <strong className="font-medium text-default-700 dark:text-gray-200" />
+            ),
+          }}
+        />
       </p>
       {impact.overwritten.length === 0 && impact.repriced.length === 0 ? (
         <p>
-          Their pricing and e-Invoice information will be kept in sync from now
-          on.
+          {t(
+            "Their pricing and e-Invoice information will be kept in sync from now on."
+          )}
         </p>
       ) : (
         <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-3 space-y-2">
           <p className="flex items-center gap-1.5 font-medium text-amber-800 dark:text-amber-300">
             <IconAlertTriangle size={16} className="flex-shrink-0" />
-            This overwrites existing information and cannot be undone
+            {t("This overwrites existing information and cannot be undone")}
           </p>
           {impact.overwritten.length > 0 && (
             <p className="text-amber-800 dark:text-amber-300">
-              e-Invoice details and phone number will be replaced for:{" "}
-              {impact.overwritten.join(", ")}
+              {t(
+                "e-Invoice details and phone number will be replaced for: {{list}}",
+                { list: impact.overwritten.join(", ") }
+              )}
             </p>
           )}
           {impact.repriced.length > 0 && (
             <p className="text-amber-800 dark:text-amber-300">
-              Existing custom product prices will be replaced for:{" "}
-              {impact.repriced.join(", ")}
+              {t("Existing custom product prices will be replaced for: {{list}}", {
+                list: impact.repriced.join(", "),
+              })}
             </p>
           )}
         </div>
@@ -375,7 +390,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim() || !selectedCustomerId) {
-      toast.error("Please enter a group name and select a customer");
+      toast.error(t("Please enter a group name and select a customer"));
       return;
     }
 
@@ -396,7 +411,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         branches,
       });
 
-      toast.success("Branch group created successfully");
+      toast.success(t("Branch group created successfully"));
       // The active group is picked up from the refreshed cache.
       await refreshCustomersCache();
       setIsCreateConfirmOpen(false);
@@ -405,7 +420,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       setSelectedCustomerIds([]);
     } catch (error: any) {
       console.error("Error creating branch group:", error);
-      toast.error(error?.message || "Failed to create branch group");
+      toast.error(error?.message || t("Failed to create branch group"));
     } finally {
       setSaving(false);
     }
@@ -422,15 +437,17 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
 
       toast.success(
         selectedCustomerIds.length === 1
-          ? "Branch added successfully"
-          : `${selectedCustomerIds.length} branches added successfully`
+          ? t("Branch added successfully")
+          : t("{{total}} branches added successfully", {
+              total: selectedCustomerIds.length,
+            })
       );
       await refreshCustomersCache();
       setIsAddConfirmOpen(false);
       setSelectedCustomerIds([]);
     } catch (error: any) {
       console.error("Error adding branches:", error);
-      toast.error(error?.message || "Failed to add branches");
+      toast.error(error?.message || t("Failed to add branches"));
     } finally {
       setSaving(false);
     }
@@ -444,12 +461,12 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       await api.delete(
         `/api/customer-branches/${activeGroup.id}/remove/${branchToRemove.customer_id}`
       );
-      toast.success("Branch removed successfully");
+      toast.success(t("Branch removed successfully"));
       await refreshCustomersCache();
       setBranchToRemove(null);
     } catch (error: any) {
       console.error("Error removing branch:", error);
-      toast.error(error?.message || "Failed to remove branch");
+      toast.error(error?.message || t("Failed to remove branch"));
     } finally {
       setSaving(false);
     }
@@ -463,11 +480,11 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
       await api.put(
         `/api/customer-branches/${activeGroup.id}/main/${branchCustomerId}`
       );
-      toast.success("Main branch updated successfully");
+      toast.success(t("Main branch updated successfully"));
       await refreshCustomersCache();
     } catch (error: any) {
       console.error("Error setting main branch:", error);
-      toast.error(error?.message || "Failed to update main branch");
+      toast.error(error?.message || t("Failed to update main branch"));
     } finally {
       setSaving(false);
     }
@@ -479,12 +496,12 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
     setSaving(true);
     try {
       await api.delete(`/api/customer-branches/${activeGroup.id}`);
-      toast.success("Branch group deleted successfully");
+      toast.success(t("Branch group deleted successfully"));
       await refreshCustomersCache();
       setIsDeleteGroupDialogOpen(false);
     } catch (error: any) {
       console.error("Error deleting branch group:", error);
-      toast.error(error?.message || "Failed to delete branch group");
+      toast.error(error?.message || t("Failed to delete branch group"));
     } finally {
       setSaving(false);
     }
@@ -527,13 +544,12 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                       as="h3"
                       className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                     >
-                      Branch Management
+                      {t("Branch Management")}
                     </DialogTitle>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
-                      Link multiple customer branches to share pricing and
-                      e-Invoice information. Any price change in one branch will
-                      update pricing for all linked branches. All branches will
-                      also share the same e-Invoice information.
+                      {t(
+                        "Link multiple customer branches to share pricing and e-Invoice information. Any price change in one branch will update pricing for all linked branches. All branches will also share the same e-Invoice information."
+                      )}
                     </p>
                   </div>
 
@@ -542,7 +558,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                     <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                         <h4 className="font-medium dark:text-gray-100">
-                          All Branch Groups{" "}
+                          {t("All Branch Groups")}{" "}
                           {!fetchingCustomers && branchGroups.length > 0 && (
                             <span className="text-default-500 dark:text-gray-400 font-normal">
                               ({branchGroups.length})
@@ -561,7 +577,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                               onChange={(e) =>
                                 setGroupSearchQuery(e.target.value)
                               }
-                              placeholder="Search groups or customers"
+                              placeholder={t("Search groups or customers")}
                               className="w-64 pl-9 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
                             />
                           </div>
@@ -574,11 +590,13 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                         </div>
                       ) : branchGroups.length === 0 ? (
                         <p className="text-gray-500 dark:text-gray-400 text-center py-3">
-                          No branch groups found
+                          {t("No branch groups found")}
                         </p>
                       ) : filteredGroups.length === 0 ? (
                         <p className="text-gray-500 dark:text-gray-400 text-center py-3">
-                          No groups match "{groupSearchQuery}"
+                          {t('No groups match "{{query}}"', {
+                            query: groupSearchQuery,
+                          })}
                         </p>
                       ) : (
                         <div className="max-h-52 overflow-y-auto -mx-1 px-1">
@@ -599,10 +617,12 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                   {group.group_name}
                                 </h5>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                  {group.branches.length}{" "}
-                                  {group.branches.length === 1
-                                    ? "branch"
-                                    : "branches"}
+                                  {t(
+                                    group.branches.length === 1
+                                      ? "{{total}} branch"
+                                      : "{{total}} branches",
+                                    { total: group.branches.length }
+                                  )}
                                 </p>
                               </button>
                             ))}
@@ -615,7 +635,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                     <div className="mb-6">
                       <CustomerCombobox
                         name="customer-select"
-                        label="Select a Customer"
+                        label={t("Select a Customer")}
                         value={
                           selectedCustomer
                             ? {
@@ -643,8 +663,9 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                     {!selectedCustomerId ? (
                       <div className="text-center py-6 border border-default-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                         <p className="text-gray-500 dark:text-gray-400">
-                          Select a branch group above, or pick a customer to
-                          manage their branches
+                          {t(
+                            "Select a branch group above, or pick a customer to manage their branches"
+                          )}
                         </p>
                       </div>
                     ) : activeGroup ? (
@@ -660,14 +681,14 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                             onClick={() => setIsDeleteGroupDialogOpen(true)}
                             disabled={saving}
                           >
-                            Delete Group
+                            {t("Delete Group")}
                           </Button>
                         </div>
 
                         <div className="mb-6">
                           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                             <h5 className="font-medium dark:text-gray-200">
-                              Linked Branches{" "}
+                              {t("Linked Branches")}{" "}
                               <span className="text-default-500 dark:text-gray-400 font-normal">
                                 ({activeGroup.branches.length})
                               </span>
@@ -685,7 +706,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                   onChange={(e) =>
                                     setBranchTableQuery(e.target.value)
                                   }
-                                  placeholder="Search branches"
+                                  placeholder={t("Search branches")}
                                   className="w-56 pl-9 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
                                 />
                               </div>
@@ -698,16 +719,16 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                 <thead className="bg-gray-50 dark:bg-gray-900/50 sticky top-0 z-10">
                                   <tr>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                      Customer ID
+                                      {t("Customer ID")}
                                     </th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                      Name
+                                      {t("Name")}
                                     </th>
                                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                      Main Branch
+                                      {t("Main Branch")}
                                     </th>
                                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                      Actions
+                                      {t("Actions")}
                                     </th>
                                   </tr>
                                 </thead>
@@ -718,7 +739,9 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                         colSpan={4}
                                         className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400"
                                       >
-                                        No branches match "{branchTableQuery}"
+                                        {t('No branches match "{{query}}"', {
+                                          query: branchTableQuery,
+                                        })}
                                       </td>
                                     </tr>
                                   ) : (
@@ -745,7 +768,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                                 size={12}
                                                 className="mr-1"
                                               />
-                                              Main
+                                              {t("Main")}
                                             </span>
                                           ) : (
                                             <Button
@@ -758,9 +781,11 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                               }
                                               disabled={saving}
                                               className="text-xs py-1"
-                                              title="Make this the source of shared e-Invoice details"
+                                              title={t(
+                                                "Make this the source of shared e-Invoice details"
+                                              )}
                                             >
-                                              Set as Main
+                                              {t("Set as Main")}
                                             </Button>
                                           )}
                                         </td>
@@ -777,7 +802,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                               disabled={saving}
                                               className="text-xs py-1"
                                             >
-                                              Remove
+                                              {t("Remove")}
                                             </Button>
                                           )}
                                         </td>
@@ -795,8 +820,10 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                 size={14}
                                 className="flex-shrink-0"
                               />
-                              Shared pricing and e-Invoice details come from{" "}
-                              {mainBranchCustomer.name}.
+                              {t(
+                                "Shared pricing and e-Invoice details come from {{name}}.",
+                                { name: mainBranchCustomer.name }
+                              )}
                             </p>
                           )}
                         </div>
@@ -804,13 +831,13 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                         {/* Add more branches */}
                         <div className="mt-2">
                           <h5 className="font-medium mb-2 dark:text-gray-200">
-                            Add More Branches
+                            {t("Add More Branches")}
                           </h5>
                           <div className="flex items-end gap-2">
                             <div className="flex-1">
                               <MultiCustomerCombobox
                                 name="add-branches"
-                                label="Select Customers"
+                                label={t("Select Customers")}
                                 value={selectedCustomerIds}
                                 onChange={setSelectedCustomerIds}
                                 options={paginatedAvailableBranches.map(
@@ -838,12 +865,13 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                 saving || selectedCustomerIds.length === 0
                               }
                             >
-                              Add
+                              {t("Add")}
                             </Button>
                           </div>
                           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                            Customers already in another branch group are not
-                            listed.
+                            {t(
+                              "Customers already in another branch group are not listed."
+                            )}
                           </p>
                         </div>
                       </div>
@@ -852,25 +880,25 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                         {isAddingNew ? (
                           <div>
                             <h4 className="font-medium mb-3 dark:text-gray-100">
-                              Create New Branch Group
+                              {t("Create New Branch Group")}
                             </h4>
                             <div className="space-y-3">
                               <FormInput
                                 name="group-name"
-                                label="Group Name"
+                                label={t("Group Name")}
                                 value={newGroupName}
                                 onChange={(e) =>
                                   setNewGroupName(e.target.value)
                                 }
                                 disabled={saving}
                                 required
-                                placeholder="Enter branch group name"
+                                placeholder={t("Enter branch group name")}
                               />
 
                               <div>
                                 <MultiCustomerCombobox
                                   name="branch-customers"
-                                  label="Select Additional Branches"
+                                  label={t("Select Additional Branches")}
                                   value={selectedCustomerIds}
                                   onChange={setSelectedCustomerIds}
                                   options={newGroupAvailableCustomers.map(
@@ -887,13 +915,18 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                   hasMore={hasMoreNewGroupCustomers}
                                   isLoading={false}
                                   disabled={saving}
-                                  placeholder="Select customers to add as branches"
+                                  placeholder={t(
+                                    "Select customers to add as branches"
+                                  )}
                                 />
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                  {selectedCustomer?.name} (
-                                  {selectedCustomer?.id}) will be the main
-                                  branch, and its pricing and e-Invoice details
-                                  will be shared with every branch added.
+                                  {t(
+                                    "{{name}} ({{id}}) will be the main branch, and its pricing and e-Invoice details will be shared with every branch added.",
+                                    {
+                                      name: selectedCustomer?.name,
+                                      id: selectedCustomer?.id,
+                                    }
+                                  )}
                                 </p>
                               </div>
 
@@ -903,7 +936,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                   onClick={() => setIsAddingNew(false)}
                                   disabled={saving}
                                 >
-                                  Cancel
+                                  {t("Cancel")}
                                 </Button>
                                 <Button
                                   variant="filled"
@@ -917,7 +950,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                                   }}
                                   disabled={saving || !newGroupName.trim()}
                                 >
-                                  {saving ? "Creating..." : "Create Group"}
+                                  {saving ? t("Creating...") : t("Create Group")}
                                 </Button>
                               </div>
                             </div>
@@ -925,7 +958,9 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                         ) : (
                           <div className="text-center py-6">
                             <p className="text-gray-500 dark:text-gray-400 mb-4">
-                              This customer is not part of any branch group yet
+                              {t(
+                                "This customer is not part of any branch group yet"
+                              )}
                             </p>
                             <Button
                               variant="filled"
@@ -933,7 +968,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                               onClick={startCreateGroup}
                               disabled={saving}
                             >
-                              Create Branch Group
+                              {t("Create Branch Group")}
                             </Button>
                           </div>
                         )}
@@ -948,7 +983,7 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                       onClick={onClose}
                       disabled={saving}
                     >
-                      Close
+                      {t("Close")}
                     </Button>
                   </div>
                 </DialogPanel>
@@ -962,13 +997,13 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         isOpen={isAddConfirmOpen}
         onClose={() => setIsAddConfirmOpen(false)}
         onConfirm={handleAddToBranch}
-        title="Link branches to this group"
+        title={t("Link branches to this group")}
         message={renderLinkImpact(
           addImpact,
-          mainBranchCustomer?.name || "the main branch",
+          mainBranchCustomer?.name || t("the main branch"),
           selectedCustomerIds.length
         )}
-        confirmButtonText={saving ? "Linking..." : "Link Branches"}
+        confirmButtonText={saving ? t("Linking...") : t("Link Branches")}
         variant="default"
         isConfirming={saving}
       />
@@ -977,13 +1012,13 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         isOpen={isCreateConfirmOpen}
         onClose={() => setIsCreateConfirmOpen(false)}
         onConfirm={handleCreateGroup}
-        title="Create branch group"
+        title={t("Create branch group")}
         message={renderLinkImpact(
           createImpact,
-          selectedCustomer?.name || "the main branch",
+          selectedCustomer?.name || t("the main branch"),
           selectedCustomerIds.length
         )}
-        confirmButtonText={saving ? "Creating..." : "Create Group"}
+        confirmButtonText={saving ? t("Creating...") : t("Create Group")}
         variant="default"
         isConfirming={saving}
       />
@@ -992,21 +1027,28 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         isOpen={Boolean(branchToRemove)}
         onClose={() => setBranchToRemove(null)}
         onConfirm={handleRemoveBranch}
-        title="Remove Branch"
+        title={t("Remove Branch")}
         message={
           <div className="space-y-3">
             <p>
-              Remove{" "}
-              <span className="font-medium text-default-700 dark:text-gray-200">
-                {branchToRemove?.customer_name}
-              </span>{" "}
-              from {activeGroup?.group_name}? It will stop sharing pricing and
-              e-Invoice information with the other branches.
+              <Trans
+                i18nKey="Remove <strong>{{name}}</strong> from {{group}}? It will stop sharing pricing and e-Invoice information with the other branches."
+                ns="catalogue"
+                values={{
+                  name: branchToRemove?.customer_name,
+                  group: activeGroup?.group_name,
+                }}
+                components={{
+                  strong: (
+                    <strong className="font-medium text-default-700 dark:text-gray-200" />
+                  ),
+                }}
+              />
             </p>
             <p>
-              The pricing and e-Invoice details it already received from the
-              main branch stay on the customer - removing it does not restore
-              its previous values.
+              {t(
+                "The pricing and e-Invoice details it already received from the main branch stay on the customer - removing it does not restore its previous values."
+              )}
             </p>
             {activeGroup?.branches.length === 2 && (
               <p className="flex items-start gap-1.5 text-amber-700 dark:text-amber-300">
@@ -1014,12 +1056,12 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
                   size={16}
                   className="flex-shrink-0 mt-0.5"
                 />
-                Only the main branch will be left in this group.
+                {t("Only the main branch will be left in this group.")}
               </p>
             )}
           </div>
         }
-        confirmButtonText={saving ? "Removing..." : "Remove Branch"}
+        confirmButtonText={saving ? t("Removing...") : t("Remove Branch")}
         isConfirming={saving}
       />
 
@@ -1027,9 +1069,15 @@ const BranchLinkageModal: React.FC<BranchLinkageModalProps> = ({
         isOpen={isDeleteGroupDialogOpen}
         onClose={() => setIsDeleteGroupDialogOpen(false)}
         onConfirm={handleDeleteGroup}
-        title="Delete Branch Group"
-        message={`Are you sure you want to delete the branch group "${activeGroup?.group_name}"? This unlinks all ${activeGroup?.branches.length} branches, which will no longer share pricing or e-Invoice information. Their current prices and details are kept.`}
-        confirmButtonText={saving ? "Deleting..." : "Delete Group"}
+        title={t("Delete Branch Group")}
+        message={t(
+          'Are you sure you want to delete the branch group "{{group}}"? This unlinks all {{total}} branches, which will no longer share pricing or e-Invoice information. Their current prices and details are kept.',
+          {
+            group: activeGroup?.group_name,
+            total: activeGroup?.branches.length,
+          }
+        )}
+        confirmButtonText={saving ? t("Deleting...") : t("Delete Group")}
         isConfirming={saving}
       />
     </>

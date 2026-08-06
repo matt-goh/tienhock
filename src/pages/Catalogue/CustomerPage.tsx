@@ -13,6 +13,7 @@ import {
   IconBuildingSkyscraper,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import CustomerCard from "../../components/Catalogue/CustomerCard";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -70,6 +71,7 @@ const reviveFilters = (cached: any): CustomerListFilters => ({
 
 const CustomerPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("catalogue");
   const { customers, isLoading, error } = useCustomersCache();
   const [searchTerm, setSearchTerm] = useState(() => {
     // Retrieve saved search term from sessionStorage
@@ -166,10 +168,10 @@ const CustomerPage: React.FC = () => {
 
         setIsDeleteDialogOpen(false);
         setCustomerToDelete(null);
-        toast.success("Customer deleted successfully");
+        toast.success(t("Customer deleted successfully"));
       } catch (err) {
         console.error("Error deleting customer:", err);
-        toast.error("Failed to delete customer. Please try again.");
+        toast.error(t("Failed to delete customer. Please try again."));
       }
     }
   };
@@ -244,7 +246,7 @@ const CustomerPage: React.FC = () => {
           <ListboxButton
             className={`${widthClass} rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500`}
           >
-            <span className="block truncate pl-2">{value}</span>
+            <span className="block truncate pl-2">{displayFilterValue(value)}</span>
             <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
               <IconChevronDown
                 className="h-5 w-5 text-default-400 dark:text-gray-400"
@@ -272,7 +274,7 @@ const CustomerPage: React.FC = () => {
                         selected ? "font-medium" : "font-normal"
                       }`}
                     >
-                      {option}
+                      {displayFilterValue(option)}
                     </span>
                     {selected && (
                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -288,6 +290,14 @@ const CustomerPage: React.FC = () => {
       </Listbox>
     </div>
   );
+
+  const displayFilterValue = (value: string): string =>
+    value === "All Salesmen" ||
+    value === ALL_BRANCHES ||
+    value === IN_BRANCH_GROUP ||
+    value === NO_BRANCH_GROUP
+      ? t(value)
+      : value;
 
   const renderPaginationButtons = () => {
     const buttons = [];
@@ -391,7 +401,7 @@ const CustomerPage: React.FC = () => {
   }
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return <div>{t("Error: {{message}}", { message: error.message })}</div>;
   }
 
   return (
@@ -404,7 +414,9 @@ const CustomerPage: React.FC = () => {
               stroke={2.5}
               className="text-default-700 dark:text-gray-200"
             />
-            Customers ({filteredCustomers.length})
+            {t("Customers ({{total}})", {
+              total: filteredCustomers.length,
+            })}
           </h1>
         </div>
         <div className="flex space-x-3">
@@ -416,7 +428,7 @@ const CustomerPage: React.FC = () => {
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search"
+              placeholder={t("search", { ns: "common" })}
               className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -425,7 +437,7 @@ const CustomerPage: React.FC = () => {
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
                 onClick={() => setSearchTerm("")}
-                title="Clear search"
+                title={t("Clear search")}
               >
                 ×
               </button>
@@ -446,38 +458,42 @@ const CustomerPage: React.FC = () => {
             onClick={async () => {
               try {
                 await refreshCustomersCache();
-                toast.success("Refreshed customer list");
+                toast.success(t("Refreshed customer list"));
               } catch (error) {
-                toast.error("Failed to refresh customers");
+                toast.error(t("Failed to refresh customers"));
               }
             }}
             variant="outline"
-            title="Refresh Customers"
+            title={t("Refresh Customers")}
             icon={IconRefresh}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             onClick={() => openBranchModal()}
             variant="outline"
             icon={IconBuildingSkyscraper}
-            title="Manage branch groups"
+            title={t("Manage branch groups")}
           >
-            Branches{branchGroupNames.length > 0 && ` (${branchGroupNames.length})`}
+            {branchGroupNames.length > 0
+              ? t("Branches ({{total}})", { total: branchGroupNames.length })
+              : t("Branches")}
           </Button>
           <Button
             onClick={() => navigate("/catalogue/customer/new")}
             icon={IconPlus}
             color="sky"
           >
-            Add Customer
+            {t("Add Customer")}
           </Button>
         </div>
       </div>
 
       {filteredCustomers.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-default-500 dark:text-gray-400">No customers found.</p>
+          <p className="text-default-500 dark:text-gray-400">
+            {t("No customers found.")}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -500,7 +516,7 @@ const CustomerPage: React.FC = () => {
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
-            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
+            <IconChevronLeft className="w-5 h-5 mr-2" /> {t("Previous")}
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
@@ -508,7 +524,7 @@ const CustomerPage: React.FC = () => {
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
-            Next <IconChevronRight className="w-5 h-5 ml-2" />
+            {t("Next")} <IconChevronRight className="w-5 h-5 ml-2" />
           </button>
         </div>
       )}
@@ -517,9 +533,12 @@ const CustomerPage: React.FC = () => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Customer"
-        message={`Are you sure you want to remove ${customerToDelete?.name} from the customer list? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Customer")}
+        message={t(
+          "Are you sure you want to remove {{name}} from the customer list? This action cannot be undone.",
+          { name: customerToDelete?.name }
+        )}
+        confirmButtonText={t("delete", { ns: "common" })}
       />
       <BranchLinkageModal
         isOpen={isBranchModalOpen}

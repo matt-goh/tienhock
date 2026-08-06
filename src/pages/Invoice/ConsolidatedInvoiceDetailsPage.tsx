@@ -15,6 +15,7 @@ import {
   IconStack2,
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import BackButton from "../../components/BackButton";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
@@ -62,6 +63,7 @@ const getYearFromConsolidatedId = (id: string): number | null => {
 };
 
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  const { t } = useTranslation("invoice");
   const normalized = status?.toLowerCase();
   let color = "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200";
   let icon = <IconAlertTriangle size={14} className="mr-1.5" />;
@@ -104,7 +106,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
       className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium ${color}`}
     >
       {icon}
-      {text}
+      {t(text)}
     </span>
   );
 };
@@ -112,6 +114,7 @@ const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
 const ConsolidatedInvoiceDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation("invoice");
 
   const [header, setHeader] = useState<ConsolidatedHeader | null>(null);
   const [invoices, setInvoices] = useState<ExtendedInvoiceData[]>([]);
@@ -131,7 +134,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
 
     try {
       const year = getYearFromConsolidatedId(id);
-      setLoadingStep("Loading consolidated e-Invoice...");
+      setLoadingStep(t("Loading consolidated e-Invoice..."));
       const response = await api.get(
         `/api/einvoice/consolidated-history${year ? `?year=${year}` : ""}`
       );
@@ -139,7 +142,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
       const match = history.find((item) => item.id === id);
 
       if (!match) {
-        setError(`Consolidated e-Invoice ${id} was not found.`);
+        setError(t("Consolidated e-Invoice {{id}} was not found.", { id }));
         setHeader(null);
         setInvoices([]);
         return;
@@ -165,7 +168,10 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
           index + INVOICE_FETCH_BATCH_SIZE
         );
         setLoadingStep(
-          `Loading invoices (${index + batchIds.length}/${invoiceIds.length})...`
+          t("Loading invoices ({{loaded}}/{{total}})...", {
+            loaded: index + batchIds.length,
+            total: invoiceIds.length,
+          })
         );
         const batch = await getInvoicesByIds(batchIds);
         loaded.push(...batch);
@@ -180,7 +186,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
       setInvoices(loaded);
     } catch (err: any) {
       console.error("Error loading consolidated e-Invoice:", err);
-      setError(err.message || "Failed to load consolidated e-Invoice");
+      setError(err.message || t("Failed to load consolidated e-Invoice"));
     } finally {
       setIsLoading(false);
       setLoadingStep("");
@@ -314,7 +320,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
 
   const handlePrintAll = (): void => {
     if (invoices.length === 0) {
-      toast.error("No invoices available to print");
+      toast.error(t("No invoices available to print"));
       return;
     }
     setShowPrintOverlay(true);
@@ -336,7 +342,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
       <div className="w-full">
         <BackButton onClick={handleBackClick} />
         <div className="p-4 text-center text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 rounded-lg mt-4">
-          {error || "Consolidated e-Invoice could not be loaded."}
+          {error || t("Consolidated e-Invoice could not be loaded.")}
         </div>
       </div>
     );
@@ -358,8 +364,9 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
               <span className="truncate">{header.id}</span>
             </h1>
             <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
-              Consolidated e-Invoice covering{" "}
-              {header.consolidated_invoices?.length || 0} invoices
+              {t("Consolidated e-Invoice covering {{total}} invoices", {
+                total: header.consolidated_invoices?.length || 0,
+              })}
             </p>
           </div>
         </div>
@@ -371,9 +378,9 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
             size="sm"
             icon={IconPrinter}
             disabled={invoices.length === 0}
-            title="Print a copy of every invoice in this consolidation"
+            title={t("Print a copy of every invoice in this consolidation")}
           >
-            Print All Invoices ({invoices.length})
+            {t("Print All Invoices ({{total}})", { total: invoices.length })}
           </Button>
         </div>
       </div>
@@ -382,7 +389,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
       <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
         <div>
           <div className="text-xs text-default-500 dark:text-gray-400 uppercase tracking-wider">
-            Total Excluding Tax
+            {t("Total Excluding Tax")}
           </div>
           <div className="text-sm font-medium text-default-900 dark:text-gray-100 mt-1">
             {formatCurrency(header.total_excluding_tax)}
@@ -390,7 +397,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
         </div>
         <div>
           <div className="text-xs text-default-500 dark:text-gray-400 uppercase tracking-wider">
-            Tax
+            {t("Tax")}
           </div>
           <div className="text-sm font-medium text-default-900 dark:text-gray-100 mt-1">
             {formatCurrency(header.tax_amount)}
@@ -398,7 +405,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
         </div>
         <div>
           <div className="text-xs text-default-500 dark:text-gray-400 uppercase tracking-wider">
-            Total Payable
+            {t("Total Payable")}
           </div>
           <div className="text-sm font-semibold text-default-900 dark:text-gray-100 mt-1">
             {formatCurrency(header.totalamountpayable)}
@@ -406,7 +413,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
         </div>
         <div>
           <div className="text-xs text-default-500 dark:text-gray-400 uppercase tracking-wider">
-            Validated
+            {t("Validated")}
           </div>
           <div className="text-sm font-medium text-default-900 dark:text-gray-100 mt-1">
             {header.datetime_validated
@@ -418,7 +425,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
           <div className="sm:col-span-2 lg:col-span-4 border-t border-default-100 dark:border-gray-700 pt-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="text-xs text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                MyInvois UUID
+                {t("MyInvois UUID")}
               </div>
               {myInvoisUrl && (
                 <a
@@ -426,10 +433,12 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-600 dark:text-sky-400 hover:underline"
-                  title="Open this consolidated e-Invoice on the MyInvois portal"
+                  title={t(
+                    "Open this consolidated e-Invoice on the MyInvois portal"
+                  )}
                 >
                   <IconExternalLink size={14} />
-                  View on MyInvois portal
+                  {t("View on MyInvois portal")}
                 </a>
               )}
             </div>
@@ -459,32 +468,41 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
           ) : (
             <IconAlertTriangle size={18} />
           )}
-          {isReconciled
-            ? "Invoices reconcile with the consolidated total"
-            : "Invoices do not reconcile with the consolidated total"}
+          {t(
+            isReconciled
+              ? "Invoices reconcile with the consolidated total"
+              : "Invoices do not reconcile with the consolidated total"
+          )}
         </div>
         <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
           <div>
-            Sum of listed invoices:{" "}
+            {t("Sum of listed invoices:")}{" "}
             <span className="font-semibold">
               {formatCurrency(invoicesTotal)}
             </span>
           </div>
           <div>
-            Consolidated total:{" "}
+            {t("Consolidated total:")}{" "}
             <span className="font-semibold">
               {formatCurrency(header.totalamountpayable)}
             </span>
           </div>
           <div>
-            Difference:{" "}
+            {t("Difference:")}{" "}
             <span className="font-semibold">{formatCurrency(difference)}</span>
           </div>
         </div>
         {missingCount > 0 && (
           <div className="mt-2 text-xs">
-            {missingCount} invoice{missingCount === 1 ? "" : "s"} listed in the
-            consolidation could not be loaded (they may have been deleted).
+            {missingCount === 1
+              ? t(
+                  "{{total}} invoice listed in the consolidation could not be loaded (they may have been deleted).",
+                  { total: missingCount }
+                )
+              : t(
+                  "{{total}} invoices listed in the consolidation could not be loaded (they may have been deleted).",
+                  { total: missingCount }
+                )}
           </div>
         )}
       </div>
@@ -494,7 +512,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="text-base font-semibold text-default-800 dark:text-gray-100">
-              Included Invoices
+              {t("Included Invoices")}
             </h2>
             {/* View switcher */}
             <div className="flex space-x-1 w-fit bg-default-100 dark:bg-gray-900/50 rounded-lg p-1">
@@ -508,7 +526,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                 }`}
               >
                 <IconLayoutList size={16} />
-                By Date
+                {t("By Date")}
               </button>
               <button
                 type="button"
@@ -520,7 +538,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                 }`}
               >
                 <IconStack2 size={16} />
-                By Receipt Range
+                {t("By Receipt Range")}
               </button>
             </div>
             {viewMode === "grouped" && filteredGroups.length > 0 && (
@@ -531,11 +549,11 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                 className="text-sm text-sky-600 dark:text-sky-400 hover:underline disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed"
                 title={
                   isSearching
-                    ? "Groups are expanded automatically while searching"
+                    ? t("Groups are expanded automatically while searching")
                     : undefined
                 }
               >
-                {allExpanded ? "Collapse all" : "Expand all"}
+                {t(allExpanded ? "Collapse all" : "Expand all")}
               </button>
             )}
           </div>
@@ -548,7 +566,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search invoice no. or customer"
+              placeholder={t("Search invoice no. or customer")}
               className="pl-9 pr-3 py-1.5 w-full text-sm rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500"
             />
           </div>
@@ -557,27 +575,28 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
         {viewMode === "grouped" && (
           <>
             <p className="text-xs text-default-500 dark:text-gray-400 mb-2">
-              Each row below is one printed line on the submitted consolidated
-              e-Invoice. Expand a row to see the invoices it covers.
+              {t(
+                "Each row below is one printed line on the submitted consolidated e-Invoice. Expand a row to see the invoices it covers."
+              )}
             </p>
             <div className="border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm overflow-x-auto">
               <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                 <thead className="bg-default-50 dark:bg-gray-900/50">
                   <tr>
                     <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                      Receipt Range
+                      {t("Receipt Range")}
                     </th>
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                      Invoices
+                      {t("Invoices")}
                     </th>
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                      Subtotal
+                      {t("Subtotal")}
                     </th>
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                      Tax
+                      {t("Tax")}
                     </th>
                     <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                      Total (MYR)
+                      {t("Total (MYR)")}
                     </th>
                   </tr>
                 </thead>
@@ -629,7 +648,9 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                                   navigate(`/sales/invoice/${invoice.id}`)
                                 }
                                 className="cursor-pointer bg-default-50/50 dark:bg-gray-900/30 hover:bg-default-100 dark:hover:bg-gray-700/50 transition-colors duration-150"
-                                title={`Open invoice ${invoice.id}`}
+                                title={t("Open invoice {{id}}", {
+                                  id: invoice.id,
+                                })}
                               >
                                 <td className="pl-12 pr-4 py-2.5 whitespace-nowrap text-sm font-medium text-sky-600 dark:text-sky-400 hover:underline">
                                   {invoice.id}
@@ -658,7 +679,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                         colSpan={5}
                         className="px-4 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                       >
-                        No invoices match your search.
+                        {t("No invoices match your search.")}
                       </td>
                     </tr>
                   )}
@@ -674,19 +695,19 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                  Invoice #
+                  {t("Invoice #")}
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                  Customer
+                  {t("customer", { ns: "common" })}
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                  Date
+                  {t("date", { ns: "common" })}
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                  Type
+                  {t("type", { ns: "common" })}
                 </th>
                 <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                  Amount (MYR)
+                  {t("Amount (MYR)")}
                 </th>
               </tr>
             </thead>
@@ -698,7 +719,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                     key={invoice.id}
                     onClick={() => navigate(`/sales/invoice/${invoice.id}`)}
                     className="cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700/50 transition-colors duration-150"
-                    title={`Open invoice ${invoice.id}`}
+                    title={t("Open invoice {{id}}", { id: invoice.id })}
                   >
                     <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-sky-600 dark:text-sky-400 hover:underline">
                       {invoice.id}
@@ -710,7 +731,9 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                       {date ? formatDisplayDate(date) : "—"}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-400">
-                      {invoice.paymenttype === "CASH" ? "Cash" : "Invoice"}
+                      {t(
+                        invoice.paymenttype === "CASH" ? "Cash" : "Invoice"
+                      )}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-right font-medium text-default-800 dark:text-gray-200">
                       {formatCurrency(invoice.totalamountpayable)}
@@ -724,7 +747,7 @@ const ConsolidatedInvoiceDetailsPage: React.FC = () => {
                     colSpan={5}
                     className="px-4 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
-                    No invoices match your search.
+                    {t("No invoices match your search.")}
                   </td>
                 </tr>
               )}

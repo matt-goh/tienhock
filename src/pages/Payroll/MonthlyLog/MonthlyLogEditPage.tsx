@@ -7,12 +7,14 @@ import toast from "react-hot-toast";
 import MonthlyLogEntryPage from "./MonthlyLogEntryPage";
 import Button from "../../../components/Button";
 import { getJobConfig } from "../../../configs/payrollJobConfigs";
+import { useTranslation } from "react-i18next";
 
 interface MonthlyLogEditPageProps {
   jobType: string;
 }
 
 const MonthlyLogEditPage: React.FC<MonthlyLogEditPageProps> = ({ jobType }) => {
+  const { t } = useTranslation("payroll");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
@@ -30,14 +32,14 @@ const MonthlyLogEditPage: React.FC<MonthlyLogEditPageProps> = ({ jobType }) => {
     try {
       const response = await api.get(`/api/monthly-work-logs/${id}`);
       if (response.status === "Processed") {
-        toast.error("Cannot edit processed work log");
+        toast.error(t("Cannot edit processed work log"));
         navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly/${id}`);
         return;
       }
       setWorkLog(response);
     } catch (error) {
       console.error("Error fetching monthly work log details:", error);
-      toast.error("Failed to fetch monthly work log details");
+      toast.error(t("Failed to fetch monthly work log details"));
       navigate(`/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } finally {
       setIsLoading(false);
@@ -59,9 +61,11 @@ const MonthlyLogEditPage: React.FC<MonthlyLogEditPageProps> = ({ jobType }) => {
   if (!workLog) {
     return (
       <div className="text-center py-12">
-        <p className="text-default-500 dark:text-gray-400">Monthly work log not found</p>
+        <p className="text-default-500 dark:text-gray-400">
+          {t("Monthly work log not found")}
+        </p>
         <Button onClick={handleBack} className="mt-4" variant="outline">
-          Back to List
+          {t("Back to List")}
         </Button>
       </div>
     );

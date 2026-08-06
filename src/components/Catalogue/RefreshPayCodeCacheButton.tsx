@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { IconRefresh } from "@tabler/icons-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import Button from "../Button";
 
 interface RefreshPayCodeCacheButtonProps {
@@ -16,6 +17,7 @@ const RefreshPayCodeCacheButton: React.FC<RefreshPayCodeCacheButtonProps> = ({
   size = "sm",
   className = "",
 }) => {
+  const { t } = useTranslation("catalogue");
   const [internalLoading, setInternalLoading] = useState(false);
   const isLoading = externalLoading || internalLoading;
 
@@ -25,9 +27,9 @@ const RefreshPayCodeCacheButton: React.FC<RefreshPayCodeCacheButtonProps> = ({
     setInternalLoading(true);
     try {
       await onRefresh();
-      toast.success("Pay code cache refreshed");
+      toast.success(t("Pay code cache refreshed"));
     } catch (error) {
-      toast.error("Failed to refresh pay code cache");
+      toast.error(t("Failed to refresh pay code cache"));
       console.error("Error refreshing pay code cache:", error);
     } finally {
       setInternalLoading(false);
@@ -42,11 +44,11 @@ const RefreshPayCodeCacheButton: React.FC<RefreshPayCodeCacheButtonProps> = ({
       size={size}
       disabled={isLoading}
       className={`${className} ${isLoading ? "[&_svg]:animate-spin" : ""}`}
-      title="Refresh pay code cache"
+      title={t("Refresh pay code cache")}
       icon={IconRefresh}
       iconSize={size === "sm" ? 16 : 18}
     >
-      Refresh
+      {t("Refresh")}
     </Button>
   );
 };

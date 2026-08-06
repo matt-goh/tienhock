@@ -8,8 +8,10 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 const StaffRecords = () => {
+  const { t } = useTranslation("catalogue");
   const { allStaffs: employees, loading, error } = useStaffsCache();
   const navigate = useNavigate();
   
@@ -109,16 +111,16 @@ const StaffRecords = () => {
     const url = `${baseURL}/api/excel/staff-records-export?api_key=REMOVED_SECRET`;
     
     navigator.clipboard.writeText(url).then(() => {
-      toast.success("Export URL copied to clipboard!");
+      toast.success(t("Export URL copied to clipboard!"));
     }).catch(() => {
-      toast.error("Failed to copy URL to clipboard");
+      toast.error(t("Failed to copy URL to clipboard"));
     });
   };
 
   // Text Export Generation
   const generateTextExport = async () => {
     if (!activeEmployees || activeEmployees.length === 0) {
-      toast.error("No staff records available to export");
+      toast.error(t("No staff records available to export"));
       return;
     }
 
@@ -190,10 +192,10 @@ const StaffRecords = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast.success("Staff records export file downloaded successfully");
+      toast.success(t("Staff records export file downloaded successfully"));
     } catch (error) {
       console.error("Error generating text export:", error);
-      toast.error("Failed to generate text export");
+      toast.error(t("Failed to generate text export"));
     } finally {
       setIsGeneratingExport(false);
     }
@@ -209,7 +211,7 @@ const StaffRecords = () => {
   }
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return <div>{t("Error: {{message}}", { message: error.message })}</div>;
   }
 
   return (
@@ -222,11 +224,13 @@ const StaffRecords = () => {
             variant="outline"
             size="sm"
           >
-            Back to Staff
+            {t("Back to Staff")}
           </Button>
           <h1 className="flex items-center text-2xl text-default-700 dark:text-gray-200 font-bold gap-2.5">
             <IconUsers size={28} stroke={2.5} className="text-default-700 dark:text-gray-200" />
-            Staff Records ({activeEmployees.length})
+            {t("Staff Records ({{total}})", {
+              total: activeEmployees.length,
+            })}
           </h1>
         </div>
         <div className="flex space-x-2">
@@ -238,7 +242,7 @@ const StaffRecords = () => {
             disabled={activeEmployees.length === 0 || isGeneratingExport}
             size="sm"
           >
-            Export
+            {t("export", { ns: "common" })}
           </Button>
           <Button
             onClick={generateExportURL}
@@ -247,7 +251,7 @@ const StaffRecords = () => {
             variant="outline"
             size="sm"
           >
-            Export Link
+            {t("Export Link")}
           </Button>
         </div>
       </div>
@@ -258,51 +262,51 @@ const StaffRecords = () => {
             <thead className="bg-default-50 dark:bg-gray-800 border-b border-default-200 dark:border-gray-700">
               <tr>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Employee Name
+                  {t("Employee Name")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  M/F
+                  {t("M/F")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Age
+                  {t("Age")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Married
+                  {t("Married")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Tel No.
+                  {t("Tel No.")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Date Join
+                  {t("Date Join")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Department
+                  {t("Department")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  No IC / Passport
+                  {t("No IC / Passport")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  KWSP No
+                  {t("KWSP No")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Income Tax No
+                  {t("Income Tax No")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Bank Acc. No
+                  {t("Bank Acc. No")}
                 </th>
                 <th className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
                   <div className="flex flex-col">
-                    <span>Date/Birth</span>
+                    <span>{t("Date/Birth")}</span>
                   </div>
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Religion
+                  {t("Religion")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Race
+                  {t("Race")}
                 </th>
                 <th className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider">
-                  Citizenship
+                  {t("Citizenship")}
                 </th>
               </tr>
             </thead>
@@ -379,10 +383,10 @@ const StaffRecords = () => {
         <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
           <IconUsers size={48} className="mx-auto text-default-300 dark:text-gray-600 mb-4" />
           <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-1">
-            No active staff members found
+            {t("No active staff members found")}
           </h3>
           <p className="text-default-500 dark:text-gray-400">
-            All staff members have been marked as resigned.
+            {t("All staff members have been marked as resigned.")}
           </p>
         </div>
       )}

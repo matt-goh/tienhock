@@ -32,6 +32,7 @@ import {
 import { usePersistedSearch } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
+import { useTranslation, Trans } from "react-i18next";
 
 // --- Types for API Data ---
 interface LeaveBalance {
@@ -72,6 +73,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
   groupedIds,
   onClick,
 }) => {
+  const { t } = useTranslation("payroll");
   const jobDisplay = Array.isArray(employee.job)
     ? employee.job.join(", ")
     : employee.job || "N/A";
@@ -97,17 +99,18 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
           className="text-xs text-sky-600 dark:text-sky-400 mb-2 line-clamp-2"
           title={groupedIdsText}
         >
-          Collapsed IDs: {groupedIdsText}
+          {t("Collapsed IDs: {{ids}}", { ids: groupedIdsText })}
         </p>
       )}
       <p className="text-sm text-default-600 dark:text-gray-300 line-clamp-2" title={jobDisplay}>
-        <span className="font-medium">Job:</span> {jobDisplay}
+        <span className="font-medium">{t("Job:")}</span> {jobDisplay}
       </p>
     </button>
   );
 };
 
 const CutiReportPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const { staffs, loading: loadingStaffs } = useStaffsCache();
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = usePersistedSearch("cutiReportSearch");
@@ -136,7 +139,9 @@ const CutiReportPage: React.FC = () => {
           groupedStaffIdsByEmployeeId.get(staff.id) || [staff.id];
         const groupedIdsLabel: string =
           groupedIds.length > 1
-            ? ` | Collapsed IDs: ${groupedIds.join(", ")}`
+            ? ` | ${t("Collapsed IDs: {{ids}}", {
+                ids: groupedIds.join(", "),
+              })}`
             : "";
 
         return {
@@ -210,7 +215,7 @@ const CutiReportPage: React.FC = () => {
       } catch (error: any) {
         console.error("Failed to fetch leave data:", error);
         setReportError(
-          error.response?.data?.message || "Failed to load leave report."
+          error.response?.data?.message || t("Failed to load leave report.")
         );
       } finally {
         setLoadingReport(false);
@@ -272,7 +277,7 @@ const CutiReportPage: React.FC = () => {
   // Single employee PDF generation
   const generateSinglePDF = async (action: "download" | "print") => {
     if (!selectedStaff || !leaveBalances) {
-      toast.error("No employee data available to generate PDF");
+      toast.error(t("No employee data available to generate PDF"));
       return;
     }
 
@@ -296,12 +301,14 @@ const CutiReportPage: React.FC = () => {
 
       await generateSingleCutiReportPDF(pdfData, action);
 
-      const actionText =
-        action === "download" ? "downloaded" : "generated for printing";
-      toast.success(`Leave report ${actionText} successfully`);
+      toast.success(
+        action === "download"
+          ? t("Leave report downloaded successfully")
+          : t("Leave report generated for printing successfully")
+      );
     } catch (error) {
       console.error("Error generating PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -310,13 +317,13 @@ const CutiReportPage: React.FC = () => {
   // Batch PDF generation for all employees
   const generateBatchPDF = async (action: "download" | "print") => {
     if (filteredEmployees.length === 0) {
-      toast.error("No employees available to generate batch PDF");
+      toast.error(t("No employees available to generate batch PDF"));
       return;
     }
 
     setIsGeneratingPDF(true);
     try {
-      toast.loading("Fetching batch leave report data...");
+      toast.loading(t("Fetching batch leave report data..."));
       
       // Get employee IDs for the batch request
       const employeeIds = filteredEmployees.map(emp => emp.id);
@@ -328,7 +335,7 @@ const CutiReportPage: React.FC = () => {
       });
 
       if (!batchResponse.employees || batchResponse.employees.length === 0) {
-        toast.error("No leave data found for selected employees");
+        toast.error(t("No leave data found for selected employees"));
         return;
       }
 
@@ -359,11 +366,13 @@ const CutiReportPage: React.FC = () => {
       await generateBatchCutiReportPDF(batchData, action);
 
       toast.success(
-        `Batch leave report generated successfully (${validEmployeeData.length} employees)`
+        t("Batch leave report generated successfully ({{total}} employees)", {
+          total: validEmployeeData.length,
+        })
       );
     } catch (error) {
       console.error("Error generating batch PDF:", error);
-      toast.error("Failed to generate batch PDF");
+      toast.error(t("Failed to generate batch PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -387,7 +396,7 @@ const CutiReportPage: React.FC = () => {
               <p className="text-default-500 dark:text-gray-400">{staff.id}</p>
               {hasCollapsedIds && (
                 <p className="text-sm text-sky-600 dark:text-sky-400">
-                  Collapsed IDs: {groupedIdsText}
+                  {t("Collapsed IDs: {{ids}}", { ids: groupedIdsText })}
                 </p>
               )}
             </div>
@@ -402,7 +411,7 @@ const CutiReportPage: React.FC = () => {
               variant="outline"
               disabled={!leaveBalances || isGeneratingPDF}
             >
-              Print Report
+              {t("Print Report")}
             </Button>
           </div>
         </div>
@@ -410,7 +419,9 @@ const CutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconBriefcase size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Job</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Job")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {staff.job.join(", ") || "N/A"}
               </p>
@@ -419,7 +430,9 @@ const CutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconCalendar size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Date Joined</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Date Joined")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {new Date(staff.dateJoined).toLocaleDateString()}
               </p>
@@ -428,16 +441,20 @@ const CutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconClockHour4 size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Years of Service</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Years of Service")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
-                {yearsOfService} years
+                {t("{{total}} years", { total: yearsOfService })}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <IconId size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">IC No.</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("IC No.")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {staff.icNo || "N/A"}
               </p>
@@ -446,7 +463,9 @@ const CutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconWorld size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Nationality</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Nationality")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {staff.nationality || "N/A"}
               </p>
@@ -470,50 +489,58 @@ const CutiReportPage: React.FC = () => {
     return (
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-default-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-default-800 dark:text-gray-100 mb-4">
-          Leave Balances ({currentYear})
+          {t("Leave Balances ({{year}})", { year: currentYear })}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-sky-50 dark:bg-sky-900/30 p-4 rounded-lg border border-sky-200 dark:border-sky-800">
-            <p className="font-semibold text-sky-800 dark:text-sky-300">Cuti Tahunan</p>
+            <p className="font-semibold text-sky-800 dark:text-sky-300">
+              {t("Annual Leave")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
                 {remainingTahunan}
               </span>
               <span className="text-sm text-sky-500 dark:text-sky-400">
-                / {balances.cuti_tahunan_total} days
+                {t("/ {{total}} days", { total: balances.cuti_tahunan_total })}
               </span>
             </div>
           </div>
           <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
-            <p className="font-semibold text-amber-800 dark:text-amber-300">Cuti Sakit</p>
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              {t("Sick Leave")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                 {remainingSakit}
               </span>
               <span className="text-sm text-amber-500 dark:text-amber-400">
-                / {balances.cuti_sakit_total} days
+                {t("/ {{total}} days", { total: balances.cuti_sakit_total })}
               </span>
             </div>
           </div>
           <div className="bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800">
-            <p className="font-semibold text-emerald-800 dark:text-emerald-300">Cuti Umum</p>
+            <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+              {t("Public Holiday")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {remainingUmum}
               </span>
               <span className="text-sm text-emerald-500 dark:text-emerald-400">
-                / {balances.cuti_umum_total} days
+                {t("/ {{total}} days", { total: balances.cuti_umum_total })}
               </span>
             </div>
           </div>
           <div className="bg-violet-50 dark:bg-violet-900/30 p-4 rounded-lg border border-violet-200 dark:border-violet-800">
-            <p className="font-semibold text-violet-800 dark:text-violet-300">Cuti Rawatan</p>
+            <p className="font-semibold text-violet-800 dark:text-violet-300">
+              {t("Medical Leave")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-violet-600 dark:text-violet-400">
                 {remainingRawatan}
               </span>
               <span className="text-sm text-violet-500 dark:text-violet-400">
-                / {balances.cuti_rawatan_total} days
+                {t("/ {{total}} days", { total: balances.cuti_rawatan_total })}
               </span>
             </div>
           </div>
@@ -577,7 +604,7 @@ const CutiReportPage: React.FC = () => {
     return (
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-default-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-default-800 dark:text-gray-100 mb-4">
-          Monthly Leave Details ({currentYear})
+          {t("Monthly Leave Details ({{year}})", { year: currentYear })}
         </h3>
         <div className="overflow-x-auto">
           <table className="min-w-full border border-default-200 dark:border-gray-700 rounded-lg">
@@ -588,7 +615,7 @@ const CutiReportPage: React.FC = () => {
                   rowSpan={2}
                   className="py-4 px-4 text-left text-sm font-semibold text-default-700 dark:text-gray-200 uppercase align-middle border-r-2 border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50"
                 >
-                  Month
+                  {t("Month")}
                 </th>
                 <th
                   colSpan={3}
@@ -596,7 +623,7 @@ const CutiReportPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-sky-500"></div>
-                    Cuti Tahunan
+                    {t("Annual Leave")}
                   </div>
                 </th>
                 <th
@@ -605,7 +632,7 @@ const CutiReportPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-amber-500"></div>
-                    Cuti Sakit
+                    {t("Sick Leave")}
                   </div>
                 </th>
                 <th
@@ -614,7 +641,7 @@ const CutiReportPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
-                    Cuti Umum
+                    {t("Public Holiday")}
                   </div>
                 </th>
                 <th
@@ -623,7 +650,7 @@ const CutiReportPage: React.FC = () => {
                 >
                   <div className="flex items-center justify-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-violet-500"></div>
-                    Cuti Rawatan
+                    {t("Medical Leave")}
                   </div>
                 </th>
               </tr>
@@ -631,43 +658,43 @@ const CutiReportPage: React.FC = () => {
               <tr className="bg-default-50 dark:bg-gray-900/50">
                 {/* Cuti Tahunan sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase border-r border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30">
-                  Days Used
+                  {t("Days Used")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase border-r border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-900/30">
-                  Amount
+                  {t("Amount")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase border-r-2 border-default-300 dark:border-gray-600 bg-sky-50 dark:bg-sky-900/30">
-                  Balance
+                  {t("Balance")}
                 </th>
                 {/* Cuti Sakit sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 dark:text-amber-300 uppercase border-r border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30">
-                  Days Used
+                  {t("Days Used")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 dark:text-amber-300 uppercase border-r border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/30">
-                  Amount
+                  {t("Amount")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-amber-700 dark:text-amber-300 uppercase border-r-2 border-default-300 dark:border-gray-600 bg-amber-50 dark:bg-amber-900/30">
-                  Balance
+                  {t("Balance")}
                 </th>
                 {/* Cuti Umum sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase border-r border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30">
-                  Days Used
+                  {t("Days Used")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase border-r border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/30">
-                  Amount
+                  {t("Amount")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-emerald-700 dark:text-emerald-300 uppercase border-r-2 border-default-300 dark:border-gray-600 bg-emerald-50 dark:bg-emerald-900/30">
-                  Balance
+                  {t("Balance")}
                 </th>
                 {/* Cuti Rawatan sub-headers */}
                 <th className="py-3 px-3 text-center text-xs font-medium text-violet-700 dark:text-violet-300 uppercase border-r border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/30">
-                  Days Used
+                  {t("Days Used")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-violet-700 dark:text-violet-300 uppercase border-r border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/30">
-                  Amount
+                  {t("Amount")}
                 </th>
                 <th className="py-3 px-3 text-center text-xs font-medium text-violet-700 dark:text-violet-300 uppercase bg-violet-50 dark:bg-violet-900/30">
-                  Balance
+                  {t("Balance")}
                 </th>
               </tr>
             </thead>
@@ -685,7 +712,7 @@ const CutiReportPage: React.FC = () => {
                   >
                     {/* Month column */}
                     <td className="py-4 px-4 whitespace-nowrap text-sm font-semibold text-default-800 dark:text-gray-100 border-r-2 border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50">
-                      {getMonthName(monthNum)}
+                      {t(getMonthName(monthNum))}
                     </td>
 
                     {/* Cuti Tahunan columns */}
@@ -810,7 +837,7 @@ const CutiReportPage: React.FC = () => {
             <tfoot className="bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
               <tr>
                 <td className="py-4 px-4 whitespace-nowrap text-sm font-bold text-default-800 dark:text-gray-100 border-r-2 border-default-300 dark:border-gray-600 bg-default-100 dark:bg-gray-800">
-                  TOTAL
+                  {t("TOTAL")}
                 </td>
 
                 {/* Cuti Tahunan totals */}
@@ -958,26 +985,41 @@ const CutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-sky-500"></div>
             <span>
-              <strong>Cuti Tahunan:</strong> Annual leave based on years of
-              service
+              <Trans
+                i18nKey="<strong>Annual Leave</strong>: Annual leave based on years of service"
+                ns="payroll"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-amber-500"></div>
             <span>
-              <strong>Cuti Sakit:</strong> Sick leave (available any day)
+              <Trans
+                i18nKey="<strong>Sick Leave</strong>: Sick leave (available any day)"
+                ns="payroll"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
             <span>
-              <strong>Cuti Umum:</strong> Public holiday leave
+              <Trans
+                i18nKey="<strong>Public Holiday</strong>: Public holiday leave"
+                ns="payroll"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-violet-500"></div>
             <span>
-              <strong>Cuti Rawatan:</strong> Hospital leave (60 days per year)
+              <Trans
+                i18nKey="<strong>Medical Leave</strong>: Hospital leave (60 days per year)"
+                ns="payroll"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
         </div>
@@ -1000,7 +1042,7 @@ const CutiReportPage: React.FC = () => {
                 <input
                   type="text"
                   className="block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-full leading-5 bg-white placeholder-default-500 dark:placeholder:text-gray-400 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-transparent dark:text-gray-100"
-                  placeholder="Search employees by name, ID, or job..."
+                  placeholder={t("Search employees by name, ID, or job...")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -1016,7 +1058,9 @@ const CutiReportPage: React.FC = () => {
                 variant="outline"
                 disabled={filteredEmployees.length === 0 || isGeneratingPDF}
               >
-                Print All ({filteredEmployees.length})
+                {t("Print All ({{total}})", {
+                  total: filteredEmployees.length,
+                })}
               </Button>
             </div>
           </div>
@@ -1039,7 +1083,9 @@ const CutiReportPage: React.FC = () => {
             {filteredEmployees.length === 0 && searchQuery && (
               <div className="text-center py-16 border border-dashed border-default-300 dark:border-gray-600 rounded-lg">
                 <p className="text-default-600 dark:text-gray-300">
-                  No employees found matching "{searchQuery}"
+                  {t('No employees found matching "{{query}}"', {
+                    query: searchQuery,
+                  })}
                 </p>
               </div>
             )}
@@ -1051,7 +1097,9 @@ const CutiReportPage: React.FC = () => {
       {loadingStaffs && !selectedStaffId && (
         <div className="flex justify-center items-center h-40">
           <LoadingSpinner />
-          <span className="ml-3 text-default-600 dark:text-gray-300">Loading employees...</span>
+          <span className="ml-3 text-default-600 dark:text-gray-300">
+            {t("Loading employees...")}
+          </span>
         </div>
       )}
 
@@ -1082,19 +1130,19 @@ const CutiReportPage: React.FC = () => {
                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                   />
                 </svg>
-                Back to Employee List
+                {t("Back to Employee List")}
               </button>
             </div>
             <div className="flex-1 md:max-w-lg">
               <FormCombobox
                 name="staff"
-                label="Select Staff"
+                label={t("Select Staff")}
                 value={selectedStaffId || ""}
                 onChange={(value) => setSelectedStaffId(value as string)}
                 options={staffOptions}
                 query={searchQuery}
                 setQuery={setSearchQuery}
-                placeholder="Search by name or ID..."
+                placeholder={t("Search by name or ID...")}
                 mode="single"
                 disabled={loadingStaffs}
               />

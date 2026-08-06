@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { Customer, CustomProduct } from "../../types/types"; // Removed Employee if not used
 import BackButton from "../../components/BackButton";
@@ -23,6 +24,7 @@ import LoadingSpinner from "../../components/LoadingSpinner"; // Import LoadingS
 
 const CustomerAddPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("catalogue");
   const goBack = useSmartBack("/catalogue/customer");
   // State for custom products specific to this new customer
   const [customProducts, setCustomProducts] = useState<CustomProduct[]>([]); // Renamed for clarity
@@ -169,12 +171,14 @@ const CustomerAddPage: React.FC = () => {
   const validateForm = (): boolean => {
     // Use same validation logic as CustomerFormPage
     if (!formData.id || !formData.name) {
-      toast.error("Customer ID and Name are required fields.");
+      toast.error(t("Customer ID and Name are required fields."));
       return false;
     }
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      toast.error("Please enter a valid email address or leave it empty.");
+      toast.error(
+        t("Please enter a valid email address or leave it empty.")
+      );
       return false;
     }
 
@@ -186,19 +190,19 @@ const CustomerAddPage: React.FC = () => {
     if (hasIdType || hasIdNumber || hasTinNumber) {
       if (!hasIdType) {
         toast.error(
-          "ID Type is required when providing identification details."
+          t("ID Type is required when providing identification details.")
         );
         return false;
       }
       if (!hasIdNumber) {
         toast.error(
-          "ID Number is required when providing identification details."
+          t("ID Number is required when providing identification details.")
         );
         return false;
       }
       if (!hasTinNumber) {
         toast.error(
-          "TIN Number is required when providing identification details."
+          t("TIN Number is required when providing identification details.")
         );
         return false;
       }
@@ -207,7 +211,9 @@ const CustomerAddPage: React.FC = () => {
     // Validate custom product entries
     for (const product of customProducts) {
       if (!product.product_id) {
-        toast.error("Please select a product for all custom pricing rows.");
+        toast.error(
+          t("Please select a product for all custom pricing rows.")
+        );
         return false;
       }
 
@@ -223,7 +229,10 @@ const CustomerAddPage: React.FC = () => {
         priceValue < 0
       ) {
         toast.error(
-          `Invalid custom price for product ID ${product.product_id}. Price must be a non-negative number.`
+          t(
+            "Invalid custom price for product ID {{id}}. Price must be a non-negative number.",
+            { id: product.product_id }
+          )
         );
         return false;
       }
@@ -299,9 +308,14 @@ const CustomerAddPage: React.FC = () => {
           console.error("Failed to save custom products:", productError);
           // Notify user about partial success
           toast.error(
-            `Customer created, but failed to save custom products: ${
-              productError?.response?.data?.message || productError.message
-            }. You may need to edit the customer to add them.`
+            t(
+              "Customer created, but failed to save custom products: {{message}}. You may need to edit the customer to add them.",
+              {
+                message:
+                  productError?.response?.data?.message ||
+                  productError.message,
+              }
+            )
           );
           // Continue to navigate after customer creation success
         }
@@ -309,16 +323,16 @@ const CustomerAddPage: React.FC = () => {
 
       // --- Post-Save Actions ---
       await Promise.all([refreshCustomersCache(), refreshAccountCodesCache()]);
-      toast.success("Customer created successfully!");
+      toast.success(t("Customer created successfully!"));
       // Show the customer just created. `replace` drops this form from history,
       // so Back from the new customer returns to wherever the user started.
       navigate(`/catalogue/customer/${newCustomerId}`, { replace: true });
     } catch (error: any) {
       console.error("Error creating customer:", error);
       toast.error(
-        `Failed to create customer: ${
-          error?.response?.data?.message || error.message
-        }`
+        t("Failed to create customer: {{message}}", {
+          message: error?.response?.data?.message || error.message,
+        })
       );
     } finally {
       setIsSaving(false);
@@ -378,10 +392,10 @@ const CustomerAddPage: React.FC = () => {
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div>
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                Add New Customer
+                {t("Add New Customer")}
               </h1>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                Enter the customer's information below.
+                {t("Enter the customer's information below.")}
               </p>
             </div>
           </div>
@@ -394,7 +408,7 @@ const CustomerAddPage: React.FC = () => {
               <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
                 <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                  Saving customer...
+                  {t("Saving customer...")}
                 </span>
               </div>
             </div>
@@ -402,15 +416,15 @@ const CustomerAddPage: React.FC = () => {
 
           <form onSubmit={handleSubmit} noValidate>
             <div className="p-6">
-              <Tab labels={["Info", "Credit & Pricing"]}>
+              <Tab labels={[t("Info"), t("Credit & Pricing")]}>
                 {/* === First tab - Customer Info === */}
                 <div className="space-y-6 mt-5">
                   {/* Re-using render helpers */}
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-                    {renderInput("id", "Customer ID", "text", "CUST001", true)}
+                    {renderInput("id", t("Customer ID"), "text", "CUST001", true)}
                     {renderInput(
                       "name",
-                      "Customer Name",
+                      t("Customer Name"),
                       "text",
                       "Example Company Sdn Bhd",
                       true
@@ -418,31 +432,33 @@ const CustomerAddPage: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2">
-                    {renderInput("phone_number", "Phone Number", "tel")}
-                    {renderInput("email", "Email", "email")}
+                    {renderInput("phone_number", t("Phone Number"), "tel")}
+                    {renderInput("email", t("Email"), "email")}
                   </div>
 
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-3">
                     <div className="sm:col-span-2">
-                      {renderInput("address", "Address", "text")}
+                      {renderInput("address", t("Address"), "text")}
                     </div>
-                    {renderInput("city", "City", "text", "KOTA KINABALU")}
+                    {renderInput("city", t("City"), "text", "KOTA KINABALU")}
                   </div>
 
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-3">
-                    {renderListbox("state", "State", stateOptions)}
-                    {renderListbox("closeness", "Closeness", closenessOptions)}
-                    {renderListbox("salesman", "Salesman", salesmen, true)}
+                    {renderListbox("state", t("State"), stateOptions)}
+                    {renderListbox("closeness", t("Closeness"), closenessOptions)}
+                    {renderListbox("salesman", t("Salesman"), salesmen, true)}
                   </div>
                   <hr className="my-4 border-t border-default-200 dark:border-gray-700" />
                   <h3 className="text-base font-medium text-default-700 dark:text-gray-200 mb-3">
-                    e-Invoice Information (Optional, requires all 3 if provided)
+                    {t(
+                      "e-Invoice Information (Optional, requires all 3 if provided)"
+                    )}
                   </h3>
                   <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-3">
                     <div>
                       <FormListbox
                         name="id_type"
-                        label="ID Type"
+                        label={t("ID Type")}
                         value={formData.id_type || ""}
                         onChange={(selectedId) =>
                           handleListboxChange("id_type", selectedId)
@@ -454,15 +470,15 @@ const CustomerAddPage: React.FC = () => {
                     </div>
                     {renderInput(
                       "id_number",
-                      "ID Number",
+                      t("ID Number"),
                       "text",
-                      getIdNumberPlaceholder(formData.id_type)
+                      t(getIdNumberPlaceholder(formData.id_type))
                     )}
                     {renderInput(
                       "tin_number",
-                      "TIN Number",
+                      t("TIN Number"),
                       "text",
-                      "Company or Individual TIN"
+                      t("Company or Individual TIN")
                     )}
                   </div>
                 </div>
@@ -473,7 +489,7 @@ const CustomerAddPage: React.FC = () => {
                   {/* --- Credit Management Section --- */}
                   <div className="p-4 border border-default-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50">
                     <h3 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
-                      Credit Management
+                      {t("Credit Management")}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                       {/* Credit Limit Input */}
@@ -482,7 +498,7 @@ const CustomerAddPage: React.FC = () => {
                           htmlFor="credit_limit"
                           className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1"
                         >
-                          Credit Limit (RM)
+                          {t("Credit Limit (RM)")}
                         </label>
                         <input
                           id="credit_limit"
@@ -516,7 +532,7 @@ const CustomerAddPage: React.FC = () => {
                         />
                         {formData.credit_limit === 0 && (
                           <p className="text-xs text-blue-600 mt-1">
-                            Unlimited credit
+                            {t("Unlimited credit")}
                           </p>
                         )}
                       </div>
@@ -524,7 +540,7 @@ const CustomerAddPage: React.FC = () => {
                       {/* Used Credit (Always 0 for new) */}
                       <div>
                         <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                          Credit Used
+                          {t("Credit Used")}
                         </label>
                         <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-900 h-[42px] flex items-center">
                           <span className="font-medium text-default-700 dark:text-gray-200">
@@ -536,12 +552,12 @@ const CustomerAddPage: React.FC = () => {
                       {/* Available Credit (Equals Limit for new) */}
                       <div>
                         <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                          Available Credit
+                          {t("Available Credit")}
                         </label>
                         <div className="px-3 py-2 border border-default-200 dark:border-gray-700 rounded-md bg-default-100 dark:bg-gray-900 h-[42px] flex items-center">
                           <span className="font-medium text-default-700 dark:text-gray-200">
                             {formData.credit_limit === 0
-                              ? "Unlimited"
+                              ? t("Unlimited")
                               : `RM ${Number(
                                   formData.credit_limit ?? 0
                                 ).toFixed(2)}`}
@@ -553,11 +569,13 @@ const CustomerAddPage: React.FC = () => {
                     {(formData.credit_limit ?? 0) > 0 && (
                       <div className="mt-4">
                         <div className="flex justify-between text-xs text-default-600 dark:text-gray-400 mb-1">
-                          <span>Usage</span>
+                          <span>{t("Usage")}</span>
                           <span>
-                            0.00 /{" "}
-                            {Number(formData.credit_limit ?? 0).toFixed(2)} RM
-                            (0.0%)
+                            {t("0.00 / {{amount}} RM (0.0%)", {
+                              amount: Number(
+                                formData.credit_limit ?? 0
+                              ).toFixed(2),
+                            })}
                           </span>
                         </div>
                         <div className="w-full bg-default-200 dark:bg-gray-700 rounded-full h-2.5">
@@ -588,7 +606,7 @@ const CustomerAddPage: React.FC = () => {
                 onClick={handleBackClick}
                 disabled={isSaving}
               >
-                Cancel
+                {t("cancel", { ns: "common" })}
               </Button>
               <Button
                 type="submit"
@@ -597,7 +615,7 @@ const CustomerAddPage: React.FC = () => {
                 disabled={isSaving || !isFormChanged} // Disable if no changes or saving
                 size="lg"
               >
-                {isSaving ? "Saving..." : "Create Customer"}
+                {isSaving ? t("Saving...") : t("Create Customer")}
               </Button>
             </div>
           </form>
@@ -608,9 +626,11 @@ const CustomerAddPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Changes"
-        message="Are you sure you want to go back? All entered information will be lost."
-        confirmButtonText="Discard"
+        title={t("Discard Changes")}
+        message={t(
+          "Are you sure you want to go back? All entered information will be lost."
+        )}
+        confirmButtonText={t("Discard")}
       />
     </div>
   );

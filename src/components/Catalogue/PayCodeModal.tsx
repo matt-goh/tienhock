@@ -11,6 +11,7 @@ import { FormInput, FormListbox } from "../FormComponents"; // Ensure correct im
 import Button from "../Button";
 import Checkbox from "../Checkbox";
 import PayRateScheduleManager from "./PayRateScheduleManager";
+import { useTranslation } from "react-i18next";
 
 interface PayCodeModalProps {
   // API base for the rate-timeline endpoints (JP passes /jellypolly/api)
@@ -90,6 +91,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
   existingPayCodes,
   apiBase = "/api",
 }) => {
+  const { t } = useTranslation("catalogue");
   // State type should match the structure without 'code'
   const [formData, setFormData] = useState<PayCodeFormData>(defaultPayCode);
   const [error, setError] = useState<string | null>(null);
@@ -99,31 +101,31 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
   // Options for select fields
   const payTypeOptions = [
-    { id: "Base", name: "Base" },
-    { id: "Tambahan", name: "Tambahan" },
-    { id: "Overtime", name: "Overtime" },
+    { id: "Base", name: t("Base") },
+    { id: "Tambahan", name: t("Additional") },
+    { id: "Overtime", name: t("Overtime") },
     // Add other PayType options if needed
   ];
 
   const rateUnitOptions = [
-    { id: "Hour", name: "Hour" },
-    { id: "Bill", name: "Bill" },
-    { id: "Day", name: "Day" },
-    { id: "Bag", name: "Bag" },
-    { id: "Ctn", name: "Ctn (Carton)" },
-    { id: "Kg", name: "Kilogram" },
-    { id: "Karung", name: "Karung" },
-    { id: "Bundle", name: "Bundle" },
-    { id: "Trip", name: "Trip" },
-    { id: "Tray", name: "Tray" },
-    { id: "Percent", name: "Percent" },
-    { id: "Fixed", name: "Fixed" },
+    { id: "Hour", name: t("Hour") },
+    { id: "Bill", name: t("Bill") },
+    { id: "Day", name: t("Day") },
+    { id: "Bag", name: t("Bag") },
+    { id: "Ctn", name: t("Ctn (Carton)") },
+    { id: "Kg", name: t("Kilogram") },
+    { id: "Karung", name: t("Karung") },
+    { id: "Bundle", name: t("Bundle") },
+    { id: "Trip", name: t("Trip") },
+    { id: "Tray", name: t("Tray") },
+    { id: "Percent", name: t("Percent") },
+    { id: "Fixed", name: t("Fixed") },
   ];
 
   // Salary Report column override (priority below the per-entry Others override).
   // "" = automatic bucketing rule. Labels mirror the Add/Edit Others modals.
   const reportColumnOptions = [
-    { id: "", name: "Automatic (by rule)" },
+    { id: "", name: t("Automatic (by rule)") },
     { id: "GAJI", name: "GAJI" },
     { id: "OT", name: "OT" },
     { id: "BONUS", name: "BONUS" },
@@ -223,11 +225,11 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
     if (!currentId) {
       // ID is always required now
-      setError("ID cannot be empty");
+      setError(t("ID cannot be empty"));
       return false;
     }
     if (!currentDesc) {
-      setError("Description cannot be empty");
+      setError(t("Description cannot be empty"));
       return false;
     }
 
@@ -235,7 +237,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     // Check only on create mode
     if (!isEditMode) {
       if (existingPayCodes.some((pc) => pc.id === currentId)) {
-        setError(`Pay code ID '${currentId}' already exists.`);
+        setError(t("Pay code ID '{{id}}' already exists.", { id: currentId }));
         return false;
       }
     }
@@ -247,19 +249,19 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     const rateUmumNum = parseRateInput(formData.rate_umum);
 
     if (isNaN(rateBiasaNum) || isNaN(rateAhadNum) || isNaN(rateUmumNum)) {
-      setError("Rates must be valid numbers or empty.");
+      setError(t("Rates must be valid numbers or empty."));
       return false;
     }
 
     if (rateBiasaNum < 0 || rateAhadNum < 0 || rateUmumNum < 0) {
-      setError("Rates cannot be negative");
+      setError(t("Rates cannot be negative"));
       return false;
     }
 
     // Percentage validation when rate_unit is "Percent"
     if (formData.rate_unit === "Percent") {
       if (rateBiasaNum > 100 || rateAhadNum > 100 || rateUmumNum > 100) {
-        setError("Percentage rates cannot exceed 100%");
+        setError(t("Percentage rates cannot exceed 100%"));
         return false;
       }
     }
@@ -307,7 +309,8 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
       console.error("Error saving pay code:", error);
       // Display error message from the API or a generic one
       setError(
-        error.message || "Failed to save pay code. Check console for details."
+        error.message ||
+          t("Failed to save pay code. Check console for details.")
       );
       setIsSaving(false); // Ensure button is re-enabled on error
     }
@@ -350,36 +353,36 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                   as="h3"
                   className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
                 >
-                  {isEditMode ? "Edit Pay Code" : "Add New Pay Code"}
+                  {isEditMode ? t("Edit Pay Code") : t("Add New Pay Code")}
                 </DialogTitle>
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
                   {/* ID Input */}
                   <FormInput
-                    label="ID"
+                    label={t("ID")}
                     name="id"
                     value={formData.id}
                     onChange={handleChange}
                     required
                     disabled={isSaving || isEditMode} // Disable ID editing after creation
-                    placeholder="e.g., MEE_BASIC_PAY (Unique)"
+                    placeholder={t("e.g., MEE_BASIC_PAY (Unique)")}
                   />
 
                   {/* REMOVED Code Input */}
 
                   {/* Description Input */}
                   <FormInput
-                    label="Description"
+                    label={t("Description")}
                     name="description"
                     value={formData.description}
                     onChange={handleChange}
                     required
                     disabled={isSaving}
-                    placeholder="e.g., Basic Pay for Mee Section"
+                    placeholder={t("e.g., Basic Pay for Mee Section")}
                   />
 
                   {/* Pay Type Listbox */}
                   <FormListbox
-                    label="Pay Type"
+                    label={t("Pay Type")}
                     name="pay_type"
                     // Ensure value matches one of the option IDs
                     value={
@@ -395,7 +398,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
                   {/* Rate Unit Listbox */}
                   <FormListbox
-                    label="Rate Unit"
+                    label={t("Rate Unit")}
                     name="rate_unit"
                     // Ensure value matches one of the option IDs
                     value={
@@ -413,7 +416,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
 
                   {/* Salary Report Column Override Listbox */}
                   <FormListbox
-                    label="Salary Report Column"
+                    label={t("Salary Report Column")}
                     name="report_column"
                     value={formData.report_column ?? ""}
                     onChange={handleListboxChange("report_column")}
@@ -426,10 +429,10 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                     <FormInput
                       label={
                         formData.rate_unit === "Fixed"
-                          ? "Normal Amount"
-                          : `Normal Rate${
-                              formData.rate_unit === "Percent" ? " (%)" : ""
-                            }`
+                          ? t("Normal Amount")
+                          : formData.rate_unit === "Percent"
+                          ? t("Normal Rate (%)")
+                          : t("Normal Rate")
                       }
                       name="rate_biasa"
                       value={formData.rate_biasa?.toString() ?? ""}
@@ -445,10 +448,10 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                     <FormInput
                       label={
                         formData.rate_unit === "Fixed"
-                          ? "Sunday Amount"
-                          : `Sunday Rate${
-                              formData.rate_unit === "Percent" ? " (%)" : ""
-                            }`
+                          ? t("Sunday Amount")
+                          : formData.rate_unit === "Percent"
+                          ? t("Sunday Rate (%)")
+                          : t("Sunday Rate")
                       }
                       name="rate_ahad"
                       value={formData.rate_ahad?.toString() ?? ""}
@@ -464,10 +467,10 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                     <FormInput
                       label={
                         formData.rate_unit === "Fixed"
-                          ? "Holiday Amount"
-                          : `Holiday Rate${
-                              formData.rate_unit === "Percent" ? " (%)" : ""
-                            }`
+                          ? t("Holiday Amount")
+                          : formData.rate_unit === "Percent"
+                          ? t("Holiday Rate (%)")
+                          : t("Holiday Rate")
                       }
                       name="rate_umum"
                       value={formData.rate_umum?.toString() ?? ""}
@@ -512,26 +515,26 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       labelPosition="right"
                       label={
                         formData.rate_unit === "Percent"
-                        ? "Requires Units Input (Required for Percentage)"
+                        ? t("Requires Units Input (Required for Percentage)")
                         : formData.rate_unit === "Bag"
-                        ? "Requires Units Input (Required for Bag)"
+                        ? t("Requires Units Input (Required for Bag)")
                         : formData.rate_unit === "Ctn"
-                        ? "Requires Units Input (Required for Carton)"
+                        ? t("Requires Units Input (Required for Carton)")
                         : formData.rate_unit === "Kg"
-                        ? "Requires Units Input (Required for Kilogram)"
+                        ? t("Requires Units Input (Required for Kilogram)")
                         : formData.rate_unit === "Karung"
-                        ? "Requires Units Input (Required for Karung)"
+                        ? t("Requires Units Input (Required for Karung)")
                         : formData.rate_unit === "Bundle"
-                        ? "Requires Units Input (Required for Bundle)"
+                        ? t("Requires Units Input (Required for Bundle)")
                         : formData.rate_unit === "Day"
-                        ? "Requires Units Input (Required for Day)"
+                        ? t("Requires Units Input (Required for Day)")
                         : formData.rate_unit === "Trip"
-                        ? "Requires Units Input (Required for Trip)"
+                        ? t("Requires Units Input (Required for Trip)")
                         : formData.rate_unit === "Hour"
-                        ? "Requires Units Input (Not Applicable for Hour)"
+                        ? t("Requires Units Input (Not Applicable for Hour)")
                         : formData.rate_unit === "Fixed"
-                        ? "Requires Units Input (Units = Direct Amount)"
-                        : "Requires Units Input"
+                        ? t("Requires Units Input (Units = Direct Amount)")
+                        : t("Requires Units Input")
                       }
                       />
                     </div>
@@ -564,7 +567,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       onClick={onClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -572,7 +575,7 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                       variant="filled"
                       disabled={isSaving}
                     >
-                      {isSaving ? "Saving..." : "Save"}
+                      {isSaving ? t("Saving...") : t("Save")}
                     </Button>
                   </div>
                 </form>

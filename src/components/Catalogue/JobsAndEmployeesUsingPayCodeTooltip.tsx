@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { IconInfoCircle, IconBriefcase, IconUser } from "@tabler/icons-react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface JobsAndEmployeesUsingPayCodeTooltipProps {
   payCodeId: string;
@@ -27,6 +28,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
   disableNavigation = false,
   navigateBase = "",
 }) => {
+  const { t } = useTranslation("catalogue");
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const iconRef = useRef<HTMLSpanElement>(null);
@@ -131,15 +133,15 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
               <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2 flex justify-between items-center">
                 <span
                   className="truncate"
-                  title={`Pay Code Usage: ${payCodeId}`}
+                  title={t("Pay Code Usage: {{payCodeId}}", { payCodeId })}
                 >
-                  Pay Code Usage: {payCodeId}
+                  {t("Pay Code Usage: {{payCodeId}}", { payCodeId })}
                 </span>
                 <span
                   className="text-xs text-default-500 dark:text-gray-400 truncate"
-                  title={`Total: ${totalCount}`}
+                  title={t("Total: {{total}}", { total: totalCount })}
                 >
-                  ({totalCount} total)
+                  {t("({{total}} total)", { total: totalCount })}
                 </span>
               </div>
               <div className="border-t border-default-200 dark:border-gray-700"></div>
@@ -153,7 +155,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                   <div className="flex items-center mb-2">
                     <IconBriefcase size={16} className="text-amber-600 dark:text-amber-400 mr-2" />
                     <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                      Jobs ({jobDetails.length})
+                      {t("Jobs ({{total}})", { total: jobDetails.length })}
                     </span>
                   </div>
                   <div className="space-y-1">
@@ -165,7 +167,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                             ? "cursor-pointer hover:bg-amber-100"
                             : ""
                         } transition-colors duration-200 flex justify-between items-center`}
-                        title={`View job details: ${job.name}`}
+                        title={t("View job details: {{name}}", { name: job.name })}
                         onClick={() => {
                           if (!disableNavigation) {
                             navigate(`${navigateBase}/catalogue/job?id=${job.id}&paycode=${payCodeId}`);
@@ -188,7 +190,9 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                   <div className="flex items-center mb-2">
                     <IconUser size={16} className="text-sky-600 dark:text-sky-400 mr-2" />
                     <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                      Employees ({employeeDetails.length})
+                      {t("Employees ({{total}})", {
+                        total: employeeDetails.length,
+                      })}
                     </span>
                   </div>
                   <div className="space-y-1">
@@ -200,7 +204,9 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
                             ? "cursor-pointer hover:bg-sky-100"
                             : ""
                         } transition-colors duration-200 flex justify-between items-center`}
-                        title={`View employee details: ${employee.name}`}
+                        title={t("View employee details: {{name}}", {
+                          name: employee.name,
+                        })}
                         onClick={() => {
                           if (!disableNavigation) {
                             navigate(`${navigateBase}/catalogue/staff/${employee.id}`);
@@ -221,7 +227,7 @@ const JobsAndEmployeesUsingPayCodeTooltip: React.FC<
 
               {totalCount === 0 && (
                 <div className="text-center text-sm text-default-500 dark:text-gray-400 py-2">
-                  Not used by any jobs or employees
+                  {t("Not used by any jobs or employees")}
                 </div>
               )}
             </div>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { IconPlus, IconPencil, IconTrash, IconCheck, IconX } from "@tabler/icons-react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { useStaffFormOptions } from "../../hooks/useStaffFormOptions";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
@@ -98,6 +99,7 @@ const EntityTable: React.FC<{
   onDelete: (id: string) => Promise<void>;
   onAdd: (item: EntityItem) => Promise<void>;
 }> = ({ config, data, onSave, onDelete, onAdd }) => {
+  const { t } = useTranslation("catalogue");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{ id: string; name: string }>({ id: "", name: "" });
   const [isAdding, setIsAdding] = useState(false);
@@ -111,7 +113,7 @@ const EntityTable: React.FC<{
 
   const handleSaveEdit = async () => {
     if (!editValues.id.trim() || !editValues.name.trim()) {
-      toast.error("ID and Name cannot be empty");
+      toast.error(t("ID and Name cannot be empty"));
       return;
     }
     const originalItem = data.find((item) => item.id === editingId);
@@ -133,11 +135,11 @@ const EntityTable: React.FC<{
 
   const handleAddNew = async () => {
     if (!newItem.id.trim() || !newItem.name.trim()) {
-      toast.error("ID and Name cannot be empty");
+      toast.error(t("ID and Name cannot be empty"));
       return;
     }
     if (data.some((item) => item.id === newItem.id)) {
-      toast.error(`ID "${newItem.id}" already exists`);
+      toast.error(t('ID "{{id}}" already exists', { id: newItem.id }));
       return;
     }
     await onAdd({ id: newItem.id, name: newItem.name });
@@ -153,7 +155,9 @@ const EntityTable: React.FC<{
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
       <div className="px-4 py-3 bg-default-50 dark:bg-gray-700 border-b border-default-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-default-700 dark:text-gray-200">{config.title}</h3>
+        <h3 className="text-sm font-semibold text-default-700 dark:text-gray-200">
+          {t(config.title)}
+        </h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -164,11 +168,11 @@ const EntityTable: React.FC<{
                   key={field.key}
                   className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                 >
-                  {field.label}
+                  {t(field.label)}
                 </th>
               ))}
               <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-20">
-                Actions
+                {t("actions", { ns: "common" })}
               </th>
             </tr>
           </thead>
@@ -221,14 +225,14 @@ const EntityTable: React.FC<{
                           <button
                             onClick={() => handleDelete(item.id)}
                             className="p-1 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                            title="Confirm delete"
+                            title={t("Confirm delete")}
                           >
                             <IconCheck size={16} />
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(null)}
                             className="p-1 text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700 rounded"
-                            title="Cancel"
+                            title={t("Cancel")}
                           >
                             <IconX size={16} />
                           </button>
@@ -238,14 +242,14 @@ const EntityTable: React.FC<{
                           <button
                             onClick={() => handleEdit(item)}
                             className="p-1 text-default-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
-                            title="Edit"
+                            title={t("Edit")}
                           >
                             <IconPencil size={16} />
                           </button>
                           <button
                             onClick={() => setDeleteConfirmId(item.id)}
                             className="p-1 text-default-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                            title="Delete"
+                            title={t("delete", { ns: "common" })}
                           >
                             <IconTrash size={16} />
                           </button>
@@ -263,7 +267,7 @@ const EntityTable: React.FC<{
                     type="text"
                     value={newItem.id}
                     onChange={(e) => setNewItem({ ...newItem, id: e.target.value })}
-                    placeholder="ID"
+                    placeholder={t("ID")}
                     className="w-full px-2 py-1 text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     autoFocus
                   />
@@ -273,7 +277,7 @@ const EntityTable: React.FC<{
                     type="text"
                     value={newItem.name}
                     onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                    placeholder="Name"
+                    placeholder={t("Name")}
                     className="w-full px-2 py-1 text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   />
                 </td>
@@ -305,7 +309,7 @@ const EntityTable: React.FC<{
                     className="flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                   >
                     <IconPlus size={16} className="mr-1" />
-                    Add new
+                    {t("Add new")}
                   </button>
                 </td>
               </tr>
@@ -324,6 +328,7 @@ const TaxTable: React.FC<{
   onDelete: (name: string) => Promise<void>;
   onAdd: (item: TaxItem) => Promise<void>;
 }> = ({ data, onSave, onDelete, onAdd }) => {
+  const { t } = useTranslation("catalogue");
   const [editingName, setEditingName] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<{ name: string; rate: number }>({ name: "", rate: 0 });
   const [isAdding, setIsAdding] = useState(false);
@@ -337,7 +342,7 @@ const TaxTable: React.FC<{
 
   const handleSaveEdit = async () => {
     if (!editValues.name.trim()) {
-      toast.error("Name cannot be empty");
+      toast.error(t("Name cannot be empty"));
       return;
     }
     const originalItem = data.find((item) => item.name === editingName);
@@ -360,12 +365,12 @@ const TaxTable: React.FC<{
 
   const handleAddNew = async () => {
     if (!newItem.name.trim()) {
-      toast.error("Name cannot be empty");
+      toast.error(t("Name cannot be empty"));
       return;
     }
     const rate = parseFloat(newItem.rate) || 0;
     if (data.some((item) => item.name === newItem.name)) {
-      toast.error(`Tax "${newItem.name}" already exists`);
+      toast.error(t('Tax "{{name}}" already exists', { name: newItem.name }));
       return;
     }
     await onAdd({ name: newItem.name, rate });
@@ -381,20 +386,22 @@ const TaxTable: React.FC<{
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
       <div className="px-4 py-3 bg-default-50 dark:bg-gray-700 border-b border-default-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-default-700 dark:text-gray-200">Tax</h3>
+        <h3 className="text-sm font-semibold text-default-700 dark:text-gray-200">
+          {t("Tax")}
+        </h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-default-50 dark:bg-gray-700">
               <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                Name
+                {t("Name")}
               </th>
               <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                Rate
+                {t("Rate")}
               </th>
               <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-20">
-                Actions
+                {t("actions", { ns: "common" })}
               </th>
             </tr>
           </thead>
@@ -448,14 +455,14 @@ const TaxTable: React.FC<{
                           <button
                             onClick={() => handleDelete(item.name)}
                             className="p-1 text-red-600 dark:text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                            title="Confirm delete"
+                            title={t("Confirm delete")}
                           >
                             <IconCheck size={16} />
                           </button>
                           <button
                             onClick={() => setDeleteConfirmName(null)}
                             className="p-1 text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700 rounded"
-                            title="Cancel"
+                            title={t("Cancel")}
                           >
                             <IconX size={16} />
                           </button>
@@ -465,14 +472,14 @@ const TaxTable: React.FC<{
                           <button
                             onClick={() => handleEdit(item)}
                             className="p-1 text-default-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
-                            title="Edit"
+                            title={t("Edit")}
                           >
                             <IconPencil size={16} />
                           </button>
                           <button
                             onClick={() => setDeleteConfirmName(item.name)}
                             className="p-1 text-default-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                            title="Delete"
+                            title={t("delete", { ns: "common" })}
                           >
                             <IconTrash size={16} />
                           </button>
@@ -490,7 +497,7 @@ const TaxTable: React.FC<{
                     type="text"
                     value={newItem.name}
                     onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                    placeholder="Name"
+                    placeholder={t("Name")}
                     className="w-full px-2 py-1 text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-700 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
                     autoFocus
                   />
@@ -533,7 +540,7 @@ const TaxTable: React.FC<{
                     className="flex items-center text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
                   >
                     <IconPlus size={16} className="mr-1" />
-                    Add new
+                    {t("Add new")}
                   </button>
                 </td>
               </tr>
@@ -546,6 +553,7 @@ const TaxTable: React.FC<{
 };
 
 const OthersPage: React.FC = () => {
+  const { t } = useTranslation("catalogue");
   const { options, loading: optionsLoading, refreshOptions } = useStaffFormOptions();
   const [entityData, setEntityData] = useState<Record<string, EntityItem[]>>({});
   const [taxes, setTaxes] = useState<TaxItem[]>([]);
@@ -582,7 +590,7 @@ const OthersPage: React.FC = () => {
         setTaxes(data.map((t: TaxItem) => ({ ...t, originalName: t.name })));
       } catch (error) {
         console.error("Error fetching taxes:", error);
-        toast.error("Failed to load taxes");
+        toast.error(t("Failed to load taxes"));
       } finally {
         setTaxLoading(false);
       }
@@ -616,13 +624,13 @@ const OthersPage: React.FC = () => {
           }));
         }
 
-        toast.success("Saved successfully");
+        toast.success(t("Saved successfully"));
         if (["nationalities", "races", "agama", "sections", "departments", "banks"].includes(config.key)) {
           await refreshOptions();
         }
       } catch (error) {
         console.error(`Error saving ${config.title}:`, error);
-        toast.error((error as Error).message || "Failed to save");
+        toast.error((error as Error).message || t("Failed to save"));
       }
     },
     [refreshOptions]
@@ -636,13 +644,13 @@ const OthersPage: React.FC = () => {
           ...prev,
           [config.key]: prev[config.key].filter((item) => item.id !== id),
         }));
-        toast.success("Deleted successfully");
+        toast.success(t("Deleted successfully"));
         if (["nationalities", "races", "agama", "sections", "departments", "banks"].includes(config.key)) {
           await refreshOptions();
         }
       } catch (error) {
         console.error(`Error deleting ${config.title}:`, error);
-        toast.error((error as Error).message || "Failed to delete");
+        toast.error((error as Error).message || t("Failed to delete"));
       }
     },
     [refreshOptions]
@@ -667,13 +675,13 @@ const OthersPage: React.FC = () => {
           }));
         }
 
-        toast.success("Added successfully");
+        toast.success(t("Added successfully"));
         if (["nationalities", "races", "agama", "sections", "departments", "banks"].includes(config.key)) {
           await refreshOptions();
         }
       } catch (error) {
         console.error(`Error adding ${config.title}:`, error);
-        toast.error((error as Error).message || "Failed to add");
+        toast.error((error as Error).message || t("Failed to add"));
       }
     },
     [refreshOptions]
@@ -695,10 +703,10 @@ const OthersPage: React.FC = () => {
       if (result.taxes) {
         setTaxes(result.taxes.map((t: TaxItem) => ({ ...t, originalName: t.name })));
       }
-      toast.success("Saved successfully");
+      toast.success(t("Saved successfully"));
     } catch (error) {
       console.error("Error saving tax:", error);
-      toast.error((error as Error).message || "Failed to save");
+      toast.error((error as Error).message || t("Failed to save"));
     }
   }, [taxes]);
 
@@ -706,10 +714,10 @@ const OthersPage: React.FC = () => {
     try {
       await api.delete("/api/taxes", [name]);
       setTaxes((prev) => prev.filter((item) => item.name !== name));
-      toast.success("Deleted successfully");
+      toast.success(t("Deleted successfully"));
     } catch (error) {
       console.error("Error deleting tax:", error);
-      toast.error((error as Error).message || "Failed to delete");
+      toast.error((error as Error).message || t("Failed to delete"));
     }
   }, []);
 
@@ -719,10 +727,10 @@ const OthersPage: React.FC = () => {
       if (result.taxes && result.taxes.length > 0) {
         setTaxes((prev) => [...prev, { ...result.taxes[0], originalName: result.taxes[0].name }]);
       }
-      toast.success("Added successfully");
+      toast.success(t("Added successfully"));
     } catch (error) {
       console.error("Error adding tax:", error);
-      toast.error((error as Error).message || "Failed to add");
+      toast.error((error as Error).message || t("Failed to add"));
     }
   }, []);
 
@@ -736,7 +744,9 @@ const OthersPage: React.FC = () => {
 
   return (
     <div className="w-full">
-      <h1 className="text-xl font-semibold text-default-700 dark:text-gray-200 mb-3">Others</h1>
+      <h1 className="text-xl font-semibold text-default-700 dark:text-gray-200 mb-3">
+        {t("Others")}
+      </h1>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {ENTITY_CONFIGS.map((config) => (
           <EntityTable

@@ -11,6 +11,7 @@ import clsx from "clsx";
 import toast from "react-hot-toast";
 import Button from "../Button";
 import { api } from "../../routes/utils/api";
+import { useTranslation } from "react-i18next";
 import { refreshProductsCache } from "../../utils/invoice/useProductsCache";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { DEFAULT_WORKER_ORDERS } from "../../config/workerOrderDefaults";
@@ -40,14 +41,6 @@ interface ProductOrderModalProps {
 
 const ORDERABLE_TYPES = ["MEE", "BH", "BUNDLE", "OTH", "JP"] as const;
 type OrderableType = (typeof ORDERABLE_TYPES)[number];
-
-const TYPE_LABELS: Record<OrderableType, string> = {
-  MEE: "Mee",
-  BH: "Bihun",
-  BUNDLE: "Bundle",
-  OTH: "Lain-lain",
-  JP: "Jelly Polly",
-};
 
 // TH packing worker scopes shown as extra tabs. The list mirrors what the
 // Production Entry grids render: active staff holding the scope's job id,
@@ -92,6 +85,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
   onClose,
   products,
 }) => {
+  const { t } = useTranslation("catalogue");
   const { staffs } = useStaffsCache();
   const [selectedTab, setSelectedTab] = useState<TabKey>("product:MEE");
   const [orderedProducts, setOrderedProducts] = useState<OrderableProduct[]>(
@@ -110,6 +104,20 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
   const selectedWorkerTab = WORKER_TABS.find(
     (tab) => `worker:${tab.scope}` === selectedTab
   );
+  const typeLabel = (type: OrderableType): string => {
+    switch (type) {
+      case "MEE":
+        return t("Mee");
+      case "BH":
+        return t("Bihun");
+      case "BUNDLE":
+        return t("Bundle");
+      case "OTH":
+        return t("Others");
+      case "JP":
+        return t("Jelly Polly");
+    }
+  };
 
   const productsByType = useMemo(() => {
     const grouped = new Map<OrderableType, OrderableProduct[]>();
@@ -223,7 +231,9 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
         // pages pick up the new order on next load without an extra GET.
         cacheWorkerOrder(selectedWorkerTab.scope, workerIds);
         toast.success(
-          `Susunan pekerja ${selectedWorkerTab.label} disimpan`
+          t("Worker order for {{label}} saved", {
+            label: t(selectedWorkerTab.label),
+          })
         );
       } else {
         await api.put("/api/products/order", {
@@ -231,15 +241,19 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
           product_ids: orderedProducts.map((product) => product.id),
         });
         await refreshProductsCache();
-        toast.success(`Susunan produk ${TYPE_LABELS[selectedType]} disimpan`);
+        toast.success(
+          t("Product order for {{label}} saved", {
+            label: typeLabel(selectedType),
+          })
+        );
       }
       onClose();
     } catch (error) {
       console.error("Error saving order:", error);
       toast.error(
         isWorkerTab
-          ? "Gagal menyimpan susunan pekerja"
-          : "Gagal menyimpan susunan produk"
+          ? t("Failed to save worker order")
+          : t("Failed to save product order")
       );
     } finally {
       setIsSaving(false);
@@ -290,7 +304,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Susun Semula Produk & Pekerja
+                  {t("Reorder Products & Workers")}
                 </DialogTitle>
                 <button
                   type="button"
@@ -301,14 +315,15 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                 </button>
               </div>
               <p className="mb-4 text-sm text-default-500 dark:text-gray-400">
-                Seret untuk menetapkan susunan paparan. Susunan ini dikongsi di
-                semua halaman produk dan pengeluaran untuk setiap pengguna.
+                {t(
+                  "Drag to set the display order. This order is shared across all product and production pages for every user."
+                )}
               </p>
 
               <div className="mb-4 space-y-2">
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="w-14 text-xs font-semibold uppercase tracking-wide text-default-400 dark:text-gray-500">
-                    Produk
+                    {t("Products")}
                   </span>
                   {ORDERABLE_TYPES.map((type) => (
                     <button
@@ -322,14 +337,13 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                           : "border-default-300 text-default-600 hover:bg-default-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                       )}
                     >
-                      {TYPE_LABELS[type]} (
-                      {productsByType.get(type)?.length || 0})
+                      {typeLabel(type)} ({productsByType.get(type)?.length || 0})
                     </button>
                   ))}
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="w-14 text-xs font-semibold uppercase tracking-wide text-default-400 dark:text-gray-500">
-                    Pekerja
+                    {t("Workers")}
                   </span>
                   {WORKER_TABS.map((tab) => (
                     <button
@@ -343,7 +357,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                           : "border-default-300 text-default-600 hover:bg-default-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                       )}
                     >
-                      {tab.label}
+                      {t(tab.label)}
                     </button>
                   ))}
                 </div>
@@ -357,8 +371,8 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                 ) : rowCount === 0 ? (
                   <p className="px-4 py-6 text-center text-sm text-default-400 dark:text-gray-500">
                     {isWorkerTab
-                      ? "Tiada pekerja untuk kategori ini."
-                      : "Tiada produk untuk jenis ini."}
+                      ? t("No workers for this category.")
+                      : t("No products for this type.")}
                   </p>
                 ) : isWorkerTab ? (
                   orderedWorkers.map((worker, index) => (
@@ -453,7 +467,7 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
                           {product.id}
                           {product.is_active === false && (
                             <span className="ml-2 rounded bg-default-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-default-500 dark:bg-gray-700 dark:text-gray-400">
-                              Tidak Aktif
+                              {t("Inactive")}
                             </span>
                           )}
                         </span>
@@ -470,14 +484,14 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
 
               <div className="mt-5 flex justify-end gap-2">
                 <Button variant="outline" onClick={onClose} disabled={isSaving}>
-                  Batal
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="sky"
                   onClick={handleSave}
                   disabled={isSaveDisabled}
                 >
-                  {isSaving ? "Menyimpan..." : "Simpan Susunan"}
+                  {isSaving ? t("Saving...") : t("Save Order")}
                 </Button>
               </div>
             </DialogPanel>

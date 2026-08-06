@@ -5,6 +5,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import TimeNavigator from "../../components/TimeNavigator";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   BarChart,
   Bar,
@@ -61,6 +62,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   onTabChange,
   scope = "tienhock",
 }) => {
+  const { t } = useTranslation("sales");
   // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
     `salesBySalesmanMonth:${scope}`
@@ -173,16 +175,18 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
 
       // Check if we received any data
       if (chartData.length === 0) {
-        toast.error("No data found for the selected salesmen in the past year");
+        toast.error(
+          t("No data found for the selected salesmen in the past year")
+        );
         setSalesTrendData([]);
         return;
       }
 
       setSalesTrendData(chartData);
-      toast.success("Sales trend data generated successfully");
+      toast.success(t("Sales trend data generated successfully"));
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
-      toast.error("Failed to generate sales trend data");
+      toast.error(t("Failed to generate sales trend data"));
     } finally {
       setIsGeneratingChart(false);
     }
@@ -211,15 +215,15 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
         }
       } catch (error) {
         console.error("Error fetching sales data:", error);
-        setError("Failed to load sales data. Please try again.");
-        toast.error("Failed to load sales data");
+        setError(t("Failed to load sales data. Please try again."));
+        toast.error(t("Failed to load sales data"));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchSalesData();
-  }, [dateRange, scope]);
+  }, [dateRange, scope, t]);
 
   useEffect(() => {
     // Clear chart data if it exists when selection changes
@@ -356,7 +360,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                     : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
                 }`}
               >
-                Products
+                {t("Products")}
               </button>
               <button
                 onClick={() => onTabChange(1)}
@@ -366,7 +370,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                     : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
                 }`}
               >
-                Salesman
+                {t("Salesman")}
               </button>
             </div>
           </div>
@@ -387,7 +391,9 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-              <h3 className="min-w-0 text-sm font-semibold truncate">Total Sales</h3>
+              <h3 className="min-w-0 text-sm font-semibold truncate">
+                {t("Total Sales")}
+              </h3>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-sky-500 dark:bg-sky-400" aria-hidden="true" />
             </div>
             <div className="px-4 py-3">
@@ -396,7 +402,9 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-              <h3 className="min-w-0 text-sm font-semibold truncate">Total Bills</h3>
+              <h3 className="min-w-0 text-sm font-semibold truncate">
+                {t("Total Bills")}
+              </h3>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-green-500 dark:bg-green-400" aria-hidden="true" />
             </div>
             <div className="px-4 py-3">
@@ -405,7 +413,9 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-              <h3 className="min-w-0 text-sm font-semibold truncate">Total Invoices</h3>
+              <h3 className="min-w-0 text-sm font-semibold truncate">
+                {t("Total Invoices")}
+              </h3>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500 dark:bg-amber-400" aria-hidden="true" />
             </div>
             <div className="px-4 py-3">
@@ -414,7 +424,9 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-              <h3 className="min-w-0 text-sm font-semibold truncate">Total Cash Bills</h3>
+              <h3 className="min-w-0 text-sm font-semibold truncate">
+                {t("Total Cash Bills")}
+              </h3>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-indigo-500 dark:bg-indigo-400" aria-hidden="true" />
             </div>
             <div className="px-4 py-3">
@@ -423,7 +435,9 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-              <h3 className="min-w-0 text-sm font-semibold truncate">Average Sale per Bill</h3>
+              <h3 className="min-w-0 text-sm font-semibold truncate">
+                {t("Average Sale per Bill")}
+              </h3>
               <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-teal-500 dark:bg-teal-400" aria-hidden="true" />
             </div>
             <div className="px-4 py-3">
@@ -442,9 +456,13 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           {/* Detailed salesman sales table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center gap-2">
-              <h3 className="min-w-0 text-base font-semibold truncate">Salesman Performance Details</h3>
+              <h3 className="min-w-0 text-base font-semibold truncate">
+                {t("Salesman Performance Details")}
+              </h3>
               <div className="text-sm text-default-500 dark:text-gray-400">
-                {filteredAndSortedData.length} salesmen
+                {t("{{total}} salesmen", {
+                  total: filteredAndSortedData.length,
+                })}
               </div>
             </div>
             {filteredAndSortedData.length > 0 ? (
@@ -458,7 +476,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         onClick={() => handleSort("id")}
                       >
                         <div className="flex items-center">
-                          Salesman ID
+                          {t("Salesman ID")}
                           {sortConfig.key === "id" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -473,7 +491,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         onClick={() => handleSort("cashCount")}
                       >
                         <div className="flex items-center justify-end">
-                          Cash Bills
+                          {t("Cash Bills")}
                           {sortConfig.key === "cashCount" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -488,7 +506,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         onClick={() => handleSort("invoiceCount")}
                       >
                         <div className="flex items-center justify-end">
-                          Invoices
+                          {t("Invoices")}
                           {sortConfig.key === "invoiceCount" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -503,7 +521,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         onClick={() => handleSort("totalQuantity")}
                       >
                         <div className="flex items-center justify-end">
-                          Total Quantity
+                          {t("Total Quantity")}
                           {sortConfig.key === "totalQuantity" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -518,7 +536,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         onClick={() => handleSort("totalSales")}
                       >
                         <div className="flex items-center justify-end">
-                          Total Sales
+                          {t("Total Sales")}
                           {sortConfig.key === "totalSales" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -559,7 +577,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         colSpan={4}
                         className="px-4 py-2 text-right text-sm font-medium"
                       >
-                        Total:
+                        {t("Total:")}
                       </td>
                       <td className="px-4 py-2 text-right text-sm font-bold">
                         {formatCurrency(summary.totalSales)}
@@ -571,8 +589,9 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
             ) : (
               <div className="p-4">
                 <div className="border border-dashed border-default-300 dark:border-gray-600 rounded p-4 text-center text-default-500 dark:text-gray-400">
-                  No data to display. Please select a different month or check if
-                  sales data exists.
+                  {t(
+                    "No data to display. Please select a different month or check if sales data exists."
+                  )}
                 </div>
               </div>
             )}
@@ -583,7 +602,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
             {/* Top Salesmen Chart */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
-                Top Performing Salesmen
+                {t("Top Performing Salesmen")}
               </h2>
               {topSalesmen.length > 0 ? (
                 <div className="h-64">
@@ -606,7 +625,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                       <Legend />
                       <Bar
                         dataKey="totalSales"
-                        name="Sales"
+                        name={t("Sales")}
                         fill="#4299e1"
                         radius={[0, 4, 4, 0]}
                       />
@@ -615,7 +634,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                 </div>
               ) : (
                 <div className="h-64 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
-                  No data available
+                  {t("No data available")}
                 </div>
               )}
             </div>
@@ -623,7 +642,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
             {/* Average Sale per Bill */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
-                Average Sale per Bill
+                {t("Average Sale per Bill")}
               </h2>
               {salesmanData.length > 0 ? (
                 <div className="h-64">
@@ -652,7 +671,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                       <Legend />
                       <Bar
                         dataKey="averageSale"
-                        name="Average Sale"
+                        name={t("Average Sale")}
                         fill="#48bb78" // Green to differentiate from the other chart
                       />
                     </BarChart>
@@ -660,7 +679,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                 </div>
               ) : (
                 <div className="h-64 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
-                  No data available
+                  {t("No data available")}
                 </div>
               )}
             </div>
@@ -670,7 +689,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">
-                Salesmen's Sales Trends Over Time
+                {t("Salesmen's Sales Trends Over Time")}
               </h2>
               <div className="flex items-center gap-3">
                 <FormCombobox
@@ -687,7 +706,10 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                       setSelectedChartSalesmen(valueArray);
                     } else if (valueArray.length > maxChartSalesmen) {
                       toast.error(
-                        `Maximum ${maxChartSalesmen} salesmen can be selected for the chart`
+                        t(
+                          "Maximum {{total}} salesmen can be selected for the chart",
+                          { total: maxChartSalesmen }
+                        )
                       );
                       // Keep the first max number of selections
                       setSelectedChartSalesmen(
@@ -711,10 +733,10 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                   color="sky"
                 >
                   {isGeneratingChart
-                    ? "Generating..."
+                    ? t("Generating...")
                     : salesTrendData.length > 0
-                    ? "Generated"
-                    : "Generate Chart"}
+                      ? t("Generated")
+                      : t("Generate Chart")}
                 </Button>
               </div>
             </div>
@@ -771,7 +793,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
               </div>
             ) : (
               <div className="h-80 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded text-default-500 dark:text-gray-400">
-                Generate to view sales trends for the past 12 months
+                {t("Generate to view sales trends for the past 12 months")}
               </div>
             )}
           </div>

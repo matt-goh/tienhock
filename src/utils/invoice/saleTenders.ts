@@ -9,6 +9,7 @@
 // drift; the server-side counterpart is `src/routes/sales/invoices/saleTenders.js`.
 
 import { Payment } from "../../types/types";
+import type { TFunction } from "i18next";
 
 export interface SaleTender {
   key: string;
@@ -117,7 +118,8 @@ export const addTender = (
 export const validateTenders = (
   tenders: SaleTender[],
   billTotal: number,
-  allowPartial: boolean
+  allowPartial: boolean,
+  t?: TFunction
 ): string[] => {
   // A RM0.00 bill (all returns / free goods) has nothing to collect.
   if (billTotal <= 0.005) return [];
@@ -125,13 +127,25 @@ export const validateTenders = (
   const errors: string[] = [];
   tenders.forEach((tender: SaleTender, index: number) => {
     if (!tender.payment_method) {
-      errors.push(`Payment #${index + 1}: payment method is required.`);
+      errors.push(
+        t
+          ? t("Payment #{{number}}: payment method is required.", {
+              number: index + 1,
+            })
+          : `Payment #${index + 1}: payment method is required.`
+      );
     }
     if (!(Number(tender.amount || 0) > 0)) {
       errors.push(
         tenders.length > 1
-          ? `Payment #${index + 1}: enter an amount above RM0.`
-          : "Enter a payment amount above RM0."
+          ? t
+            ? t("Payment #{{number}}: enter an amount above RM0.", {
+                number: index + 1,
+              })
+            : `Payment #${index + 1}: enter an amount above RM0.`
+          : t
+            ? t("Enter a payment amount above RM0.")
+            : "Enter a payment amount above RM0."
       );
     }
   });
@@ -139,11 +153,24 @@ export const validateTenders = (
   const remaining = roundTenderAmount(billTotal - sumTenders(tenders));
   if (remaining < -0.005) {
     errors.push(
-      `Payments exceed the RM${billTotal.toFixed(2)} bill by RM${Math.abs(remaining).toFixed(2)}.`
+      t
+        ? t("Payments exceed the RM{{total}} bill by RM{{amount}}.", {
+            total: billTotal.toFixed(2),
+            amount: Math.abs(remaining).toFixed(2),
+          })
+        : `Payments exceed the RM${billTotal.toFixed(2)} bill by RM${Math.abs(remaining).toFixed(2)}.`
     );
   } else if (remaining > 0.005 && !allowPartial) {
     errors.push(
-      `A cash bill must be paid in full — RM${remaining.toFixed(2)} of RM${billTotal.toFixed(2)} is unaccounted for. Change the bill to Invoice to leave a balance outstanding.`
+      t
+        ? t(
+            "A cash bill must be paid in full – RM{{amount}} of RM{{total}} is unaccounted for. Change the bill to Invoice to leave a balance outstanding.",
+            {
+              amount: remaining.toFixed(2),
+              total: billTotal.toFixed(2),
+            }
+          )
+        : `A cash bill must be paid in full 窶・RM${remaining.toFixed(2)} of RM${billTotal.toFixed(2)} is unaccounted for. Change the bill to Invoice to leave a balance outstanding.`
     );
   }
   return errors;
