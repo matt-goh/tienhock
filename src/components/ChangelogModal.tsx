@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-06",
+    ms: "Borang invois baharu (Tien Hock dan Jelly Polly): ruangan Tarikh kini menggunakan pemilih kalendar dengan anak panah untuk ke hari sebelum atau selepas. Ruangan Masa tidak berubah.",
+    en: "New invoice form (Tien Hock and Jelly Polly): the Date field now uses a calendar picker with arrows to step to the previous or next day. The Time field is unchanged.",
+  },
+  {
+    date: "2026-08-06",
     ms: "Green Target: Tong, Tarikh Letak dan Tarikh Ambil kini pilihan semasa membuat sewaan — hanya pelanggan dan pemandu diperlukan. Ini membolehkan anda merekod tapak dan alamat pelanggan sahaja, kemudian terus ke invois, bayaran dan perakaunan, sementara pergerakan tong direkod di tempat lain. Pada senarai dan halaman sewaan, label \"Active/Completed\" digantikan dengan status bil: No Invoice, Unpaid, Partly Paid, Overdue atau Paid. Butang \"Mark as Picked Up\" hanya muncul untuk sewaan yang mempunyai Tarikh Letak. Sewaan tanpa Tarikh Letak sentiasa dipaparkan walaupun anda menapis mengikut julat tarikh. Tapisan \"Active Rentals Only\" telah dibuang kerana ia tidak lagi bermakna; tapisan \"No Invoice Only\" kekal.",
     en: "Green Target: Dumpster, Placement Date and Pickup Date are now optional when creating a rental — only the customer and driver are required. This lets you record just the customer's site and address and move straight on to the invoice, payment and accounting, while the tong movement is recorded elsewhere. On the rental list and rental page, the \"Active/Completed\" label is replaced with the billing status: No Invoice, Unpaid, Partly Paid, Overdue or Paid. The \"Mark as Picked Up\" button only appears for rentals that have a Placement Date. Rentals with no Placement Date always show, even when you filter by a date range. The \"Active Rentals Only\" filter has been removed since it no longer means anything; the \"No Invoice Only\" filter stays.",
   },
