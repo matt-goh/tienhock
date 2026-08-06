@@ -3,7 +3,9 @@ import React, {
   Fragment,
   useState,
   useEffect,
+  useLayoutEffect,
   useCallback,
+  useMemo,
   useRef,
 } from "react";
 import {
@@ -23,14 +25,26 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import clsx from "clsx";
+import { useTranslation } from "react-i18next";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
+import TrialBalanceOrderButton from "../../../components/Accounting/TrialBalanceOrderButton";
+import TrialBalanceOrderModal from "../../../components/Accounting/TrialBalanceOrderModal";
 import Pagination from "../../../components/Invoice/Pagination";
 import { api } from "../../../routes/utils/api";
 import { generateTrialBalancePDF } from "../../../utils/accounting/TrialBalancePDF";
+import { useAccountCodesCache } from "../../../utils/accounting/useAccountingCache";
+import {
+  buildNotesByCode,
+  loadTrialBalanceOrderPreference,
+  saveTrialBalanceOrderPreference,
+  sortTrialBalanceAccounts,
+  type FinancialStatementNoteLike,
+  type TrialBalanceOrderPreference,
+} from "../../../utils/accounting/trialBalanceOrder";
 import { GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
@@ -47,16 +61,30 @@ const SCROLL_RESTORATION_KEYS = {
   greentarget: "gt-trial-balance",
 } as const;
 
+const DEFAULT_PAGE_SIZE = 100;
+const PAGE_SIZE_OPTIONS: number[] = [50, 100, 200, 500, 1000];
+
+// Each header cell sticks on its own and carries its own background, so the
+// rows scrolling underneath never show through.
+const headerCellClasses: string =
+  "sticky z-20 bg-gray-50 dark:bg-gray-900 px-4 py-3 font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700";
+
+const footerCellClasses: string =
+  "sticky bottom-0 z-20 bg-gray-100 dark:bg-gray-900 px-4 py-3 font-bold text-gray-900 dark:text-white border-t-2 border-gray-300 dark:border-gray-600";
+
 interface CachedTrialBalanceFilters {
   month: Date;
   searchTerm: string;
   selectedLedgerType: string;
   hideZeroBalance: boolean;
+  onlyShowMonthAccounts: boolean;
   page: number;
+  pageSize: number;
 }
 
-// Restores the month, search, ledger-type, zero-balance toggle and page so
-// returning from an account ledger lands on the same view.
+// Restores the month, search, ledger-type, zero-balance toggle, page and page
+// size — plus the order modal's month-accounts filter — so returning from an
+// account ledger lands on the same view.
 const loadCachedFilters = (storageKey: string): CachedTrialBalanceFilters => {
   const now = new Date();
   const fallback: CachedTrialBalanceFilters = {
@@ -64,7 +92,9 @@ const loadCachedFilters = (storageKey: string): CachedTrialBalanceFilters => {
     searchTerm: "",
     selectedLedgerType: "",
     hideZeroBalance: true,
+    onlyShowMonthAccounts: true,
     page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
   };
 
   try {
@@ -84,8 +114,14 @@ const loadCachedFilters = (storageKey: string): CachedTrialBalanceFilters => {
           ? parsed.selectedLedgerType
           : "",
       hideZeroBalance: parsed.hideZeroBalance !== false,
+      onlyShowMonthAccounts: parsed.onlyShowMonthAccounts !== false,
       page:
         typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
+      pageSize:
+        typeof parsed.pageSize === "number" &&
+        PAGE_SIZE_OPTIONS.includes(parsed.pageSize)
+          ? parsed.pageSize
+          : DEFAULT_PAGE_SIZE,
     };
   } catch (e) {
     console.error("Error loading cached trial balance filters:", e);
@@ -99,6 +135,7 @@ interface TrialBalanceAccount {
   ledger_type: string;
   fs_note: string | null;
   note_name: string | null;
+  sort_order?: number | null;
   debit: number;
   credit: number;
   balance: number;
@@ -133,8 +170,6 @@ interface TrialBalanceData {
   };
 }
 
-const PAGE_SIZE = 100;
-
 const LEDGER_TYPE_LABELS: Record<string, string> = {
   BK: "Bank",
   CS: "Closing Stock",
@@ -159,6 +194,7 @@ export interface TrialBalancePageProps {
 const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
   company = "tienhock",
 }: TrialBalancePageProps) => {
+  const { t } = useTranslation("common");
   const isGreenTarget: boolean = company === "greentarget";
   const reportsBasePath: string = isGreenTarget
     ? "/greentarget/api/financial-reports"
@@ -180,9 +216,91 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(
     () => loadCachedFilters(filtersStorageKey).hideZeroBalance
   );
+  const [onlyShowMonthAccounts, setOnlyShowMonthAccounts] = useState<boolean>(
+    () => loadCachedFilters(filtersStorageKey).onlyShowMonthAccounts
+  );
   const [currentPage, setCurrentPage] = useState<number>(
     () => loadCachedFilters(filtersStorageKey).page
   );
+  const [pageSize, setPageSize] = useState<number>(
+    () => loadCachedFilters(filtersStorageKey).pageSize
+  );
+  const [orderPreference, setOrderPreference] =
+    useState<TrialBalanceOrderPreference>(() =>
+      loadTrialBalanceOrderPreference(company)
+    );
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
+  const [fsNotes, setFsNotes] = useState<FinancialStatementNoteLike[]>([]);
+  const { accountCodes, isLoading: accountCodesLoading } =
+    useAccountCodesCache(company, isOrderModalOpen);
+
+  // The standard order needs each account's financial-statement note category,
+  // which comes from the notes catalogue (the account-codes API only carries
+  // the note reference).
+  useEffect(() => {
+    let isCurrent = true;
+    api
+      .get(`${reportsBasePath}/notes`)
+      .then((rows: FinancialStatementNoteLike[]) => {
+        if (isCurrent) setFsNotes(Array.isArray(rows) ? rows : []);
+      })
+      .catch((error: unknown) => {
+        console.error("Error fetching financial statement notes:", error);
+      });
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [reportsBasePath]);
+
+  // The sticky header is a variable height (filters wrap on narrow screens), so
+  // the table head has to be offset by whatever it currently measures.
+  const [pageHeaderHeight, setPageHeaderHeight] = useState<number>(0);
+  const pageHeaderRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const headerElement: HTMLDivElement | null = pageHeaderRef.current;
+    if (!headerElement) return;
+
+    const updateHeaderHeight = (): void => {
+      setPageHeaderHeight(headerElement.getBoundingClientRect().height);
+    };
+
+    updateHeaderHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateHeaderHeight);
+      return (): void => window.removeEventListener("resize", updateHeaderHeight);
+    }
+
+    const resizeObserver = new ResizeObserver(updateHeaderHeight);
+    resizeObserver.observe(headerElement);
+    return (): void => resizeObserver.disconnect();
+  }, [loading]);
+
+  // The sticky pagination footer is a variable height too (its controls wrap on
+  // narrow screens), so the totals row sticks just above it.
+  const [paginationFooterHeight, setPaginationFooterHeight] = useState<number>(0);
+  const paginationFooterRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const footerElement: HTMLDivElement | null = paginationFooterRef.current;
+    if (!footerElement) return;
+
+    const updateFooterHeight = (): void => {
+      setPaginationFooterHeight(footerElement.getBoundingClientRect().height);
+    };
+
+    updateFooterHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateFooterHeight);
+      return (): void => window.removeEventListener("resize", updateFooterHeight);
+    }
+
+    const resizeObserver = new ResizeObserver(updateFooterHeight);
+    resizeObserver.observe(footerElement);
+    return (): void => resizeObserver.disconnect();
+  }, [loading]);
 
   // Month selection state
   const [selectedMonth, setSelectedMonth] = useState<Date>(
@@ -198,7 +316,9 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
           searchTerm,
           selectedLedgerType,
           hideZeroBalance,
+          onlyShowMonthAccounts,
           page: currentPage,
+          pageSize,
         })
       );
     } catch (e) {
@@ -210,7 +330,9 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     searchTerm,
     selectedLedgerType,
     hideZeroBalance,
+    onlyShowMonthAccounts,
     currentPage,
+    pageSize,
   ]);
 
   // Debounce the search input; a changed search always restarts from page 1.
@@ -240,8 +362,9 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     const month = selectedMonth.getMonth() + 1;
 
     const params = buildFilterParams();
-    params.set("limit", String(PAGE_SIZE));
-    params.set("offset", String((currentPage - 1) * PAGE_SIZE));
+    // Fetch the whole filtered set (no limit/offset) so the user's chosen
+    // account order can be applied in the browser before client-side
+    // pagination. The PDF export already relies on omitting limit.
 
     try {
       setLoading(true);
@@ -257,7 +380,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, buildFilterParams, currentPage, reportsBasePath]);
+  }, [selectedMonth, buildFilterParams, reportsBasePath]);
 
   useEffect(() => {
     fetchTrialBalance();
@@ -284,6 +407,21 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     setCurrentPage(1);
   };
 
+  const handlePageSizeChange = (value: string): void => {
+    const next = Number(value);
+    if (!Number.isInteger(next) || next <= 0) return;
+    setPageSize(next);
+    setCurrentPage(1);
+  };
+
+  const handleOrderPreferenceChange = (
+    next: TrialBalanceOrderPreference
+  ): void => {
+    setOrderPreference(next);
+    saveTrialBalanceOrderPreference(company, next);
+    setCurrentPage(1);
+  };
+
   const handlePrintPDF = async (): Promise<void> => {
     if (!trialBalance) return;
 
@@ -295,9 +433,15 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
       const fullData: TrialBalanceData = await api.get(
         `${reportsBasePath}/trial-balance/${year}/${month}?${buildFilterParams().toString()}`
       );
+      const orderedFullAccounts = sortTrialBalanceAccounts(
+        fullData.accounts,
+        orderPreference,
+        company,
+        buildNotesByCode(fsNotes)
+      );
       await generateTrialBalancePDF(
         fullData,
-        fullData.accounts,
+        orderedFullAccounts,
         isGreenTarget
           ? {
               companyName: GREENTARGET_INFO.name,
@@ -320,10 +464,39 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     }).format(amount);
   };
 
-  // Search/hide-zero/pagination are applied server-side
-  const accounts = trialBalance?.accounts || [];
-  const totalFiltered = trialBalance?.pagination?.total || 0;
-  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  // Search/hide-zero are applied server-side; ordering and pagination are
+  // applied here so the user's chosen account order drives the whole report.
+  const notesByCode = useMemo(
+    () => buildNotesByCode(fsNotes),
+    [fsNotes]
+  );
+  // The account codes that actually appear in the selected month's Trial
+  // Balance (full filtered set, no pagination) — used by the order modal's
+  // "only show this month" filter.
+  const monthTrialBalanceCodes = useMemo(
+    () =>
+      new Set<string>(
+        (trialBalance?.accounts ?? []).map((account) => account.code)
+      ),
+    [trialBalance]
+  );
+  const fullAccounts = trialBalance?.accounts || [];
+  const orderedFullAccounts = useMemo(
+    () =>
+      sortTrialBalanceAccounts(
+        fullAccounts,
+        orderPreference,
+        company,
+        notesByCode
+      ),
+    [fullAccounts, orderPreference, company, notesByCode]
+  );
+  const totalFiltered = orderedFullAccounts.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const accounts = orderedFullAccounts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const getMonthName = (date: Date): string => {
     return date.toLocaleString("default", { month: "long", year: "numeric" });
@@ -339,8 +512,14 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
 
   return (
     <div className="w-full">
+      {/* Sticky band: the filters, actions and balance status stay visible
+          while the account list scrolls underneath. */}
+      <div
+        ref={pageHeaderRef}
+        className="sticky top-0 z-30 -mx-4 -mt-3 mb-3 space-y-2 border-b border-default-200 bg-white/95 px-4 pb-2 pt-3 backdrop-blur dark:border-gray-700 dark:bg-gray-950/95"
+      >
       {/* Header: period + filters on the left, actions on the right */}
-      <div className="mb-2 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <MonthNavigator
             selectedMonth={selectedMonth}
@@ -432,6 +611,14 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2">
+          <TrialBalanceOrderButton
+            preference={orderPreference}
+            onModeChange={(mode) =>
+              handleOrderPreferenceChange({ ...orderPreference, mode })
+            }
+            onOpen={() => setIsOrderModalOpen(true)}
+          />
+
           {/* Source Guide (TH-specific) */}
           {!isGreenTarget && <ReportSourceGuide report="trial_balance" />}
 
@@ -459,17 +646,10 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
         </div>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
-          <p className="text-red-700 dark:text-red-300">{error}</p>
-        </div>
-      )}
-
       {/* Balance Status Banner */}
       {trialBalance && (
         <div
-          className={`mb-2 p-2 rounded-lg border ${
+          className={`p-2 rounded-lg border ${
             trialBalance.totals.is_balanced
               ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800"
               : "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800"
@@ -499,30 +679,59 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
           </div>
         </div>
       )}
+      </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+          <p className="text-red-700 dark:text-red-300">{error}</p>
+        </div>
+      )}
 
       {/* Trial Balance Table */}
       {trialBalance && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
+              {/* Sticky lives on the cells, not the thead/tr row wrappers
+                  are not reliably stickable. Offset by the page header's height
+                  so the columns stack directly beneath it. */}
+              <thead>
                 <tr>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300 w-32">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-left w-32 rounded-tl-lg")}
+                  >
                     Account Code
                   </th>
-                  <th className="px-4 py-3 text-left font-semibold text-gray-700 dark:text-gray-300">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-left")}
+                  >
                     Description
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-gray-300 w-20">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-center w-20")}
+                  >
                     Type
                   </th>
-                  <th className="px-4 py-3 text-center font-semibold text-gray-700 dark:text-gray-300 w-20">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-center w-20")}
+                  >
                     Note
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300 w-36">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-right w-36")}
+                  >
                     Debit (RM)
                   </th>
-                  <th className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300 w-36">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-right w-36 rounded-tr-lg")}
+                  >
                     Credit (RM)
                   </th>
                 </tr>
@@ -565,18 +774,26 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
                 )}
               </tbody>
               {/* Totals Footer */}
-              <tfoot className="sticky bottom-0 z-10 bg-gray-100 dark:bg-gray-900">
+              {/* Same rule as the header: sticky on the cells, not the tfoot */}
+              <tfoot>
                 <tr>
                   <td
                     colSpan={4}
-                    className="px-4 py-3 font-bold text-gray-900 dark:text-white text-right border-t-2 border-gray-300 dark:border-gray-600"
+                    style={{ bottom: paginationFooterHeight }}
+                    className={clsx(footerCellClasses, "text-right")}
                   >
                     TOTALS:
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white border-t-2 border-gray-300 dark:border-gray-600">
+                  <td
+                    style={{ bottom: paginationFooterHeight }}
+                    className={clsx(footerCellClasses, "text-right")}
+                  >
                     {formatCurrency(trialBalance.totals.debit)}
                   </td>
-                  <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white border-t-2 border-gray-300 dark:border-gray-600">
+                  <td
+                    style={{ bottom: paginationFooterHeight }}
+                    className={clsx(footerCellClasses, "text-right")}
+                  >
                     {formatCurrency(trialBalance.totals.credit)}
                   </td>
                 </tr>
@@ -584,15 +801,87 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
             </table>
           </div>
 
-          {/* Summary Footer with pagination */}
-          <div className="px-4 pb-3 bg-gray-50 dark:bg-gray-900">
+          {/* Summary Footer with pagination: sticks to the viewport bottom so
+              paging stays available while scrolling the account list */}
+          <div
+            ref={paginationFooterRef}
+            className="sticky bottom-0 z-30 px-4 pb-3 bg-gray-50/95 dark:bg-gray-900/95 backdrop-blur border-t border-gray-200 dark:border-gray-700 rounded-b-lg"
+          >
             <Pagination
               currentPage={currentPage}
               totalPages={totalPages}
               onPageChange={setCurrentPage}
               itemsCount={accounts.length}
               totalItems={totalFiltered}
-              pageSize={PAGE_SIZE}
+              pageSize={pageSize}
+              leading={
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-600 dark:text-gray-400">
+                    {t("Rows per page")}
+                  </span>
+                  {/* Anchored (portalled by Headless UI) so the dropdown escapes
+                      any scroll/overflow ancestor and is never clipped */}
+                  <Listbox value={String(pageSize)} onChange={handlePageSizeChange}>
+                    <div className="relative">
+                      <ListboxButton className="relative w-20 cursor-pointer rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-3 pr-8 text-left text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <span className="block truncate">{pageSize}</span>
+                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
+                          <IconChevronDown
+                            className="h-4 w-4 text-gray-400"
+                            aria-hidden="true"
+                          />
+                        </span>
+                      </ListboxButton>
+                      <Transition
+                        as={Fragment}
+                        leave="transition ease-in duration-100"
+                        leaveFrom="opacity-100"
+                        leaveTo="opacity-0"
+                      >
+                        <ListboxOptions
+                          anchor="bottom end"
+                          className="z-50 w-[var(--button-width)] [--anchor-gap:0.25rem] max-h-60 overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 dark:ring-gray-700 focus:outline-none"
+                        >
+                          {PAGE_SIZE_OPTIONS.map((option) => (
+                            <ListboxOption
+                              key={option}
+                              value={String(option)}
+                              className={({ active }) =>
+                                clsx(
+                                  "relative cursor-pointer select-none py-1.5 pl-3 pr-9",
+                                  active
+                                    ? "bg-sky-100 dark:bg-sky-900/40 text-sky-900 dark:text-sky-200"
+                                    : "text-gray-900 dark:text-gray-100"
+                                )
+                              }
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span
+                                    className={`block truncate ${
+                                      selected ? "font-medium" : "font-normal"
+                                    }`}
+                                  >
+                                    {option}
+                                  </span>
+                                  {selected && (
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
+                                      <IconCheck
+                                        className="h-4 w-4"
+                                        aria-hidden="true"
+                                      />
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </ListboxOption>
+                          ))}
+                        </ListboxOptions>
+                      </Transition>
+                    </div>
+                  </Listbox>
+                </div>
+              }
             />
             <div className="text-right text-xs text-gray-500 dark:text-gray-400 mt-2">
               Period: January - {getMonthName(selectedMonth)}
@@ -600,6 +889,20 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
           </div>
         </div>
       )}
+
+      <TrialBalanceOrderModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        company={company}
+        accountCodes={accountCodes}
+        accountCodesLoading={accountCodesLoading}
+        fsNotes={fsNotes}
+        preference={orderPreference}
+        onPreferenceChange={handleOrderPreferenceChange}
+        onlyShowMonthAccounts={onlyShowMonthAccounts}
+        onOnlyShowMonthAccountsChange={setOnlyShowMonthAccounts}
+        monthAccountCodes={monthTrialBalanceCodes}
+      />
     </div>
   );
 };

@@ -47,6 +47,7 @@ import {
 } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 type MidMonthSubview = "summary" | "pinjam";
 
@@ -66,6 +67,7 @@ interface MidMonthPinjamData {
 }
 
 const MidMonthPayrollPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   // State
   const [payrolls, setPayrolls] = useState<MidMonthPayroll[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -185,7 +187,7 @@ const MidMonthPayrollPage: React.FC = () => {
       setPinjamByEmp(pinjamMap);
     } catch (error) {
       console.error("Error fetching payrolls:", error);
-      toast.error("Failed to load mid-month payrolls");
+      toast.error(t("Failed to load mid-month payrolls"));
     } finally {
       setIsLoading(false);
     }
@@ -207,7 +209,7 @@ const MidMonthPayrollPage: React.FC = () => {
 
   const generatePDF = async (action: "download" | "print") => {
     if (payrolls.length === 0) {
-      toast.error("No data available to generate PDF");
+      toast.error(t("No data available to generate PDF"));
       return;
     }
 
@@ -246,12 +248,14 @@ const MidMonthPayrollPage: React.FC = () => {
       };
 
       await generateMidMonthPayrollReportPDF(pdfData, action);
-      const actionText =
-        action === "download" ? "downloaded" : "generated for printing";
-      toast.success(`Mid-month payroll report ${actionText} successfully`);
+      toast.success(
+        action === "download"
+          ? t("Mid-month payroll report downloaded successfully")
+          : t("Mid-month payroll report generated for printing successfully")
+      );
     } catch (error) {
       console.error("Error generating PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -260,7 +264,7 @@ const MidMonthPayrollPage: React.FC = () => {
   const generateTextExport = async () => {
     const bankPayrolls = payrolls.filter((p) => p.payment_method === "Bank");
     if (bankPayrolls.length === 0) {
-      toast.error("No Bank-payment employees available to export");
+      toast.error(t("No Bank-payment employees available to export"));
       return;
     }
 
@@ -397,7 +401,7 @@ const MidMonthPayrollPage: React.FC = () => {
         });
 
       if (dataRows.length === 0) {
-        toast.error("No payable rows after deducting pinjam");
+        toast.error(t("No payable rows after deducting pinjam"));
         return;
       }
 
@@ -440,10 +444,12 @@ const MidMonthPayrollPage: React.FC = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast.success("Mid-month payment export file downloaded successfully");
+      toast.success(
+        t("Mid-month payment export file downloaded successfully")
+      );
     } catch (error) {
       console.error("Error generating text export:", error);
-      toast.error("Failed to generate text export");
+      toast.error(t("Failed to generate text export"));
     } finally {
       setIsGeneratingExport(false);
     }
@@ -459,13 +465,13 @@ const MidMonthPayrollPage: React.FC = () => {
 
     try {
       await deleteMidMonthPayroll(deletingId);
-      toast.success("Payroll deleted successfully");
+      toast.success(t("Payroll deleted successfully"));
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchPayrolls();
     } catch (error) {
       console.error("Error deleting payroll:", error);
-      toast.error("Failed to delete payroll");
+      toast.error(t("Failed to delete payroll"));
     }
   };
 
@@ -523,7 +529,7 @@ const MidMonthPayrollPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Mid-month Payrolls
+          {t("Mid-month Payrolls")}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -532,7 +538,7 @@ const MidMonthPayrollPage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <div
             className="relative"
@@ -546,7 +552,7 @@ const MidMonthPayrollPage: React.FC = () => {
               variant="outline"
               disabled={payrolls.length === 0 || isGeneratingPDF}
             >
-              Print
+              {t("Print")}
             </Button>
             {isPrintDropdownOpen && (
               <div className="absolute right-0 top-full mt-1 z-50">
@@ -559,7 +565,7 @@ const MidMonthPayrollPage: React.FC = () => {
                     disabled={payrolls.length === 0 || isGeneratingPDF}
                     className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Print
+                    {t("Print")}
                   </button>
                   <button
                     onClick={() => {
@@ -569,7 +575,7 @@ const MidMonthPayrollPage: React.FC = () => {
                     disabled={payrolls.length === 0 || isGeneratingPDF}
                     className="w-full px-3 py-2 text-left text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Download PDF
+                    {t("Download PDF")}
                   </button>
                 </div>
               </div>
@@ -582,7 +588,7 @@ const MidMonthPayrollPage: React.FC = () => {
             variant="outline"
             disabled={payrolls.length === 0 || isGeneratingExport}
           >
-            Export
+            {t("Export")}
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}
@@ -590,7 +596,7 @@ const MidMonthPayrollPage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add Payroll
+            {t("Add Payroll")}
           </Button>
         </div>
       </div>
@@ -618,14 +624,14 @@ const MidMonthPayrollPage: React.FC = () => {
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setSearchQuery(event.target.value)
                 }
-                placeholder="Search employee..."
+                placeholder={t("Search employee...")}
                 className="w-full rounded-lg border border-default-300 bg-white py-1.5 pl-8 pr-8 text-sm text-default-900 shadow-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-500 sm:w-56"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery("")}
-                  aria-label="Clear employee search"
+                  aria-label={t("Clear employee search")}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600 dark:text-gray-500 dark:hover:text-gray-300"
                 >
                   <IconX size={14} />
@@ -634,10 +640,14 @@ const MidMonthPayrollPage: React.FC = () => {
             </div>
             <div className="text-sm text-default-600 dark:text-gray-300">
               <div className="font-medium">
-                Total: {filteredPayrolls.length} employees
+                {t("Total: {{total}} employees", {
+                  total: filteredPayrolls.length,
+                })}
               </div>
               <div className="font-medium">
-                Amount: {formatCurrency(filteredTotalAmount)}
+                {t("Amount: {{amount}}", {
+                  amount: formatCurrency(filteredTotalAmount),
+                })}
               </div>
             </div>
           </div>
@@ -668,7 +678,7 @@ const MidMonthPayrollPage: React.FC = () => {
                       : ""
                   }`}
                 >
-                  {view}
+                  {t(view)}
                 </button>
               )
             )}
@@ -682,7 +692,7 @@ const MidMonthPayrollPage: React.FC = () => {
             </div>
           ) : pinjamReportData.length === 0 ? (
             <div className="text-center py-12 text-default-500 dark:text-gray-400">
-              No mid-month payrolls found.
+              {t("No mid-month payrolls found.")}
             </div>
           ) : (
             <div className="px-6 pt-2 pb-2">
@@ -697,13 +707,15 @@ const MidMonthPayrollPage: React.FC = () => {
         ) : payrolls.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No payrolls found</p>
-            <p>Click "Add Payroll" to create mid-month payrolls</p>
+            <p className="text-lg font-medium">{t("No payrolls found")}</p>
+            <p>{t('Click "Add Payroll" to create mid-month payrolls')}</p>
           </div>
         ) : filteredPayrolls.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconSearch className="mx-auto mb-4 h-12 w-12 text-default-300" />
-            <p className="text-lg font-medium">No employees match your search</p>
+            <p className="text-lg font-medium">
+              {t("No employees match your search")}
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -711,22 +723,22 @@ const MidMonthPayrollPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee ID
+                    {t("Employee ID")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
+                    {t("Name")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Payment Method
+                    {t("Payment Method")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Created
+                    {t("Created")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -753,7 +765,7 @@ const MidMonthPayrollPage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(payroll)}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -763,7 +775,7 @@ const MidMonthPayrollPage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -804,9 +816,11 @@ const MidMonthPayrollPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeletePayroll}
-        title="Delete Mid-month Payroll"
-        message="Are you sure you want to delete this mid-month payroll? This action cannot be undone."
-        confirmButtonText="Delete"
+        title={t("Delete Mid-month Payroll")}
+        message={t(
+          "Are you sure you want to delete this mid-month payroll? This action cannot be undone."
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

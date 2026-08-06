@@ -19,6 +19,7 @@ import { useHolidayCache } from "../../../utils/payroll/useHolidayCache";
 import ImportHolidaysModal from "../../../components/Payroll/ImportHolidaysModal";
 import { usePersistedNumber } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
+import { useTranslation } from "react-i18next";
 
 interface Holiday {
   id: number;
@@ -29,6 +30,7 @@ interface Holiday {
 }
 
 const HolidayCalendarPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const [selectedYear, setSelectedYear] = usePersistedNumber(
     "holidayCalendarYear",
     2000,
@@ -67,11 +69,11 @@ const HolidayCalendarPage: React.FC = () => {
 
     try {
       await api.delete(`/api/holidays/${holidayToDelete.id}`);
-      toast.success("Holiday deleted successfully");
+      toast.success(t("Holiday deleted successfully"));
       await refreshHolidays();
     } catch (error) {
       console.error("Error deleting holiday:", error);
-      toast.error("Failed to delete holiday");
+      toast.error(t("Failed to delete holiday"));
     } finally {
       setShowDeleteDialog(false);
       setHolidayToDelete(null);
@@ -82,7 +84,10 @@ const HolidayCalendarPage: React.FC = () => {
     <div className="space-y-2">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Holiday Calendar ({holidays.length}) - Cuti Umum ({cutiUmumCount})
+          {t("Holiday Calendar ({{total}}) - Cuti Umum ({{cuti}})", {
+            total: holidays.length,
+            cuti: cutiUmumCount,
+          })}
         </h1>
         <div className="flex items-center gap-4">
           {/* Year Navigation */}
@@ -107,7 +112,7 @@ const HolidayCalendarPage: React.FC = () => {
             icon={IconFileImport}
             variant="outline"
           >
-            Import
+            {t("Import")}
           </Button>
 
           <Button
@@ -116,7 +121,7 @@ const HolidayCalendarPage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add Holiday
+            {t("Add Holiday")}
           </Button>
         </div>
       </div>
@@ -133,19 +138,19 @@ const HolidayCalendarPage: React.FC = () => {
                 <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                      Date
+                      {t("Date")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                      Day
+                      {t("Day")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                      Description
+                      {t("Description")}
                     </th>
                     <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                      Cuti Umum
+                      {t("Cuti Umum")}
                     </th>
                     <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                      Actions
+                      {t("Actions")}
                     </th>
                   </tr>
                 </thead>
@@ -177,7 +182,7 @@ const HolidayCalendarPage: React.FC = () => {
                                 : "text-default-700 dark:text-gray-200"
                             }`}
                           >
-                            {dayOfWeek}
+                            {t(dayOfWeek)}
                           </td>
                           <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-200">
                             {holiday.description || "-"}
@@ -187,7 +192,7 @@ const HolidayCalendarPage: React.FC = () => {
                               type="checkbox"
                               checked={holiday.is_cuti_umum}
                               readOnly
-                              aria-label="Counts toward Cuti Umum"
+                              aria-label={t("Counts toward Cuti Umum")}
                               className="h-4 w-4 rounded border-default-300 text-sky-600 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700"
                             />
                           </td>
@@ -195,7 +200,7 @@ const HolidayCalendarPage: React.FC = () => {
                             <div className="flex items-center justify-center space-x-2">
                               <button
                                 className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
-                                title="Edit"
+                                title={t("Edit")}
                               >
                                 <IconPencil size={18} />
                               </button>
@@ -206,7 +211,7 @@ const HolidayCalendarPage: React.FC = () => {
                                   setShowDeleteDialog(true);
                                 }}
                                 className="text-rose-600 hover:text-rose-800"
-                                title="Delete"
+                                title={t("Delete")}
                               >
                                 <IconTrash size={18} />
                               </button>
@@ -221,7 +226,9 @@ const HolidayCalendarPage: React.FC = () => {
                         colSpan={5}
                         className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                       >
-                        No holidays recorded for {selectedYear}
+                        {t("No holidays recorded for {{year}}", {
+                          year: selectedYear,
+                        })}
                       </td>
                     </tr>
                   )}
@@ -240,12 +247,12 @@ const HolidayCalendarPage: React.FC = () => {
           setHolidayToDelete(null);
         }}
         onConfirm={handleDeleteHoliday}
-        title="Delete Holiday"
-        message={`Are you sure you want to delete the holiday for ${
-          holidayToDelete
+        title={t("Delete Holiday")}
+        message={t("Are you sure you want to delete the holiday for {{date}}?", {
+          date: holidayToDelete
             ? format(new Date(holidayToDelete.holiday_date), "dd MMM yyyy")
-            : ""
-        }?`}
+            : "",
+        })}
         variant="danger"
       />
       <ImportHolidaysModal

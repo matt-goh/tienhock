@@ -6,6 +6,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
 import TimeNavigator from "../../components/TimeNavigator";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   XAxis,
   YAxis,
@@ -76,6 +77,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   onTabChange,
   scope = "tienhock",
 }) => {
+  const { t } = useTranslation("sales");
   const isJp = scope === "jp";
   // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
@@ -314,16 +316,18 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
 
       // Check if we received any data
       if (chartData.length === 0) {
-        toast.error("No data found for the selected products in the past year");
+        toast.error(
+          t("No data found for the selected products in the past year")
+        );
         setYearlyTrendData([]);
         return;
       }
 
       setYearlyTrendData(chartData);
-      toast.success("Product trend data generated successfully");
+      toast.success(t("Product trend data generated successfully"));
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
-      toast.error("Failed to generate product trend data");
+      toast.error(t("Failed to generate product trend data"));
     } finally {
       setIsGeneratingChart(false);
     }
@@ -352,15 +356,15 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         }
       } catch (error) {
         console.error("Error fetching sales data:", error);
-        setError("Failed to load sales data. Please try again.");
-        toast.error("Failed to load sales data");
+        setError(t("Failed to load sales data. Please try again."));
+        toast.error(t("Failed to load sales data"));
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchSalesData();
-  }, [dateRange, scope]);
+  }, [dateRange, scope, t]);
 
   // Fetch products-by-salesman data for individual salesman tables
   useEffect(() => {
@@ -662,7 +666,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
                 }`}
               >
-                Products
+                {t("Products")}
               </button>
               <button
                 onClick={() => onTabChange(1)}
@@ -672,7 +676,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
                 }`}
               >
-                Salesman
+                {t("Salesman")}
               </button>
             </div>
           </div>
@@ -695,14 +699,20 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
           {/* Total Sales */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold truncate">Total</h3>
+              <h3 className="text-sm font-semibold truncate">
+                {t("Total")}
+              </h3>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
-                All Products
+                {t("All Products")}
               </span>
             </div>
             <div className="px-4 py-3">
               <div className="text-xl font-bold text-sky-600 dark:text-sky-400">
-                {salesData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                {t("{{total}} units", {
+                  total: salesData
+                    .reduce((sum, p) => sum + p.quantity, 0)
+                    .toLocaleString(),
+                })}
               </div>
               <div className="mt-1 text-sm font-bold">{formatCurrency(summary.totalSales)}</div>
             </div>
@@ -711,14 +721,21 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             /* JP Products */
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
               <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-                <h3 className="text-sm font-semibold truncate">Jelly Polly Products</h3>
+                <h3 className="text-sm font-semibold truncate">
+                  {t("Jelly Polly Products")}
+                </h3>
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">
                   JP
                 </span>
               </div>
               <div className="px-4 py-3">
                 <div className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                  {salesData.filter(p => p.type === "JP").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                  {t("{{total}} units", {
+                    total: salesData
+                      .filter((p) => p.type === "JP")
+                      .reduce((sum, p) => sum + p.quantity, 0)
+                      .toLocaleString(),
+                  })}
                 </div>
                 <div className="mt-1 text-sm font-bold">{formatCurrency(summary.othTotal)}</div>
               </div>
@@ -728,14 +745,21 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               {/* BH Products */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
                 <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold truncate">BH Products</h3>
+                  <h3 className="text-sm font-semibold truncate">
+                    {t("BH Products")}
+                  </h3>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                     BH
                   </span>
                 </div>
                 <div className="px-4 py-3">
                   <div className="text-xl font-bold text-blue-600 dark:text-blue-400">
-                    {salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                    {t("{{total}} units", {
+                      total: salesData
+                        .filter((p) => p.type === "BH")
+                        .reduce((sum, p) => sum + p.quantity, 0)
+                        .toLocaleString(),
+                    })}
                   </div>
                   <div className="mt-1 text-sm font-bold">{formatCurrency(summary.bhTotal)}</div>
                 </div>
@@ -743,14 +767,21 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               {/* MEE Products */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
                 <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold truncate">MEE Products</h3>
+                  <h3 className="text-sm font-semibold truncate">
+                    {t("MEE Products")}
+                  </h3>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
                     MEE
                   </span>
                 </div>
                 <div className="px-4 py-3">
                   <div className="text-xl font-bold text-green-600 dark:text-green-400">
-                    {salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                    {t("{{total}} units", {
+                      total: salesData
+                        .filter((p) => p.type === "MEE")
+                        .reduce((sum, p) => sum + p.quantity, 0)
+                        .toLocaleString(),
+                    })}
                   </div>
                   <div className="mt-1 text-sm font-bold">{formatCurrency(summary.meeTotal)}</div>
                 </div>
@@ -758,14 +789,21 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               {/* OTH Products */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
                 <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
-                  <h3 className="text-sm font-semibold truncate">Other Products</h3>
+                  <h3 className="text-sm font-semibold truncate">
+                    {t("Other Products")}
+                  </h3>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                     OTH
                   </span>
                 </div>
                 <div className="px-4 py-3">
                   <div className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                    {salesData.filter(p => p.type === "OTH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                    {t("{{total}} units", {
+                      total: salesData
+                        .filter((p) => p.type === "OTH")
+                        .reduce((sum, p) => sum + p.quantity, 0)
+                        .toLocaleString(),
+                    })}
                   </div>
                   <div className="mt-1 text-sm font-bold">{formatCurrency(summary.othTotal)}</div>
                 </div>
@@ -814,19 +852,21 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         {totalFoc > 0 && (
                           <HoverTooltip content={focTooltip}>
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 cursor-default">
-                              FOC {totalFoc}
+                              {t("FOC {{total}}", { total: totalFoc })}
                             </span>
                           </HoverTooltip>
                         )}
                         {totalRtn > 0 && (
                           <HoverTooltip content={rtnTooltip}>
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 cursor-default">
-                              RTN {totalRtn}
+                              {t("RTN {{total}}", { total: totalRtn })}
                             </span>
                           </HoverTooltip>
                         )}
                         <span className="text-sky-600 dark:text-sky-400 font-bold">
-                          {salesman.totalQuantity.toLocaleString()} units
+                          {t("{{total}} units", {
+                            total: salesman.totalQuantity.toLocaleString(),
+                          })}
                         </span>
                         <span className="text-default-400 dark:text-gray-500">·</span>
                         <span className="font-bold">{formatCurrency(salesman.totalSales)}</span>
@@ -838,19 +878,19 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         <thead className="bg-default-50 dark:bg-gray-700/30">
                           <tr>
                             <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
-                              Product ID
+                              {t("Product ID")}
                             </th>
                             <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
-                              Description
+                              {t("description", { ns: "common" })}
                             </th>
                             <th className="px-4 py-2 text-left text-sm font-medium text-default-500 dark:text-gray-400">
-                              Type
+                              {t("type", { ns: "common" })}
                             </th>
                             <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
-                              Qty
+                              {t("Qty")}
                             </th>
                             <th className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400">
-                              Sales
+                              {t("Sales")}
                             </th>
                           </tr>
                         </thead>
@@ -885,20 +925,28 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             </div>
           ) : (
             <div className="border border-dashed border-default-300 dark:border-gray-600 rounded p-4 text-center text-default-500 dark:text-gray-400">
-              No salesman data available for this period.
+              {t("No salesman data available for this period.")}
             </div>
           )}
 
           {/* All Salesmen - Product Sales Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
-              <h3 className="text-base font-semibold">All Products Summary</h3>
+              <h3 className="text-base font-semibold">
+                {t("All Products Summary")}
+              </h3>
               <div className="flex items-center gap-2 text-sm font-bold">
                 <span className="text-default-400 dark:text-gray-500 font-normal">
-                  ({filteredAndSortedData.length} products)
+                  {t("({{total}} products)", {
+                    total: filteredAndSortedData.length,
+                  })}
                 </span>
                 <span className="text-sky-600 dark:text-sky-400">
-                  {filteredAndSortedData.reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                  {t("{{total}} units", {
+                    total: filteredAndSortedData
+                      .reduce((sum, p) => sum + p.quantity, 0)
+                      .toLocaleString(),
+                  })}
                 </span>
                 <span className="text-default-400 dark:text-gray-500">·</span>
                 <span>{formatCurrency(summary.totalSales)}</span>
@@ -915,7 +963,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         onClick={() => handleSort("id")}
                       >
                         <div className="flex items-center">
-                          Product ID
+                          {t("Product ID")}
                           {sortConfig.key === "id" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -930,7 +978,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         onClick={() => handleSort("description")}
                       >
                         <div className="flex items-center">
-                          Description
+                          {t("description", { ns: "common" })}
                           {sortConfig.key === "description" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -945,7 +993,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         onClick={() => handleSort("type")}
                       >
                         <div className="flex items-center">
-                          Type
+                          {t("type", { ns: "common" })}
                           {sortConfig.key === "type" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -960,7 +1008,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         onClick={() => handleSort("foc")}
                       >
                         <div className="flex items-center justify-end">
-                          FOC
+                          {t("FOC")}
                           {sortConfig.key === "foc" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -975,7 +1023,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         onClick={() => handleSort("returns")}
                       >
                         <div className="flex items-center justify-end">
-                          Returns
+                          {t("Returns")}
                           {sortConfig.key === "returns" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -990,7 +1038,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         onClick={() => handleSort("quantity")}
                       >
                         <div className="flex items-center justify-end">
-                          Quantity
+                          {t("Quantity")}
                           {sortConfig.key === "quantity" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -1005,7 +1053,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         onClick={() => handleSort("totalSales")}
                       >
                         <div className="flex items-center justify-end">
-                          Total Sales
+                          {t("Total Sales")}
                           {sortConfig.key === "totalSales" &&
                             (sortConfig.direction === "asc" ? (
                               <IconSortAscending size={16} className="ml-1" />
@@ -1062,7 +1110,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         colSpan={5}
                         className="px-4 py-2 text-right text-base font-medium"
                       >
-                        Total:
+                        {t("Total:")}
                       </td>
                       <td className="px-4 py-2 text-right text-base font-bold">
                         {filteredAndSortedData
@@ -1083,8 +1131,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               </div>
             ) : (
               <div className="border border-dashed border-default-300 dark:border-gray-600 rounded p-4 text-center text-default-500 dark:text-gray-400">
-                No data to display. Please select a different month or check if
-                sales data exists.
+                {t(
+                  "No data to display. Please select a different month or check if sales data exists."
+                )}
               </div>
             )}
           </div>
@@ -1095,7 +1144,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             {!isJp && (
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
-                Bihun Products Distribution
+                {t("Bihun Products Distribution")}
               </h2>
               {summary.bhPieData && summary.bhPieData.length > 0 ? (
                 <>
@@ -1124,7 +1173,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         </Pie>
                         <Tooltip
                           formatter={(value, _name, props) => [
-                            `${formatCurrency(Number(value))} · ${props.payload.quantity?.toLocaleString() || 0} units`,
+                            t("{{amount}} · {{quantity}} units", {
+                              amount: formatCurrency(Number(value)),
+                              quantity:
+                                props.payload.quantity?.toLocaleString() || 0,
+                            }),
                             props.payload.description
                           ]}
                         />
@@ -1140,14 +1193,23 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     }}
                   >
                     <div>
-                      {salesData.filter(p => p.type === "BH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                      {t("{{total}} units", {
+                        total: salesData
+                          .filter((p) => p.type === "BH")
+                          .reduce((sum, p) => sum + p.quantity, 0)
+                          .toLocaleString(),
+                      })}
                     </div>
-                    <div className="text-sm opacity-80">Total: {formatCurrency(summary.bhTotal)}</div>
+                    <div className="text-sm opacity-80">
+                      {t("Total: {{amount}}", {
+                        amount: formatCurrency(summary.bhTotal),
+                      })}
+                    </div>
                   </div>
                 </>
               ) : (
                 <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
-                  No Bihun products data available
+                  {t("No Bihun products data available")}
                 </div>
               )}
             </div>
@@ -1157,7 +1219,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             {!isJp && (
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
-                Mee Products Distribution
+                {t("Mee Products Distribution")}
               </h2>
               {summary.meePieData && summary.meePieData.length > 0 ? (
                 <>
@@ -1186,7 +1248,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         </Pie>
                         <Tooltip
                           formatter={(value, _name, props) => [
-                            `${formatCurrency(Number(value))} · ${props.payload.quantity?.toLocaleString() || 0} units`,
+                            t("{{amount}} · {{quantity}} units", {
+                              amount: formatCurrency(Number(value)),
+                              quantity:
+                                props.payload.quantity?.toLocaleString() || 0,
+                            }),
                             props.payload.description
                           ]}
                         />
@@ -1202,14 +1268,23 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     }}
                   >
                     <div>
-                      {salesData.filter(p => p.type === "MEE").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                      {t("{{total}} units", {
+                        total: salesData
+                          .filter((p) => p.type === "MEE")
+                          .reduce((sum, p) => sum + p.quantity, 0)
+                          .toLocaleString(),
+                      })}
                     </div>
-                    <div className="text-sm opacity-80">Total: {formatCurrency(summary.meeTotal)}</div>
+                    <div className="text-sm opacity-80">
+                      {t("Total: {{amount}}", {
+                        amount: formatCurrency(summary.meeTotal),
+                      })}
+                    </div>
                   </div>
                 </>
               ) : (
                 <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
-                  No Mee products data available
+                  {t("No Mee products data available")}
                 </div>
               )}
             </div>
@@ -1218,7 +1293,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             {/* OTH / JP Products Doughnut Chart */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
-                {isJp ? "Jelly Polly Products Distribution" : "Other Products Distribution"}
+                {t(
+                  isJp
+                    ? "Jelly Polly Products Distribution"
+                    : "Other Products Distribution"
+                )}
               </h2>
               {summary.othPieData && summary.othPieData.length > 0 ? (
                 <>
@@ -1247,7 +1326,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         </Pie>
                         <Tooltip
                           formatter={(value, _name, props) => [
-                            `${formatCurrency(Number(value))} · ${props.payload.quantity?.toLocaleString() || 0} units`,
+                            t("{{amount}} · {{quantity}} units", {
+                              amount: formatCurrency(Number(value)),
+                              quantity:
+                                props.payload.quantity?.toLocaleString() || 0,
+                            }),
                             props.payload.description
                           ]}
                         />
@@ -1263,14 +1346,29 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     }}
                   >
                     <div>
-                      {salesData.filter(p => isJp ? p.type === "JP" : p.type === "OTH").reduce((sum, p) => sum + p.quantity, 0).toLocaleString()} units
+                      {t("{{total}} units", {
+                        total: salesData
+                          .filter((p) =>
+                            isJp ? p.type === "JP" : p.type === "OTH"
+                          )
+                          .reduce((sum, p) => sum + p.quantity, 0)
+                          .toLocaleString(),
+                      })}
                     </div>
-                    <div className="text-sm opacity-80">Total: {formatCurrency(summary.othTotal)}</div>
+                    <div className="text-sm opacity-80">
+                      {t("Total: {{amount}}", {
+                        amount: formatCurrency(summary.othTotal),
+                      })}
+                    </div>
                   </div>
                 </>
               ) : (
                 <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
-                  {isJp ? "No Jelly Polly products data available" : "No Other products data available"}
+                  {t(
+                    isJp
+                      ? "No Jelly Polly products data available"
+                      : "No Other products data available"
+                  )}
                 </div>
               )}
             </div>
@@ -1279,7 +1377,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
           {/* Product Mix Analysis Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
-              <h2 className="text-lg font-semibold">Product Mix Analysis</h2>
+              <h2 className="text-lg font-semibold">
+                {t("Product Mix Analysis")}
+              </h2>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <div className="w-full sm:w-96">
                   <FormCombobox
@@ -1304,7 +1404,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         );
                       } else {
                         toast.error(
-                          `Maximum ${maxChartProducts} products can be selected for the chart`
+                          t(
+                            "Maximum {{total}} products can be selected for the chart",
+                            { total: maxChartProducts }
+                          )
                         );
                         // Keep the first max number of selections
                         setSelectedChartProducts(
@@ -1316,7 +1419,12 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         );
                       }
                     }}
-                    options={productOptions}
+                    options={productOptions.map((option) => ({
+                      ...option,
+                      name: ["MEE", "BH", "OTH", "JP"].includes(option.id)
+                        ? t(option.name)
+                        : option.name,
+                    }))}
                     query={productQuery}
                     setQuery={setProductQuery}
                   />
@@ -1331,10 +1439,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                   color="sky"
                 >
                   {isGeneratingChart
-                    ? "Generating..."
+                    ? t("Generating...")
                     : yearlyTrendData.length > 0
-                    ? "Generated"
-                    : "Generate Chart"}
+                      ? t("Generated")
+                      : t("Generate Chart")}
                 </Button>
               </div>
             </div>
@@ -1378,15 +1486,15 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           // Get display name for the line
                           const displayName =
                             key === "MEE"
-                              ? "All Mee Products"
+                              ? t("All Mee Products")
                               : key === "BH"
-                              ? "All Bihun Products"
+                                ? t("All Bihun Products")
                               : key === "JP"
-                              ? "All JellyPolly Products"
+                                ? t("All JellyPolly Products")
                               : key === "OTH"
-                              ? "All Other Products"
-                              : products.find((p) => p.id === key)
-                                  ?.description || key;
+                                ? t("All Other Products")
+                                : products.find((p) => p.id === key)
+                                    ?.description || key;
 
                           return (
                             <Line
@@ -1407,8 +1515,12 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             ) : (
               <div className="h-80 flex flex-col items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded text-default-500 dark:text-gray-400">
                 {selectedChartProducts.length === 0
-                  ? "Generate Chart to view product mix trends for the past 12 months"
-                  : "No data available for selected products. Try selecting different products or a different time period."}
+                  ? t(
+                      "Generate Chart to view product mix trends for the past 12 months"
+                    )
+                  : t(
+                      "No data available for selected products. Try selecting different products or a different time period."
+                    )}
               </div>
             )}
           </div>

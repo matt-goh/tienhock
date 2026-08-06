@@ -17,6 +17,7 @@ import { api } from "../../../routes/utils/api";
 import MissingEPFNumberDialog, {
   MissingEPFEmployee,
 } from "../../../components/Payroll/MissingEPFNumberDialog";
+import { useTranslation, Trans } from "react-i18next";
 
 // File System Access API types
 interface FileSystemWritableFileStream extends WritableStream {
@@ -148,6 +149,7 @@ const formatIC = (ic: string): string => {
 };
 
 const ECarumanPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   // Use Date object for month navigation
   const [selectedDate, setSelectedDate] = usePersistedMonth("eCarumanMonth");
 
@@ -288,7 +290,11 @@ const ECarumanPage: React.FC = () => {
 
           // Check if File System Access API is supported
           if (!window.showDirectoryPicker) {
-            toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
+            toast.error(
+              t(
+                "Your browser does not support folder creation. Please use Chrome or Edge."
+              )
+            );
             break;
           }
 
@@ -298,7 +304,9 @@ const ECarumanPage: React.FC = () => {
           );
 
           if (!exportData.files || exportData.files.length === 0) {
-            toast.error("No EPF contribution data found for the specified period");
+            toast.error(
+              t("No EPF contribution data found for the specified period")
+            );
             break;
           }
 
@@ -324,7 +332,16 @@ const ECarumanPage: React.FC = () => {
           }
 
           toast.success(
-            `EPF files created successfully (${createdCount} file${createdCount > 1 ? "s" : ""}) in EPF/${exportData.year}/TH/${exportData.month}/`
+            t(
+              createdCount === 1
+                ? "EPF file created successfully ({{total}} file) in EPF/{{year}}/TH/{{month}}/"
+                : "EPF files created successfully ({{total}} files) in EPF/{{year}}/TH/{{month}}/",
+              {
+                total: createdCount,
+                year: exportData.year,
+                month: exportData.month,
+              }
+            )
           );
           break;
         }
@@ -334,7 +351,11 @@ const ECarumanPage: React.FC = () => {
           // (SOCSO + EIS + SKBBK) — the 2026 gazette replaced the separate
           // BRG8A.TXT and SIP*.TXT/SIPE*.TXT submissions with one file.
           if (!window.showDirectoryPicker) {
-            toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
+            toast.error(
+              t(
+                "Your browser does not support folder creation. Please use Chrome or Edge."
+              )
+            );
             break;
           }
 
@@ -343,7 +364,11 @@ const ECarumanPage: React.FC = () => {
           );
 
           if (!combinedExportData.files || combinedExportData.files.length === 0) {
-            toast.error("No SOCSO/EIS contribution data found for the specified period");
+            toast.error(
+              t(
+                "No SOCSO/EIS contribution data found for the specified period"
+              )
+            );
             break;
           }
 
@@ -364,14 +389,24 @@ const ECarumanPage: React.FC = () => {
           }
 
           toast.success(
-            `Combined SOCSO-SIP file created in SOCSO-SIP/${combinedExportData.year}/TH/${combinedExportData.month}/`
+            t(
+              "Combined SOCSO-SIP file created in SOCSO-SIP/{{year}}/TH/{{month}}/",
+              {
+                year: combinedExportData.year,
+                month: combinedExportData.month,
+              }
+            )
           );
           break;
         }
         case "income_tax": {
           // Check if File System Access API is supported
           if (!window.showDirectoryPicker) {
-            toast.error("Your browser does not support folder creation. Please use Chrome or Edge.");
+            toast.error(
+              t(
+                "Your browser does not support folder creation. Please use Chrome or Edge."
+              )
+            );
             break;
           }
 
@@ -381,7 +416,11 @@ const ECarumanPage: React.FC = () => {
           );
 
           if (!incomeTaxExportData.files || incomeTaxExportData.files.length === 0) {
-            toast.error("No Income Tax/PCB contribution data found for the specified period");
+            toast.error(
+              t(
+                "No Income Tax/PCB contribution data found for the specified period"
+              )
+            );
             break;
           }
 
@@ -405,14 +444,22 @@ const ECarumanPage: React.FC = () => {
           }
 
           toast.success(
-            `Income Tax file created successfully in PCB/${incomeTaxExportData.year}/TH/${incomeTaxExportData.month}/`
+            t(
+              "Income Tax file created successfully in PCB/{{year}}/TH/{{month}}/",
+              {
+                year: incomeTaxExportData.year,
+                month: incomeTaxExportData.month,
+              }
+            )
           );
           break;
         }
       }
     } catch (error) {
       console.error(`Error downloading ${type} file:`, error);
-      toast.error(error instanceof Error ? error.message : "Failed to download file");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to download file")
+      );
     } finally {
       setLoadingType(null);
     }
@@ -421,7 +468,9 @@ const ECarumanPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="mb-4 flex items-center gap-4">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">e-Caruman</h1>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+          {t("e-Caruman")}
+        </h1>
         <span className="text-gray-300 dark:text-gray-600">|</span>
         <TimeNavigator
           range={monthRange}
@@ -436,25 +485,38 @@ const ECarumanPage: React.FC = () => {
           className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors whitespace-nowrap"
         >
           <IconExternalLink size={14} />
-          Contribution Rates
+          {t("Contribution Rates")}
         </Link>
       </div>
 
       {/* Download Contribution Files Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
         <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">
-          Download Contribution Files
+          {t("Download Contribution Files")}
         </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Select the contribution type to generate and download the file for{" "}
-          <span className="font-medium text-gray-700 dark:text-gray-200">
-            {selectedDate.toLocaleDateString("en-MY", { month: "long", year: "numeric" })}
-          </span>
+          <Trans
+            i18nKey="Select the contribution type to generate and download the file for <strong>{{period}}</strong>"
+            ns="payroll"
+            values={{
+              period: selectedDate.toLocaleDateString("en-MY", {
+                month: "long",
+                year: "numeric",
+              }),
+            }}
+            components={{
+              strong: (
+                <strong className="font-medium text-gray-700 dark:text-gray-200" />
+              ),
+            }}
+          />
         </p>
         {previewLoading ? (
           <div className="flex items-center justify-center py-8">
             <IconLoader2 size={24} className="animate-spin text-gray-400" />
-            <span className="ml-2 text-gray-500 dark:text-gray-400">Loading preview data...</span>
+            <span className="ml-2 text-gray-500 dark:text-gray-400">
+              {t("Loading preview data...")}
+            </span>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -477,7 +539,9 @@ const ECarumanPage: React.FC = () => {
                       setShowMissingEPFDialog(true);
                     }}
                     className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 rounded-full text-xs font-medium hover:bg-amber-200 dark:hover:bg-amber-900/70 transition-colors"
-                    title="Click to view employees with missing EPF numbers"
+                    title={t(
+                      "Click to view employees with missing EPF numbers"
+                    )}
                   >
                     <IconAlertTriangle size={14} />
                     {preview.missing_epf_no.count}
@@ -494,36 +558,48 @@ const ECarumanPage: React.FC = () => {
               {preview.epf ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {t("Employees:")}
+                    </span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">{preview.epf.count}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Total Salary:</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {t("Total Salary:")}
+                    </span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.epf.totals.salary.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {t("Employer Share:")}
+                    </span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.epf.totals.em_share.toLocaleString("en-MY")}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {t("Employee Share:")}
+                    </span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       RM {preview.epf.totals.emp_share.toLocaleString("en-MY")}
                     </span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">
+                      {t("Total:")}
+                    </span>
                     <span className="font-semibold text-blue-600 dark:text-blue-400">
                       RM {preview.epf.totals.total_contribution.toLocaleString("en-MY")}
                     </span>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400 italic">No data available</p>
+                <p className="text-sm text-gray-400 italic">
+                  {t("No data available")}
+                </p>
               )}
 
               {/* EPF Detailed Tooltip */}
@@ -534,19 +610,23 @@ const ECarumanPage: React.FC = () => {
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">EPF File Preview (EPFORMA2.csv)</h4>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.epf.count} records</span>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                      {t("EPF File Preview (EPFORMA2.csv)")}
+                    </h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {t("{{total}} records", { total: preview.epf.count })}
+                    </span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                         <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Member No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Member No")}</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("IC No")}</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Name")}</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Salary")}</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Employer")}</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Employee")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -569,7 +649,7 @@ const ECarumanPage: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-blue-50 dark:bg-gray-900 sticky bottom-0 z-10">
                         <tr className="font-medium">
-                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">{t("Total")}</td>
                           <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.epf.totals.salary.toFixed(2)}
                           </td>
@@ -601,9 +681,9 @@ const ECarumanPage: React.FC = () => {
                 <h3 className="font-medium text-gray-900 dark:text-gray-100">SOCSO & SIP / EIS</h3>
                 <span
                   className="px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 text-[10px] font-medium uppercase tracking-wide"
-                  title="Downloads the combined SOCSO + EIS + SKBBK file"
+                  title={t("Downloads the combined SOCSO + EIS + SKBBK file")}
                 >
-                  Combined file
+                  {t("Combined file")}
                 </span>
                 <div className="ml-auto">
                   {loadingType === "socso" ? (
@@ -618,35 +698,47 @@ const ECarumanPage: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="font-medium text-gray-900 dark:text-gray-100">SOCSO</span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">Keilatan + SKBBK</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {t("Keilatan + SKBBK")}
+                      </span>
                     </div>
                     {preview.socso ? (
                       <>
                         <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">Employees:</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("Employees:")}
+                          </span>
                           <span className="font-medium text-gray-900 dark:text-gray-100">{preview.socso.count}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("Employer Share:")}
+                          </span>
                           <span className="font-medium text-gray-900 dark:text-gray-100">
                             RM {preview.socso.totals.socso_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("Employee Share:")}
+                          </span>
                           <span className="font-medium text-gray-900 dark:text-gray-100">
                             RM {preview.socso.totals.socso_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                          <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
+                          <span className="text-gray-700 dark:text-gray-200 font-medium">
+                            {t("Total:")}
+                          </span>
                           <span className="font-semibold text-green-600 dark:text-green-400">
                             RM {preview.socso.totals.socso_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                       </>
                     ) : (
-                      <p className="text-sm text-gray-400 italic">No SOCSO data</p>
+                      <p className="text-sm text-gray-400 italic">
+                        {t("No SOCSO data")}
+                      </p>
                     )}
                   </div>
 
@@ -661,40 +753,54 @@ const ECarumanPage: React.FC = () => {
                   <div className="space-y-2 text-sm">
                     <div className="mb-2 flex items-center justify-between">
                       <span className="font-medium text-gray-900 dark:text-gray-100">SIP / EIS</span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500">Employment Insurance</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">
+                        {t("Employment Insurance")}
+                      </span>
                     </div>
                     {preview.sip ? (
                       <>
                         <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">Employees:</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("Employees:")}
+                          </span>
                           <span className="font-medium text-gray-900 dark:text-gray-100">{preview.sip.count}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">Employer Share:</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("Employer Share:")}
+                          </span>
                           <span className="font-medium text-gray-900 dark:text-gray-100">
                             RM {preview.sip.totals.eis_employer.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500 dark:text-gray-400">Employee Share:</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {t("Employee Share:")}
+                          </span>
                           <span className="font-medium text-gray-900 dark:text-gray-100">
                             RM {preview.sip.totals.eis_employee.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                         <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                          <span className="text-gray-700 dark:text-gray-200 font-medium">Total:</span>
+                          <span className="text-gray-700 dark:text-gray-200 font-medium">
+                            {t("Total:")}
+                          </span>
                           <span className="font-semibold text-green-600 dark:text-green-400">
                             RM {preview.sip.totals.sip_total.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                           </span>
                         </div>
                       </>
                     ) : (
-                      <p className="text-sm text-gray-400 italic">No SIP data</p>
+                      <p className="text-sm text-gray-400 italic">
+                        {t("No SIP data")}
+                      </p>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400 italic">No data available</p>
+                <p className="text-sm text-gray-400 italic">
+                  {t("No data available")}
+                </p>
               )}
 
               {/* SOCSO/SIP Detailed Tooltip */}
@@ -707,11 +813,19 @@ const ECarumanPage: React.FC = () => {
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">SOCSO & SIP Preview (combined SOCSO-SIP{`{MMYY}`}.TXT)</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                      {t("SOCSO & SIP Preview (combined SOCSO-SIP{{file}}.TXT)", {
+                        file: "{MMYY}",
+                      })}
+                    </h4>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      SOCSO {preview.socso ? preview.socso.count : 0}{" "} records{" "}
+                      {t("SOCSO {{total}} records", {
+                        total: preview.socso ? preview.socso.count : 0,
+                      })}{" "}
                       <span className="text-gray-300 dark:text-gray-600">|</span>{" "}
-                      SIP {preview.sip ? preview.sip.count : 0} records
+                      {t("SIP {{total}} records", {
+                        total: preview.sip ? preview.sip.count : 0,
+                      })}
                     </span>
                   </div>
                   <div className="max-h-80 space-y-4 overflow-auto">
@@ -724,13 +838,13 @@ const ECarumanPage: React.FC = () => {
                           <table className="w-full text-xs">
                             <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                               <tr>
-                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
-                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Salary</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Keilatan</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">SKBBK</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee Total</th>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("IC No")}</th>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Name")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Salary")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Employer")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Keilatan")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("SKBBK")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Employee Total")}</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -758,7 +872,7 @@ const ECarumanPage: React.FC = () => {
                             </tbody>
                             <tfoot className="bg-green-50 dark:bg-gray-900 sticky bottom-0 z-10">
                               <tr className="font-medium">
-                                <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                                <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">{t("Total")}</td>
                                 <td className="px-2 py-1.5 text-right text-gray-700 dark:text-gray-200 font-mono border-t border-gray-200 dark:border-gray-700">
                                   {preview.socso.totals.salary.toFixed(2)}
                                 </td>
@@ -790,11 +904,11 @@ const ECarumanPage: React.FC = () => {
                           <table className="w-full text-xs">
                             <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                               <tr>
-                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
-                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employer</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Employee</th>
-                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Total</th>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("IC No")}</th>
+                                <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Name")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Employer")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Employee")}</th>
+                                <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Total")}</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -816,7 +930,7 @@ const ECarumanPage: React.FC = () => {
                             </tbody>
                             <tfoot className="bg-green-50 dark:bg-gray-900 sticky bottom-0 z-10">
                               <tr className="font-medium">
-                                <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                                <td colSpan={2} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">{t("Total")}</td>
                                 <td className="px-2 py-1.5 text-right text-green-600 dark:text-green-400 font-mono border-t border-gray-200 dark:border-gray-700">
                                   {preview.sip.totals.eis_employer.toFixed(2)}
                                 </td>
@@ -860,18 +974,24 @@ const ECarumanPage: React.FC = () => {
               {preview.income_tax ? (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Employees:</span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {t("Employees:")}
+                    </span>
                     <span className="font-medium text-gray-900 dark:text-gray-100">{preview.income_tax.count}</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
-                    <span className="text-gray-700 dark:text-gray-200 font-medium">Total PCB:</span>
+                    <span className="text-gray-700 dark:text-gray-200 font-medium">
+                      {t("Total PCB:")}
+                    </span>
                     <span className="font-semibold text-amber-600 dark:text-amber-400">
                       RM {preview.income_tax.totals.pcb_amount.toLocaleString("en-MY", { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400 italic">No data available</p>
+                <p className="text-sm text-gray-400 italic">
+                  {t("No data available")}
+                </p>
               )}
 
               {/* Income Tax Detailed Tooltip */}
@@ -882,17 +1002,23 @@ const ECarumanPage: React.FC = () => {
                   onMouseLeave={handleTooltipMouseLeave}
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-gray-100">Income Tax File Preview (LHDN*.TXT)</h4>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{preview.income_tax.count} records</span>
+                    <h4 className="font-medium text-gray-900 dark:text-gray-100">
+                      {t("Income Tax File Preview (LHDN*.TXT)")}
+                    </h4>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {t("{{total}} records", {
+                        total: preview.income_tax.count,
+                      })}
+                    </span>
                   </div>
                   <div className="max-h-64 overflow-auto border border-gray-100 dark:border-gray-700 rounded">
                     <table className="w-full text-xs">
                       <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                         <tr>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Tax No</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">Name</th>
-                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">IC No</th>
-                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">PCB Amount</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Tax No")}</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("Name")}</th>
+                          <th className="px-2 py-1.5 text-left font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("IC No")}</th>
+                          <th className="px-2 py-1.5 text-right font-medium text-gray-600 dark:text-gray-300 border-b dark:border-gray-700">{t("PCB Amount")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
@@ -909,7 +1035,7 @@ const ECarumanPage: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-amber-50 dark:bg-gray-900 sticky bottom-0 z-10">
                         <tr className="font-medium">
-                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">Total</td>
+                          <td colSpan={3} className="px-2 py-1.5 text-gray-700 dark:text-gray-200 border-t border-gray-200 dark:border-gray-700">{t("Total")}</td>
                           <td className="px-2 py-1.5 text-right text-amber-600 dark:text-amber-400 font-mono border-t border-gray-200 dark:border-gray-700">
                             {preview.income_tax.totals.pcb_amount.toFixed(2)}
                           </td>

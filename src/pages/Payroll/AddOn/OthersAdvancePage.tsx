@@ -24,8 +24,7 @@ import {
 } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
-
-const DISPLAY_LABEL = "Others (Advance)";
+import { useTranslation } from "react-i18next";
 
 interface Commission {
   id: number;
@@ -41,6 +40,8 @@ interface Commission {
 }
 
 const OthersAdvancePage: React.FC = () => {
+  const { t } = useTranslation("payroll");
+  const displayLabel = t("Others (Advance)");
   // State
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [searchQuery, setSearchQuery] = usePersistedUrlSearch(
@@ -121,7 +122,7 @@ const OthersAdvancePage: React.FC = () => {
       setCommissions(response || []);
     } catch (error) {
       console.error("Error fetching commissions:", error);
-      toast.error(`Failed to load ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to load {{label}}", { label: displayLabel }));
     } finally {
       setIsLoading(false);
     }
@@ -136,13 +137,15 @@ const OthersAdvancePage: React.FC = () => {
     if (!deletingId) return;
     try {
       await api.delete(`/api/incentives/${deletingId}`);
-      toast.success(`${DISPLAY_LABEL} record deleted successfully`);
+      toast.success(
+        t("{{label}} record deleted successfully", { label: displayLabel })
+      );
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchCommissions();
     } catch (error) {
       console.error("Error deleting commission:", error);
-      toast.error(`Failed to delete ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to delete {{label}}", { label: displayLabel }));
     }
   };
 
@@ -197,7 +200,7 @@ const OthersAdvancePage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          {DISPLAY_LABEL}
+          {displayLabel}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -206,7 +209,7 @@ const OthersAdvancePage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}
@@ -214,7 +217,7 @@ const OthersAdvancePage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add {DISPLAY_LABEL}
+            {t("Add {{label}}", { label: displayLabel })}
           </Button>
         </div>
       </div>
@@ -240,7 +243,7 @@ const OthersAdvancePage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, location, amount, description..."
+                placeholder={t("Search name, location, amount, description...")}
                 className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
               {searchQuery && (
@@ -248,7 +251,7 @@ const OthersAdvancePage: React.FC = () => {
                   type="button"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   <IconX size={13} />
                 </button>
@@ -257,10 +260,14 @@ const OthersAdvancePage: React.FC = () => {
             <div className="hidden h-6 w-px bg-default-300 dark:bg-gray-600 sm:block" />
             <div className="text-right text-sm text-default-600 dark:text-gray-300">
               <div className="font-medium">
-                Total: {filteredCommissions.length} records
+                {t("Total: {{total}} records", {
+                  total: filteredCommissions.length,
+                })}
               </div>
               <div className="font-medium">
-                Amount: {formatCurrency(totalAmount)}
+                {t("Amount: {{amount}}", {
+                  amount: formatCurrency(totalAmount),
+                })}
               </div>
             </div>
           </div>
@@ -283,13 +290,15 @@ const OthersAdvancePage: React.FC = () => {
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">
               {searchQuery.trim()
-                ? `No matching ${DISPLAY_LABEL} records`
-                : `No ${DISPLAY_LABEL} records found`}
+                ? t("No matching {{label}} records", { label: displayLabel })
+                : t("No {{label}} records found", { label: displayLabel })}
             </p>
             <p>
               {searchQuery.trim()
-                ? "Try a different search term"
-                : `Click "Add ${DISPLAY_LABEL}" to create records`}
+                ? t("Try a different search term")
+                : t('Click "Add {{label}}" to create records', {
+                    label: displayLabel,
+                  })}
             </p>
           </div>
         ) : (
@@ -298,25 +307,25 @@ const OthersAdvancePage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee ID
+                    {t("Employee ID")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
+                    {t("Name")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Location
+                    {t("Location")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -334,7 +343,10 @@ const OthersAdvancePage: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300 transition-colors duration-150 group-hover:bg-sky-200 dark:group-hover:bg-sky-900/50">
-                        {commission.location_code} - {commission.location_name || "Unknown"}
+                        {t("{{code}} - {{name}}", {
+                          code: commission.location_code,
+                          name: commission.location_name || t("Unknown"),
+                        })}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
@@ -354,7 +366,7 @@ const OthersAdvancePage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(commission)}
                           className="p-1.5 rounded-full text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-150"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -364,7 +376,7 @@ const OthersAdvancePage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors duration-150"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -387,8 +399,8 @@ const OthersAdvancePage: React.FC = () => {
           currentYear={currentYear}
           currentMonth={currentMonth}
           incentiveType="Commission"
-          displayLabel={DISPLAY_LABEL}
-          displayLabelPlural={DISPLAY_LABEL}
+          displayLabel={displayLabel}
+          displayLabelPlural={displayLabel}
         />
       )}
 
@@ -400,7 +412,7 @@ const OthersAdvancePage: React.FC = () => {
         }}
         onSuccess={fetchCommissions}
         incentive={editingCommission}
-        displayLabel={DISPLAY_LABEL}
+        displayLabel={displayLabel}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -411,9 +423,12 @@ const OthersAdvancePage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeleteCommission}
-        title={`Delete ${DISPLAY_LABEL}`}
-        message={`Are you sure you want to delete this ${DISPLAY_LABEL} record? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete {{label}}", { label: displayLabel })}
+        message={t(
+          "Are you sure you want to delete this {{label}} record? This action cannot be undone.",
+          { label: displayLabel }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

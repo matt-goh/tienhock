@@ -12,6 +12,7 @@ import { api } from "../../routes/utils/api";
 import { JobCategory, SelectOption } from "../../types/types";
 import { FormInput, FormListbox } from "../FormComponents"; // Assuming these exist and work as planned
 import Button from "../Button"; // Assuming a standard Button component exists
+import { useTranslation } from "react-i18next";
 
 interface JobCategoryModalProps {
   isOpen: boolean;
@@ -26,6 +27,7 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
   onSave,
   initialData = null,
 }) => {
+  const { t } = useTranslation("catalogue");
   const [formData, setFormData] = useState<JobCategory>({
     id: "",
     category: "",
@@ -72,8 +74,8 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
       setSections(formattedSections);
     } catch (fetchError) {
       console.error("Error fetching sections:", fetchError);
-      toast.error("Failed to load sections. Please try again.");
-      setError("Could not load required section data.");
+      toast.error(t("Failed to load sections. Please try again."));
+      setError(t("Could not load required section data."));
     } finally {
       setLoadingSections(false);
     }
@@ -120,15 +122,15 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
 
   const validateForm = (): boolean => {
     if (!formData.id.trim()) {
-      setError("Job Category ID cannot be empty.");
+      setError(t("Job Category ID cannot be empty."));
       return false;
     }
     if (!formData.category.trim()) {
-      setError("Category name cannot be empty.");
+      setError(t("Category name cannot be empty."));
       return false;
     }
     if (!formData.section) {
-      setError("Section must be selected.");
+      setError(t("Section must be selected."));
       return false;
     }
     // Add other validation if needed
@@ -156,8 +158,8 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
       // onClose(); // Close is handled externally after successful save + cache refresh typically
     } catch (saveError: any) {
       console.error("Error saving job category:", saveError);
-      setError(saveError.message || "Failed to save job category.");
-      toast.error(saveError.message || "Failed to save. Please try again.");
+      setError(saveError.message || t("Failed to save job category."));
+      toast.error(saveError.message || t("Failed to save. Please try again."));
     } finally {
       setIsSaving(false);
     }
@@ -196,11 +198,13 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
                   as="h3"
                   className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
                 >
-                  {isEditMode ? "Edit Job Category" : "Add New Job Category"}
+                  {isEditMode
+                    ? t("Edit Job Category")
+                    : t("Add New Job Category")}
                 </DialogTitle>
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
                   <FormInput
-                    label="Job Category ID"
+                    label={t("Job Category ID")}
                     name="id"
                     value={formData.id}
                     onChange={handleChange}
@@ -209,7 +213,7 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
                     placeholder="e.g., JC001"
                   />
                   <FormInput
-                    label="Category Name"
+                    label={t("Category Name")}
                     name="category"
                     value={formData.category}
                     onChange={handleChange}
@@ -218,7 +222,7 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
                     placeholder="e.g., Senior Technician"
                   />
                   <FormListbox
-                    label="Section"
+                    label={t("Section")}
                     name="section"
                     value={formData.section}
                     onChange={handleListboxChange("section")}
@@ -226,32 +230,32 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
                     required
                     disabled={isSaving || loadingSections}
                     placeholder={
-                      loadingSections ? "Loading..." : "Select Section"
+                      loadingSections ? t("Loading...") : t("Select Section")
                     }
                   />
                   <FormInput
-                    label="Gaji"
+                    label={t("Salary")}
                     name="gaji"
                     value={formData.gaji}
                     onChange={handleChange}
                     disabled={isSaving}
-                    placeholder="Optional flag (e.g., Y/N)"
+                    placeholder={t("Optional flag (e.g., Y/N)")}
                   />
                   <FormInput
-                    label="Ikut"
+                    label={t("Follow")}
                     name="ikut"
                     value={formData.ikut}
                     onChange={handleChange}
                     disabled={isSaving}
-                    placeholder="Optional flag (e.g., Y/N)"
+                    placeholder={t("Optional flag (e.g., Y/N)")}
                   />
                   <FormInput
-                    label="JV"
+                    label={t("JV")}
                     name="jv"
                     value={formData.jv}
                     onChange={handleChange}
                     disabled={isSaving}
-                    placeholder="Optional flag (e.g., Y/N)"
+                    placeholder={t("Optional flag (e.g., Y/N)")}
                   />
 
                   {error && (
@@ -264,8 +268,8 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
                       variant="outline"
                       onClick={onClose}
                       disabled={isSaving}
-                    >
-                      Cancel
+                  >
+                    {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -273,7 +277,7 @@ const JobCategoryModal: React.FC<JobCategoryModalProps> = ({
                       variant="filled"
                       disabled={isSaving || loadingSections}
                     >
-                      {isSaving ? "Saving..." : "Save Category"}
+                      {isSaving ? t("Saving...") : t("Save Category")}
                     </Button>
                   </div>
                 </form>

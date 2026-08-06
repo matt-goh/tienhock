@@ -14,6 +14,8 @@ import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import { Payment, InvoiceData } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import InvoiceSelectionTable from "./InvoiceSelectionTable";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import TimeNavigator, {
@@ -225,9 +227,9 @@ const formatLocalDateLabel = (value: string): string => {
   );
 };
 
-const getApiErrorMessage = (error: unknown): string => {
+const getApiErrorMessage = (error: unknown, t?: TFunction): string => {
   if (typeof error !== "object" || error === null) {
-    return "Failed to record payment";
+    return t ? t("Failed to record payment") : "Failed to record payment";
   }
 
   const apiError: ApiErrorShape = error as ApiErrorShape;
@@ -235,7 +237,7 @@ const getApiErrorMessage = (error: unknown): string => {
     apiError.response?.data?.message ||
     apiError.data?.message ||
     apiError.message ||
-    "Failed to record payment"
+    (t ? t("Failed to record payment") : "Failed to record payment")
   );
 };
 
@@ -247,6 +249,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   initialValues,
   referenceGroup,
 }) => {
+  const { t } = useTranslation("invoice");
   // Tien Hock uses the atomic grouped-receipt endpoint (one request = one
   // receipt covering every selected invoice = one journal). Other companies
   // keep the per-invoice payments endpoint.
@@ -350,7 +353,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       console.error("Error fetching unpaid invoices:", error);
       if (requestId === invoiceRequestIdRef.current) {
         setAvailableInvoices([]);
-        toast.error("Failed to fetch unpaid invoices");
+        toast.error(t("Failed to fetch unpaid invoices"));
       }
     } finally {
       if (requestId === invoiceRequestIdRef.current) {
@@ -667,7 +670,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     }
 
     if (selectedInvoices.length === 0) {
-      toast.error("Please select at least one invoice to pay");
+      toast.error(t("Please select at least one invoice to pay"));
       return;
     }
 
@@ -679,7 +682,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
     if (invalidAllocation) {
       toast.error(
-        `Enter a payment amount greater than RM0 for invoice ${invalidAllocation.invoice.id}`
+        t("Enter a payment amount greater than RM0 for invoice {{id}}", {
+          id: invalidAllocation.invoice.id,
+        })
       );
       return;
     }
@@ -693,18 +698,26 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         const available = overpaymentBalances[customerId] || 0;
         if (applyAmount > available + 0.005) {
           toast.error(
-            `Overpayment applied for ${customerId} cannot exceed the available ${formatCurrency(
-              available
-            )}`
+            t(
+              "Overpayment applied for {{customerId}} cannot exceed the available {{amount}}",
+              {
+                customerId,
+                amount: formatCurrency(available),
+              }
+            )
           );
           return;
         }
         const settleSum = settleSumForCustomer(customerId);
         if (applyAmount > settleSum + 0.005) {
           toast.error(
-            `Overpayment applied for ${customerId} cannot exceed the selected settle total of ${formatCurrency(
-              settleSum
-            )}`
+            t(
+              "Overpayment applied for {{customerId}} cannot exceed the selected settle total of {{amount}}",
+              {
+                customerId,
+                amount: formatCurrency(settleSum),
+              }
+            )
           );
           return;
         }
@@ -718,13 +731,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       moneyAllocations.length > 0
     ) {
       toast.error(
-        "Payment reference is required for multiple invoice payments"
+        t("Payment reference is required for multiple invoice payments")
       );
       return;
     }
 
     if (isCheckingReference) {
-      toast.error("Wait for the payment reference check to finish");
+      toast.error(t("Wait for the payment reference check to finish"));
       return;
     }
     // Tien Hock's reference is repeatable, and the join box is ticked by
@@ -733,7 +746,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     // only thing standing between a typo and a mis-keyed reference.
     if (!useGroupedReceipt && referenceUsage && !isDuplicateReferenceConfirmed) {
       toast.error(
-        "Confirm that this reference really is the same transfer, or use a different one"
+        t(
+          "Confirm that this reference really is the same transfer, or use a different one"
+        )
       );
       return;
     }
@@ -746,9 +761,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     );
     if (overCollectedCashBill) {
       toast.error(
-        `Cash bill ${overCollectedCashBill.invoice.id} only collected ${formatCurrency(
-          settleableOf(overCollectedCashBill.invoice)
-        )} in cash — a payment against it cannot exceed that`
+        t(
+          "Cash bill {{id}} only collected {{amount}} in cash — a payment against it cannot exceed that",
+          {
+            id: overCollectedCashBill.invoice.id,
+            amount: formatCurrency(
+              settleableOf(overCollectedCashBill.invoice)
+            ),
+          }
+        )
       );
       return;
     }
@@ -762,9 +783,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     if (overpaymentInvoices.length > 0 && !useGroupedReceipt) {
       const firstOverpayment: InvoicePaymentAllocation = overpaymentInvoices[0];
       toast.error(
-        `Payment for invoice ${firstOverpayment.invoice.id} cannot exceed its ${formatCurrency(
-          firstOverpayment.invoice.balance_due
-        )} balance`
+        t(
+          "Payment for invoice {{id}} cannot exceed its {{amount}} balance",
+          {
+            id: firstOverpayment.invoice.id,
+            amount: formatCurrency(firstOverpayment.invoice.balance_due),
+          }
+        )
       );
       return;
     }
@@ -791,7 +816,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
   const processPayments = async (): Promise<void> => {
     setIsSubmitting(true);
-    const toastId = toast.loading("Processing payment...");
+    const toastId = toast.loading(t("Processing payment..."));
     let reconciliationRequest: ImportedPaymentReconciliationRequest | null =
       null;
 
@@ -873,32 +898,49 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       let successMessage: string;
       if (appliedTotal > 0) {
         if (moneyAllocationCount > 0) {
-          successMessage = `Payment recorded, including ${formatCurrency(
-            appliedTotal
-          )} overpayment applied`;
+          successMessage = t(
+            "Payment recorded, including {{amount}} overpayment applied",
+            { amount: formatCurrency(appliedTotal) }
+          );
         } else {
           successMessage =
             selectedInvoices.length === 1
-              ? "Overpayment applied to the invoice"
-              : `Overpayment applied to ${selectedInvoices.length} invoices`;
+              ? t("Overpayment applied to the invoice")
+              : t("Overpayment applied to {{total}} invoices", {
+                  total: selectedInvoices.length,
+                });
         }
       } else if (overpaymentCount > 0) {
         if (selectedInvoices.length === 1) {
-          successMessage =
-            "Payment recorded; the excess remains as customer credit";
+          successMessage = t(
+            "Payment recorded; the excess remains as customer credit"
+          );
         } else {
-          successMessage = `Payments recorded for ${selectedInvoices.length} invoices`;
+          successMessage = t("Payments recorded for {{total}} invoices", {
+            total: selectedInvoices.length,
+          });
           if (overpaymentCount === selectedInvoices.length) {
-            successMessage += " - all with excess kept as customer credit";
+            successMessage = t(
+              "Payments recorded for {{total}} invoices - all with excess kept as customer credit",
+              { total: selectedInvoices.length }
+            );
           } else {
-            successMessage += ` - ${overpaymentCount} with excess kept as customer credit`;
+            successMessage = t(
+              "Payments recorded for {{total}} invoices - {{count}} with excess kept as customer credit",
+              {
+                total: selectedInvoices.length,
+                count: overpaymentCount,
+              }
+            );
           }
         }
       } else {
         successMessage =
           selectedInvoices.length === 1
-            ? "Payment recorded successfully"
-            : `Payment recorded for ${selectedInvoices.length} invoices`;
+            ? t("Payment recorded successfully")
+            : t("Payment recorded for {{total}} invoices", {
+                total: selectedInvoices.length,
+              });
       }
 
       toast.success(successMessage, { id: toastId, duration: 6000 });
@@ -938,12 +980,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         importedCandidate
       ) {
         toast.error(
-          `Record invoice ${importedCandidate.invoice_id} by itself, without applying held overpayment or grouping other invoices, then review the imported-ledger match again.`,
+          t(
+            "Record invoice {{id}} by itself, without applying held overpayment or grouping other invoices, then review the imported-ledger match again.",
+            { id: importedCandidate.invoice_id }
+          ),
           { id: toastId, duration: 7000 }
         );
         return;
       }
-      toast.error(getApiErrorMessage(error), {
+      toast.error(getApiErrorMessage(error, t), {
         id: toastId,
       });
     } finally {
@@ -961,7 +1006,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
     setIsSubmitting(true);
     const toastId: string = toast.loading(
-      "Clearing invoice from the existing ledger payment..."
+      t("Clearing invoice from the existing ledger payment...")
     );
     try {
       await api.post(
@@ -969,14 +1014,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         importedReconciliation.request
       );
       toast.success(
-        `Invoice ${importedReconciliation.preview.invoice_id} cleared using ${importedReconciliation.preview.payment_reference}. No new receipt or journal was created.`,
+        t(
+          "Invoice {{id}} cleared using {{reference}}. No new receipt or journal was created.",
+          {
+            id: importedReconciliation.preview.invoice_id,
+            reference: importedReconciliation.preview.payment_reference,
+          }
+        ),
         { id: toastId, duration: 7000 }
       );
       setImportedReconciliation(null);
       onSuccess();
     } catch (error: unknown) {
       console.error("Error reconciling imported payment:", error);
-      toast.error(getApiErrorMessage(error), { id: toastId });
+      toast.error(getApiErrorMessage(error, t), { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
@@ -1050,7 +1101,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             onClick={onClose}
             className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             disabled={isSubmitting}
-            aria-label="Close payment form"
+            aria-label={t("Close payment form")}
           >
             <IconX size={20} />
           </button>
@@ -1064,12 +1115,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <div className="space-y-4 px-4 py-4 [scrollbar-gutter:stable] lg:min-h-0 lg:overflow-y-auto lg:px-5 lg:py-5">
               {referenceGroup && (
                 <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-100">
-                  This payment will use reference {referenceGroup} and appear in
-                  the same payment group.
+                  {t(
+                    "This payment will use reference {{reference}} and appear in the same payment group.",
+                    { reference: referenceGroup }
+                  )}
                   {formData.payment_method === "cheque" && (
                     <span className="mt-1 block text-xs text-sky-700 dark:text-sky-300">
-                      The cheque will still need to be confirmed before the
-                      invoice balance changes.
+                      {t(
+                        "The cheque will still need to be confirmed before the invoice balance changes."
+                      )}
                     </span>
                   )}
                 </div>
@@ -1078,16 +1132,17 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               <section className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                   <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                    Payment details
+                    {t("Payment details")}
                   </h4>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    Date, payment method and reference information.
+                    {t("Date, payment method and reference information.")}
                   </p>
                 </div>
                 <div className="space-y-4 p-4">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                      Payment Date <span className="text-red-500">*</span>
+                      {t("Payment Date")}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <TimeNavigator
                       range={
@@ -1106,7 +1161,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                      Payment Method
+                      {t("Payment Method")}
                     </label>
                     <PillSelect<RecordablePaymentMethod>
                       value={groupPaymentMethod}
@@ -1116,16 +1171,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                           payment_method: value,
                         })
                       }
-                      options={paymentMethodOptions}
+                      options={paymentMethodOptions.map((option) => ({
+                        ...option,
+                        label: t(option.label),
+                      }))}
                       disabled={isSubmitting || bankingFieldsLocked}
-                      ariaLabel="Payment method"
+                      ariaLabel={t("Payment method")}
                     size="md"
                     />
                   </div>
                   {groupPaymentMethod !== "cash" && (
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                        Deposit To
+                        {t("Deposit To")}
                       </label>
                       <PillSelect
                         value={groupBankAccount}
@@ -1135,9 +1193,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                             bank_account: value,
                           })
                         }
-                        options={BANK_ACCOUNT_OPTIONS}
+                        options={BANK_ACCOUNT_OPTIONS.map((option) => ({
+                          ...option,
+                          label: t(option.label),
+                        }))}
                         disabled={isSubmitting || bankingFieldsLocked}
-                        ariaLabel="Deposit to"
+                        ariaLabel={t("Deposit to")}
                       size="md"
                       />
                     </div>
@@ -1146,21 +1207,19 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     name="payment_reference"
                     label={
                       referenceGroup
-                        ? "Payment Reference (Same group)"
-                        : `Payment Reference ${
-                            selectedInvoices.length > 1
-                              ? "(Required)"
-                              : "(Optional)"
-                          }`
+                        ? t("Payment Reference (Same group)")
+                        : selectedInvoices.length > 1
+                          ? t("Payment Reference (Required)")
+                          : t("Payment Reference (Optional)")
                     }
                     placeholder={
                       groupPaymentMethod === "cheque"
-                        ? "Cheque number"
+                        ? t("Cheque number")
                         : groupPaymentMethod === "bank_transfer"
-                        ? "Transaction reference"
-                        : groupPaymentMethod === "online"
-                        ? "Transaction ID"
-                        : "Reference number"
+                          ? t("Transaction reference")
+                          : groupPaymentMethod === "online"
+                            ? t("Transaction ID")
+                            : t("Reference number")
                     }
                     value={formData.payment_reference}
                     onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
@@ -1175,7 +1234,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   {isCheckingReference && (
                     <div className="flex items-center gap-2 text-xs text-default-500 dark:text-gray-400">
                       <IconLoader2 size={14} className="animate-spin" />
-                      Checking this reference number...
+                      {t("Checking this reference number...")}
                     </div>
                   )}
                   {referenceUsage && (
@@ -1187,10 +1246,37 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                            Reference {referenceUsage.reference} is already used
-                            by {referenceUsage.count}{" "}
-                            {useGroupedReceipt ? "receipt" : "payment"}
-                            {referenceUsage.count === 1 ? "" : "s"}.
+                            {useGroupedReceipt
+                              ? referenceUsage.count === 1
+                                ? t(
+                                    "Reference {{reference}} is already used by {{total}} receipt.",
+                                    {
+                                      reference: referenceUsage.reference,
+                                      total: referenceUsage.count,
+                                    }
+                                  )
+                                : t(
+                                    "Reference {{reference}} is already used by {{total}} receipts.",
+                                    {
+                                      reference: referenceUsage.reference,
+                                      total: referenceUsage.count,
+                                    }
+                                  )
+                              : referenceUsage.count === 1
+                                ? t(
+                                    "Reference {{reference}} is already used by {{total}} payment.",
+                                    {
+                                      reference: referenceUsage.reference,
+                                      total: referenceUsage.count,
+                                    }
+                                  )
+                                : t(
+                                    "Reference {{reference}} is already used by {{total}} payments.",
+                                    {
+                                      reference: referenceUsage.reference,
+                                      total: referenceUsage.count,
+                                    }
+                                  )}
                           </p>
                           <ul className="mt-2 space-y-1 text-xs text-amber-800 dark:text-amber-200">
                             {(referenceUsage.receipts || []).map(
@@ -1198,15 +1284,35 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 usage: ReceiptReferenceUsageRow
                               ): React.ReactNode => (
                                 <li key={usage.id}>
-                                  {formatCurrency(usage.total_amount)} on{" "}
-                                  {format(
-                                    new Date(usage.received_date),
-                                    "dd/MM/yyyy"
-                                  )}{" "}
-                                  — {usage.allocation_count} invoice
-                                  {usage.allocation_count === 1 ? "" : "s"}
+                                  {usage.allocation_count === 1
+                                    ? t(
+                                        "{{amount}} on {{date}} – {{total}} invoice",
+                                        {
+                                          amount: formatCurrency(
+                                            usage.total_amount
+                                          ),
+                                          date: format(
+                                            new Date(usage.received_date),
+                                            "dd/MM/yyyy"
+                                          ),
+                                          total: usage.allocation_count,
+                                        }
+                                      )
+                                    : t(
+                                        "{{amount}} on {{date}} – {{total}} invoices",
+                                        {
+                                          amount: formatCurrency(
+                                            usage.total_amount
+                                          ),
+                                          date: format(
+                                            new Date(usage.received_date),
+                                            "dd/MM/yyyy"
+                                          ),
+                                          total: usage.allocation_count,
+                                        }
+                                      )}
                                   {usage.status === "pending"
-                                    ? " (pending cheque)"
+                                    ? t(" (pending cheque)")
                                     : ""}
                                 </li>
                               )
@@ -1216,16 +1322,34 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 usage: PaymentReferenceUsageRow
                               ): React.ReactNode => (
                                 <li key={usage.payment_id}>
-                                  Invoice {usage.invoice_id}
                                   {usage.customerid
-                                    ? ` (${usage.customerid})`
-                                    : ""}{" "}
-                                  — {formatCurrency(Number(usage.amount_paid))}{" "}
-                                  on{" "}
-                                  {format(
-                                    new Date(usage.payment_date),
-                                    "dd/MM/yyyy"
-                                  )}
+                                    ? t(
+                                        "Invoice {{id}} ({{customer}}) – {{amount}} on {{date}}",
+                                        {
+                                          id: usage.invoice_id,
+                                          customer: usage.customerid,
+                                          amount: formatCurrency(
+                                            Number(usage.amount_paid)
+                                          ),
+                                          date: format(
+                                            new Date(usage.payment_date),
+                                            "dd/MM/yyyy"
+                                          ),
+                                        }
+                                      )
+                                    : t(
+                                        "Invoice {{id}} – {{amount}} on {{date}}",
+                                        {
+                                          id: usage.invoice_id,
+                                          amount: formatCurrency(
+                                            Number(usage.amount_paid)
+                                          ),
+                                          date: format(
+                                            new Date(usage.payment_date),
+                                            "dd/MM/yyyy"
+                                          ),
+                                        }
+                                      )}
                                 </li>
                               )
                             )}
@@ -1243,8 +1367,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 size={18}
                                 label={
                                   useGroupedReceipt
-                                    ? "Add this payment to that group"
-                                    : "This is the same transfer — record it under the same reference"
+                                    ? t("Add this payment to that group")
+                                    : t(
+                                        "This is the same transfer — record it under the same reference"
+                                      )
                                 }
                               />
                             </div>
@@ -1252,11 +1378,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                           <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
                             {useGroupedReceipt
                               ? !joinableReceipt
-                                ? "That is a pre-changeover record, so this payment cannot be added to it. It will be recorded on its own, sharing only the reference number."
+                                ? t(
+                                    "That is a pre-changeover record, so this payment cannot be added to it. It will be recorded on its own, sharing only the reference number."
+                                  )
                                 : joinedReceiptGroup
-                                ? `The group's date, payment method and account are used as they are, so this payment appears under ${referenceUsage.reference} alongside the payments above. Nothing already recorded is changed.`
-                                : "Unticked: this is recorded as its own payment with its own date and method, sharing only the reference number."
-                              : "Each invoice keeps its own payment record; they are only linked by this reference."}
+                                  ? t(
+                                      "The group's date, payment method and account are used as they are, so this payment appears under {{reference}} alongside the payments above. Nothing already recorded is changed.",
+                                      { reference: referenceUsage.reference }
+                                    )
+                                  : t(
+                                      "Unticked: this is recorded as its own payment with its own date and method, sharing only the reference number."
+                                    )
+                              : t(
+                                  "Each invoice keeps its own payment record; they are only linked by this reference."
+                                )}
                           </p>
                         </div>
                       </div>
@@ -1264,7 +1399,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   )}
                   <FormInput
                     name="notes"
-                    label="Notes (Optional)"
+                    label={t("Notes (Optional)")}
                     value={formData.notes}
                     onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                       setFormData({
@@ -1281,7 +1416,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                   <div className="flex flex-wrap items-center gap-2">
                     <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                      Selected invoices
+                      {t("Selected invoices")}
                     </h4>
                     <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                       {selectedInvoices.length}
@@ -1290,7 +1425,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   {selectedInvoices.some(isOverpaymentAllocation) && (
                     <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
                       {selectedInvoices.filter(isOverpaymentAllocation).length}{" "}
-                      {useGroupedReceipt ? "Overpayment(s)" : "Above balance"}
+                      {t(
+                        useGroupedReceipt
+                          ? "Overpayment(s)"
+                          : "Above balance"
+                      )}
                     </span>
                   )}
                 </div>
@@ -1298,11 +1437,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 {selectedInvoices.length === 0 ? (
                   <div className="px-4 py-8 text-center">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                      No invoices selected
+                      {t("No invoices selected")}
                     </p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Use the invoice browser to add one or more unpaid
-                      invoices.
+                      {t(
+                        "Use the invoice browser to add one or more unpaid invoices."
+                      )}
                     </p>
                   </div>
                 ) : (
@@ -1358,7 +1498,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 }
                                 className="flex-shrink-0 rounded-md p-2 text-red-500 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/40"
                                 disabled={isSubmitting}
-                                aria-label={`Remove invoice ${invoice.id}`}
+                                aria-label={t("Remove invoice {{id}}", {
+                                  id: invoice.id,
+                                })}
                               >
                                 <IconTrash size={16} />
                               </button>
@@ -1367,7 +1509,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                             <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(120px,0.8fr)] items-end gap-3 border-t border-gray-200 pt-3 dark:border-gray-700">
                               <div>
                                 <span className="block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  {isCashBill(invoice) ? "Cash collected" : "Balance due"}
+                                  {t(
+                                    isCashBill(invoice)
+                                      ? "Cash collected"
+                                      : "Balance due"
+                                  )}
                                 </span>
                                 <span className="mt-1 block text-sm font-semibold text-gray-900 dark:text-gray-100">
                                   {formatCurrency(settleableOf(invoice))}
@@ -1375,7 +1521,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                               </div>
                               <label>
                                 <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Payment amount
+                                  {t("Payment amount")}
                                 </span>
                                 <input
                                   type="number"
@@ -1418,14 +1564,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 }`}
                               >
                                 {isUnsupportedOverpayment
-                                  ? "Above the invoice balance by"
-                                  : "Customer credit after payment"}
+                                  ? t("Above the invoice balance by")
+                                  : t("Customer credit after payment")}
                                 : {formatCurrency(overpaidAmount)}
                               </p>
                             )}
                             {isInvalidAmount && (
                               <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
-                                Enter an amount above RM0.
+                                {t("Enter an amount above RM0.")}
                               </p>
                             )}
                           </div>
@@ -1437,7 +1583,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       selectedInvoices.some(isOverpaymentAllocation) && (
                         <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm dark:border-purple-800 dark:bg-purple-950/30">
                           <div className="flex justify-between gap-3 text-purple-700 dark:text-purple-300">
-                            <span>Applied to invoices</span>
+                            <span>{t("Applied to invoices")}</span>
                             <span className="font-medium">
                               {formatCurrency(
                                 selectedInvoices.reduce(
@@ -1456,7 +1602,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                             </span>
                           </div>
                           <div className="mt-1 flex justify-between gap-3 text-purple-700 dark:text-purple-300">
-                            <span>Customer credit</span>
+                            <span>{t("Customer credit")}</span>
                             <span className="font-medium">
                               {formatCurrency(
                                 selectedInvoices.reduce(
@@ -1513,15 +1659,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 checkedColor="text-amber-600 dark:text-amber-400"
                                 label={
                                   <span className="text-amber-900 dark:text-amber-100">
-                                    Apply held overpayment for {customerId}{" "}
-                                    (available {formatCurrency(available)})
+                                    {t(
+                                      "Apply held overpayment for {{customerId}} (available {{amount}})",
+                                      {
+                                        customerId,
+                                        amount: formatCurrency(available),
+                                      }
+                                    )}
                                   </span>
                                 }
                               />
                               {applying && (
                                 <div className="mt-2 flex items-center gap-2 pl-7">
                                   <span className="text-xs font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                                    Amount
+                                    {t("amount", { ns: "common" })}
                                   </span>
                                   <input
                                     type="number"
@@ -1573,20 +1724,24 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <div className="min-w-0">
               <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                 {selectedInvoices.length === 0
-                  ? "Select at least one invoice to continue."
-                  : `${selectedInvoices.length} invoice${
-                      selectedInvoices.length === 1 ? "" : "s"
-                    } selected`}
+                  ? t("Select at least one invoice to continue.")
+                  : selectedInvoices.length === 1
+                    ? t("{{total}} invoice selected", {
+                        total: selectedInvoices.length,
+                      })
+                    : t("{{total}} invoices selected", {
+                        total: selectedInvoices.length,
+                      })}
                 {selectedInvoices.length > 0 &&
                   groupPaymentMethod === "cheque" && (
                     <span className="ml-1 text-amber-600 dark:text-amber-400">
-                      - Pending until confirmed
+                      {t("- Pending until confirmed")}
                     </span>
                   )}
                 {selectedInvoices.length > 0 &&
                   groupPaymentMethod === "cash" && (
                     <span className="ml-1 text-amber-600 dark:text-amber-400">
-                      - Remains unbanked until Cash Bank-In
+                      {t("- Remains unbanked until Cash Bank-In")}
                     </span>
                   )}
               </p>
@@ -1595,7 +1750,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               {selectedInvoices.length > 0 && (
                 <div className="mr-auto text-left sm:mr-2 sm:text-right">
                   <span className="block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Payment total
+                    {t("Payment total")}
                   </span>
                   <span className="block text-lg font-bold text-green-600 dark:text-green-400">
                     {formatCurrency(totalPaymentAmount)}
@@ -1608,7 +1763,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 onClick={onClose}
                 disabled={isSubmitting}
               >
-                Cancel
+                {t("cancel", { ns: "common" })}
               </Button>
               <Button
                 type="submit"
@@ -1622,7 +1777,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     !isDuplicateReferenceConfirmed)
                 }
               >
-                {isSubmitting ? "Processing..." : "Record Payment"}
+                {isSubmitting ? t("Processing...") : t("Record Payment")}
               </Button>
             </div>
           </div>
@@ -1636,16 +1791,21 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           setOverpaymentDetails(null);
         }}
         onConfirm={handleConfirmOverpayment}
-        title={`Overpayment${
-          overpaymentDetails && overpaymentDetails.length > 1 ? "s" : ""
-        } Detected`}
+        title={t(
+          overpaymentDetails && overpaymentDetails.length > 1
+            ? "Overpayments Detected"
+            : "Overpayment Detected"
+        )}
         message={
           overpaymentDetails ? (
             <div className="space-y-2 text-default-600 dark:text-gray-300">
               <p>
                 {overpaymentDetails.length === 1
-                  ? "The following payment exceeds the balance due:"
-                  : `${overpaymentDetails.length} payments exceed their respective balance due:`}
+                  ? t("The following payment exceeds the balance due:")
+                  : t(
+                      "{{total}} payments exceed their respective balance due:",
+                      { total: overpaymentDetails.length }
+                    )}
               </p>
 
               <div className="space-y-2 max-h-[264px] overflow-y-auto">
@@ -1655,23 +1815,26 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     className="bg-gray-50 dark:bg-gray-900/50 p-3 border border-gray-200 dark:border-gray-700 rounded-lg"
                   >
                     <div className="font-medium text-sm text-gray-800 dark:text-gray-100 mb-2">
-                      Invoice {detail.invoiceId} - {detail.customerName}
+                      {t("Invoice {{id}} - {{customer}}", {
+                        id: detail.invoiceId,
+                        customer: detail.customerName,
+                      })}
                     </div>
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span>Total Payment:</span>
+                        <span>{t("Total Payment:")}</span>
                         <span className="font-medium">
                           {formatCurrency(detail.totalAmount)}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Applied to Invoice:</span>
+                        <span>{t("Applied to Invoice:")}</span>
                         <span className="font-medium">
                           {formatCurrency(detail.regularAmount)}
                         </span>
                       </div>
                       <div className="flex justify-between border-t border-gray-200 dark:border-gray-700 pt-1 mt-1">
-                        <span>Customer Credit:</span>
+                        <span>{t("Customer Credit:")}</span>
                         <span className="font-medium text-purple-600 dark:text-purple-300">
                           {formatCurrency(detail.overpaidAmount)}
                         </span>
@@ -1684,11 +1847,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               {/* Summary */}
               <div className="bg-purple-50 dark:bg-purple-900/30 p-3 border border-purple-200 dark:border-purple-700 rounded-lg">
                 <div className="font-medium text-sm text-purple-800 dark:text-purple-200 mb-2">
-                  Summary
+                  {t("Summary")}
                 </div>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span>Total Applied to Invoices:</span>
+                    <span>{t("Total Applied to Invoices:")}</span>
                     <span className="font-medium">
                       {formatCurrency(
                         overpaymentDetails.reduce(
@@ -1699,7 +1862,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Total Customer Credit:</span>
+                    <span>{t("Total Customer Credit:")}</span>
                     <span className="font-medium text-purple-600 dark:text-purple-300">
                       {formatCurrency(
                         overpaymentDetails.reduce(
@@ -1710,7 +1873,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between border-t border-purple-200 dark:border-purple-700 pt-1 mt-1">
-                    <span>Grand Total:</span>
+                    <span>{t("Grand Total:")}</span>
                     <span className="font-bold text-default-900 dark:text-gray-100">
                       {formatCurrency(
                         overpaymentDetails.reduce(
@@ -1724,17 +1887,20 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               </div>
 
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Each excess amount will be kept as unapplied customer credit
-                and can be used later.
+                {t(
+                  "Each excess amount will be kept as unapplied customer credit and can be used later."
+                )}
               </p>
             </div>
           ) : (
             ""
           )
         }
-        confirmButtonText={`Confirm Overpayment${
-          overpaymentDetails && overpaymentDetails.length > 1 ? "s" : ""
-        }`}
+        confirmButtonText={t(
+          overpaymentDetails && overpaymentDetails.length > 1
+            ? "Confirm Overpayments"
+            : "Confirm Overpayment"
+        )}
         variant="default"
       />
       <ConfirmationDialog
@@ -1743,42 +1909,42 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           if (!isSubmitting) setImportedReconciliation(null);
         }}
         onConfirm={() => void handleConfirmImportedReconciliation()}
-        title="Payment already found in imported ledger"
+        title={t("Payment already found in imported ledger")}
         message={
           importedReconciliation ? (
             <div className="space-y-3 text-default-600 dark:text-gray-300">
               <p>
-                The old ledger already contains this exact payment. Continuing
-                will clear the invoice only; it will not create another receipt
-                or journal.
+                {t(
+                  "The old ledger already contains this exact payment. Continuing will clear the invoice only; it will not create another receipt or journal."
+                )}
               </p>
               <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
                 <div className="flex justify-between gap-4">
-                  <span>Invoice</span>
+                  <span>{t("Invoice")}</span>
                   <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
                     {importedReconciliation.preview.invoice_id}
                   </span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span>Customer</span>
+                  <span>{t("customer", { ns: "common" })}</span>
                   <span className="text-right font-medium text-gray-900 dark:text-gray-100">
                     {importedReconciliation.preview.customer_name}
                   </span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span>Reference</span>
+                  <span>{t("Reference")}</span>
                   <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
                     {importedReconciliation.preview.payment_reference}
                   </span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span>Amount</span>
+                  <span>{t("amount", { ns: "common" })}</span>
                   <span className="font-medium text-gray-900 dark:text-gray-100">
                     {formatCurrency(importedReconciliation.preview.amount)}
                   </span>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <span>Entered date</span>
+                  <span>{t("Entered date")}</span>
                   <span>
                     {formatLocalDateLabel(
                       importedReconciliation.preview.entered_payment_date
@@ -1786,7 +1952,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between gap-4 border-t border-emerald-200 pt-2 dark:border-emerald-800">
-                  <span>Ledger date used</span>
+                  <span>{t("Ledger date used")}</span>
                   <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                     {formatLocalDateLabel(
                       importedReconciliation.preview.ledger_payment_date
@@ -1796,9 +1962,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               </div>
               {importedReconciliation.preview.payment_date_corrected && (
                 <p className="text-amber-700 dark:text-amber-300">
-                  The entered date differs from the imported ledger. The ledger
-                  date above is authoritative and will be used in payment
-                  history.
+                  {t(
+                    "The entered date differs from the imported ledger. The ledger date above is authoritative and will be used in payment history."
+                  )}
                 </p>
               )}
               <a
@@ -1807,7 +1973,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 rel="noreferrer"
                 className="inline-flex font-medium text-sky-600 hover:underline dark:text-sky-400"
               >
-                Review the existing journal
+                {t("Review the existing journal")}
               </a>
             </div>
           ) : (
@@ -1815,7 +1981,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           )
         }
         confirmButtonText={
-          isSubmitting ? "Clearing Invoice..." : "Use Existing Ledger Payment"
+          isSubmitting
+            ? t("Clearing Invoice...")
+            : t("Use Existing Ledger Payment")
         }
         isConfirming={isSubmitting}
         variant="success"

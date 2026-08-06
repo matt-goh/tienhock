@@ -47,6 +47,7 @@ import {
   readLastAccessedPayrollMonth,
   saveLastAccessedPayrollMonth,
 } from "../../utils/payroll/payrollPageStorage";
+import { useTranslation } from "react-i18next";
 
 const FIRST_WEEK_DAY_OF_MONTH: number = 7;
 const EXPANDED_JOBS_STORAGE_PREFIX: string = "payroll-expanded-jobs:";
@@ -257,6 +258,7 @@ const buildExpandedJobsState = (
 };
 
 const PayrollPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -449,7 +451,7 @@ const PayrollPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error fetching payroll details:", error);
-      toast.error("Failed to load payroll details");
+      toast.error(t("Failed to load payroll details"));
     } finally {
       setIsLoading(false);
     }
@@ -533,17 +535,17 @@ const PayrollPage: React.FC = () => {
     setIsCreating(true);
     try {
       await createMonthlyPayroll(year, month);
-      toast.success("Payroll created successfully");
+      toast.success(t("Payroll created successfully"));
       // Fetch the newly created payroll
       await fetchPayrollDetails();
     } catch (error: unknown) {
       const axiosError = error as { response?: { status?: number } };
       if (axiosError.response?.status === 409) {
-        toast.error("A payroll already exists for this month");
+        toast.error(t("A payroll already exists for this month"));
         // Refetch to get the existing payroll
         await fetchPayrollDetails();
       } else {
-        toast.error("Failed to create payroll");
+        toast.error(t("Failed to create payroll"));
       }
     } finally {
       setIsCreating(false);
@@ -873,7 +875,9 @@ const PayrollPage: React.FC = () => {
     setProcessingProgress({
       current: 30,
       total: 100,
-      stage: `Processing ${selectedCombinations.length} employee-job combinations...`,
+      stage: t("Processing {{total}} employee-job combinations...", {
+        total: selectedCombinations.length,
+      }),
     });
 
     const response = await processMonthlyPayrolls(payroll.id, {
@@ -884,7 +888,7 @@ const PayrollPage: React.FC = () => {
     setProcessingProgress({
       current: 90,
       total: 100,
-      stage: "Finalizing...",
+      stage: t("Finalizing..."),
     });
 
     if (response.missing_income_tax_employees?.length > 0) {
@@ -893,10 +897,16 @@ const PayrollPage: React.FC = () => {
     }
 
     if (response.errors?.length > 0) {
-      toast.error(`Processed with ${response.errors.length} errors`);
+      toast.error(
+        t("Processed with {{total}} errors", {
+          total: response.errors.length,
+        })
+      );
     } else {
       toast.success(
-        `Successfully processed ${response.processed_count} employees`
+        t("Successfully processed {{total}} employees", {
+          total: response.processed_count,
+        })
       );
     }
 
@@ -919,8 +929,8 @@ const PayrollPage: React.FC = () => {
       total: 100,
       stage:
         searchTerm.trim().length > 0
-          ? "Preparing shown employees..."
-          : "Fetching eligible employees...",
+          ? t("Preparing shown employees...")
+          : t("Fetching eligible employees..."),
     });
 
     try {
@@ -931,7 +941,7 @@ const PayrollPage: React.FC = () => {
         await processPayrollCombinations(
           selectedCombinations,
           false,
-          "No visible employees found for processing"
+          t("No visible employees found for processing")
         );
       } else {
         const eligibleData = await getEligibleEmployees(payroll.id);
@@ -941,12 +951,12 @@ const PayrollPage: React.FC = () => {
         await processPayrollCombinations(
           selectedCombinations,
           true,
-          "No eligible employees found for processing"
+          t("No eligible employees found for processing")
         );
       }
     } catch (error) {
       console.error("Error processing payroll:", error);
-      toast.error("Failed to process payroll");
+      toast.error(t("Failed to process payroll"));
     } finally {
       setIsProcessing(false);
       setProcessingProgress({ current: 0, total: 0, stage: "" });
@@ -960,7 +970,7 @@ const PayrollPage: React.FC = () => {
     setProcessingProgress({
       current: 10,
       total: 100,
-      stage: "Preparing selected employees...",
+      stage: t("Preparing selected employees..."),
     });
 
     try {
@@ -970,11 +980,11 @@ const PayrollPage: React.FC = () => {
       await processPayrollCombinations(
         selectedCombinations,
         false,
-        "No selected employees found for processing"
+        t("No selected employees found for processing")
       );
     } catch (error) {
       console.error("Error processing selected payrolls:", error);
-      toast.error("Failed to process selected payrolls");
+      toast.error(t("Failed to process selected payrolls"));
     } finally {
       setIsProcessing(false);
       setProcessingProgress({ current: 0, total: 0, stage: "" });
@@ -992,7 +1002,9 @@ const PayrollPage: React.FC = () => {
     setProcessingProgress({
       current: 10,
       total: 100,
-      stage: `Processing ${employeePayroll.employee_name ?? "employee"}...`,
+      stage: t("Processing {{name}}...", {
+        name: employeePayroll.employee_name ?? "employee",
+      }),
     });
 
     try {
@@ -1002,11 +1014,11 @@ const PayrollPage: React.FC = () => {
       await processPayrollCombinations(
         combinations,
         false,
-        "No employee found for processing"
+        t("No employee found for processing")
       );
     } catch (error) {
       console.error("Error processing employee payroll:", error);
-      toast.error("Failed to process employee");
+      toast.error(t("Failed to process employee"));
     } finally {
       setIsProcessing(false);
       setProcessingEmployeePayrollId(null);
@@ -1080,14 +1092,15 @@ const PayrollPage: React.FC = () => {
 
             {/* Text Content */}
             <h3 className="text-lg font-semibold text-default-700 dark:text-gray-200 mb-2">
-              No Payroll Yet
+              {t("No Payroll Yet")}
             </h3>
             <p className="text-default-400 dark:text-gray-400 text-center max-w-sm mb-6">
-              There's no payroll record for{" "}
-              <span className="font-medium text-default-600 dark:text-gray-300">
-                {getMonthName(displayMonth)} {displayYear}
-              </span>
-              . Create one to start processing employee payments.
+              {t(
+                "There's no payroll record for {{period}}. Create one to start processing employee payments.",
+                {
+                  period: `${getMonthName(displayMonth)} ${displayYear}`,
+                }
+              )}
             </p>
 
             {/* Create Button */}
@@ -1098,7 +1111,7 @@ const PayrollPage: React.FC = () => {
               disabled={isCreating}
               size="md"
             >
-              {isCreating ? "Creating..." : "Create Payroll"}
+              {isCreating ? t("Creating...") : t("Create Payroll")}
             </Button>
           </div>
         </div>
@@ -1113,12 +1126,14 @@ const PayrollPage: React.FC = () => {
   const totals = calculateTotals(payroll.employeePayrolls || []);
   const processButtonText: string =
     hasActiveSearch && visibleEmployeePayrolls.length > 0
-      ? `Process ${visibleEmployeePayrolls.length} shown`
+      ? t("Process {{total}} shown", {
+          total: visibleEmployeePayrolls.length,
+        })
       : payroll.employeePayrolls.length > 0 && payroll.updated_at
         ? formatDistanceToNow(new Date(payroll.updated_at), {
             addSuffix: true,
           })
-        : "Process";
+        : t("Process");
 
   // Check if all jobs are expanded
   const areAllJobsExpanded =
@@ -1169,10 +1184,14 @@ const PayrollPage: React.FC = () => {
           <div className="flex items-center mb-3">
             <IconClock className="text-sky-500 dark:text-sky-400 mr-3" size={24} />
             <div className="flex-1">
-              <h3 className="font-medium text-sky-800 dark:text-sky-200">Processing Payroll</h3>
+              <h3 className="font-medium text-sky-800 dark:text-sky-200">
+                {t("Processing Payroll")}
+              </h3>
               <p className="text-sm text-sky-600 dark:text-sky-400">
                 {processingProgress.stage ||
-                  "Please wait while employee payrolls are being calculated..."}
+                  t(
+                    "Please wait while employee payrolls are being calculated..."
+                  )}
               </p>
             </div>
           </div>
@@ -1213,13 +1232,14 @@ const PayrollPage: React.FC = () => {
                 <IconCash size={16} className="text-emerald-600 dark:text-emerald-400" />
                 <span
                   className="font-semibold text-emerald-700 dark:text-emerald-300"
-                  title={`Setelah Digenapkan (${formatCurrency(
-                    totals.setelahDigenapkan
-                  )}) = total earned salary. Remaining take-home after commission/bonus advances is ${formatCurrency(
-                    totals.takeHome
-                  )}; ${formatCurrency(
-                    totals.advances
-                  )} was already paid out as commission/bonus advances.`}
+                  title={t(
+                    "Setelah Digenapkan ({{earned}}) = total earned salary. Remaining take-home after commission/bonus advances is {{takeHome}}; {{advances}} was already paid out as commission/bonus advances.",
+                    {
+                      earned: formatCurrency(totals.setelahDigenapkan),
+                      takeHome: formatCurrency(totals.takeHome),
+                      advances: formatCurrency(totals.advances),
+                    }
+                  )}
                 >
                   {formatAmount(totals.setelahDigenapkan)}
                 </span>
@@ -1240,12 +1260,18 @@ const PayrollPage: React.FC = () => {
                 className="inline-flex items-center gap-1.5 text-default-500 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors"
                 title={
                   viewMode === "groups"
-                    ? "Showing Groups (employees grouped by job, most recently opened group first). Click to switch to Recent."
-                    : "Showing Recent (flat list, most recently opened employee first). Click to switch to Groups."
+                    ? t(
+                        "Showing Groups (employees grouped by job, most recently opened group first). Click to switch to Recent."
+                      )
+                    : t(
+                        "Showing Recent (flat list, most recently opened employee first). Click to switch to Groups."
+                      )
                 }
               >
                 <IconArrowsSort size={14} />
-                <span>{viewMode === "groups" ? "Groups" : "Recent"}</span>
+                <span>
+                  {viewMode === "groups" ? t("Groups") : t("Recent")}
+                </span>
               </button>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <button
@@ -1257,8 +1283,8 @@ const PayrollPage: React.FC = () => {
                 className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
                 title={
                   hasActiveSearch
-                    ? "Process employees shown by the search"
-                    : "Re-process payroll"
+                    ? t("Process employees shown by the search")
+                    : t("Re-process payroll")
                 }
               >
                 <IconRefresh
@@ -1282,7 +1308,7 @@ const PayrollPage: React.FC = () => {
                   onClick={handleProcessSelected}
                   disabled={isProcessing || selectedCount === 0}
                 >
-                  Process {selectedCount}
+                  {t("Process {{total}}", { total: selectedCount })}
                 </Button>
                 {!isAllSelected && (
                   <PrintBatchPayslipsButton
@@ -1292,8 +1318,8 @@ const PayrollPage: React.FC = () => {
                     color="sky"
                     buttonText={
                       isFetchingMidMonth
-                        ? "Loading..."
-                        : `${selectedCount} Payslips`
+                        ? t("Loading...")
+                        : t("{{total}} Payslips", { total: selectedCount })
                     }
                     disabled={isFetchingMidMonth || selectedCount === 0}
                     midMonthPayrollsMap={midMonthPayrollsMap}
@@ -1308,15 +1334,15 @@ const PayrollPage: React.FC = () => {
               disabled={isFetchingMidMonth}
               buttonLabel={
                 isFetchingMidMonth
-                  ? "Loading..."
-                  : "Payslips"
+                  ? t("Loading...")
+                  : t("Payslips")
               }
             />
             <div className="relative">
               <input
                 ref={searchInputRef}
                 type="text"
-                placeholder="Search employees..."
+                placeholder={t("Search employees...")}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 w-[154px] placeholder-gray-400 dark:placeholder-gray-500"
@@ -1326,7 +1352,7 @@ const PayrollPage: React.FC = () => {
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
                   onMouseDown={handleClearSearchMouseDown}
                   onClick={handleClearSearch}
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   ×
                 </button>
@@ -1346,7 +1372,9 @@ const PayrollPage: React.FC = () => {
 
         {Object.keys(groupedEmployees).length === 0 ? (
           <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
-            <p className="text-default-500 dark:text-gray-400">No employee payrolls found.</p>
+            <p className="text-default-500 dark:text-gray-400">
+              {t("No employee payrolls found.")}
+            </p>
             <Button
               onClick={handleProcessAll}
               color="sky"
@@ -1354,7 +1382,7 @@ const PayrollPage: React.FC = () => {
               className="mt-4"
               disabled={isProcessing}
             >
-              {isProcessing ? "Processing..." : "Process Payroll"}
+              {isProcessing ? t("Processing...") : t("Process Payroll")}
             </Button>
           </div>
         ) : viewMode === "recent" ? (

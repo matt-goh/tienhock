@@ -204,6 +204,9 @@ const getMonthName = (year: number, month: number): string => {
   return date.toLocaleString("default", { month: "long", year: "numeric" });
 };
 
+// `accounts` is rendered exactly in the order supplied. The Trial Balance page
+// pre-orders the rows (manual/standard trial balance ordering) before calling
+// the PDF generator, so the printed report matches the on-screen order.
 interface TrialBalancePDFDocumentProps {
   data: TrialBalanceData;
   accounts: TrialBalanceAccount[];
@@ -318,6 +321,13 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
   );
 };
 
+/**
+ * Generate and print the Trial Balance PDF.
+ *
+ * @param data    Full report data (period + totals).
+ * @param accounts Rows to print, already filtered AND in the desired display
+ *                 order — the renderer never re-sorts them.
+ */
 export const generateTrialBalancePDF = async (
   data: TrialBalanceData,
   accounts: TrialBalanceAccount[],

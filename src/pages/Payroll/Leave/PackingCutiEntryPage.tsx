@@ -13,6 +13,7 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import PillSelect, { PillSelectOption } from "../../../components/PillSelect";
 import TimeNavigator, { type TimeRange } from "../../../components/TimeNavigator";
 import { api } from "../../../routes/utils/api";
+import { useTranslation, Trans } from "react-i18next";
 
 type PackingJobType = "MEE_PACKING" | "BH_PACKING";
 type LeaveType = "cuti_umum" | "cuti_sakit" | "cuti_tahunan" | "cuti_rawatan";
@@ -60,13 +61,6 @@ interface RowState {
   leaveType: LeaveType;
   amountPaid: string;
 }
-
-const LEAVE_OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
-  { value: "cuti_sakit", label: "Cuti Sakit" },
-  { value: "cuti_tahunan", label: "Cuti Tahunan" },
-  { value: "cuti_umum", label: "Cuti Umum" },
-  { value: "cuti_rawatan", label: "Cuti Rawatan" },
-];
 
 const DEFAULT_LEAVE_TYPE: LeaveType = "cuti_sakit";
 const DEFAULT_AMOUNT_PAID: string = "50";
@@ -146,6 +140,13 @@ const isInteractiveClickTarget = (target: EventTarget | null): boolean => {
 const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
   jobType,
 }) => {
+  const { t } = useTranslation("payroll");
+  const LEAVE_OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
+    { value: "cuti_sakit", label: t("Sick Leave") },
+    { value: "cuti_tahunan", label: t("Annual Leave") },
+    { value: "cuti_umum", label: t("Public Holiday") },
+    { value: "cuti_rawatan", label: t("Medical Leave") },
+  ];
   const [searchParams] = useSearchParams();
   const queryDateParam: string | null = searchParams.get("date");
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -168,9 +169,11 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
   const pageTitle =
-    jobType === "MEE_PACKING" ? "MEE Packing Cuti" : "Bihun Packing Cuti";
+    jobType === "MEE_PACKING"
+      ? t("MEE Packing Cuti")
+      : t("Bihun Packing Cuti");
   const pageSubtitle =
-    jobType === "MEE_PACKING" ? "Packing Mee" : "Packing Bihun";
+    jobType === "MEE_PACKING" ? t("Packing Mee") : t("Packing Bihun");
 
   useEffect(() => {
     if (isValidDateString(queryDateParam)) {
@@ -240,7 +243,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
       }
     } catch (error) {
       console.error("Error loading packing cuti entries:", error);
-      toast.error("Failed to load packing cuti entries");
+      toast.error(t("Failed to load packing cuti entries"));
     } finally {
       setIsLoading(false);
     }
@@ -394,7 +397,9 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
       (entry) => !Number.isFinite(entry.amount_paid) || entry.amount_paid < 0,
     );
     if (invalidEntry) {
-      toast.error(`Invalid amount for ${invalidEntry.employee_id}`);
+      toast.error(
+        t("Invalid amount for {{id}}", { id: invalidEntry.employee_id })
+      );
       return;
     }
 
@@ -405,11 +410,13 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
         date: selectedDate,
         entries: payloadEntries,
       });
-      toast.success("Packing cuti saved");
+      toast.success(t("Packing cuti saved"));
       await fetchData();
     } catch (error) {
       console.error("Error saving packing cuti:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to save")
+      );
     } finally {
       setIsSaving(false);
     }
@@ -463,7 +470,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search workers"
+                placeholder={t("Search workers")}
                 className="h-10 w-full rounded-lg border border-default-300 bg-white pl-10 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               />
               {searchQuery && (
@@ -482,7 +489,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
               onChange={(value: LeaveType) => setBulkLeaveType(value)}
               options={LEAVE_OPTIONS}
               disabled={isSaving}
-              ariaLabel="Leave type to apply to the selected workers"
+              ariaLabel={t("Leave type to apply to the selected workers")}
             />
 
             <Button
@@ -491,19 +498,25 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
               onClick={handleApplyBulkLeaveType}
               disabled={selectedRows.length === 0 || isSaving}
             >
-              Apply
+              {t("Apply")}
             </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-default-600 dark:text-gray-300">
-              <span className="font-medium text-default-900 dark:text-gray-100">
-                {selectedRows.length}
-              </span>{" "}
-              selected /{" "}
-              <span className="font-medium text-default-900 dark:text-gray-100">
-                {formatCurrency(selectedTotal)}
-              </span>
+              <Trans
+                i18nKey="<strong>{{total}}</strong> selected / <strong>{{amount}}</strong>"
+                ns="payroll"
+                values={{
+                  total: selectedRows.length,
+                  amount: formatCurrency(selectedTotal),
+                }}
+                components={{
+                  strong: (
+                    <strong className="font-medium text-default-900 dark:text-gray-100" />
+                  ),
+                }}
+              />
             </div>
             <Button
               icon={IconRefresh}
@@ -512,7 +525,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
               onClick={handleReset}
               disabled={!hasUnsavedChanges || isSaving}
             >
-              Reset
+              {t("Reset")}
             </Button>
             <Button
               icon={IconDeviceFloppy}
@@ -521,7 +534,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
               onClick={handleSave}
               disabled={!hasUnsavedChanges || isSaving}
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? t("Saving...") : t("Save")}
             </Button>
           </div>
         </div>
@@ -535,21 +548,21 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
                     checked={allFilteredSelected}
                     onChange={() => handleToggleFiltered()}
                     disabled={filteredWorkers.length === 0 || isSaving}
-                    ariaLabel="Select filtered workers"
+                    ariaLabel={t("Select filtered workers")}
                     className="translate-y-0.5"
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Worker
+                  {t("Worker")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Leave Type
+                  {t("Leave Type")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Balance
+                  {t("Balance")}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Amount
+                  {t("Amount")}
                 </th>
               </tr>
             </thead>
@@ -560,7 +573,7 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
                     colSpan={5}
                     className="px-4 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
-                    No workers found
+                    {t("No workers found")}
                   </td>
                 </tr>
               ) : (
@@ -594,7 +607,9 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
                           }
                           disabled={isSaving}
                           checkedColor="text-amber-600 dark:text-amber-400"
-                          ariaLabel={`Select ${worker.name}`}
+                          ariaLabel={t("Select {{name}}", {
+                            name: worker.name,
+                          })}
                           className="translate-y-0.5"
                         />
                       </td>
@@ -614,7 +629,9 @@ const PackingCutiEntryPage: React.FC<PackingCutiEntryPageProps> = ({
                           }
                           options={LEAVE_OPTIONS}
                           disabled={isSaving}
-                          ariaLabel={`Leave type for ${worker.name}`}
+                          ariaLabel={t("Leave type for {{name}}", {
+                            name: worker.name,
+                          })}
                         />
                       </td>
                       <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">

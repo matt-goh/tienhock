@@ -7,6 +7,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   IconPencil,
   IconBuildingSkyscraper,
@@ -76,6 +77,7 @@ const Section: React.FC<{
 
 const CustomerDetailsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("catalogue");
   const { id } = useParams<{ id: string }>();
   const { customers, isLoading } = useCustomersCache();
   const { salesmen } = useSalesmanCache();
@@ -113,7 +115,10 @@ const CustomerDetailsPage: React.FC = () => {
     if (!cached) {
       setCustomer(null);
       setError(
-        `Customer with ID ${id} not found in cache, please refresh the customers at Customer page.`
+        t(
+          "Customer with ID {{id}} not found in cache, please refresh the customers at Customer page.",
+          { id }
+        )
       );
       return;
     }
@@ -133,7 +138,7 @@ const CustomerDetailsPage: React.FC = () => {
     setCustomProducts(products);
     initialProductsRef.current = JSON.parse(JSON.stringify(products));
     originalProductIdsRef.current = new Set(products.map((p) => p.product_id));
-  }, [id, customers, isLoading]);
+  }, [id, customers, isLoading, t]);
 
   // Scroll to Transaction History once, and only after its rows have arrived -
   // until then the section is a loading spinner and the page is far shorter
@@ -169,7 +174,9 @@ const CustomerDetailsPage: React.FC = () => {
     // Same guard the form page applies to custom pricing rows.
     for (const product of customProducts) {
       if (!product.product_id) {
-        toast.error("Please select a product for all custom pricing rows.");
+        toast.error(
+          t("Please select a product for all custom pricing rows.")
+        );
         return;
       }
       const priceValue =
@@ -183,7 +190,10 @@ const CustomerDetailsPage: React.FC = () => {
         priceValue < 0
       ) {
         toast.error(
-          `Invalid custom price for product ID ${product.product_id}. Price must be a non-negative number.`
+          t(
+            "Invalid custom price for product ID {{id}}. Price must be a non-negative number.",
+            { id: product.product_id }
+          )
         );
         return;
       }
@@ -217,13 +227,13 @@ const CustomerDetailsPage: React.FC = () => {
       }
 
       await refreshCustomersCache();
-      toast.success("Credit & pricing updated successfully");
+      toast.success(t("Credit & pricing updated successfully"));
     } catch (err: any) {
       console.error("Error saving credit & pricing:", err);
       toast.error(
-        `Failed to save credit & pricing: ${
-          err?.response?.data?.message || err.message
-        }`
+        t("Failed to save credit & pricing: {{message}}", {
+          message: err?.response?.data?.message || err.message,
+        })
       );
     } finally {
       setIsSaving(false);
@@ -244,7 +254,7 @@ const CustomerDetailsPage: React.FC = () => {
       <div className="container mx-auto px-4 py-6">
         <BackButton fallbackPath="/catalogue/customer" />
         <div className="mt-4 p-4 border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
-          {error || "Customer not found."}
+          {error || t("Customer not found.")}
         </div>
       </div>
     );
@@ -278,7 +288,7 @@ const CustomerDetailsPage: React.FC = () => {
                       <IconBuildingStore size={14} />
                     )}
                     {branchInfo.groupName}
-                    {branchInfo.isMainBranch ? " (Main)" : ""}
+                    {branchInfo.isMainBranch ? t(" (Main)") : ""}
                   </span>
                 )}
               </div>
@@ -290,32 +300,32 @@ const CustomerDetailsPage: React.FC = () => {
             icon={IconPencil}
             onClick={() => navigate(`/catalogue/customer/${customer.id}/edit`)}
           >
-            Edit
+            {t("Edit")}
           </Button>
         </div>
 
         <div className="px-6 py-5">
           {/* --- Read-only: Customer --- */}
-          <Section title="Customer">
+          <Section title={t("Customer")}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
-              <Field label="Customer ID" value={customer.id} />
-              <Field label="Customer Name" value={customer.name} />
-              <Field label="Phone Number" value={customer.phone_number} />
-              <Field label="Email" value={customer.email} />
-              <Field label="Address" value={customer.address} />
-              <Field label="City" value={customer.city} />
-              <Field label="State" value={getStateName(customer.state)} />
-              <Field label="Closeness" value={customer.closeness} />
-              <Field label="Salesman" value={salesmanName} />
+              <Field label={t("Customer ID")} value={customer.id} />
+              <Field label={t("Customer Name")} value={customer.name} />
+              <Field label={t("Phone Number")} value={customer.phone_number} />
+              <Field label={t("Email")} value={customer.email} />
+              <Field label={t("Address")} value={customer.address} />
+              <Field label={t("City")} value={customer.city} />
+              <Field label={t("State")} value={getStateName(customer.state)} />
+              <Field label={t("Closeness")} value={customer.closeness} />
+              <Field label={t("Salesman")} value={salesmanName} />
             </div>
           </Section>
 
           {/* --- Read-only: e-Invoice --- */}
-          <Section title="e-Invoice">
+          <Section title={t("e-Invoice")}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
-              <Field label="ID Type" value={customer.id_type} />
-              <Field label="ID Number" value={customer.id_number} />
-              <Field label="TIN Number" value={customer.tin_number} />
+              <Field label={t("ID Type")} value={customer.id_type} />
+              <Field label={t("ID Number")} value={customer.id_number} />
+              <Field label={t("TIN Number")} value={customer.tin_number} />
             </div>
           </Section>
 
@@ -335,19 +345,27 @@ const CustomerDetailsPage: React.FC = () => {
                   />
                 )}
                 <h3 className="text-base font-medium text-indigo-700 dark:text-indigo-300">
-                  {branchInfo.isMainBranch ? "Main Branch" : "Branch Location"} -{" "}
-                  {branchInfo.groupName}
+                  {t(
+                    branchInfo.isMainBranch
+                      ? "Main Branch"
+                      : "Branch Location"
+                  )}{" "}
+                  - {branchInfo.groupName}
                 </h3>
               </div>
               <p className="text-sm text-indigo-600 dark:text-indigo-300 mb-2">
                 {branchInfo.isMainBranch
-                  ? "This is the main branch. Changes to pricing, phone number, and e-Invoice information will affect all branches."
-                  : "This is a branch location. Pricing, phone number, and e-Invoice information are synchronized with the main branch."}
+                  ? t(
+                      "This is the main branch. Changes to pricing, phone number, and e-Invoice information will affect all branches."
+                    )
+                  : t(
+                      "This is a branch location. Pricing, phone number, and e-Invoice information are synchronized with the main branch."
+                    )}
               </p>
               {(branchInfo.branches?.length ?? 0) > 1 && (
                 <div className="mt-2">
                   <p className="text-xs font-medium text-indigo-500 dark:text-indigo-400 mb-1">
-                    Connected branches:
+                    {t("Connected branches:")}
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {branchInfo.branches
@@ -375,7 +393,7 @@ const CustomerDetailsPage: React.FC = () => {
 
           {/* --- Editable: Credit & Pricing --- */}
           <Section
-            title="Credit & Pricing"
+            title={t("Credit & Pricing")}
             action={
               <Button
                 type="button"
@@ -385,7 +403,7 @@ const CustomerDetailsPage: React.FC = () => {
                 onClick={handleSaveCredit}
                 disabled={isSaving || !isCreditChanged}
               >
-                {isSaving ? "Saving..." : "Save"}
+                {isSaving ? t("Saving...") : t("save", { ns: "common" })}
               </Button>
             }
           >
@@ -406,7 +424,10 @@ const CustomerDetailsPage: React.FC = () => {
           </Section>
 
           {/* --- Transaction History --- */}
-          <Section title="Transaction History" sectionRef={transactionsRef}>
+          <Section
+            title={t("Transaction History")}
+            sectionRef={transactionsRef}
+          >
             <CustomerTransactionsTab
               customerId={customer.id}
               customerName={customer.name}

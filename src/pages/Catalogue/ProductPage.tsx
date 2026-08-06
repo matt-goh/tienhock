@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import toast from "react-hot-toast";
+import { useTranslation, Trans } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
@@ -35,6 +36,7 @@ interface Product {
 }
 
 const ProductPage: React.FC = () => {
+  const { t } = useTranslation("catalogue");
   const {
     products: cachedProductsData,
     isLoading: cacheLoading,
@@ -114,7 +116,7 @@ const ProductPage: React.FC = () => {
   useEffect(() => {
     if (cacheError) {
       console.error("Error fetching products from cache:", cacheError);
-      toast.error("Failed to load products. Please try refreshing.");
+      toast.error(t("Failed to load products. Please try refreshing."));
     }
   }, [cacheError]);
 
@@ -158,12 +160,12 @@ const ProductPage: React.FC = () => {
         is_active: false,
       });
       await refreshProductsCache();
-      toast.success("Product deactivated successfully");
+      toast.success(t("Product deactivated successfully"));
       setDeleteConfirmOpen(false);
       setProductToDelete(null);
     } catch (error: any) {
       console.error("Error deactivating product:", error);
-      toast.error("Failed to deactivate product. Please try again.");
+      toast.error(t("Failed to deactivate product. Please try again."));
     }
   }, [productToDelete]);
 
@@ -176,12 +178,12 @@ const ProductPage: React.FC = () => {
         is_active: true,
       });
       await refreshProductsCache();
-      toast.success("Product reactivated successfully");
+      toast.success(t("Product reactivated successfully"));
       setReactivateConfirmOpen(false);
       setProductToReactivate(null);
     } catch (error: any) {
       console.error("Error reactivating product:", error);
-      toast.error("Failed to reactivate product. Please try again.");
+      toast.error(t("Failed to reactivate product. Please try again."));
     }
   }, [productToReactivate]);
 
@@ -192,7 +194,7 @@ const ProductPage: React.FC = () => {
       // api.delete wraps payload as { products: payload }, so just pass the array
       await api.delete("/api/products", [productToHardDelete.id]);
       await refreshProductsCache();
-      toast.success("Product permanently deleted");
+      toast.success(t("Product permanently deleted"));
       setHardDeleteConfirmOpen(false);
       setProductToHardDelete(null);
     } catch (error: any) {
@@ -201,11 +203,13 @@ const ProductPage: React.FC = () => {
       const errorMessage = error?.data?.error || error?.message || "";
       if (errorMessage.includes("foreign key constraint") || errorMessage.includes("customer_products")) {
         toast.error(
-          "Cannot delete this product - it is assigned to one or more customers. Remove customer assignments first or deactivate instead.",
+          t(
+            "Cannot delete this product - it is assigned to one or more customers. Remove customer assignments first or deactivate instead."
+          ),
           { duration: 5000 }
         );
       } else {
-        toast.error("Failed to delete product. Please try again.");
+        toast.error(t("Failed to delete product. Please try again."));
       }
     }
   }, [productToHardDelete]);
@@ -219,14 +223,14 @@ const ProductPage: React.FC = () => {
             (p: Product) => p.id === productData.id
           );
           if (existingProduct) {
-            toast.error("Product ID already exists");
+            toast.error(t("Product ID already exists"));
             return;
           }
 
           await api.post("/api/products/batch", {
             products: [productData],
           });
-          toast.success("Product created successfully");
+          toast.success(t("Product created successfully"));
         } else {
           // For edit mode
           const updateData = {
@@ -241,15 +245,16 @@ const ProductPage: React.FC = () => {
           await api.post("/api/products/batch", {
             products: [updateData],
           });
-          toast.success("Product updated successfully");
+          toast.success(t("Product updated successfully"));
         }
 
         await refreshProductsCache();
         setIsModalOpen(false);
       } catch (error) {
         console.error("Error saving product:", error);
-        const message = (error as any)?.message || "An unknown error occurred";
-        toast.error(`Failed to save product: ${message}`);
+        const message =
+          (error as any)?.message || t("An unknown error occurred");
+        toast.error(t("Failed to save product: {{message}}", { message }));
         throw error; // Re-throw to let modal handle the error state
       }
     },
@@ -296,7 +301,7 @@ const ProductPage: React.FC = () => {
         <div className="w-full mb-4 flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <h1 className="text-lg text-default-700 dark:text-gray-200 font-medium">
-              Product Catalogue
+              {t("Product Catalogue")}
             </h1>
             <div className="w-48">
               <FormListbox
@@ -304,7 +309,7 @@ const ProductPage: React.FC = () => {
                 value={typeFilter}
                 onChange={(value: string) => setTypeFilter(value)}
                 options={[
-                  { id: "all", name: "All Types" },
+                  { id: "all", name: t("All Types") },
                   { id: "MEE", name: "MEE" },
                   { id: "BH", name: "BH" },
                   { id: "JP", name: "JP" },
@@ -320,10 +325,10 @@ const ProductPage: React.FC = () => {
               icon={IconArrowsSort}
               variant="outline"
             >
-              Reorder
+              {t("Reorder")}
             </Button>
             <Button onClick={handleCreateProduct} icon={IconPlus} color="sky">
-              Add Product
+              {t("Add Product")}
             </Button>
           </div>
         </div>
@@ -335,25 +340,25 @@ const ProductPage: React.FC = () => {
               <thead>
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[12%]">
-                    ID
+                    {t("ID")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[32%]">
-                    Description
+                    {t("description", { ns: "common" })}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%]">
-                    Price/Unit
+                    {t("Price/Unit")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%]">
-                    Type
+                    {t("type", { ns: "common" })}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[8%]">
-                    Tax
+                    {t("Tax")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%]">
-                    Status
+                    {t("status", { ns: "common" })}
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[18%]">
-                    Actions
+                    {t("actions", { ns: "common" })}
                   </th>
                 </tr>
               </thead>
@@ -408,12 +413,12 @@ const ProductPage: React.FC = () => {
                       {product.is_active ? (
                         <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full dark:bg-green-900/30 dark:text-green-300">
                           <IconCheck className="w-3 h-3 mr-0.5" />
-                          Active
+                          {t("active", { ns: "common" })}
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-400">
                           <IconX className="w-3 h-3 mr-0.5" />
-                          Inactive
+                          {t("inactive", { ns: "common" })}
                         </span>
                       )}
                     </td>
@@ -426,7 +431,7 @@ const ProductPage: React.FC = () => {
                           variant="outline"
                           color="sky"
                         >
-                          Edit
+                          {t("Edit")}
                         </Button>
                         {product.is_active ? (
                           <Button
@@ -436,7 +441,7 @@ const ProductPage: React.FC = () => {
                             variant="outline"
                             color="amber"
                           >
-                            Deactivate
+                            {t("Deactivate")}
                           </Button>
                         ) : (
                           <Button
@@ -446,7 +451,7 @@ const ProductPage: React.FC = () => {
                             variant="outline"
                             color="green"
                           >
-                            Reactivate
+                            {t("Reactivate")}
                           </Button>
                         )}
                         <Button
@@ -456,7 +461,7 @@ const ProductPage: React.FC = () => {
                           variant="outline"
                           color="rose"
                         >
-                          Delete
+                          {t("delete", { ns: "common" })}
                         </Button>
                       </div>
                     </td>
@@ -468,14 +473,22 @@ const ProductPage: React.FC = () => {
             {filteredProducts.length === 0 && !cacheLoading && (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
                 {typeFilter === "all"
-                  ? 'No products found. Click "Add Product" to create your first product.'
-                  : `No products found for type "${typeFilter}". Try changing the filter or add a new product.`}
+                  ? t(
+                      "No products found. Click \"Add Product\" to create your first product."
+                    )
+                  : t(
+                      "No products found for type \"{{type}}\". Try changing the filter or add a new product.",
+                      { type: typeFilter }
+                    )}
               </div>
             )}
           </div>
         </div>
         <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 ml-auto text-right">
-          Showing {filteredProducts.length} of {products.length} products
+          {t("Showing {{shown}} of {{total}} products", {
+            shown: filteredProducts.length,
+            total: products.length,
+          })}
         </div>
       </div>
 
@@ -497,20 +510,22 @@ const ProductPage: React.FC = () => {
         isOpen={deleteConfirmOpen}
         onClose={handleCloseDeleteConfirm}
         onConfirm={confirmDelete}
-        title="Deactivate Product"
+        title={t("Deactivate Product")}
         message={
           <>
             <p>
-              Are you sure you want to deactivate the product "
-              {productToDelete?.description}"?
+              {t("Are you sure you want to deactivate the product \"{{name}}\"?", {
+                name: productToDelete?.description,
+              })}
             </p>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              This product will be hidden but not permanently deleted. You can
-              reactivate it later if needed.
+              {t(
+                "This product will be hidden but not permanently deleted. You can reactivate it later if needed."
+              )}
             </p>
           </>
         }
-        confirmButtonText="Deactivate"
+        confirmButtonText={t("Deactivate")}
         variant="danger"
       />
 
@@ -521,9 +536,12 @@ const ProductPage: React.FC = () => {
           setProductToReactivate(null);
         }}
         onConfirm={confirmReactivate}
-        title="Reactivate Product"
-        message={`Are you sure you want to reactivate "${productToReactivate?.description}"? This product will be visible and available for use again.`}
-        confirmButtonText="Reactivate"
+        title={t("Reactivate Product")}
+        message={t(
+          "Are you sure you want to reactivate \"{{name}}\"? This product will be visible and available for use again.",
+          { name: productToReactivate?.description }
+        )}
+        confirmButtonText={t("Reactivate")}
         variant="success"
       />
 
@@ -534,19 +552,25 @@ const ProductPage: React.FC = () => {
           setProductToHardDelete(null);
         }}
         onConfirm={confirmHardDelete}
-        title="Permanently Delete Product"
+        title={t("Permanently Delete Product")}
         message={
           <>
             <p>
-              Are you sure you want to <strong>permanently delete</strong> the product "
-              {productToHardDelete?.description}"?
+              <Trans
+                i18nKey={"Are you sure you want to <strong>permanently delete</strong> the product \"{{name}}\"?"}
+                ns="catalogue"
+                values={{ name: productToHardDelete?.description }}
+                components={{ strong: <strong /> }}
+              />
             </p>
             <p className="mt-2 text-sm text-rose-600 dark:text-rose-400 font-medium">
-              This action cannot be undone. The product will be removed from the database.
+              {t(
+                "This action cannot be undone. The product will be removed from the database."
+              )}
             </p>
           </>
         }
-        confirmButtonText="Delete Permanently"
+        confirmButtonText={t("Delete Permanently")}
         variant="danger"
       />
     </div>

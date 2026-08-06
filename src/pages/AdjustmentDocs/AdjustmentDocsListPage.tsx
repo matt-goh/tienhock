@@ -29,6 +29,7 @@ import StyledListbox from "../../components/StyledListbox";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   AdjustmentDocument,
   AdjustmentDocType,
@@ -107,6 +108,7 @@ interface Props {
 
 const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("adjustments");
   const paths = getAdjustmentDocsPaths(company);
   const [docs, setDocs] = useState<AdjustmentDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +170,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       setDocs(Array.isArray(response) ? response : []);
     } catch (error: any) {
       console.error("Error fetching adjustment documents:", error);
-      toast.error("Failed to fetch adjustment documents");
+      toast.error(t("Failed to fetch adjustment documents"));
       setDocs([]);
     } finally {
       setLoading(false);
@@ -179,6 +181,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     filterStatus,
     filterSearchTerm,
     paths.apiBase,
+    t,
   ]);
 
   useEffect(() => {
@@ -256,7 +259,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       currentId: formatAdjustmentDocDisplayId(targets[0]),
     });
     const toastId = toast.loading(
-      `Submitting ${targets.length} document(s) to MyInvois...`
+      targets.length === 1
+        ? t("Submitting {{total}} document to MyInvois...", {
+            total: targets.length,
+          })
+        : t("Submitting {{total}} documents to MyInvois...", {
+            total: targets.length,
+          })
     );
     let success = 0;
     let failed = 0;
@@ -270,9 +279,11 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         currentId: formatAdjustmentDocDisplayId(d),
       });
       toast.loading(
-        `Submitting ${i + 1}/${targets.length}: ${formatAdjustmentDocDisplayId(
-          d
-        )}...`,
+        t("Submitting {{current}}/{{total}}: {{id}}...", {
+          current: i + 1,
+          total: targets.length,
+          id: formatAdjustmentDocDisplayId(d),
+        }),
         { id: toastId }
       );
       try {
@@ -284,17 +295,34 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       }
     }
     if (failed === 0) {
-      toast.success(`Submitted ${success} document(s) successfully`, {
-        id: toastId,
-      });
+      toast.success(
+        success === 1
+          ? t("Submitted {{total}} document successfully", {
+              total: success,
+            })
+          : t("Submitted {{total}} documents successfully", {
+              total: success,
+            }),
+        {
+          id: toastId,
+        }
+      );
     } else if (success === 0) {
-      toast.error(`All ${failed} submission(s) failed`, {
-        id: toastId,
-        duration: 6000,
-      });
+      toast.error(
+        failed === 1
+          ? t("All {{total}} submission failed", { total: failed })
+          : t("All {{total}} submissions failed", { total: failed }),
+        {
+          id: toastId,
+          duration: 6000,
+        }
+      );
     } else {
       toast.success(
-        `${success} submitted, ${failed} failed — check each document for details`,
+        t(
+          "{{success}} submitted, {{failed}} failed — check each document for details",
+          { success, failed }
+        ),
         { id: toastId, duration: 6000 }
       );
     }
@@ -302,7 +330,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     setSubmitProgress(null);
     setSelectedIds(new Set());
     fetchDocs();
-  }, [eligibleSelectedDocs, paths.apiBase, fetchDocs]);
+  }, [eligibleSelectedDocs, paths.apiBase, fetchDocs, t]);
 
   const fetchSelectedDocsWithLines = useCallback(
     async (ids: string[]): Promise<AdjustmentDocument[]> => {
@@ -320,11 +348,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
     setIsBatchProcessing(true);
     const ids = Array.from(selectedIds);
     const toastId = toast.loading(
-      `Loading ${ids.length} document${ids.length === 1 ? "" : "s"}...`
+      ids.length === 1
+        ? t("Loading {{total}} document...", { total: ids.length })
+        : t("Loading {{total}} documents...", { total: ids.length })
     );
     try {
       const fullDocs = await fetchSelectedDocsWithLines(ids);
-      toast.loading("Generating PDF...", { id: toastId });
+      toast.loading(t("Generating PDF..."), { id: toastId });
       const isJellyPolly =
         typeof window !== "undefined" &&
         window.location.pathname.includes("/jellypolly");
@@ -341,25 +371,28 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(pdfUrl);
-      toast.success("PDF downloaded successfully", { id: toastId });
+      toast.success(t("PDF downloaded successfully"), { id: toastId });
     } catch (error) {
       toast.error(
-        `Failed to generate PDF: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        t("Failed to generate PDF: {{message}}", {
+          message:
+            error instanceof Error ? error.message : t("Unknown error"),
+        }),
         { id: toastId }
       );
     } finally {
       setIsBatchProcessing(false);
     }
-  }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines]);
+  }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines, t]);
 
   const handleBatchPrint = useCallback(async () => {
     if (selectedIds.size === 0 || isBatchProcessing) return;
     setIsBatchProcessing(true);
     const ids = Array.from(selectedIds);
     const toastId = toast.loading(
-      `Loading ${ids.length} document${ids.length === 1 ? "" : "s"}...`
+      ids.length === 1
+        ? t("Loading {{total}} document...", { total: ids.length })
+        : t("Loading {{total}} documents...", { total: ids.length })
     );
     try {
       const fullDocs = await fetchSelectedDocsWithLines(ids);
@@ -367,15 +400,16 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
       setBatchPrintDocs(fullDocs);
     } catch (error) {
       toast.error(
-        `Failed to load documents: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
+        t("Failed to load documents: {{message}}", {
+          message:
+            error instanceof Error ? error.message : t("Unknown error"),
+        }),
         { id: toastId }
       );
     } finally {
       setIsBatchProcessing(false);
     }
-  }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines]);
+  }, [selectedIds, isBatchProcessing, fetchSelectedDocsWithLines, t]);
 
   // Unified Time Navigator change handler. Handles day, month, and custom-range
   // selections from the single TimeNavigator control.
@@ -411,7 +445,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <IconFileText size={28} className="text-gray-700 dark:text-gray-200" />
-            Adjustment Docs
+            {t("Adjustment Docs")}
           </h1>
           <span className="hidden sm:inline text-default-300 dark:text-gray-600 text-2xl font-light">
             |
@@ -434,7 +468,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   }`}
                 >
                   <Icon size={16} />
-                  {tab.label}
+                  {tab.id === "all" ? t("all", { ns: "common" }) : tab.label}
                   {count > 0 && (
                     <span
                       className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
@@ -458,7 +492,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
             variant="outline"
             size="md"
           >
-            New Debit Note
+            {t("New Debit Note")}
           </Button>
           <Button
             onClick={() => navigate(`${paths.uiBase}/new?type=credit`)}
@@ -466,16 +500,18 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
             variant="outline"
             size="md"
           >
-            New Credit Note
+            {t("New Credit Note")}
           </Button>
           <Button
             onClick={() => navigate(`${paths.uiBase}/new?type=refund`)}
             icon={IconRotate2}
             variant="outline"
             size="md"
-            title="Issue a standalone Refund Note (rare — normally use Credit Note with paired refund)"
+            title={t(
+              "Issue a standalone Refund Note (rare — normally use Credit Note with paired refund)"
+            )}
           >
-            New Refund Note
+            {t("New Refund Note")}
           </Button>
         </div>
       </div>
@@ -499,7 +535,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
             />
             <input
               type="text"
-              placeholder="Search"
+              placeholder={t("search", { ns: "common" })}
               className="w-full h-10 pl-9 pr-3 bg-white dark:bg-gray-900/50 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-500"
               value={filters.searchTerm}
               onChange={(e) =>
@@ -518,14 +554,14 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 }))
               }
               options={[
-                { id: "", name: "All e-Status" },
-                { id: "null", name: "Not Submitted" },
-                { id: "pending", name: "Pending" },
-                { id: "valid", name: "Valid" },
-                { id: "invalid", name: "Invalid" },
-                { id: "cancelled", name: "Cancelled" },
+                { id: "", name: t("All e-Status") },
+                { id: "null", name: t("Not Submitted") },
+                { id: "pending", name: t("Pending") },
+                { id: "valid", name: t("Valid") },
+                { id: "invalid", name: t("Invalid") },
+                { id: "cancelled", name: t("Cancelled") },
               ]}
-              placeholder="All e-Status"
+              placeholder={t("All e-Status")}
               rounded="lg"
               className="h-10"
             />
@@ -541,11 +577,11 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 }))
               }
               options={[
-                { id: "", name: "All" },
-                { id: "active", name: "Active" },
-                { id: "cancelled", name: "Cancelled" },
+                { id: "", name: t("all", { ns: "common" }) },
+                { id: "active", name: t("Active") },
+                { id: "cancelled", name: t("Cancelled") },
               ]}
-              placeholder="All"
+              placeholder={t("all", { ns: "common" })}
               rounded="lg"
               className="h-10"
             />
@@ -558,7 +594,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
             size="md"
             disabled={loading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           {selectedIds.size > 0 && (
             <>
@@ -568,9 +604,11 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 variant="outline"
                 size="md"
                 disabled={isBatchProcessing || loading}
-                title="Print selected documents"
+                title={t("Print selected documents")}
               >
-                {isBatchProcessing ? "Loading..." : `Print (${selectedIds.size})`}
+                {isBatchProcessing
+                  ? t("Loading...")
+                  : t("Print ({{total}})", { total: selectedIds.size })}
               </Button>
               <Button
                 onClick={handleBatchDownload}
@@ -578,17 +616,21 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 variant="outline"
                 size="md"
                 disabled={isBatchProcessing || loading}
-                title="Download a single PDF with selected documents"
+                title={t(
+                  "Download a single PDF with selected documents"
+                )}
               >
                 {isBatchProcessing
-                  ? "Loading..."
-                  : `Download (${selectedIds.size})`}
+                  ? t("Loading...")
+                  : t("Download ({{total}})", { total: selectedIds.size })}
               </Button>
               <Button
                 onClick={() => {
                   if (eligibleSelectedDocs.length === 0) {
                     toast.error(
-                      "None of the selected documents are eligible for e-invoice submission (need active + not valid/pending/cancelled)."
+                      t(
+                        "None of the selected documents are eligible for e-invoice submission (need active + not valid/pending/cancelled)."
+                      )
                     );
                     return;
                   }
@@ -599,11 +641,13 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 color="sky"
                 size="md"
                 disabled={isSubmitting || loading || isBatchProcessing}
-                title="Submit selected documents to MyInvois"
+                title={t("Submit selected documents to MyInvois")}
               >
                 {isSubmitting
-                  ? "Submitting..."
-                  : `Submit e-Invoice (${eligibleSelectedDocs.length})`}
+                  ? t("Submitting...")
+                  : t("Submit e-Invoice ({{total}})", {
+                      total: eligibleSelectedDocs.length,
+                    })}
               </Button>
             </>
           )}
@@ -622,11 +666,12 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
             className="text-default-300 dark:text-gray-600 mx-auto mb-3"
           />
           <p className="text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-            No adjustment documents found
+            {t("No adjustment documents found")}
           </p>
           <p className="text-xs text-default-500 dark:text-gray-400">
-            Try changing your filters, or create one from an invoice's details
-            page.
+            {t(
+              "Try changing your filters, or create one from an invoice's details page."
+            )}
           </p>
         </div>
       ) : (
@@ -642,10 +687,10 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                       className="inline-flex items-center justify-center p-0.5 rounded hover:bg-default-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-sky-500 align-middle"
                       title={
                         selectAllState === "all"
-                          ? "Deselect all"
+                          ? t("Deselect all")
                           : selectAllState === "some"
-                          ? "Clear selection"
-                          : "Select all"
+                            ? t("Clear selection")
+                            : t("Select all")
                       }
                     >
                       {selectAllState === "all" ? (
@@ -667,28 +712,28 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                     </button>
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Document ID
+                    {t("Document ID")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Original Invoice
+                    {t("Original Invoice")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Original e-Invoice
+                    {t("Original e-Invoice")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Customer
+                    {t("customer", { ns: "common" })}
                   </th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Amount
+                    {t("amount", { ns: "common" })}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Adj. e-Invoice
+                    {t("Adj. e-Invoice")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Created
+                    {t("Created")}
                   </th>
                 </tr>
               </thead>
@@ -718,7 +763,7 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                             e.stopPropagation();
                             toggleSelect(doc.id);
                           }}
-                          aria-label={isSelected ? "Deselect" : "Select"}
+                          aria-label={t(isSelected ? "Deselect" : "Select")}
                         >
                           {isSelected ? (
                             <IconSquareCheckFilled
@@ -738,9 +783,11 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                         {doc.paired_doc_id && (
                           <span
                             className="block text-xs text-default-500 dark:text-gray-400"
-                            title={`Paired with ${formatAdjustmentDocId(
-                              doc.paired_display_id || doc.paired_doc_id
-                            )}`}
+                            title={t("Paired with {{id}}", {
+                              id: formatAdjustmentDocId(
+                                doc.paired_display_id || doc.paired_doc_id
+                              ),
+                            })}
                           >
                             ↔{" "}
                             {formatAdjustmentDocId(
@@ -791,13 +838,33 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
           if (!isSubmitting) setShowSubmitDialog(false);
         }}
         onConfirm={handleBatchSubmit}
-        title={`Submit ${eligibleSelectedDocs.length} document(s) to MyInvois`}
+        title={t(
+          eligibleSelectedDocs.length === 1
+            ? "Submit {{total}} document to MyInvois"
+            : "Submit {{total}} documents to MyInvois",
+          { total: eligibleSelectedDocs.length }
+        )}
         message={
           eligibleSelectedDocs.length === selectedIds.size
-            ? `You are about to submit ${eligibleSelectedDocs.length} document(s) to MyInvois. Continue?`
-            : `${eligibleSelectedDocs.length} of ${selectedIds.size} selected document(s) are eligible. The rest will be skipped. Continue?`
+            ? t(
+                eligibleSelectedDocs.length === 1
+                  ? "You are about to submit {{total}} document to MyInvois. Continue?"
+                  : "You are about to submit {{total}} documents to MyInvois. Continue?",
+                { total: eligibleSelectedDocs.length }
+              )
+            : t(
+                eligibleSelectedDocs.length === 1
+                  ? "{{eligible}} of {{selected}} selected document is eligible. The rest will be skipped. Continue?"
+                  : "{{eligible}} of {{selected}} selected documents are eligible. The rest will be skipped. Continue?",
+                {
+                  eligible: eligibleSelectedDocs.length,
+                  selected: selectedIds.size,
+                }
+              )
         }
-        confirmButtonText={isSubmitting ? "Submitting..." : "Submit"}
+        confirmButtonText={
+          isSubmitting ? t("Submitting...") : t("Submit")
+        }
         variant="default"
       />
 
@@ -844,12 +911,16 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   <LoadingSpinner />
                 </div>
                 <h3 className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100">
-                  Submitting e-Invoices to MyInvois
+                  {t("Submitting e-Invoices to MyInvois")}
                 </h3>
                 <p className="mt-2 text-sm text-default-500 dark:text-gray-400">
-                  Please don't close or navigate away from this page. Submitting{" "}
-                  {submitProgress?.current ?? 0} of {submitProgress?.total ?? 0}
-                  …
+                  {t(
+                    "Please don't close or navigate away from this page. Submitting {{current}} of {{total}}…",
+                    {
+                      current: submitProgress?.current ?? 0,
+                      total: submitProgress?.total ?? 0,
+                    }
+                  )}
                 </p>
                 {submitProgress && (
                   <>
@@ -872,11 +943,15 @@ const AdjustmentDocsListPage: React.FC<Props> = ({ company = "tienhock" }) => {
                     </div>
                     <div className="mt-3 flex justify-center gap-4 text-xs">
                       <span className="text-emerald-600 dark:text-emerald-400">
-                        {submitProgress.success} succeeded
+                        {t("{{total}} succeeded", {
+                          total: submitProgress.success,
+                        })}
                       </span>
                       {submitProgress.failed > 0 && (
                         <span className="text-rose-600 dark:text-rose-400">
-                          {submitProgress.failed} failed
+                          {t("{{total}} failed", {
+                            total: submitProgress.failed,
+                          })}
                         </span>
                       )}
                     </div>

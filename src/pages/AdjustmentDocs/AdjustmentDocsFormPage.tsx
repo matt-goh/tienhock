@@ -26,6 +26,7 @@ import {
   parseAdjustmentDocId,
 } from "../../utils/adjustments/formatDocId";
 import toast from "react-hot-toast";
+import { useTranslation, Trans } from "react-i18next";
 import {
   AdjustmentDocument,
   AdjustmentDocType,
@@ -194,6 +195,7 @@ const getMaxCreditNoteAmount = (sourceInvoice: ExtendedInvoiceData): number =>
 
 const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("adjustments");
   const paths = getAdjustmentDocsPaths(company);
   const goBack = useSmartBack(paths.uiBase);
   const [params, setParams] = useSearchParams();
@@ -327,12 +329,12 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       return;
     }
     if (!docRunningNumber.trim()) {
-      setDocIdError("Document No. running number is required");
+      setDocIdError(t("Document No. running number is required"));
       setIsCheckingDocId(false);
       return;
     }
     if (!requestedDocId) {
-      setDocIdError("Document No. running number must be greater than 0");
+      setDocIdError(t("Document No. running number must be greater than 0"));
       setIsCheckingDocId(false);
       return;
     }
@@ -353,13 +355,13 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         setDocIdError(
           response.available
             ? ""
-            : `Document No. ${formatAdjustmentDocId(
-                requestedDocId
-              )} is already used by an active document`
+            : t("Document No. {{id}} is already used by an active document", {
+                id: formatAdjustmentDocId(requestedDocId),
+              })
         );
       } catch (error: any) {
         if (!cancelled) {
-          setDocIdError(error?.message || "Could not check Document No.");
+          setDocIdError(error?.message || t("Could not check Document No."));
         }
       } finally {
         if (!cancelled) setIsCheckingDocId(false);
@@ -378,6 +380,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     selectedDocumentYearShort,
     selectedDocumentYear,
     type,
+    t,
   ]);
 
   const invoiceBalanceDue: number = invoice
@@ -414,10 +417,10 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   // ----- Validate type only (invoiceId can be picked in-form) -----
   useEffect(() => {
     if (!type) {
-      toast.error("Missing required parameter: type");
+      toast.error(t("Missing required parameter: type"));
       navigate(paths.uiBase, { replace: true });
     }
-  }, [type, navigate]);
+  }, [type, navigate, t]);
 
   // ----- Picker search (debounced) — only when no invoice selected yet -----
   useEffect(() => {
@@ -463,12 +466,14 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           `${paths.invoiceApiBase}/${invoiceId}`
         )) as ExtendedInvoiceData;
         if (!inv) {
-          toast.error(`Invoice ${invoiceId} not found`);
+          toast.error(t("Invoice {{id}} not found", { id: invoiceId }));
           navigate(paths.uiBase, { replace: true });
           return;
         }
         if (inv.invoice_status === "cancelled") {
-          toast.error("Cannot create adjustment for a cancelled invoice");
+          toast.error(
+            t("Cannot create adjustment for a cancelled invoice")
+          );
           navigate(`${paths.invoiceUiBase}/${invoiceId}`, { replace: true });
           return;
         }
@@ -502,7 +507,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             creditNote.original_invoice_id !== invoiceId ||
             creditNote.status !== "active"
           ) {
-            toast.error("Active Credit Note not found for this invoice");
+            toast.error(
+              t("Active Credit Note not found for this invoice")
+            );
             navigate(`${paths.invoiceUiBase}/${invoiceId}`, { replace: true });
             return;
           }
@@ -511,7 +518,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               `${paths.apiBase}/${creditNote.paired_with_id}`
             )) as AdjustmentDocument;
             if (pairedDoc.status === "active") {
-              toast.error("This Credit Note already has an active Refund Note");
+              toast.error(
+                t("This Credit Note already has an active Refund Note")
+              );
               navigate(`${paths.uiBase}/${creditNote.id}`, { replace: true });
               return;
             }
@@ -527,7 +536,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           );
           if (!lp) {
             toast.error(
-              "Linked payment not found or not in overpaid status"
+              t("Linked payment not found or not in overpaid status")
             );
             navigate(`${paths.invoiceUiBase}/${invoiceId}`, { replace: true });
             return;
@@ -613,7 +622,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         }
       } catch (error: any) {
         console.error(error);
-        toast.error(error?.message || "Failed to load invoice");
+        toast.error(error?.message || t("Failed to load invoice"));
         navigate(paths.uiBase, { replace: true });
       } finally {
         setIsLoading(false);
@@ -737,28 +746,44 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   // ----- Validation -----
   const validate = (): string[] => {
     const errors: string[] = [];
-    if (lines.length === 0) errors.push("At least one line item required");
+    if (lines.length === 0) errors.push(t("At least one line item required"));
     const nonSub = lines.filter((l) => !l.issubtotal);
-    if (nonSub.length === 0) errors.push("At least one product line required");
+    if (nonSub.length === 0)
+      errors.push(t("At least one product line required"));
     nonSub.forEach((l, i) => {
       if (!l.code && !l.description)
-        errors.push(`Line ${i + 1}: code or description required`);
+        errors.push(
+          t("Line {{number}}: code or description required", {
+            number: i + 1,
+          })
+        );
       const total = Number(l.total || 0);
-      if (!isFinite(total)) errors.push(`Line ${i + 1}: invalid total`);
+      if (!isFinite(total))
+        errors.push(
+          t("Line {{number}}: invalid total", { number: i + 1 })
+        );
       const qty = Number(l.quantity || 0);
       const price = Number(l.price || 0);
       const isFreeformAmount = isFreeformAdjustmentCode(l.code);
       if (!isFreeformAmount && qty <= 0)
-        errors.push(`Line ${i + 1}: quantity must be greater than 0`);
+        errors.push(
+          t("Line {{number}}: quantity must be greater than 0", {
+            number: i + 1,
+          })
+        );
       if (l.code !== "LESS" && price < 0)
-        errors.push(`Line ${i + 1}: price cannot be negative`);
+        errors.push(
+          t("Line {{number}}: price cannot be negative", {
+            number: i + 1,
+          })
+        );
     });
     if (totals.totalamountpayable <= 0)
-      errors.push("Document total must be greater than 0");
-    if (!requestedDocId) errors.push("Document No. is required");
+      errors.push(t("Document total must be greater than 0"));
+    if (!requestedDocId) errors.push(t("Document No. is required"));
     if (docIdError) errors.push(docIdError);
     if (isCheckingDocId) {
-      errors.push("Document No. availability is still being checked");
+      errors.push(t("Document No. availability is still being checked"));
     }
 
     if (isCN && invoice) {
@@ -767,9 +792,10 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       );
       if (totals.totalamountpayable > maxCreditNoteAmount) {
         errors.push(
-          `Credit Note amount cannot exceed adjusted invoice total RM ${maxCreditNoteAmount.toFixed(
-            2
-          )}`
+          t(
+            "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}",
+            { amount: maxCreditNoteAmount.toFixed(2) }
+          )
         );
       }
       if (
@@ -777,35 +803,40 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         totals.totalamountpayable > currentBalanceDue
       ) {
         errors.push(
-          `Credit Note amount cannot exceed unpaid balance RM ${currentBalanceDue.toFixed(
-            2
-          )} when the invoice has no received payment`
+          t(
+            "Credit Note amount cannot exceed unpaid balance RM {{amount}} when the invoice has no received payment",
+            { amount: currentBalanceDue.toFixed(2) }
+          )
         );
       }
     }
 
     if (isRN) {
-      if (!refundMethod) errors.push("Refund method required");
+      if (!refundMethod) errors.push(t("Refund method required"));
       if (refundMethod !== "cash" && !bankAccount)
-        errors.push("Bank account required for non-cash refund");
+        errors.push(t("Bank account required for non-cash refund"));
       if (isReplacementPairedRefund && !pairedCreditNote) {
-        errors.push("Credit Note link required for replacement Refund Note");
+        errors.push(
+          t("Credit Note link required for replacement Refund Note")
+        );
       }
       if (isReplacementPairedRefund && pairedCreditNote) {
         if (totals.totalamountpayable > pairedCreditNote.totalamountpayable) {
           errors.push(
-            `Refund amount cannot exceed Credit Note amount RM ${pairedCreditNote.totalamountpayable.toFixed(
-              2
-            )}`
+            t(
+              "Refund amount cannot exceed Credit Note amount RM {{amount}}",
+              { amount: pairedCreditNote.totalamountpayable.toFixed(2) }
+            )
           );
         }
       }
       if (linkedPayment) {
         if (totals.totalamountpayable > linkedPayment.amount_paid) {
           errors.push(
-            `Refund amount cannot exceed overpaid amount RM ${linkedPayment.amount_paid.toFixed(
-              2
-            )}`
+            t(
+              "Refund amount cannot exceed overpaid amount RM {{amount}}",
+              { amount: linkedPayment.amount_paid.toFixed(2) }
+            )
           );
         }
       }
@@ -813,13 +844,16 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
 
     if (isCN && issuePairedRefund && canPairRefund) {
       if (refundMethod !== "cash" && !bankAccount)
-        errors.push("Paired refund requires bank account for non-cash method");
+        errors.push(
+          t("Paired refund requires bank account for non-cash method")
+        );
     }
     if (isCN && issuePairedRefund && !canPairRefund) {
       errors.push(
-        `Paired refund is only available when the Credit Note exceeds the current outstanding balance. Current outstanding balance: RM ${invoiceBalanceDue.toFixed(
-          2
-        )}`
+        t(
+          "Paired refund is only available when the Credit Note exceeds the current outstanding balance. Current outstanding balance: RM {{amount}}",
+          { amount: invoiceBalanceDue.toFixed(2) }
+        )
       );
     }
     if (isReplacementPairedRefund && pairedCreditNote) {
@@ -835,15 +869,20 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       );
       if (maxReplacementRefundAmount <= MONEY_TOLERANCE) {
         errors.push(
-          `Refund Note cannot be paired because Credit Note ${formatAdjustmentDocDisplayId(
-            pairedCreditNote
-          )} did not create a refundable excess. Issue the Credit Note alone to reduce the balance.`
+          t(
+            "Refund Note cannot be paired because Credit Note {{id}} did not create a refundable excess. Issue the Credit Note alone to reduce the balance.",
+            { id: formatAdjustmentDocDisplayId(pairedCreditNote) }
+          )
         );
       } else if (totals.totalamountpayable > maxReplacementRefundAmount) {
         errors.push(
-          `Refund amount cannot exceed the refundable excess RM ${maxReplacementRefundAmount.toFixed(
-            2
-          )} from Credit Note ${formatAdjustmentDocDisplayId(pairedCreditNote)}.`
+          t(
+            "Refund amount cannot exceed the refundable excess RM {{amount}} from Credit Note {{id}}.",
+            {
+              amount: maxReplacementRefundAmount.toFixed(2),
+              id: formatAdjustmentDocDisplayId(pairedCreditNote),
+            }
+          )
         );
       }
     }
@@ -860,7 +899,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
     if (!invoice || !type) return;
 
     setIsSaving(true);
-    const toastId = toast.loading("Creating adjustment document...");
+    const toastId = toast.loading(t("Creating adjustment document..."));
     try {
       const payload: any = {
         type,
@@ -917,12 +956,16 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       }
 
       const response = await api.post(paths.apiBase, payload);
-      toast.success(response.message || "Document created", { id: toastId });
+      toast.success(response.message || t("Document created"), {
+        id: toastId,
+      });
       navigate(`${paths.uiBase}/${response.document.id}`, {
         replace: true,
       });
     } catch (error: any) {
-      toast.error(error?.message || "Failed to create document", { id: toastId });
+      toast.error(error?.message || t("Failed to create document"), {
+        id: toastId,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -968,17 +1011,21 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               <BackButton fallbackPath={paths.uiBase} />
               <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                {TYPE_LABEL[type]} Baru - Pilih Invois
+                {t("New {{type}} - Select Invoice", {
+                  type: t(TYPE_LABEL[type]),
+                })}
               </h1>
             </div>
           </div>
 
           <div className="p-4 border-b border-default-200 dark:border-gray-700">
             <p className="text-sm text-default-600 dark:text-gray-300 mb-3">
-              Pilih invois yang anda mahu laraskan. Senarai di bawah hanya
-              memaparkan <strong>50 invois terkini</strong> - gunakan kotak
-              carian untuk mencari invois yang lebih lama (mengikut nombor
-              invois, nama pelanggan, atau jumlah).
+              <Trans
+                i18nKey="Choose the invoice you want to adjust. The list below only shows the latest <strong>{{count}} invoices</strong> - use the search box to find older invoices (by invoice number, customer name, or amount)."
+                ns="adjustments"
+                values={{ count: 50 }}
+                components={{ strong: <strong /> }}
+              />
             </p>
             <div className="relative">
               <IconSearch
@@ -988,7 +1035,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               <input
                 autoFocus
                 type="text"
-                placeholder="Cari mengikut nombor invois, nama pelanggan, atau jumlah..."
+                placeholder={t(
+                  "Search by invoice number, customer name, or amount..."
+                )}
                 className="w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 value={pickerQuery}
                 onChange={(e) => setPickerQuery(e.target.value)}
@@ -1004,30 +1053,30 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             ) : pickerResults.length === 0 ? (
               <div className="p-8 text-center text-sm text-default-500 dark:text-gray-400">
                 {pickerQuery
-                  ? "Tiada invois yang sepadan ditemui."
-                  : "Tiada invois untuk dipaparkan."}
+                  ? t("No matching invoices found.")
+                  : t("No invoices to display.")}
               </div>
             ) : (
               <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                 <thead className="bg-default-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Invoice
+                      {t("Invoice")}
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Customer
+                      {t("customer", { ns: "common" })}
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Date
+                      {t("date", { ns: "common" })}
                     </th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Total
+                      {t("total", { ns: "common" })}
                     </th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Balance
+                      {t("balance", { ns: "common" })}
                     </th>
                     <th className="px-4 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Status
+                      {t("status", { ns: "common" })}
                     </th>
                   </tr>
                 </thead>
@@ -1092,7 +1141,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             <BackButton onClick={handleBackClick} disabled={isSaving} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
-              New {TYPE_LABEL[type]}
+              {t("New {{type}}", { type: t(TYPE_LABEL[type]) })}
               <AdjustmentDocTypeBadge type={type} />
             </h1>
           </div>
@@ -1109,7 +1158,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 !requestedDocId
               }
             >
-              {isSaving ? "Saving..." : `Create ${TYPE_LABEL[type]}`}
+              {isSaving
+                ? t("Saving...")
+                : t("Create {{type}}", { type: t(TYPE_LABEL[type]) })}
             </Button>
           </div>
         </div>
@@ -1119,9 +1170,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 text-sm sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-[max-content_max-content_1px_repeat(5,minmax(110px,1fr))]">
             <div className="min-w-0">
               <div className="mb-1.5 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
-                Document No.
+                {t("Document No.")}
               </div>
-              <div title="Only the final running number can be changed">
+              <div title={t("Only the final running number can be changed")}>
                 <div className="flex min-h-[34px] items-center gap-1.5">
                   <span className="whitespace-nowrap font-semibold text-default-900 dark:text-gray-100">
                     {docNumberPrefix || "—"}
@@ -1138,7 +1189,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                       }}
                       className="h-[30px] w-16 rounded-md border border-default-300 bg-white px-2 text-sm font-semibold text-default-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                       disabled={isSaving}
-                      aria-label="Document number running number"
+                      aria-label={t("Document number running number")}
                     />
                   )}
                 </div>
@@ -1150,14 +1201,14 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                         : "text-default-500 dark:text-gray-400"
                     }`}
                   >
-                    {docIdError || "Checking..."}
+                    {docIdError || t("Checking...")}
                   </div>
                 )}
               </div>
             </div>
             <div className="min-w-0 sm:col-span-2 lg:col-span-2 xl:col-span-1">
               <div className="mb-1.5 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
-                Document Date
+                {t("Document Date")}
               </div>
               <TimeNavigator
                 range={documentDateRange}
@@ -1174,12 +1225,12 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             <div className="hidden h-[54px] w-px bg-default-300 dark:bg-gray-600 xl:block" />
             <div className="min-w-0">
               <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
-                Original Invoice
+                {t("Original Invoice")}
               </div>
               <div
                 className="flex w-fit cursor-pointer items-center gap-1 font-semibold text-default-900 hover:text-sky-600 dark:text-gray-100 dark:hover:text-sky-400"
                 onClick={() => navigate(`${paths.invoiceUiBase}/${invoice.id}`)}
-                title="Open invoice"
+                title={t("Open invoice")}
               >
                 {invoice.id}
                 <IconExternalLink size={14} className="text-sky-600 dark:text-sky-400" />
@@ -1187,7 +1238,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             </div>
             <div className="min-w-0">
               <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
-                Customer
+                {t("customer", { ns: "common" })}
               </div>
               <div
                 className="truncate font-semibold text-default-900 dark:text-gray-100"
@@ -1198,7 +1249,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             </div>
             <div className="min-w-0">
               <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
-                Invoice Total
+                {t("Invoice Total")}
               </div>
               <div className="font-semibold text-default-900 dark:text-gray-100">
                 RM {Number(invoice.totalamountpayable).toFixed(2)}
@@ -1206,7 +1257,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             </div>
             <div className="min-w-0">
               <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
-                Balance Due
+                {t("Balance Due")}
               </div>
               <div className="font-semibold text-default-900 dark:text-gray-100">
                 RM {Number(invoice.balance_due).toFixed(2)}
@@ -1214,7 +1265,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             </div>
             <div className="min-w-0">
               <div className="mb-1 text-xs uppercase tracking-wider text-default-500 dark:text-gray-400">
-                Invoice e-Status
+                {t("Invoice e-Status")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 <AdjustmentDocStatusBadge
@@ -1231,38 +1282,48 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           {linkedPayment && (
             <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
               <span className="font-medium text-indigo-800 dark:text-indigo-300">
-                Membayar balik bayaran lebih #{linkedPayment.payment_id}
+                {t("Refunding overpaid payment #{{id}}", {
+                  id: linkedPayment.payment_id,
+                })}
               </span>
               <span className="ml-2 text-indigo-700 dark:text-indigo-400">
-                (Tersedia: RM {Number(linkedPayment.amount_paid).toFixed(2)})
+                {t("(Available: RM {{amount}})", {
+                  amount: Number(linkedPayment.amount_paid).toFixed(2),
+                })}
               </span>
             </div>
           )}
           {pairedCreditNote && (
             <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
               <span className="font-medium text-indigo-800 dark:text-indigo-300">
-                Reissuing Refund Note for Credit Note{" "}
-                {formatAdjustmentDocDisplayId(pairedCreditNote)}
+                {t("Reissuing Refund Note for Credit Note {{id}}", {
+                  id: formatAdjustmentDocDisplayId(pairedCreditNote),
+                })}
               </span>
               <span className="ml-2 text-indigo-700 dark:text-indigo-400">
-                (Tersedia: RM {Number(pairedCreditNote.totalamountpayable).toFixed(2)})
+                {t("(Available: RM {{amount}})", {
+                  amount: Number(
+                    pairedCreditNote.totalamountpayable
+                  ).toFixed(2),
+                })}
               </span>
             </div>
           )}
           {isRN && !linkedPayment && !pairedCreditNote && !isReplacementPairedRefund && (
             <div className="mt-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-300">
               <div className="font-medium mb-1">
-                Nota Bayaran Balik sendiri (tiada bayaran lebih, tiada Nota
-                Kredit berpasangan)
+                {t(
+                  "Standalone Refund Note (no overpayment, no paired Credit Note)"
+                )}
               </div>
               <div className="text-xs">
-                Catatan perakaunan ialah{" "}
-                <span className="font-mono">Dr Deposit Pelanggan / Cr Bank</span>.
-                Ini sesuai untuk membayar balik baki kredit pelanggan yang masih
-                belum digunakan. Jika anda juga perlu membalikkan jualan asal,
-                keluarkan Nota Kredit sebaliknya (ia boleh menggandingkan Nota
-                Bayaran Balik secara automatik). Untuk kes lain, catat jurnal
-                pelarasan selepas mencipta RN.
+                <Trans
+                  i18nKey="The accounting entry is <mono>Dr Customer Deposit / Cr Bank</mono>. This is suitable for refunding an unused customer credit balance. If you also need to reverse the original sale, issue a Credit Note instead (it can pair a Refund Note automatically). For other cases, key an adjustment journal after creating the RN."
+                  ns="adjustments"
+                  components={{
+                    mono: <span className="font-mono" />,
+                  }}
+                />
               </div>
             </div>
           )}
@@ -1271,23 +1332,23 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         {/* Reason */}
         <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-            Reason / Description
+            {t("Reason / Description")}
           </label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder={
               isCN
-                ? "cth. Barang rosak dipulangkan"
+                ? t("e.g. Damaged goods returned")
                 : isDN
-                ? "cth. Caj bayaran lewat"
-                : isReplacementPairedRefund
-                ? `Bayaran balik gantian untuk Nota Kredit ${
-                    pairedCreditNote
-                      ? formatAdjustmentDocDisplayId(pairedCreditNote)
-                      : formatAdjustmentDocId(pairedCreditNoteId)
-                  }`
-                : "cth. Bayaran balik untuk bayaran lebih"
+                  ? t("e.g. Late payment charge")
+                  : isReplacementPairedRefund
+                    ? t("Replacement refund for Credit Note {{id}}", {
+                        id: pairedCreditNote
+                          ? formatAdjustmentDocDisplayId(pairedCreditNote)
+                          : formatAdjustmentDocId(pairedCreditNoteId),
+                      })
+                    : t("e.g. Refund for overpayment")
             }
             rows={2}
             className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
@@ -1299,7 +1360,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-              Line Items
+              {t("Line Items")}
             </h2>
             <div className="flex items-center gap-2">
               {!isRN && (
@@ -1311,8 +1372,8 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   disabled={isSaving}
                 >
                   {isCN && issuePairedRefund
-                    ? "Use Original Items"
-                    : "Set Quantities to 1"}
+                    ? t("Use Original Items")
+                    : t("Set Quantities to 1")}
                 </Button>
               )}
               <Button
@@ -1322,17 +1383,15 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 size="sm"
                 disabled={isSaving}
               >
-                Add Line
+                {t("Add Line")}
               </Button>
             </div>
           </div>
           {!isRN && (
             <div className="mb-3 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-900/20 px-3 py-2 text-xs text-sky-800 dark:text-sky-300">
-              Masukkan beza yang terlibat sahaja. Untuk pembetulan harga,
-              gunakan kuantiti terlibat dan beza harga setiap item. Untuk
-              pulangan, kekurangan, atau barang rosak, gunakan kuantiti
-              terlibat dan harga unit asal. Nota Debit akan menambah jumlah ini
-              kepada baki invois; Nota Kredit akan mengurangkannya.
+              {t(
+                "Enter only the involved variance. For price corrections, use the involved quantity and per-item price difference. For returns, shortages, or damaged goods, use the involved quantity and original unit price. A Debit Note will add this amount to the invoice balance; a Credit Note will reduce it."
+              )}
             </div>
           )}
           <div className="overflow-x-auto">
@@ -1340,22 +1399,22 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Code
+                    {t("Code")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Description
+                    {t("description", { ns: "common" })}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
-                    Qty
+                    {t("Qty")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-28">
-                    Price
+                    {t("Price")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
-                    Tax
+                    {t("Tax")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-28">
-                    Total
+                    {t("total", { ns: "common" })}
                   </th>
                   <th className="w-12" />
                 </tr>
@@ -1428,7 +1487,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                         onClick={() => removeLine(line.uid)}
                         disabled={isSaving || lines.length <= 1}
                         className="p-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Remove line"
+                        title={t("Remove line")}
                       >
                         <IconTrash size={16} />
                       </button>
@@ -1459,7 +1518,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   disabled={isSaving || !canPairRefund}
                   title={
                     !canPairRefund
-                      ? "Nota Bayaran Balik berpasangan hanya tersedia apabila jumlah Nota Kredit melebihi baki tertunggak. Lebihan sahaja akan dibayar balik."
+                      ? t(
+                          "Paired Refund Note is only available when the Credit Note total exceeds the outstanding balance. Only the excess will be refunded."
+                        )
                       : ""
                   }
                 >
@@ -1476,12 +1537,17 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                   )}
                   <div>
                     <div className="font-medium text-sm text-default-900 dark:text-gray-100">
-                      Keluarkan Nota Bayaran Balik berpasangan
+                      {t("Issue paired Refund Note")}
                     </div>
                     <div className="text-xs text-default-500 dark:text-gray-400">
                       {canPairRefund
-                        ? `Lebihan RM ${pairedRefundAmount.toFixed(2)} akan dibayar balik; selebihnya mengurangkan baki pelanggan.`
-                        : "Tidak tersedia: jumlah Nota Kredit belum melebihi baki tertunggak. Nota Kredit sahaja akan mengurangkan baki pelanggan."}
+                        ? t(
+                            "Excess of RM {{amount}} will be refunded; the rest reduces the customer balance.",
+                            { amount: pairedRefundAmount.toFixed(2) }
+                          )
+                        : t(
+                            "Not available: the Credit Note total does not exceed the outstanding balance yet. The Credit Note alone will reduce the customer balance."
+                          )}
                     </div>
                   </div>
                 </button>
@@ -1492,37 +1558,43 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               <div className="space-y-3 bg-indigo-50/40 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-200 dark:border-indigo-800">
                 <div className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
                   {isRN
-                    ? "Butiran bayaran balik"
-                    : "Butiran bayaran balik berpasangan"}
+                    ? t("Refund details")
+                    : t("Paired refund details")}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                    Refund Method
+                    {t("Refund Method")}
                   </label>
                   <PillSelect<string>
                     value={refundMethod}
                     onChange={(value: string) =>
                       setRefundMethod(value as Payment["payment_method"])
                     }
-                    options={PAYMENT_METHOD_OPTIONS}
+                    options={PAYMENT_METHOD_OPTIONS.map((option) => ({
+                      ...option,
+                      label: t(option.label),
+                    }))}
                     disabled={isSaving}
-                    ariaLabel="Refund method"
+                    ariaLabel={t("Refund method")}
                   size="md"
                   />
                 </div>
                 {refundMethod !== "cash" && (
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Bank Account
+                      {t("Bank Account")}
                     </label>
                     <PillSelect<string>
                       value={bankAccount || ""}
                       onChange={(value: string) =>
                         setBankAccount(value as Payment["bank_account"])
                       }
-                      options={BANK_ACCOUNT_OPTIONS}
+                      options={BANK_ACCOUNT_OPTIONS.map((option) => ({
+                        ...option,
+                        label: t(option.label),
+                      }))}
                       disabled={isSaving}
-                      ariaLabel="Bank account"
+                      ariaLabel={t("Bank account")}
                     size="md"
                     />
                   </div>
@@ -1534,14 +1606,14 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                     name="refundReference"
                     label={
                       refundMethod === "cheque"
-                        ? "Cheque Number"
+                        ? t("Cheque Number")
                         : refundMethod === "online"
-                        ? "Transaction ID"
-                        : "Transaction Ref"
+                          ? t("Transaction ID")
+                          : t("Transaction Ref")
                     }
                     value={refundReference}
                     onChange={(e) => setRefundReference(e.target.value)}
-                    placeholder="Enter reference"
+                    placeholder={t("Enter reference")}
                     disabled={isSaving}
                   />
                 )}
@@ -1554,7 +1626,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-default-600 dark:text-gray-400">
-                  Subtotal
+                  {t("Subtotal")}
                 </span>
                 <span className="font-medium text-default-900 dark:text-gray-100">
                   RM {totals.total_excluding_tax.toFixed(2)}
@@ -1562,7 +1634,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               </div>
               <div className="flex justify-between">
                 <span className="text-default-600 dark:text-gray-400">
-                  Tax
+                  {t("Tax")}
                 </span>
                 <span className="font-medium text-default-900 dark:text-gray-100">
                   RM {totals.tax_amount.toFixed(2)}
@@ -1570,7 +1642,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-default-600 dark:text-gray-400">
-                  Rounding
+                  {t("Rounding")}
                 </span>
                 <input
                   type="number"
@@ -1583,7 +1655,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
               </div>
               <div className="border-t border-default-200 dark:border-gray-700 pt-2 mt-2 flex justify-between">
                 <span className="font-semibold text-default-900 dark:text-gray-100">
-                  Total Payable
+                  {t("Total Payable")}
                 </span>
                 <span className="font-bold text-lg text-default-900 dark:text-gray-100">
                   RM {totals.totalamountpayable.toFixed(2)}
@@ -1598,9 +1670,11 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
         isOpen={showBackConfirm}
         onClose={() => setShowBackConfirm(false)}
         onConfirm={goBack}
-        title="Discard Draft"
-        message="Are you sure you want to leave? Your changes will be lost."
-        confirmButtonText="Discard"
+        title={t("Discard Draft")}
+        message={t(
+          "Are you sure you want to leave? Your changes will be lost."
+        )}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
     </div>

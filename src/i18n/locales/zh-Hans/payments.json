@@ -1,0 +1,18 @@
+{
+  "Failed to fetch payments": "获取付款失败",
+  "Contra and overpayment credits cannot be reused as payment groups.": "对冲和多付信用不能重新用作付款组。",
+  "This payment group does not have a reference to reuse.": "此付款组没有可重复使用的参考。",
+  "Search payments by invoice, reference, or amount": "按发票、参考或金额搜索付款",
+  "All Methods": "所有方式",
+  "Cash": "现金",
+  "Cheque": "支票",
+  "Bank Transfer": "银行转账",
+  "Online": "在线",
+  "Contra Credit": "对冲信用",
+  "All Status": "所有状态",
+  "Active": "有效",
+  "Pending": "待处理",
+  "Overpaid": "已多付",
+  "Cancelled": "已取消",
+  "New Payment": "新付款"
+}

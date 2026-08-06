@@ -16,6 +16,7 @@ import {
 } from "@tabler/icons-react";
 import { FilterOptions } from "../../types/types";
 import Button from "../Button";
+import { useTranslation } from "react-i18next";
 
 type StaffFilterMenuProps = {
   onFilterChange: (filters: FilterOptions) => void;
@@ -28,6 +29,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
   currentFilters,
   jobOptions,
 }) => {
+  const { t } = useTranslation("catalogue");
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -69,7 +71,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
         icon={IconFilter}
         variant="outline"
       >
-        Filter
+        {t("Filter")}
       </Button>
       {isOpen && (
         <div className="absolute space-y-1 right-0 mt-2 w-64 text-default-700 dark:text-gray-200 text-sm font-medium rounded-md bg-white dark:bg-gray-800 shadow-lg focus:outline-none z-10 border border-default-200 dark:border-gray-700">
@@ -80,7 +82,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                 handleFilterChange("showResigned", !currentFilters.showResigned)
               }
             >
-              Show inactive staff
+              {t("Show inactive staff")}
               {currentFilters.showResigned ? (
                 <IconSquareCheckFilled
                   width={18}
@@ -128,7 +130,9 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                           : ""
                       } flex items-center`}
                     >
-                      <span className="block truncate">Filter by job(s)</span>
+                      <span className="block truncate">
+                        {t("Filter by job(s)")}
+                      </span>
                       <IconChevronDown
                         stroke={2}
                         size={18}
@@ -170,7 +174,7 @@ const StaffFilterMenu: React.FC<StaffFilterMenuProps> = ({
                     <ComboboxOptions className="absolute z-10 w-full mt-1 p-1 border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none">
                       {uniqueJobOptions.length === 0 ? (
                         <div className="relative cursor-default select-none py-2 px-4 text-default-700 dark:text-gray-300">
-                          No jobs found.
+                          {t("No jobs found.")}
                         </div>
                       ) : (
                         uniqueJobOptions.map((option) => (

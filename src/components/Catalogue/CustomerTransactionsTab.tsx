@@ -26,6 +26,7 @@ import { parseDatabaseTimestamp, formatDisplayDate } from "../../utils/invoice/d
 import { generateTransactionHistoryPDF } from "../../utils/catalogue/TransactionHistoryPDF";
 import LoadingSpinner from "../LoadingSpinner";
 import { AdjustmentDocType, EInvoiceStatus } from "../../types/types";
+import { useTranslation } from "react-i18next";
 
 // Human-readable labels for the PDF / exports.
 const KIND_LABELS: Record<TxnKind, string> = {
@@ -202,13 +203,6 @@ const getStatusFilterActiveClass = (statusValue: string): string => {
   return "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300";
 };
 
-const paymentTypeLabel = (paymentType: TxnPaymentType | null): string =>
-  paymentType === "CASH"
-    ? "Cash"
-    : paymentType === "INVOICE"
-    ? "Invoice"
-    : "-";
-
 // Build the merged, date-sorted (newest first) row list from the three sources.
 const buildRows = (
   invoicesRaw: unknown,
@@ -284,6 +278,7 @@ const buildRows = (
 
 // Small status pill for invoice/payment rows (adjustments use their own badge).
 const StatusPill: React.FC<{ status: string | null }> = ({ status }) => {
+  const { t } = useTranslation("catalogue");
   if (!status) {
     return <span className="text-default-400 dark:text-gray-500">-</span>;
   }
@@ -302,12 +297,13 @@ const StatusPill: React.FC<{ status: string | null }> = ({ status }) => {
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${color}`}
     >
-      {status}
+      {t(formatStatusLabel(status))}
     </span>
   );
 };
 
 const TypeCell: React.FC<{ row: TxnRow }> = ({ row }) => {
+  const { t } = useTranslation("catalogue");
   if (isAdjustmentKind(row.kind)) {
     return <AdjustmentDocTypeBadge type={row.kind} />;
   }
@@ -315,14 +311,14 @@ const TypeCell: React.FC<{ row: TxnRow }> = ({ row }) => {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300">
         <IconFileInvoice size={12} />
-        Invoice
+        {t("Invoice")}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
       <IconCash size={12} />
-      Payment
+      {t("Payment")}
     </span>
   );
 };
@@ -350,6 +346,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
   cache,
   onCacheChange,
 }) => {
+  const { t } = useTranslation("catalogue");
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -391,7 +388,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
           setError(
             apiError.response?.data?.message ||
               apiError.message ||
-              "Failed to load transaction history."
+              t("Failed to load transaction history.")
           );
         }
       } finally {
@@ -530,7 +527,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
       );
     } catch (err) {
       console.error("Error generating transaction history PDF:", err);
-      toast.error("Failed to generate PDF. Please try again.");
+      toast.error(t("Failed to generate PDF. Please try again."));
     } finally {
       setIsExporting(false);
     }
@@ -557,7 +554,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
                     : "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
                 }`}
               >
-                {status.label}
+                {t(status.label)}
               </button>
             );
           })}
@@ -584,7 +581,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
                     : "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
                 }`}
               >
-                {option.label}
+                {t(option.label)}
               </button>
             );
           })}
@@ -596,17 +593,17 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
             onClick={() => handleExport("print")}
             disabled={!canExport || isExporting}
             className="inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-default-300 dark:border-gray-600 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-50 dark:bg-gray-900/50 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Print transaction history"
+            title={t("Print transaction history")}
           >
             <IconPrinter size={16} />
-            Print
+            {t("Print")}
           </button>
           <button
             type="button"
             onClick={() => handleExport("download")}
             disabled={!canExport || isExporting}
             className="inline-flex items-center gap-1.5 h-[34px] px-3 rounded-lg border border-default-300 dark:border-gray-600 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-50 dark:bg-gray-900/50 hover:bg-default-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Download transaction history as PDF"
+            title={t("Download transaction history as PDF")}
           >
             <IconDownload size={16} />
             PDF
@@ -623,14 +620,17 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
       {/* Summary cards */}
       {showingCurrent && (
         <div className="flex flex-wrap gap-3">
-          <SummaryCard label="Total Invoiced" value={fmtRM(summary.invoiced)} />
           <SummaryCard
-            label="Total Paid"
+            label={t("Total Invoiced")}
+            value={fmtRM(summary.invoiced)}
+          />
+          <SummaryCard
+            label={t("Total Paid")}
             value={fmtRM(summary.paid)}
             accent="text-emerald-600 dark:text-emerald-400"
           />
           <SummaryCard
-            label="Adjustments"
+            label={t("Adjustments")}
             value={String(summary.adjustments)}
           />
         </div>
@@ -650,11 +650,11 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
           </div>
         ) : !isLoading && showingCurrent && rows.length === 0 ? (
           <div className="p-10 text-center text-default-500 dark:text-gray-400">
-            No transactions found for this period.
+            {t("No transactions found for this period.")}
           </div>
         ) : !isLoading && showingCurrent && filteredRows.length === 0 ? (
           <div className="p-10 text-center text-default-500 dark:text-gray-400">
-            No transactions match the selected filters.
+            {t("No transactions match the selected filters.")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -662,13 +662,13 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   {[
-                    "Date",
-                    "Type",
-                    "Reference",
-                    "Related Invoice",
-                    "Payment Type",
-                    "Amount",
-                    "Status",
+                    t("Date"),
+                    t("Type"),
+                    t("Reference"),
+                    t("Related Invoice"),
+                    t("Payment Type"),
+                    t("Amount"),
+                    t("Status"),
                   ].map((h) => (
                     <th
                       key={h}
@@ -687,7 +687,7 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
                     key={row.key}
                     onClick={() => handleRowClick(row)}
                     className="group cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors"
-                    title="View details"
+                    title={t("View details")}
                   >
                     <td className="px-4 py-3 text-sm text-default-700 dark:text-gray-300 whitespace-nowrap">
                       {formatDisplayDate(row.date)}
@@ -708,7 +708,11 @@ const CustomerTransactionsTab: React.FC<CustomerTransactionsTabProps> = ({
                       {row.relatedInvoice ?? "-"}
                     </td>
                     <td className="px-4 py-3 text-sm text-default-600 dark:text-gray-300 whitespace-nowrap">
-                      {paymentTypeLabel(row.paymentType)}
+                      {row.paymentType === "CASH"
+                        ? t("Cash")
+                        : row.paymentType === "INVOICE"
+                        ? t("Invoice")
+                        : "-"}
                     </td>
                     <td
                       className={`px-4 py-3 text-sm font-semibold text-right whitespace-nowrap ${

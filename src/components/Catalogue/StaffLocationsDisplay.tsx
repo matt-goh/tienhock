@@ -9,6 +9,7 @@
 // else the first job-mapped location.
 import React from "react";
 import { IconMapPin } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 
 interface DirectLocation {
   code: string;
@@ -35,12 +36,13 @@ const StaffLocationsDisplay: React.FC<StaffLocationsDisplayProps> = ({
   directLocations,
   jobLocations,
 }) => {
+  const { t } = useTranslation("catalogue");
   const hasAny = directLocations.length > 0 || jobLocations.length > 0;
 
   return (
     <div className="space-y-1">
       <p className="text-xs font-medium text-default-500 dark:text-gray-400">
-        Locations
+        {t("Locations")}
       </p>
       {!hasAny ? (
         <p className="text-sm text-default-400 dark:text-gray-500">—</p>
@@ -48,7 +50,7 @@ const StaffLocationsDisplay: React.FC<StaffLocationsDisplayProps> = ({
         <div className="space-y-1.5">
           {/* Directly assigned */}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className={captionCls}>Assigned</span>
+            <span className={captionCls}>{t("Assigned")}</span>
             {directLocations.length > 0 ? (
               directLocations.map((loc) => (
                 <span
@@ -61,13 +63,13 @@ const StaffLocationsDisplay: React.FC<StaffLocationsDisplayProps> = ({
                 </span>
               ))
             ) : (
-              <span className={emptyCls}>None</span>
+              <span className={emptyCls}>{t("None")}</span>
             )}
           </div>
 
           {/* Inherited from jobs */}
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className={captionCls}>From jobs</span>
+            <span className={captionCls}>{t("From jobs")}</span>
             {jobLocations.length > 0 ? (
               jobLocations.map((jl) => (
                 <span
@@ -77,12 +79,12 @@ const StaffLocationsDisplay: React.FC<StaffLocationsDisplayProps> = ({
                 >
                   {jl.name}
                   <span className="text-[10px] font-normal text-indigo-500/70 dark:text-indigo-300/60">
-                    via {jl.jobName}
+                    {t("via {{jobName}}", { jobName: jl.jobName })}
                   </span>
                 </span>
               ))
             ) : (
-              <span className={emptyCls}>None</span>
+              <span className={emptyCls}>{t("None")}</span>
             )}
           </div>
         </div>

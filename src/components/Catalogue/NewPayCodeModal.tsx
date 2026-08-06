@@ -17,6 +17,7 @@ import { IconCheck, IconChevronDown } from "@tabler/icons-react";
 
 import Button from "../Button";
 import { PayCode, Job } from "../../types/types";
+import { useTranslation } from "react-i18next";
 
 interface NewPayCodeModalProps {
   isOpen: boolean;
@@ -33,6 +34,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
   availablePayCodesToAdd,
   onPayCodeAdded,
 }) => {
+  const { t } = useTranslation("catalogue");
   const [query, setQuery] = useState("");
   const [selectedPayCodeToAdd, setSelectedPayCodeToAdd] =
     useState<PayCode | null>(null);
@@ -139,12 +141,14 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Add Pay Code to Job "{job?.name}"
+                  {t('Add Pay Code to Job "{{jobName}}"', {
+                    jobName: job?.name,
+                  })}
                 </DialogTitle>
                 <div className="mt-4">
                   <Field>
                     <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
-                      Select Pay Code
+                      {t("Select Pay Code")}
                     </label>
                     {/* Wrap Combobox in a relative container to anchor the options */}
                     <div className="relative">
@@ -160,7 +164,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                               pc ? `${pc.id} - ${pc.description}` : ""
                             }
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search code or description..."
+                            placeholder={t("Search code or description...")}
                             autoComplete="off"
                           />
                           <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -182,12 +186,12 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                           <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black dark:ring-gray-700 ring-opacity-5 focus:outline-none sm:text-sm">
                             {filteredPayCodes.length === 0 && query !== "" ? (
                               <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                                Nothing found.
+                                {t("Nothing found.")}
                               </div>
                             ) : filteredPayCodes.length === 0 &&
                               availablePayCodesToAdd.length === 0 ? (
                               <div className="relative cursor-default select-none py-2 px-4 text-gray-500 dark:text-gray-400">
-                                No available pay codes to add.
+                                {t("No available pay codes to add.")}
                               </div>
                             ) : (
                               filteredPayCodes.map((pc) => (
@@ -237,7 +241,13 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                                 disabled={isAdding}
                               >
                                 <IconChevronDown size={16} className="mr-1.5" />
-                                <span>Load More Pay Codes ({availablePayCodesToAdd.length - loadedItemCount} remaining)</span>
+                                <span>
+                                  {t("Load More Pay Codes ({{total}} remaining)", {
+                                    total:
+                                      availablePayCodesToAdd.length -
+                                      loadedItemCount,
+                                  })}
+                                </span>
                               </button>
                               </div>
                             )}
@@ -255,7 +265,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                     onClick={handleClose}
                     disabled={isAdding}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </Button>
                   <Button
                     type="button"
@@ -264,7 +274,7 @@ const NewPayCodeModal: React.FC<NewPayCodeModalProps> = ({
                     disabled={!selectedPayCodeToAdd || isAdding}
                     onClick={handleAdd}
                   >
-                    {isAdding ? "Adding..." : "Add"}
+                    {isAdding ? t("Adding...") : t("Add")}
                   </Button>
                 </div>
               </DialogPanel>

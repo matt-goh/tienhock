@@ -21,6 +21,7 @@ import { Job, PayCode, JobPayCodeDetails } from "../../types/types";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 interface BatchManageJobPayCodesModalProps {
   // API base for pay-code endpoints (JP passes /jellypolly/api)
@@ -42,6 +43,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
   onComplete,
   apiBase = "/api",
 }) => {
+  const { t } = useTranslation("catalogue");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>("");
 
@@ -223,12 +225,12 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
       await Promise.all(promises);
 
       await onComplete();
-      toast.success("Pay codes updated successfully");
+      toast.success(t("Pay codes updated successfully"));
       handleClose();
     } catch (err: any) {
       console.error("Error saving pay code changes:", err);
-      setError(err.message || "Failed to save changes");
-      toast.error("Failed to save changes");
+      setError(err.message || t("Failed to save changes"));
+      toast.error(t("Failed to save changes"));
     } finally {
       setIsSaving(false);
     }
@@ -286,7 +288,9 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Manage Pay Codes for "{job?.name || ""}"
+                    {t('Manage Pay Codes for "{{jobName}}"', {
+                      jobName: job?.name || "",
+                    })}
                   </DialogTitle>
                   <button
                     onClick={handleClose}
@@ -304,7 +308,9 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                     <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                       <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                         <IconCode size={16} />
-                        Assigned Pay Codes ({selectedPayCodes.size})
+                        {t("Assigned Pay Codes ({{total}})", {
+                          total: selectedPayCodes.size,
+                        })}
                       </div>
                       <div className="relative mt-2">
                         <IconSearch
@@ -313,7 +319,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                         />
                         <input
                           type="text"
-                          placeholder="Search assigned..."
+                          placeholder={t("Search assigned...")}
                           className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                           value={assignedSearch}
                           onChange={(e) => setAssignedSearch(e.target.value)}
@@ -329,7 +335,9 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                             size={32}
                             className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                           />
-                          {assignedSearch ? "No pay codes found" : "No pay codes assigned yet"}
+                          {assignedSearch
+                            ? t("No pay codes found")
+                            : t("No pay codes assigned yet")}
                         </div>
                       ) : (
                         <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -348,7 +356,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                                     {pc.description}
                                     {isNew && (
                                       <span className="text-xs px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
-                                        New
+                                        {t("New")}
                                       </span>
                                     )}
                                   </div>
@@ -372,7 +380,11 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                                         ? "text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300"
                                         : "text-default-300 hover:text-amber-400 dark:text-gray-500 dark:hover:text-amber-400"
                                     }`}
-                                    title={isDefault ? "Remove default" : "Set as default"}
+                                    title={
+                                      isDefault
+                                        ? t("Remove default")
+                                        : t("Set as default")
+                                    }
                                   >
                                     {isDefault ? <IconStarFilled size={18} /> : <IconStar size={18} />}
                                   </button>
@@ -381,7 +393,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                                     onClick={() => handleRemovePayCode(pc.id)}
                                     disabled={isSaving}
                                     className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
-                                    title="Remove pay code"
+                                    title={t("Remove pay code")}
                                   >
                                     <IconTrash size={16} />
                                   </button>
@@ -399,10 +411,12 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                     <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                          Add Pay Code
+                          {t("Add Pay Code")}
                         </div>
                         <span className="text-xs text-default-500 dark:text-gray-400">
-                          {availablePayCodes.length} available
+                          {t("{{total}} available", {
+                            total: availablePayCodes.length,
+                          })}
                         </span>
                       </div>
                       <div className="relative mt-2">
@@ -412,7 +426,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                         />
                         <input
                           type="text"
-                          placeholder="Search available..."
+                          placeholder={t("Search available...")}
                           className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                           value={availableSearch}
                           onChange={(e) => setAvailableSearch(e.target.value)}
@@ -428,7 +442,9 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                             size={32}
                             className="mx-auto mb-2 text-emerald-400"
                           />
-                          {availableSearch ? "No pay codes found" : "All pay codes assigned"}
+                          {availableSearch
+                            ? t("No pay codes found")
+                            : t("All pay codes assigned")}
                         </div>
                       ) : (
                         <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -456,7 +472,7 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                                 onClick={() => handleAddPayCode(pc.id)}
                                 disabled={isSaving}
                                 className="p-1.5 text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded disabled:opacity-50"
-                                title="Add pay code"
+                                title={t("Add pay code")}
                               >
                                 <IconPlus size={18} />
                               </button>
@@ -480,9 +496,11 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                   <div className="text-sm text-default-500 dark:text-gray-400">
                     {hasChanges ? (
                       <div className="flex items-center gap-3">
-                        <span className="inline-flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                          Assigned: {selectedPayCodes.size}
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                            {t("Assigned: {{total}}", {
+                              total: selectedPayCodes.size,
+                            })}
                         </span>
                         <span className="text-amber-600 dark:text-amber-400">
                           ({changesSummary.toAdd > 0 && `+${changesSummary.toAdd}`}
@@ -492,13 +510,18 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                             changesSummary.defaultsChanged > 0 &&
                             ", "}
                           {changesSummary.defaultsChanged > 0 &&
-                            `${changesSummary.defaultsChanged} default${changesSummary.defaultsChanged > 1 ? "s" : ""} changed`})
+                            t(
+                              changesSummary.defaultsChanged === 1
+                                ? "{{total}} default changed"
+                                : "{{total}} defaults changed",
+                              { total: changesSummary.defaultsChanged }
+                            )})
                         </span>
                       </div>
                     ) : (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <IconCheck size={14} /> No changes
-                      </span>
+                          <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                            <IconCheck size={14} /> {t("No changes")}
+                          </span>
                     )}
                   </div>
                   <div className="flex space-x-3">
@@ -507,8 +530,8 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                       variant="outline"
                       onClick={handleClose}
                       disabled={isSaving}
-                    >
-                      Cancel
+                        >
+                          {t("Cancel")}
                     </Button>
                     <Button
                       type="button"
@@ -516,8 +539,8 @@ const BatchManageJobPayCodesModal: React.FC<BatchManageJobPayCodesModalProps> = 
                       variant="filled"
                       onClick={handleSubmit}
                       disabled={isSaving || !hasChanges}
-                    >
-                      {isSaving ? "Saving..." : "Save Changes"}
+                        >
+                          {isSaving ? t("Saving...") : t("Save Changes")}
                     </Button>
                   </div>
                 </div>

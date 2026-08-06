@@ -1,6 +1,7 @@
 // src/components/Catalogue/CustomerCard.tsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Customer } from "../../types/types";
 import {
   IconTrash,
@@ -34,6 +35,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
   branchInfo,
   onManageBranchesClick,
 }) => {
+  const { t } = useTranslation("catalogue");
   const [isCardHovered, setIsCardHovered] = useState(false);
   const navigate = useNavigate();
 
@@ -107,21 +109,21 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
             <button
               onClick={handleEditClick}
               className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900/50 text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors duration-150 shadow-sm"
-              title="Edit customer"
+              title={t("Edit customer")}
             >
               <IconPencil size={16} stroke={1.5} />
             </button>
             <button
               onClick={handleTransactionsClick}
               className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-sky-50 dark:hover:bg-sky-900/50 text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors duration-150 shadow-sm"
-              title="Transaction History"
+              title={t("Transaction History")}
             >
               <IconHistory size={16} stroke={1.5} />
             </button>
             <button
               onClick={handleDeleteClick}
               className="p-1.5 rounded-full bg-white dark:bg-gray-700 hover:bg-rose-50 dark:hover:bg-rose-900/50 text-default-500 dark:text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors duration-150 shadow-sm"
-              title="Delete customer"
+              title={t("Delete customer")}
             >
               <IconTrash size={16} stroke={1.5} />
             </button>
@@ -142,7 +144,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
           />
           <div className="text-sm text-default-700 dark:text-gray-200 flex-1">
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300">
-              {customer.salesman || "Unassigned"}
+              {customer.salesman || t("Unassigned")}
             </span>
           </div>
         </div>
@@ -178,9 +180,11 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
               className="text-default-400 dark:text-gray-500 flex-shrink-0 mr-2"
             />
             <div className="flex items-center">
-              <span className="text-sm text-default-700 dark:text-gray-200 mr-1">e-Invoice:</span>
+              <span className="text-sm text-default-700 dark:text-gray-200 mr-1">
+                {t("e-Invoice:")}
+              </span>
               <span className="inline-flex items-center text-xs font-medium text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 rounded-full px-2 py-0.5">
-                <IconCheck size={12} className="mr-1" /> Ready
+                <IconCheck size={12} className="mr-1" /> {t("Ready")}
               </span>
             </div>
           </div>
@@ -201,17 +205,25 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
               />
             )}
             <div className="flex items-center space-x-1 min-w-0">
-              <span className="text-sm text-default-700 dark:text-gray-200 mr-1">Branch:</span>
+              <span className="text-sm text-default-700 dark:text-gray-200 mr-1">
+                {t("Branch:")}
+              </span>
               {onManageBranchesClick ? (
                 <button
                   type="button"
                   onClick={handleManageBranchesClick}
                   title={
                     siblingBranchCount > 0
-                      ? `Manage ${branchInfo.groupName} (${siblingBranchCount} other ${
-                          siblingBranchCount === 1 ? "branch" : "branches"
-                        })`
-                      : `Manage ${branchInfo.groupName}`
+                      ? t(
+                          siblingBranchCount === 1
+                            ? "Manage {{group}} ({{total}} other branch)"
+                            : "Manage {{group}} ({{total}} other branches)",
+                          {
+                            group: branchInfo.groupName,
+                            total: siblingBranchCount,
+                          }
+                        )
+                      : t("Manage {{group}}", { group: branchInfo.groupName })
                   }
                   className={`inline-flex items-center max-w-full truncate text-xs font-medium rounded-full px-2 py-0.5 transition-colors hover:ring-1 hover:ring-indigo-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
                     branchInfo.isMainBranch
@@ -236,7 +248,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
                 <span
                   className={`inline-flex items-center flex-shrink-0 text-xs font-medium rounded-full px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300`}
                 >
-                  Main
+                  {t("Main")}
                 </span>
               )}
               {siblingBranchCount > 0 && (

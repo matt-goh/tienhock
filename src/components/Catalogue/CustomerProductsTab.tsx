@@ -8,6 +8,7 @@ import toast from "react-hot-toast";
 import { FormListbox } from "../FormComponents";
 import clsx from "clsx";
 import Checkbox from "../Checkbox";
+import { useTranslation } from "react-i18next";
 
 interface CustomerProductsTabProps {
   products: CustomProduct[]; // Receive products directly
@@ -20,15 +21,16 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
   onProductsChange,
   disabled = false, // Default to not disabled
 }) => {
+  const { t } = useTranslation("catalogue");
   const { products: allProducts } = useProductsCache("all"); // Full product list from cache
 
   // Memoize product options for performance
   const productOptions = useMemo(() => {
     return allProducts.map((p) => ({
       id: p.id,
-      name: p.description || `Product ID: ${p.id}`,
+      name: p.description || t("Product ID: {{id}}", { id: p.id }),
     }));
-  }, [allProducts]);
+  }, [allProducts, t]);
 
   // Memoize descriptions map for quick lookup
   const productDescriptions = useMemo(() => {
@@ -52,7 +54,11 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
       (p) => p.product_id === newProductId && p.uid !== uid
     );
     if (isAlreadyAdded) {
-      toast.error(`${productInfo.description} has already been added.`);
+      toast.error(
+        t("{{product}} has already been added.", {
+          product: productInfo.description,
+        })
+      );
       return;
     }
 
@@ -125,7 +131,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     if (!uid) return;
     const updated = customerProducts.filter((p) => p.uid !== uid);
     onProductsChange(updated);
-    toast.success("Product custom price removed");
+    toast.success(t("Product custom price removed"));
   };
 
   const handleAddProduct = () => {
@@ -137,7 +143,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
     );
 
     if (availableProducts.length === 0) {
-      toast.error("All available products have already been added.");
+      toast.error(t("All available products have already been added."));
       return;
     }
 
@@ -159,7 +165,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
       {/* Header and Add Button */}
       <div className="flex w-full items-center justify-between mb-4">
         <h3 className="text-lg font-medium text-default-900 dark:text-gray-100">
-          Custom Pricing & Availability
+          {t("Custom Pricing & Availability")}
         </h3>
         <Button
           onClick={handleAddProduct}
@@ -171,13 +177,15 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
           type="button"
           disabled={disabled}
         >
-          Add Custom Price
+          {t("Add Custom Price")}
         </Button>
       </div>
 
       {customerProducts.length === 0 ? (
         <div className="text-center py-8 border border-dashed border-default-200 dark:border-gray-700 rounded-lg bg-default-50 dark:bg-gray-900/50">
-          <p className="text-default-500 dark:text-gray-400">No custom product price added.</p>
+          <p className="text-default-500 dark:text-gray-400">
+            {t("No custom product price added.")}
+          </p>
         </div>
       ) : (
         <div className="border border-default-200 dark:border-gray-700 rounded-lg">
@@ -188,31 +196,31 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                   scope="col"
                   className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[120px]"
                 >
-                  Product
+                  {t("Product")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider flex-1"
                 >
-                  Description
+                  {t("Description")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[160px]"
                 >
-                  Custom Price (RM)
+                  {t("Custom Price (RM)")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[100px]"
                 >
-                  Available
+                  {t("Available")}
                 </th>
                 <th
                   scope="col"
                   className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider w-[110px]"
                 >
-                  Action
+                  {t("Action")}
                 </th>
               </tr>
             </thead>
@@ -233,7 +241,7 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                         handleProductChange(product.uid, newProductId)
                       }
                       options={productOptions}
-                      placeholder="Select..."
+                      placeholder={t("Select...")}
                       disabled={disabled}
                       optionsPosition="top"
                     />
@@ -257,10 +265,11 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                       )}
                       placeholder="0.00"
                       disabled={disabled}
-                      aria-label={`Custom price for ${
-                        productDescriptions[product.product_id] ||
-                        product.product_id
-                      }`}
+                      aria-label={t("Custom price for {{product}}", {
+                        product:
+                          productDescriptions[product.product_id] ||
+                          product.product_id,
+                      })}
                     />
                   </td>
                   {/* Is Available */}
@@ -271,10 +280,11 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                         handleAvailabilityChange(product.uid, checked)
                       }
                       disabled={disabled}
-                      ariaLabel={`Toggle availability for ${
-                        productDescriptions[product.product_id] ||
-                        product.product_id
-                      }`}
+                      ariaLabel={t("Toggle availability for {{product}}", {
+                        product:
+                          productDescriptions[product.product_id] ||
+                          product.product_id,
+                      })}
                       role="switch"
                       buttonClassName="p-1.5 rounded-full"
                     />
@@ -287,14 +297,15 @@ const CustomerProductsTab: React.FC<CustomerProductsTabProps> = ({
                       color="rose"
                       size="sm"
                       icon={IconTrash}
-                      aria-label={`Remove ${
-                        productDescriptions[product.product_id] ||
-                        product.product_id
-                      } custom price`}
+                      aria-label={t("Remove {{product}} custom price", {
+                        product:
+                          productDescriptions[product.product_id] ||
+                          product.product_id,
+                      })}
                       disabled={disabled}
                       className="px-2 py-1"
                     >
-                      Delete
+                      {t("delete", { ns: "common" })}
                     </Button>
                   </td>
                 </tr>

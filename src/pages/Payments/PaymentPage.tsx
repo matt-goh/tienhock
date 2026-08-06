@@ -6,6 +6,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import TimeNavigator from "../../components/TimeNavigator";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import {
   Payment,
   PaymentCancellationErrorData,
@@ -65,6 +66,7 @@ const reviveFilters = (cached: any): PaymentFilters | null => {
 
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("payments");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [sortedPayments, setSortedPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,7 +165,7 @@ const PaymentPage: React.FC = () => {
       setSortedPayments(sorted);
     } catch (error) {
       console.error("Error fetching payments:", error);
-      toast.error("Failed to fetch payments");
+      toast.error(t("Failed to fetch payments"));
     } finally {
       setLoading(false);
     }
@@ -216,7 +218,7 @@ const PaymentPage: React.FC = () => {
       payment.payment_method === "overpayment"
     ) {
       toast.error(
-        "Contra and overpayment credits cannot be reused as payment groups."
+        t("Contra and overpayment credits cannot be reused as payment groups.")
       );
       return;
     }
@@ -226,7 +228,7 @@ const PaymentPage: React.FC = () => {
     const groupReference: string | null =
       payment.receipt_reference || payment.payment_reference || null;
     if (!groupReference) {
-      toast.error("This payment group does not have a reference to reuse.");
+      toast.error(t("This payment group does not have a reference to reuse."));
       return;
     }
 
@@ -260,8 +262,10 @@ const PaymentPage: React.FC = () => {
               />
               <input
                 type="text"
-                placeholder="Search"
-                title="Search payments by invoice, reference, or amount"
+                placeholder={t("search", { ns: "common" })}
+                title={t(
+                  "Search payments by invoice, reference, or amount"
+                )}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
                 value={filters.searchTerm}
                 onChange={(e) =>
@@ -293,14 +297,14 @@ const PaymentPage: React.FC = () => {
                   }))
                 }
                 options={[
-                  { id: "", name: "All Methods" },
-                  { id: "cash", name: "Cash" },
-                  { id: "cheque", name: "Cheque" },
-                  { id: "bank_transfer", name: "Bank Transfer" },
-                  { id: "online", name: "Online" },
-                  { id: "contra", name: "Contra Credit" },
+                  { id: "", name: t("All Methods") },
+                  { id: "cash", name: t("Cash") },
+                  { id: "cheque", name: t("Cheque") },
+                  { id: "bank_transfer", name: t("Bank Transfer") },
+                  { id: "online", name: t("Online") },
+                  { id: "contra", name: t("Contra Credit") },
                 ]}
-                placeholder="All Methods"
+                placeholder={t("All Methods")}
                 rounded="lg"
               />
             </div>
@@ -316,13 +320,13 @@ const PaymentPage: React.FC = () => {
                   }))
                 }
                 options={[
-                  { id: "", name: "All Status" },
-                  { id: "active", name: "Active" },
-                  { id: "pending", name: "Pending" },
-                  { id: "overpaid", name: "Overpaid" },
-                  { id: "cancelled", name: "Cancelled" },
+                  { id: "", name: t("All Status") },
+                  { id: "active", name: t("Active") },
+                  { id: "pending", name: t("Pending") },
+                  { id: "overpaid", name: t("Overpaid") },
+                  { id: "cancelled", name: t("Cancelled") },
                 ]}
-                placeholder="All Status"
+                placeholder={t("All Status")}
                 rounded="lg"
               />
             </div>
@@ -333,7 +337,7 @@ const PaymentPage: React.FC = () => {
               size="md"
               className="w-full whitespace-nowrap sm:w-auto"
             >
-              New Payment
+              {t("New Payment")}
             </Button>
           </div>
         </div>

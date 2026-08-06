@@ -4,11 +4,13 @@ import Tab from "../../../components/Tab";
 import CutiReportPage from "./CutiReportPage";
 import HolidayCalendarPage from "./HolidayCalendarPage";
 import { usePersistedNumber } from "../../../hooks/usePersistedFilters";
+import { useTranslation } from "react-i18next";
 
 const CutiManagementPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const tabLabels = [
-    "Cuti Report",
-    "Holiday Calendar",
+    t("Leave Report"),
+    t("Holiday Calendar"),
   ];
 
   const [activeTab, setActiveTab] = usePersistedNumber(
@@ -23,10 +25,10 @@ const CutiManagementPage: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between items-center">
         <div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Leave Management
+            {t("Leave Management")}
           </h1>
           <p className="mt-1 text-sm text-default-600 dark:text-gray-300">
-            Manage employee leave and holidays.
+            {t("Manage employee leave and holidays.")}
           </p>
         </div>
       </div>

@@ -15,6 +15,7 @@ import { EmployeePayCodeDetails } from "../../utils/catalogue/useJobPayCodeMappi
 import { api } from "../../routes/utils/api";
 import Checkbox from "../Checkbox";
 import PayRateScheduleManager from "./PayRateScheduleManager";
+import { useTranslation } from "react-i18next";
 
 interface EditRatesState {
   biasa: string;
@@ -53,6 +54,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
   onRatesSaved,
   apiBase = "/api",
 }) => {
+  const { t } = useTranslation("catalogue");
   const [editRates, setEditRates] = useState<EditRatesState>({
     biasa: "",
     ahad: "",
@@ -110,13 +112,17 @@ const EditEmployeePayCodeRatesModal: React.FC<
       await api.delete(
         `${apiBase}/employee-pay-codes/${employeeId}/${payCodeDetail.id}`
       );
-      toast.success("Pay code unlinked successfully");
+      toast.success(t("Pay code unlinked successfully"));
       onRatesSaved();
       onClose();
     } catch (err: any) {
       console.error("Error unlinking employee pay code:", err);
-      setError(err?.response?.data?.message || "Failed to unlink pay code");
-      toast.error(err?.response?.data?.message || "Failed to unlink pay code");
+      setError(
+        err?.response?.data?.message || t("Failed to unlink pay code")
+      );
+      toast.error(
+        err?.response?.data?.message || t("Failed to unlink pay code")
+      );
     }
   };
 
@@ -134,7 +140,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
       (rate: number | null): boolean => rate !== null && !Number.isFinite(rate)
     );
     if (hasInvalidRate) {
-      setError("Invalid rate value. Rates must be valid numbers.");
+      setError(t("Invalid rate value. Rates must be valid numbers."));
       setIsSaving(false);
       return;
     }
@@ -144,7 +150,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
       (newAhad !== null && newAhad < 0) ||
       (newUmum !== null && newUmum < 0)
     ) {
-      setError("Invalid rate value. Rates cannot be negative numbers.");
+      setError(t("Invalid rate value. Rates cannot be negative numbers."));
       setIsSaving(false);
       return;
     }
@@ -170,7 +176,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
     }
 
     if (!changed) {
-      toast.success("No changes detected.");
+      toast.success(t("No changes detected."));
       onClose();
       setIsSaving(false);
       return;
@@ -181,13 +187,15 @@ const EditEmployeePayCodeRatesModal: React.FC<
         `${apiBase}/employee-pay-codes/${employeeId}/${payCodeDetail.id}`,
         payload
       );
-      toast.success("Pay code settings updated successfully");
+      toast.success(t("Pay code settings updated successfully"));
       onRatesSaved();
       onClose();
     } catch (err: any) {
       console.error("Error updating employee pay code settings:", err);
-      setError(err?.response?.data?.message || "Failed to update settings");
-      toast.error(err?.response?.data?.message || "Failed to update settings");
+      setError(err?.response?.data?.message || t("Failed to update settings"));
+      toast.error(
+        err?.response?.data?.message || t("Failed to update settings")
+      );
     } finally {
       setIsSaving(false);
     }
@@ -236,7 +244,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
             <button
               type="button"
               onClick={() => handleResetRate(name)}
-              title={`Reset ${label} to default`}
+              title={t("Reset {{label}} to default", { label })}
               disabled={isSaving}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-sky-600 dark:hover:text-sky-400"
             >
@@ -263,7 +271,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                   as="h3"
                   className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Edit Rates for {payCodeDetail?.id}
+                  {t("Edit Rates for {{id}}", { id: payCodeDetail?.id })}
                 </DialogTitle>
                 <p className="mt-1 text-sm text-default-600 dark:text-gray-300">
                   {payCodeDetail?.description}
@@ -275,25 +283,25 @@ const EditEmployeePayCodeRatesModal: React.FC<
                       <div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                            Rate overrides
+                            {t("Rate overrides")}
                           </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Blank = use the default rate
+                            {t("Blank = use the default rate")}
                           </span>
                         </div>
                         <div className="mt-2 grid grid-cols-3 gap-3">
                           {renderRateField(
-                            "Biasa (Normal)",
+                            t("Biasa (Normal)"),
                             "biasa",
                             payCodeDetail.rate_biasa
                           )}
                           {renderRateField(
-                            "Ahad (Sunday)",
+                            t("Ahad (Sunday)"),
                             "ahad",
                             payCodeDetail.rate_ahad
                           )}
                           {renderRateField(
-                            "Umum (Holiday)",
+                            t("Umum (Holiday)"),
                             "umum",
                             payCodeDetail.rate_umum
                           )}
@@ -326,10 +334,13 @@ const EditEmployeePayCodeRatesModal: React.FC<
                         onChange={handleDefaultChange}
                         label={
                           <span>
-                            <span className="font-medium text-default-700 dark:text-gray-200">Default</span>
+                            <span className="font-medium text-default-700 dark:text-gray-200">
+                              {t("Default")}
+                            </span>
                             <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                              (Auto-select this pay code when creating new
-                              entries)
+                              {t(
+                                "(Auto-select this pay code when creating new entries)"
+                              )}
                             </span>
                           </span>
                         }
@@ -349,7 +360,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                             disabled={isSaving}
                           >
                             <IconLinkOff size={16} className="mr-1" />
-                            Unlink Pay Code
+                            {t("Unlink Pay Code")}
                           </button>
                         ) : (
                           <div className="inline-flex items-center space-x-2">
@@ -359,7 +370,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                               onClick={handleUnlink}
                               disabled={isSaving}
                             >
-                              Confirm
+                              {t("Confirm")}
                             </button>
                             <button
                               type="button"
@@ -367,7 +378,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                               onClick={() => setShowUnlinkConfirm(false)}
                               disabled={isSaving}
                             >
-                              Cancel
+                              {t("Cancel")}
                             </button>
                           </div>
                         )}
@@ -386,7 +397,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                     onClick={handleClose}
                     disabled={isSaving}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </Button>
                   <Button
                     type="button"
@@ -395,7 +406,7 @@ const EditEmployeePayCodeRatesModal: React.FC<
                     onClick={handleSave}
                     disabled={isSaving}
                   >
-                    {isSaving ? "Saving..." : "Save Changes"}
+                    {isSaving ? t("Saving...") : t("Save Changes")}
                   </Button>
                 </div>
               </DialogPanel>

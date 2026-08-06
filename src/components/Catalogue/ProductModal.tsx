@@ -11,6 +11,7 @@ import toast from "react-hot-toast";
 import Button from "../Button";
 import { FormInput, FormListbox } from "../FormComponents";
 import Checkbox from "../Checkbox";
+import { useTranslation } from "react-i18next";
 
 interface Product {
   id: string;
@@ -36,6 +37,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   product,
   mode,
 }) => {
+  const { t } = useTranslation("catalogue");
   const [formData, setFormData] = useState<Product>({
     id: "",
     description: "",
@@ -69,22 +71,22 @@ const ProductModal: React.FC<ProductModalProps> = ({
     e.preventDefault();
 
     if (!formData.id.trim()) {
-      toast.error("Product ID is required");
+      toast.error(t("Product ID is required"));
       return;
     }
 
     if (!formData.description.trim()) {
-      toast.error("Description is required");
+      toast.error(t("Description is required"));
       return;
     }
 
     if (formData.price_per_unit < 0) {
-      toast.error("Price must be greater than or equal to 0");
+      toast.error(t("Price must be greater than or equal to 0"));
       return;
     }
 
     if (!formData.type.trim()) {
-      toast.error("Type is required");
+      toast.error(t("Type is required"));
       return;
     }
 
@@ -99,7 +101,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   };
 
   const taxOptions = [
-    { id: "None", name: "None" },
+    { id: "None", name: t("None") },
     { id: "SR", name: "SR" },
     { id: "ZRL", name: "ZRL" },
   ];
@@ -142,7 +144,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  {mode === "create" ? "Create Product" : "Edit Product"}
+                  {mode === "create"
+                    ? t("Create Product")
+                    : t("Edit Product")}
                 </DialogTitle>
                 <button
                   type="button"
@@ -156,7 +160,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
               <form onSubmit={handleSubmit} className="space-y-4">
                 <FormInput
                   name="id"
-                  label="Product ID"
+                  label={t("Product ID")}
                   value={formData.id}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFormData({ ...formData, id: e.target.value })
@@ -166,7 +170,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
                 <FormInput
                   name="description"
-                  label="Description"
+                  label={t("Description")}
                   value={formData.description}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFormData({ ...formData, description: e.target.value })
@@ -176,7 +180,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
                 <FormInput
                   name="price_per_unit"
-                  label="Price per Unit"
+                  label={t("Price per Unit")}
                   type="number"
                   min={0}
                   step="0.05"
@@ -192,7 +196,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
                 <FormInput
                   name="type"
-                  label="Type"
+                  label={t("Type")}
                   value={formData.type}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                     setFormData({ ...formData, type: e.target.value })
@@ -202,7 +206,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
                 <FormListbox
                   name="tax"
-                  label="Tax"
+                  label={t("Tax")}
                   value={formData.tax}
                   onChange={(value: string) =>
                     setFormData({ ...formData, tax: value })
@@ -217,7 +221,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     onChange={(checked: boolean) =>
                       setFormData({ ...formData, is_active: checked })
                     }
-                    label="Active"
+                    label={t("Active")}
                     labelPosition="right"
                   />
                 </div>
@@ -229,14 +233,14 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     variant="outline"
                     disabled={isSubmitting}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </Button>
                   <Button type="submit" color="sky" disabled={isSubmitting}>
                     {isSubmitting
-                      ? "Saving..."
+                      ? t("Saving...")
                       : mode === "create"
-                      ? "Create"
-                      : "Update"}
+                      ? t("Create")
+                      : t("Update")}
                   </Button>
                 </div>
               </form>

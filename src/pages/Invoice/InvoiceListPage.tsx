@@ -25,6 +25,7 @@ import PrintPDFOverlay from "../../utils/invoice/PDF/PrintPDFOverlay";
 import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
 import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import {
   IconPlus,
@@ -277,6 +278,7 @@ const clearSessionState = () => {
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation("invoice");
 
   // --- State ---
   const [invoices, setInvoices] = useState<ExtendedInvoiceData[]>([]); // Data for the CURRENT page
@@ -500,7 +502,7 @@ const InvoiceListPage: React.FC = () => {
         // Optional: Clear selection when data reloads
         // setSelectedInvoiceIds(new Set());
       } catch (err: any) {
-        setError(err.message || "Failed to fetch invoices.");
+        setError(err.message || t("Failed to fetch invoices."));
         setInvoices([]); // Clear data on error
         setTotalItems(0);
         setTotalPages(1);
@@ -655,7 +657,9 @@ const InvoiceListPage: React.FC = () => {
       if (selectedInvoiceIds.size > 0) {
         if (
           window.confirm(
-            "Your current selections will be lost when changing filters. Continue?"
+            t(
+              "Your current selections will be lost when changing filters. Continue?"
+            )
           )
         ) {
           setSelectedInvoiceIds(new Set()); // Only clear if user confirms
@@ -901,16 +905,17 @@ const InvoiceListPage: React.FC = () => {
           setSelectedInvoiceIds(new Set(response.ids));
           setSelectedInvoicesTotal(response.total || 0);
         } else if (Array.isArray(response) && response.length === 0) {
-          toast.error("No invoices match your current filters");
+          toast.error(t("No invoices match your current filters"));
         } else {
-          toast.error("Failed to select all invoices");
+          toast.error(t("Failed to select all invoices"));
         }
       } catch (error) {
         console.error("Error fetching all invoice IDs:", error);
         toast.error(
-          `Failed to select all invoices: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`
+          t("Failed to select all invoices: {{message}}", {
+            message:
+              error instanceof Error ? error.message : t("Unknown error"),
+          })
         );
       } finally {
         setIsAllSelectFetching(false);
@@ -959,7 +964,7 @@ const InvoiceListPage: React.FC = () => {
         selectedInvoiceIds.has(inv.id) && inv.invoice_status !== "cancelled"
     );
     if (cancellableInvoices.length === 0) {
-      toast.error("No selected invoices are eligible for cancellation.");
+      toast.error(t("No selected invoices are eligible for cancellation."));
       return;
     }
     setShowCancelConfirm(true);
@@ -979,7 +984,9 @@ const InvoiceListPage: React.FC = () => {
     if (idsToCancel.length === 0) return;
 
     const toastId = toast.loading(
-      `Cancelling ${idsToCancel.length} invoice(s)...`
+      idsToCancel.length === 1
+        ? t("Cancelling {{total}} invoice...", { total: idsToCancel.length })
+        : t("Cancelling {{total}} invoices...", { total: idsToCancel.length })
     );
     let successCount = 0;
     let failCount = 0;
@@ -989,9 +996,15 @@ const InvoiceListPage: React.FC = () => {
 
     for (let i = 0; i < idsToCancel.length; i += BATCH_SIZE) {
       const batchIds = idsToCancel.slice(i, i + BATCH_SIZE);
-      toast.loading(`Cancelling invoices (${i}/${idsToCancel.length})...`, {
-        id: toastId,
-      });
+      toast.loading(
+        t("Cancelling invoices ({{current}}/{{total}})...", {
+          current: i,
+          total: idsToCancel.length,
+        }),
+        {
+          id: toastId,
+        }
+      );
 
       const batchResults = await Promise.allSettled(
         batchIds.map((id) => cancelInvoice(id))
@@ -1023,13 +1036,30 @@ const InvoiceListPage: React.FC = () => {
 
     if (failCount > 0) {
       toast.error(
-        `${failCount} cancellation(s) failed. ${successCount} succeeded. Check console for details.`,
+        failCount === 1
+          ? t(
+              "{{failCount}} cancellation failed. {{successCount}} succeeded. Check console for details.",
+              { failCount, successCount }
+            )
+          : t(
+              "{{failCount}} cancellations failed. {{successCount}} succeeded. Check console for details.",
+              { failCount, successCount }
+            ),
         { id: toastId, duration: 5000 }
       );
     } else {
-      toast.success(`${successCount} invoice(s) cancelled successfully.`, {
-        id: toastId,
-      });
+      toast.success(
+        successCount === 1
+          ? t("{{total}} invoice cancelled successfully.", {
+              total: successCount,
+            })
+          : t("{{total}} invoices cancelled successfully.", {
+              total: successCount,
+            }),
+        {
+          id: toastId,
+        }
+      );
     }
 
     // Refresh to make sure we have the latest data
@@ -1060,12 +1090,18 @@ const InvoiceListPage: React.FC = () => {
     );
 
     if (eligibleInvoices.length === 0) {
-      toast.error("No selected invoices are eligible for cancellation sync.");
+      toast.error(t("No selected invoices are eligible for cancellation sync."));
       return;
     }
 
     const toastId = toast.loading(
-      `Syncing cancellation status for ${eligibleInvoices.length} invoice(s)...`
+      eligibleInvoices.length === 1
+        ? t("Syncing cancellation status for {{total}} invoice...", {
+            total: eligibleInvoices.length,
+          })
+        : t("Syncing cancellation status for {{total}} invoices...", {
+            total: eligibleInvoices.length,
+          })
     );
     let successCount = 0;
     let failCount = 0;
@@ -1087,13 +1123,30 @@ const InvoiceListPage: React.FC = () => {
 
     if (failCount > 0) {
       toast.error(
-        `${failCount} sync operation(s) failed. ${successCount} succeeded.`,
+        failCount === 1
+          ? t("{{failCount}} sync operation failed. {{successCount}} succeeded.", {
+              failCount,
+              successCount,
+            })
+          : t(
+              "{{failCount}} sync operations failed. {{successCount}} succeeded.",
+              { failCount, successCount }
+            ),
         { id: toastId, duration: 5000 }
       );
     } else {
-      toast.success(`${successCount} invoice(s) synced successfully.`, {
-        id: toastId,
-      });
+      toast.success(
+        successCount === 1
+          ? t("{{total}} invoice synced successfully.", {
+              total: successCount,
+            })
+          : t("{{total}} invoices synced successfully.", {
+              total: successCount,
+            }),
+        {
+          id: toastId,
+        }
+      );
     }
 
     // Refresh the list to show updated statuses
@@ -1130,15 +1183,27 @@ const InvoiceListPage: React.FC = () => {
     if (eligibleInvoices.length === 0) {
       toast.error(
         zeroValueCount === selectedInvoiceIds.size
-          ? "These bills total RM0.00 and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice."
-          : "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID and phone number, and not already Valid/Cancelled).",
+          ? t(
+              "These bills total RM0.00 and have no sales value, so they cannot be submitted as individual e-Invoices. They are covered by the monthly consolidated e-Invoice."
+            )
+          : t(
+              "No selected invoices are eligible for e-invoice submission (Must be within last 3 days, Unpaid/Paid/Overdue, Customer must have TIN/ID and phone number, and not already Valid/Cancelled)."
+            ),
         { duration: 12000 }
       );
       return;
     }
     if (zeroValueCount > 0) {
       toast(
-        `${zeroValueCount} bill(s) totalling RM0.00 were skipped - they have no sales value and are covered by the monthly consolidated e-Invoice.`,
+        zeroValueCount === 1
+          ? t(
+              "{{total}} bill totalling RM0.00 was skipped - it has no sales value and is covered by the monthly consolidated e-Invoice.",
+              { total: zeroValueCount }
+            )
+          : t(
+              "{{total}} bills totalling RM0.00 were skipped - they have no sales value and are covered by the monthly consolidated e-Invoice.",
+              { total: zeroValueCount }
+            ),
         { duration: 8000 }
       );
     }
@@ -1146,7 +1211,21 @@ const InvoiceListPage: React.FC = () => {
       const ineligibleCount =
         selectedInvoiceIds.size - zeroValueCount - eligibleInvoices.length;
       toast.error(
-        `${ineligibleCount} selected invoice(s) are ineligible (check date, status, customer info). Proceeding with ${eligibleInvoices.length} eligible invoice(s).`,
+        ineligibleCount === 1
+          ? t(
+              "{{ineligible}} selected invoice is ineligible (check date, status, customer info). Proceeding with {{eligible}} eligible invoice.",
+              {
+                ineligible: ineligibleCount,
+                eligible: eligibleInvoices.length,
+              }
+            )
+          : t(
+              "{{ineligible}} selected invoices are ineligible (check date, status, customer info). Proceeding with {{eligible}} eligible invoices.",
+              {
+                ineligible: ineligibleCount,
+                eligible: eligibleInvoices.length,
+              }
+            ),
         { duration: 8000 }
       );
     }
@@ -1172,7 +1251,7 @@ const InvoiceListPage: React.FC = () => {
       .map((inv) => inv.id);
 
     if (idsToSubmit.length === 0) {
-      toast.error("No eligible invoices found to submit.");
+      toast.error(t("No eligible invoices found to submit."));
       return;
     }
 
@@ -1196,16 +1275,35 @@ const InvoiceListPage: React.FC = () => {
         const rejectedCount = response.rejectedDocuments?.length || 0;
 
         if (acceptedCount > 0 && rejectedCount === 0) {
-          toast.success(`Successfully submitted ${acceptedCount} invoice(s)`);
+          toast.success(
+            acceptedCount === 1
+              ? t("Successfully submitted {{total}} invoice", {
+                  total: acceptedCount,
+                })
+              : t("Successfully submitted {{total}} invoices", {
+                  total: acceptedCount,
+                })
+          );
         } else if (acceptedCount > 0 && rejectedCount > 0) {
           toast.success(
-            `Partial success: ${acceptedCount} accepted, ${rejectedCount} rejected`
+            t("Partial success: {{accepted}} accepted, {{rejected}} rejected", {
+              accepted: acceptedCount,
+              rejected: rejectedCount,
+            })
           );
         } else {
-          toast.error(`All ${rejectedCount} invoice(s) were rejected`);
+          toast.error(
+            rejectedCount === 1
+              ? t("All {{total}} invoice was rejected", {
+                  total: rejectedCount,
+                })
+              : t("All {{total}} invoices were rejected", {
+                  total: rejectedCount,
+                })
+          );
         }
       } else {
-        toast.error(response.message || "E-invoice submission failed");
+        toast.error(response.message || t("E-invoice submission failed"));
       }
 
       setSelectedInvoiceIds(new Set()); // Clear selection
@@ -1213,11 +1311,12 @@ const InvoiceListPage: React.FC = () => {
     } catch (error: any) {
       console.error("Error calling bulk e-invoice submission endpoint:", error);
       toast.error(
-        `Submission request failed: ${
-          error.response?.data?.message ||
-          error.message ||
-          "Network or server error"
-        }`
+        t("Submission request failed: {{message}}", {
+          message:
+            error.response?.data?.message ||
+            error.message ||
+            t("Network or server error"),
+        })
       );
       setShowSubmissionResults(false); // Hide modal on network error
     } finally {
@@ -1229,21 +1328,29 @@ const InvoiceListPage: React.FC = () => {
   // Bulk Export Handler
   const handleBulkExport = async () => {
     if (selectedInvoiceIds.size === 0) {
-      toast.error("No invoices selected for export");
+      toast.error(t("No invoices selected for export"));
       return;
     }
 
     // Check for File System Access API support
     if (!("showSaveFilePicker" in window)) {
       toast.error(
-        "Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge."
+        t(
+          "Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge."
+        )
       );
       return;
     }
 
     setIsExporting(true);
     const toastId = toast.loading(
-      `Preparing ${selectedInvoiceIds.size} invoices for export...`
+      selectedInvoiceIds.size === 1
+        ? t("Preparing {{total}} invoice for export...", {
+            total: selectedInvoiceIds.size,
+          })
+        : t("Preparing {{total}} invoices for export...", {
+            total: selectedInvoiceIds.size,
+          })
     );
 
     try {
@@ -1254,19 +1361,33 @@ const InvoiceListPage: React.FC = () => {
       let completeInvoices: ExtendedInvoiceData[] = [];
       for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
         const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
-        toast.loading(`Loading invoice data (${i}/${selectedIds.length})...`, {
-          id: toastId,
-        });
+        toast.loading(
+          t("Loading invoice data ({{current}}/{{total}})...", {
+            current: i,
+            total: selectedIds.length,
+          }),
+          {
+            id: toastId,
+          }
+        );
         const batchInvoices = await getInvoicesByIds(batchIds);
         completeInvoices = completeInvoices.concat(batchInvoices);
       }
 
       if (completeInvoices.length === 0) {
-        throw new Error("Could not fetch required invoice details for export.");
+        throw new Error(
+          t("Could not fetch required invoice details for export.")
+        );
       }
 
       toast.loading(
-        `Generating export data for ${completeInvoices.length} invoices...`,
+        completeInvoices.length === 1
+          ? t("Generating export data for {{total}} invoice...", {
+              total: completeInvoices.length,
+            })
+          : t("Generating export data for {{total}} invoices...", {
+              total: completeInvoices.length,
+            }),
         {
           id: toastId,
         }
@@ -1281,7 +1402,7 @@ const InvoiceListPage: React.FC = () => {
         suggestedName,
         types: [
           {
-            description: "Sales Text File",
+            description: t("Sales Text File"),
             accept: { "text/plain": [".txt"] },
           },
         ],
@@ -1292,7 +1413,10 @@ const InvoiceListPage: React.FC = () => {
       await writable.close();
 
       toast.success(
-        `Successfully exported ${completeInvoices.length} invoices to ${handle.name}`,
+        t("Successfully exported {{total}} invoices to {{name}}", {
+          total: completeInvoices.length,
+          name: handle.name,
+        }),
         { id: toastId }
       );
     } catch (error) {
@@ -1303,7 +1427,9 @@ const InvoiceListPage: React.FC = () => {
       }
       console.error("Error during bulk export:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to export invoices.",
+        error instanceof Error
+          ? error.message
+          : t("Failed to export invoices."),
         { id: toastId }
       );
     } finally {
@@ -1314,12 +1440,14 @@ const InvoiceListPage: React.FC = () => {
   // Bulk Download PDF Handler
   const handleBulkDownload = async () => {
     if (selectedInvoiceIds.size === 0) {
-      toast.error("No invoices selected for download");
+      toast.error(t("No invoices selected for download"));
       return;
     }
 
     const toastId = toast.loading(
-      `Preparing ${selectedInvoiceIds.size} invoice PDFs...`
+      t("Preparing {{total}} invoice PDFs...", {
+        total: selectedInvoiceIds.size,
+      })
     );
 
     try {
@@ -1332,21 +1460,30 @@ const InvoiceListPage: React.FC = () => {
 
       for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
         const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
-        toast.loading(`Loading invoices (${i}/${selectedIds.length})...`, {
-          id: toastId,
-        });
+        toast.loading(
+          t("Loading invoices ({{current}}/{{total}})...", {
+            current: i,
+            total: selectedIds.length,
+          }),
+          {
+            id: toastId,
+          }
+        );
 
         const batchInvoices = await getInvoicesByIds(batchIds);
         completeInvoices = completeInvoices.concat(batchInvoices);
       }
 
       if (completeInvoices.length === 0) {
-        throw new Error("Could not fetch required invoice details");
+        throw new Error(t("Could not fetch required invoice details"));
       }
 
       if (completeInvoices.length < selectedIds.length) {
         toast.loading(
-          `Generating PDFs for ${completeInvoices.length}/${selectedIds.length} invoices...`,
+          t("Generating PDFs for {{loaded}}/{{total}} invoices...", {
+            loaded: completeInvoices.length,
+            total: selectedIds.length,
+          }),
           { id: toastId }
         );
       }
@@ -1368,15 +1505,17 @@ const InvoiceListPage: React.FC = () => {
         );
         if (downloadButton && downloadButton instanceof HTMLButtonElement) {
           downloadButton.click();
-          toast.success("Generating PDF download...", { id: toastId });
+          toast.success(t("Generating PDF download..."), { id: toastId });
         } else {
-          throw new Error("Download button not found");
+          throw new Error(t("Download button not found"));
         }
       }, 100);
     } catch (error) {
       console.error("Error preparing PDF download:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to prepare PDF",
+        error instanceof Error
+          ? error.message
+          : t("Failed to prepare PDF"),
         { id: toastId }
       );
       setIsGeneratingPDF(false);
@@ -1388,12 +1527,18 @@ const InvoiceListPage: React.FC = () => {
   // Bulk Print PDF Handler
   const handleBulkPrint = async () => {
     if (selectedInvoiceIds.size === 0) {
-      toast.error("No invoices selected for printing");
+      toast.error(t("No invoices selected for printing"));
       return;
     }
 
     const toastId = toast.loading(
-      `Preparing ${selectedInvoiceIds.size} invoices for printing...`
+      selectedInvoiceIds.size === 1
+        ? t("Preparing {{total}} invoice for printing...", {
+            total: selectedInvoiceIds.size,
+          })
+        : t("Preparing {{total}} invoices for printing...", {
+            total: selectedInvoiceIds.size,
+          })
     );
 
     try {
@@ -1406,25 +1551,37 @@ const InvoiceListPage: React.FC = () => {
 
       for (let i = 0; i < selectedIds.length; i += BATCH_SIZE) {
         const batchIds = selectedIds.slice(i, i + BATCH_SIZE);
-        toast.loading(`Loading invoices (${i}/${selectedIds.length})...`, {
-          id: toastId,
-        });
+        toast.loading(
+          t("Loading invoices ({{current}}/{{total}})...", {
+            current: i,
+            total: selectedIds.length,
+          }),
+          {
+            id: toastId,
+          }
+        );
 
         const batchInvoices = await getInvoicesByIds(batchIds);
         completeInvoices = completeInvoices.concat(batchInvoices);
       }
 
       if (completeInvoices.length === 0) {
-        throw new Error("Could not fetch required invoice details");
+        throw new Error(t("Could not fetch required invoice details"));
       }
 
       if (completeInvoices.length < selectedIds.length) {
         toast.error(
-          `Only ${completeInvoices.length} out of ${selectedIds.length} invoices could be loaded`,
+          t(
+            "Only {{loaded}} out of {{total}} invoices could be loaded",
+            {
+              loaded: completeInvoices.length,
+              total: selectedIds.length,
+            }
+          ),
           { id: toastId, duration: 4000 }
         );
       } else {
-        toast.success("Opening print dialog...", { id: toastId });
+        toast.success(t("Opening print dialog..."), { id: toastId });
       }
 
       setSelectedInvoicesForPDF(completeInvoices);
@@ -1438,7 +1595,9 @@ const InvoiceListPage: React.FC = () => {
     } catch (error) {
       console.error("Error preparing for print:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to prepare print view",
+        error instanceof Error
+          ? error.message
+          : t("Failed to prepare print view"),
         { id: toastId }
       );
     }
@@ -1453,7 +1612,9 @@ const InvoiceListPage: React.FC = () => {
           {/* Left: Count + Title + Time Navigator */}
           <div className="flex items-center gap-3 min-w-0">
             <h1 className="truncate min-w-0 text-xl font-semibold text-default-900 dark:text-gray-100">
-              {totalItems > 0 && !isLoading ? `${totalItems} ` : ""}Invoices
+              {totalItems > 0 && !isLoading
+                ? t("{{total}} Invoices", { total: totalItems })
+                : t("Invoices")}
             </h1>
             <span className="flex-shrink-0 hidden sm:inline text-default-300 dark:text-gray-600">|</span>
             <div className="flex-shrink-0">
@@ -1469,7 +1630,9 @@ const InvoiceListPage: React.FC = () => {
             {/* Search Input */}
             <div
               className="relative flex-1 xl:flex-none xl:w-48 h-10"
-              title="Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
+              title={t(
+                "Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
+              )}
             >
               <IconSearch
                 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-500 pointer-events-none"
@@ -1477,7 +1640,7 @@ const InvoiceListPage: React.FC = () => {
               />
               <input
                 type="text"
-                placeholder="Search"
+                placeholder={t("search", { ns: "common" })}
                 className="w-full h-10 pl-9 pr-6 bg-white dark:bg-gray-900/50 border border-default-300 dark:border-gray-600 rounded-lg focus:border-sky-500 focus:ring-1 focus:ring-sky-500 outline-none text-sm text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-500"
                 value={searchTerm}
                 onChange={handleSearchChange}
@@ -1488,7 +1651,7 @@ const InvoiceListPage: React.FC = () => {
                 <button
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                   onClick={handleClearSearch}
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   ×
                 </button>
@@ -1500,8 +1663,11 @@ const InvoiceListPage: React.FC = () => {
               <StyledListbox
                 value={selectedSalesmanId}
                 onChange={handleSalesmanChange}
-                options={salesmanOptions}
-                placeholder="All Salesmen"
+                options={salesmanOptions.map((option) => ({
+                  ...option,
+                  name: option.id === "" ? t("All Salesmen") : option.name,
+                }))}
+                placeholder={t("All Salesmen")}
                 rounded="lg"
                 className="h-10"
               />
@@ -1529,11 +1695,15 @@ const InvoiceListPage: React.FC = () => {
                 {isFilterButtonHovered && (
                   <div className="absolute z-30 mt-2 right-0 w-72 bg-white dark:bg-gray-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-sky-100 dark:border-sky-800 py-3 px-4 text-sm animate-fadeIn transition-all duration-200 transform origin-top-right">
                     <h3 className="font-semibold text-default-800 dark:text-gray-100 mb-2 border-b pb-1.5 border-default-100 dark:border-gray-700">
-                      {activeFilterCount > 0 ? "Applied Filters" : "Filters"}
+                      {t(
+                        activeFilterCount > 0
+                          ? "Applied Filters"
+                          : "Filters"
+                      )}
                     </h3>
                     {activeFilterCount === 0 ? (
                       <div className="text-default-500 dark:text-gray-400 py-2 px-1">
-                        No filters applied.
+                        {t("No filters applied.")}
                       </div>
                     ) : (
                       <ul className="space-y-2">
@@ -1545,7 +1715,7 @@ const InvoiceListPage: React.FC = () => {
                               </div>
                               <div className="min-w-0 flex-1">
                                 <span className="text-default-500 dark:text-gray-400 text-xs">
-                                  Salesman
+                                  {t("Salesman")}
                                 </span>
                                 <div className="font-medium break-words">
                                   {filters.salespersonId.join(", ")}
@@ -1561,7 +1731,7 @@ const InvoiceListPage: React.FC = () => {
                             </div>
                             <div className="min-w-0 flex-1">
                               <span className="text-default-500 dark:text-gray-400 text-xs">
-                                Customer
+                                {t("customer", { ns: "common" })}
                               </span>
                               <div className="font-medium break-words">
                                 {customerNames[filters.customerId] ||
@@ -1578,7 +1748,7 @@ const InvoiceListPage: React.FC = () => {
                             </div>
                             <div>
                               <span className="text-default-500 dark:text-gray-400 text-xs">
-                                Payment Type
+                                {t("Payment Type")}
                               </span>
                               <div className="font-medium">
                                 {filters.paymentType}
@@ -1605,14 +1775,16 @@ const InvoiceListPage: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-default-500 dark:text-gray-400 text-xs">
-                                  Invoice Status
+                                  {t("Invoice Status")}
                                 </span>
                                 <div className="font-medium">
                                   {filters.invoiceStatus
                                     .map(
                                       (status) =>
-                                        status.charAt(0).toUpperCase() +
-                                        status.slice(1)
+                                        t(
+                                          status.charAt(0).toUpperCase() +
+                                            status.slice(1)
+                                        )
                                     )
                                     .join(", ")}
                                 </div>
@@ -1631,15 +1803,17 @@ const InvoiceListPage: React.FC = () => {
                               </div>
                               <div>
                                 <span className="text-default-500 dark:text-gray-400 text-xs">
-                                  E-Invoice Status
+                                  {t("E-Invoice Status")}
                                 </span>
                                 <div className="font-medium">
                                   {filters.eInvoiceStatus
                                     .map((status) =>
                                       status === "null"
-                                        ? "Not Submitted"
-                                        : status.charAt(0).toUpperCase() +
-                                          status.slice(1)
+                                        ? t("Not Submitted")
+                                        : t(
+                                            status.charAt(0).toUpperCase() +
+                                              status.slice(1)
+                                          )
                                     )
                                     .join(", ")}
                                 </div>
@@ -1654,12 +1828,12 @@ const InvoiceListPage: React.FC = () => {
                             </div>
                             <div>
                               <span className="text-default-500 dark:text-gray-400 text-xs">
-                                Consolidation
+                                {t("Consolidation")}
                               </span>
                               <div className="font-medium">
                                 {filters.consolidation === "consolidated"
-                                  ? "Consolidated"
-                                  : "Individual"}
+                                  ? t("Consolidated")
+                                  : t("Individual")}
                               </div>
                             </div>
                           </li>
@@ -1681,8 +1855,8 @@ const InvoiceListPage: React.FC = () => {
           onClick={handleToggleSelectAll}
           title={
             selectionState.isAllSelectedOnPage
-              ? "Deselect All on Page"
-              : "Select All on Page"
+              ? t("Deselect All on Page")
+              : t("Select All on Page")
           }
         >
           <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
@@ -1696,8 +1870,8 @@ const InvoiceListPage: React.FC = () => {
                 }}
                 title={
                   selectedInvoiceIds.size > 0
-                    ? "Clear selection"
-                    : "Select all invoices across all pages"
+                    ? t("Clear selection")
+                    : t("Select all invoices across all pages")
                 }
               >
                 {selectedInvoiceIds.size > 0 ? (
@@ -1713,11 +1887,15 @@ const InvoiceListPage: React.FC = () => {
               {/* Selection info text */}
               {selectedInvoiceIds.size > 0 ? (
                 <span className="font-medium text-sky-800 dark:text-sky-300 text-sm flex items-center flex-wrap gap-x-2">
-                  <span>{selectedInvoiceIds.size} selected</span>
+                  <span>
+                    {t("{{total}} selected", {
+                      total: selectedInvoiceIds.size,
+                    })}
+                  </span>
                   <span className="hidden sm:inline mx-1 border-r border-sky-300 dark:border-sky-600 h-4"></span>
                   <span className="whitespace-nowrap">
                     {/* Use the total state instead of calculating from visible invoices */}
-                    Total:{" "}
+                    {t("Total:")}{" "}
                     {new Intl.NumberFormat("en-MY", {
                       style: "currency",
                       currency: "MYR",
@@ -1732,7 +1910,7 @@ const InvoiceListPage: React.FC = () => {
                     handleToggleSelectAll(e);
                   }}
                 >
-                  Select invoices to perform actions
+                  {t("Select invoices to perform actions")}
                 </span>
               )}
             </div>
@@ -1755,10 +1933,10 @@ const InvoiceListPage: React.FC = () => {
                   }}
                   icon={IconBan}
                   disabled={isLoading || isExporting}
-                  aria-label="Cancel Selected Invoices"
-                  title="Cancel"
+                  aria-label={t("Cancel Selected Invoices")}
+                  title={t("cancel", { ns: "common" })}
                 >
-                  Cancel
+                  {t("cancel", { ns: "common" })}
                 </Button>
                 {hasCancelledUnsynced() && (
                   <Button
@@ -1771,10 +1949,10 @@ const InvoiceListPage: React.FC = () => {
                     }}
                     icon={IconRefresh}
                     disabled={isLoading || isExporting}
-                    aria-label="Sync Cancellation Status"
-                    title="Sync Cancellation Status"
+                    aria-label={t("Sync Cancellation Status")}
+                    title={t("Sync Cancellation Status")}
                   >
-                    Sync Cancellation
+                    {t("Sync Cancellation")}
                   </Button>
                 )}
                 <Button
@@ -1787,10 +1965,10 @@ const InvoiceListPage: React.FC = () => {
                   }}
                   icon={IconSend}
                   disabled={isLoading || isExporting}
-                  aria-label="Submit Selected for E-Invoice"
-                  title="Submit e-Invoice"
+                  aria-label={t("Submit Selected for E-Invoice")}
+                  title={t("Submit e-Invoice")}
                 >
-                  e-Invoice
+                  {t("e-Invoice")}
                 </Button>
                 <Button
                   size="sm"
@@ -1801,10 +1979,10 @@ const InvoiceListPage: React.FC = () => {
                   }}
                   icon={IconFileExport}
                   disabled={isLoading || isExporting}
-                  aria-label="Export Selected Invoices"
-                  title="Export"
+                  aria-label={t("Export Selected Invoices")}
+                  title={t("export", { ns: "common" })}
                 >
-                  Export
+                  {t("export", { ns: "common" })}
                 </Button>
                 <Button
                   size="sm"
@@ -1815,10 +1993,10 @@ const InvoiceListPage: React.FC = () => {
                   }}
                   icon={IconFileDownload}
                   disabled={isLoading || isExporting}
-                  aria-label="Download Selected Invoices"
-                  title="Download PDF"
+                  aria-label={t("Download Selected Invoices")}
+                  title={t("Download PDF")}
                 >
-                  Download
+                  {t("download", { ns: "common" })}
                 </Button>
                 <Button
                   size="sm"
@@ -1829,10 +2007,10 @@ const InvoiceListPage: React.FC = () => {
                   }}
                   icon={IconPrinter}
                   disabled={isLoading || isExporting}
-                  aria-label="Print Selected Invoices"
-                  title="Print PDF"
+                  aria-label={t("Print Selected Invoices")}
+                  title={t("Print PDF")}
                 >
-                  Print
+                  {t("print", { ns: "common" })}
                 </Button>
               </>
             )}
@@ -1845,10 +2023,10 @@ const InvoiceListPage: React.FC = () => {
               color="amber"
               disabled={isLoading || isExporting}
               size="sm"
-              title="Consolidated Invoice"
-              aria-label="Consolidated Invoice"
+              title={t("Consolidated Invoice")}
+              aria-label={t("Consolidated Invoice")}
             >
-              Consolidate
+              {t("Consolidate")}
             </Button>
             <Button
               onClick={handleRefresh}
@@ -1856,10 +2034,10 @@ const InvoiceListPage: React.FC = () => {
               variant="outline"
               disabled={isLoading || isExporting}
               size="sm"
-              title="Refresh Invoices"
-              aria-label="Refresh Invoices"
+              title={t("Refresh Invoices")}
+              aria-label={t("Refresh Invoices")}
             >
-              Refresh
+              {t("Refresh")}
             </Button>
             <Button
               onClick={handleCreateNewInvoice}
@@ -1867,10 +2045,10 @@ const InvoiceListPage: React.FC = () => {
               variant="filled"
               color="sky"
               size="sm"
-              title="Create New Invoice"
-              aria-label="Create New Invoice"
+              title={t("Create New Invoice")}
+              aria-label={t("Create New Invoice")}
             >
-              Create
+              {t("create", { ns: "common" })}
             </Button>
           </div>
         </div>
@@ -1885,13 +2063,13 @@ const InvoiceListPage: React.FC = () => {
           {/* Error Message */}
           {error && !isLoading && (
             <div className="p-4 text-center text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/30 rounded-lg border border-rose-200 dark:border-rose-800">
-              Error fetching invoices: {error}
+              {t("Error fetching invoices: {{message}}", { message: error })}
             </div>
           )}
           {/* No Results Message */}
           {!isLoading && !error && invoices.length === 0 && (
             <div className="p-6 text-center text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-default-200 dark:border-gray-700">
-              No invoices found matching your criteria.
+              {t("No invoices found matching your criteria.")}
             </div>
           )}
           {/* Invoice Grid */}
@@ -1950,32 +2128,37 @@ const InvoiceListPage: React.FC = () => {
         isOpen={showCancelConfirm}
         onClose={() => setShowCancelConfirm(false)}
         onConfirm={confirmBulkCancel}
-        title={`Cancel Selected Invoice(s)`}
-        message={`Are you sure you want to cancel the selected eligible invoice(s)? This action is and may attempt to cancel submitted e-invoices.`}
-        confirmButtonText="Confirm Cancellation"
+        title={t("Cancel Selected Invoice(s)")}
+        message={t(
+          "Are you sure you want to cancel the selected eligible invoice(s)? This action is and may attempt to cancel submitted e-invoices."
+        )}
+        confirmButtonText={t("Confirm Cancellation")}
         variant="danger"
       />
       <ConfirmationDialog
         isOpen={showEInvoiceConfirm}
         onClose={() => setShowEInvoiceConfirm(false)}
         onConfirm={confirmBulkSubmitEInvoice}
-        title={`Submit Selected Invoices for e-Invoicing`}
-        message={`You are about to submit ${
-          invoices.filter(
-            // Recalculate count here for the message
-            (inv) =>
-              selectedInvoiceIds.has(inv.id) &&
-              inv.invoice_status !== "cancelled" &&
-              !isZeroValueBill(inv) &&
-              (inv.einvoice_status === null ||
-                inv.einvoice_status === "invalid" ||
-                inv.einvoice_status === "pending") &&
-              inv.customerTin &&
-              inv.customerIdNumber &&
-              isInvoiceDateEligibleForEinvoice(inv.createddate)
-          ).length
-        } eligible invoice(s) to MyInvois e-invoicing system. Continue?`}
-        confirmButtonText="Submit e-Invoices"
+        title={t("Submit Selected Invoices for e-Invoicing")}
+        message={t(
+          "You are about to submit {{total}} eligible invoice(s) to MyInvois e-invoicing system. Continue?",
+          {
+            total: invoices.filter(
+              // Recalculate count here for the message
+              (inv) =>
+                selectedInvoiceIds.has(inv.id) &&
+                inv.invoice_status !== "cancelled" &&
+                !isZeroValueBill(inv) &&
+                (inv.einvoice_status === null ||
+                  inv.einvoice_status === "invalid" ||
+                  inv.einvoice_status === "pending") &&
+                inv.customerTin &&
+                inv.customerIdNumber &&
+                isInvoiceDateEligibleForEinvoice(inv.createddate)
+            ).length,
+          }
+        )}
+        confirmButtonText={t("Submit e-Invoices")}
         variant="default"
       />
       {/* PDF Download Handler - Hidden but functional */}

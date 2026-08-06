@@ -18,6 +18,7 @@ import {
 import Button from "../Button";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { Job, Employee } from "../../types/types";
 
 interface AssociateEmployeesWithJobModalProps {
@@ -41,6 +42,7 @@ const AssociateEmployeesWithJobModal: React.FC<
   onAssociationComplete,
   apiBase = "/api",
 }) => {
+  const { t } = useTranslation("catalogue");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>("");
 
@@ -150,14 +152,18 @@ const AssociateEmployeesWithJobModal: React.FC<
 
       await onAssociationComplete();
       toast.success(
-        `Job "${job.name}" updated - Added: ${employeesToAdd.length}, Removed: ${employeesToRemove.length} employee(s)`
+        t('Job "{{jobName}}" updated - Added: {{added}}, Removed: {{removed}} employee(s)', {
+          jobName: job.name,
+          added: employeesToAdd.length,
+          removed: employeesToRemove.length,
+        })
       );
 
       handleClose();
     } catch (err: any) {
       console.error("Error updating employee associations:", err);
-      setError(err.message || "Failed to update employee associations");
-      toast.error("Failed to update employee associations");
+      setError(err.message || t("Failed to update employee associations"));
+      toast.error(t("Failed to update employee associations"));
     } finally {
       setIsSaving(false);
     }
@@ -213,7 +219,9 @@ const AssociateEmployeesWithJobModal: React.FC<
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Manage Employees for "{job?.name || ""}"
+                    {t('Manage Employees for "{{jobName}}"', {
+                      jobName: job?.name || "",
+                    })}
                   </DialogTitle>
                   <button
                     onClick={handleClose}
@@ -233,7 +241,9 @@ const AssociateEmployeesWithJobModal: React.FC<
                         <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                           <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                             <IconUsers size={16} />
-                            Assigned Employees ({selectedEmployees.size})
+                            {t("Assigned Employees ({{total}})", {
+                              total: selectedEmployees.size,
+                            })}
                           </div>
                           <div className="relative mt-2">
                             <IconSearch
@@ -242,7 +252,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                             />
                             <input
                               type="text"
-                              placeholder="Search assigned..."
+                              placeholder={t("Search assigned...")}
                               className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                               value={assignedSearch}
                               onChange={(e) => setAssignedSearch(e.target.value)}
@@ -258,7 +268,9 @@ const AssociateEmployeesWithJobModal: React.FC<
                                 size={32}
                                 className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                               />
-                              {assignedSearch ? "No employees found" : "No employees assigned yet"}
+                              {assignedSearch
+                                ? t("No employees found")
+                                : t("No employees assigned yet")}
                             </div>
                           ) : (
                             <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -276,7 +288,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                                         {emp.name}
                                         {isNew && (
                                           <span className="text-xs px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
-                                            New
+                                            {t("New")}
                                           </span>
                                         )}
                                       </div>
@@ -289,7 +301,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                                       onClick={() => handleRemoveEmployee(emp.id)}
                                       disabled={isSaving}
                                       className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:opacity-50"
-                                      title="Remove employee"
+                                      title={t("Remove employee")}
                                     >
                                       <IconTrash size={16} />
                                     </button>
@@ -306,10 +318,12 @@ const AssociateEmployeesWithJobModal: React.FC<
                         <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                           <div className="flex items-center justify-between">
                             <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                              Add Employee
+                              {t("Add Employee")}
                             </div>
                             <span className="text-xs text-default-500 dark:text-gray-400">
-                              {unassignedEmployees.length} available
+                              {t("{{total}} available", {
+                                total: unassignedEmployees.length,
+                              })}
                             </span>
                           </div>
                           <div className="relative mt-2">
@@ -319,7 +333,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                             />
                             <input
                               type="text"
-                              placeholder="Search available..."
+                              placeholder={t("Search available...")}
                               className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                               value={availableSearch}
                               onChange={(e) => setAvailableSearch(e.target.value)}
@@ -335,7 +349,9 @@ const AssociateEmployeesWithJobModal: React.FC<
                                 size={32}
                                 className="mx-auto mb-2 text-emerald-400"
                               />
-                              {availableSearch ? "No employees found" : "All employees assigned"}
+                              {availableSearch
+                                ? t("No employees found")
+                                : t("All employees assigned")}
                             </div>
                           ) : (
                             <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -357,7 +373,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                                     onClick={() => handleAddEmployee(emp.id)}
                                     disabled={isSaving}
                                     className="p-1.5 text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded disabled:opacity-50"
-                                    title="Add employee"
+                                    title={t("Add employee")}
                                   >
                                     <IconPlus size={18} />
                                   </button>
@@ -381,9 +397,11 @@ const AssociateEmployeesWithJobModal: React.FC<
                       <div className="text-sm text-default-500 dark:text-gray-400">
                         {hasChanges ? (
                           <div className="flex items-center gap-3">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                              Assigned: {selectedEmployees.size}
+                              <span className="inline-flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-sky-500"></span>
+                                {t("Assigned: {{total}}", {
+                                  total: selectedEmployees.size,
+                                })}
                             </span>
                             <span className="text-amber-600 dark:text-amber-400">
                               ({changesSummary.toAdd > 0 && `+${changesSummary.toAdd}`}
@@ -393,7 +411,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                           </div>
                         ) : (
                           <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                            <IconCheck size={14} /> No changes
+                            <IconCheck size={14} /> {t("No changes")}
                           </span>
                         )}
                       </div>
@@ -404,7 +422,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                           onClick={handleClose}
                           disabled={isSaving}
                         >
-                          Cancel
+                          {t("Cancel")}
                         </Button>
                         <Button
                           type="button"
@@ -413,7 +431,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                           onClick={handleSubmit}
                           disabled={isSaving || !hasChanges}
                         >
-                          {isSaving ? "Saving..." : "Save Changes"}
+                          {isSaving ? t("Saving...") : t("Save Changes")}
                         </Button>
                       </div>
                     </div>
@@ -421,7 +439,7 @@ const AssociateEmployeesWithJobModal: React.FC<
                 ) : (
                   <div className="mt-4 text-center">
                     <p className="text-sm text-default-500 dark:text-gray-400">
-                      No job selected
+                      {t("No job selected")}
                     </p>
                   </div>
                 )}

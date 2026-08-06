@@ -4,6 +4,7 @@
 // the same editable block. Purely controlled - the host owns the values and the
 // saving.
 import React from "react";
+import { useTranslation } from "react-i18next";
 
 interface CustomerCreditSectionProps {
   creditLimit: number;
@@ -31,6 +32,7 @@ const CustomerCreditSection: React.FC<CustomerCreditSectionProps> = ({
   onCreditUsedChange,
   disabled = false,
 }) => {
+  const { t } = useTranslation("catalogue");
   // Shared behaviour for both money inputs: accept partial typing (text input,
   // max 2 decimals) and clamp to a non-negative number on blur.
   const handleAmountChange = (
@@ -65,7 +67,7 @@ const CustomerCreditSection: React.FC<CustomerCreditSectionProps> = ({
             htmlFor="credit_limit"
             className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1"
           >
-            Credit Limit (RM)
+            {t("Credit Limit (RM)")}
           </label>
           <input
             id="credit_limit"
@@ -87,7 +89,7 @@ const CustomerCreditSection: React.FC<CustomerCreditSectionProps> = ({
             htmlFor="credit_used"
             className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1"
           >
-            Credit Used (RM)
+            {t("Credit Used (RM)")}
           </label>
           <input
             id="credit_used"
@@ -106,12 +108,12 @@ const CustomerCreditSection: React.FC<CustomerCreditSectionProps> = ({
         {/* Available Credit */}
         <div>
           <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-            Available Credit
+            {t("Available Credit")}
           </label>
           <div className="px-3 py-2 border border-default-200 dark:border-gray-600 rounded-md bg-default-100 dark:bg-gray-700 h-[42px] flex items-center">
             <span className="font-medium text-default-700 dark:text-gray-200">
               {limit === 0
-                ? "Unlimited"
+                ? t("Unlimited")
                 : `RM ${Math.max(0, limit - used).toFixed(2)}`}
             </span>
           </div>
@@ -122,7 +124,7 @@ const CustomerCreditSection: React.FC<CustomerCreditSectionProps> = ({
       {limit > 0 && (
         <div className="mt-4">
           <div className="flex justify-between text-xs text-default-600 dark:text-gray-400 mb-1">
-            <span>Usage</span>
+            <span>{t("Usage")}</span>
             <span>
               {used.toFixed(2)} / {limit.toFixed(2)} RM (
               {usagePercent.toFixed(1)}%)

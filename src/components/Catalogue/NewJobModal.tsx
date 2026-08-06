@@ -22,6 +22,7 @@ import { Job } from "../../types/types"; // Assuming SelectOption is defined in 
 import { api } from "../../routes/utils/api";
 import Button from "../Button"; // Assuming Button component exists
 import toast from "react-hot-toast"; // For potential API errors
+import { useTranslation } from "react-i18next";
 
 interface Section {
   id: string; // Usually corresponds to the name in this context based on usage
@@ -44,6 +45,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
   onJobAdded,
   sectionOptions,
 }) => {
+  const { t } = useTranslation("catalogue");
   const [formData, setFormData] = useState<{
     id: string;
     name: string;
@@ -73,8 +75,8 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
       setSections(filteredData);
     } catch (error) {
       console.error("Error fetching sections:", error);
-      setError("Failed to load sections. Cannot add job without sections.");
-      toast.error("Failed to load sections");
+      setError(t("Failed to load sections. Cannot add job without sections."));
+      toast.error(t("Failed to load sections"));
     } finally {
       setLoadingSections(false);
     }
@@ -128,19 +130,19 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
 
   const validateForm = (): boolean => {
     if (!formData.id.trim()) {
-      setError("Job ID cannot be empty.");
+      setError(t("Job ID cannot be empty."));
       return false;
     }
     if (/\s/.test(formData.id.trim())) {
-      setError("Job ID cannot contain spaces.");
+      setError(t("Job ID cannot contain spaces."));
       return false;
     }
     if (!formData.name.trim()) {
-      setError("Job Name cannot be empty.");
+      setError(t("Job Name cannot be empty."));
       return false;
     }
     if (formData.section.length === 0) {
-      setError("At least one Section must be selected.");
+      setError(t("At least one Section must be selected."));
       return false;
     }
     setError(null);
@@ -162,7 +164,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
       // onClose(); // Close is handled by the parent upon successful save
     } catch (error: any) {
       console.error("Error in onJobAdded:", error);
-      setError(error.message || "Failed to add job");
+      setError(error.message || t("Failed to add job"));
       // No need for toast here, error is displayed in the modal
     } finally {
       setIsSaving(false);
@@ -207,7 +209,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                   as="h3"
                   className="text-lg font-semibold leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Add New Job
+                  {t("Add New Job")}
                 </Dialog.Title>
                 <form onSubmit={handleSubmit} className="mt-4">
                   {/* Removed Fieldset, using div structure */}
@@ -215,7 +217,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                     {/* ID Field */}
                     <Field>
                       <Label className="block text-sm font-medium text-default-600 dark:text-gray-300">
-                        Job ID <span className="text-red-500">*</span>
+                        {t("Job ID")} <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         className={clsx(
@@ -228,13 +230,13 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         onChange={handleChange}
                         required
                         disabled={isSaving}
-                        placeholder="e.g., LORRY01 (no spaces)"
+                        placeholder={t("e.g., LORRY01 (no spaces)")}
                       />
                     </Field>
                     {/* Name Field */}
                     <Field>
                       <Label className="block text-sm font-medium text-default-600 dark:text-gray-300">
-                        Job Name <span className="text-red-500">*</span>
+                        {t("Job Name")} <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         className={clsx(
@@ -247,13 +249,13 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                         onChange={handleChange}
                         required
                         disabled={isSaving}
-                        placeholder="e.g., Lorry Driver"
+                        placeholder={t("e.g., Lorry Driver")}
                       />
                     </Field>
                     {/* Section Field */}
                     <Field>
                       <Label className="block text-sm font-medium text-default-600 dark:text-gray-300">
-                        Section(s) <span className="text-red-500">*</span>
+                        {t("Section(s)")} <span className="text-red-500">*</span>
                       </Label>
                       {/* Using FormCombobox structure directly */}
                       <Combobox
@@ -280,15 +282,17 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                               )}
                               displayValue={(selectedSections: string[]) =>
                                 selectedSections.join(", ") ||
-                                (loadingSections ? "Loading sections..." : "")
+                                (loadingSections
+                                  ? t("Loading sections...")
+                                  : "")
                               }
                               onChange={(event) =>
                                 setSectionQuery(event.target.value)
                               }
                               placeholder={
                                 loadingSections
-                                  ? "Loading..."
-                                  : "Select or search sections"
+                                  ? t("Loading...")
+                                  : t("Select or search sections")
                               }
                               disabled={isSaving || loadingSections}
                             />
@@ -310,12 +314,12 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                             <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black dark:ring-gray-700 ring-opacity-5 focus:outline-none sm:text-sm">
                               {loadingSections ? (
                                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                                  Loading...
+                                  {t("Loading...")}
                                 </div>
                               ) : filteredSections.length === 0 &&
                                 sectionQuery !== "" ? (
                                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                                  No sections found.
+                                  {t("No sections found.")}
                                 </div>
                               ) : (
                                 filteredSections.map((section) => (
@@ -381,7 +385,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                       onClick={onClose}
                       disabled={isSaving} // Disable cancel during save
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -389,7 +393,7 @@ const NewJobModal: React.FC<NewJobModalProps> = ({
                       variant="filled"
                       disabled={isSaving || loadingSections} // Disable save if loading or saving
                     >
-                      {isSaving ? "Adding..." : "Add Job"}
+                      {isSaving ? t("Adding...") : t("Add Job")}
                     </Button>
                   </div>
                 </form>

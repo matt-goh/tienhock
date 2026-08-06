@@ -10,6 +10,7 @@ interface PaginationProps {
   itemsCount: number; // Items on the current page
   totalItems: number; // Total items matching filters
   pageSize: number;
+  leading?: React.ReactNode; // Optional content rendered beside the items info
 }
 
 const Pagination: React.FC<PaginationProps> = ({
@@ -19,6 +20,7 @@ const Pagination: React.FC<PaginationProps> = ({
   itemsCount,
   totalItems,
   pageSize,
+  leading,
 }) => {
   const { t } = useTranslation("invoice");
   const startItem = (currentPage - 1) * pageSize + 1;
@@ -79,21 +81,24 @@ const Pagination: React.FC<PaginationProps> = ({
   return (
     <div className="flex justify-between items-center text-sm text-default-600 dark:text-gray-400 pt-3 border-t border-default-200 dark:border-gray-700">
       {/* Items Info */}
-      <div>
-        <Trans
-          t={t}
-          i18nKey="Showing <start>{{startItem}}</start>- <end>{{endItem}}</end> of <total>{{totalItems}}</total> results"
-          values={{
-            startItem: itemsCount > 0 ? startItem : 0,
-            endItem,
-            totalItems,
-          }}
-          components={{
-            start: <span className="font-semibold" />,
-            end: <span className="font-semibold" />,
-            total: <span className="font-semibold" />,
-          }}
-        />
+      <div className="flex items-center gap-3">
+        {leading}
+        <div>
+          <Trans
+            t={t}
+            i18nKey="Showing <start>{{startItem}}</start>- <end>{{endItem}}</end> of <total>{{totalItems}}</total> results"
+            values={{
+              startItem: itemsCount > 0 ? startItem : 0,
+              endItem,
+              totalItems,
+            }}
+            components={{
+              start: <span className="font-semibold" />,
+              end: <span className="font-semibold" />,
+              total: <span className="font-semibold" />,
+            }}
+          />
+        </div>
       </div>
 
       {/* Pagination Buttons */}
