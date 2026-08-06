@@ -11,7 +11,7 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { CashReceiptVoucherData } from "../../types/types";
-import { printPdfFrameWithFallback } from "../pdfPrintFallback";
+import { printPdfBlob } from "../pdfPrintFallback";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -374,7 +374,11 @@ const CashReceiptVoucherDocument: React.FC<CashReceiptVoucherDocumentProps> = ({
   );
 
   return (
-    <Document>
+    <Document
+      title={`Cash Receipt Voucher ${data.voucher_number} - ${formatDate(
+        data.voucher_date
+      )} - ${TIENHOCK_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -585,27 +589,12 @@ export const printCashReceiptVoucherPDF = async (
   data: CashReceiptVoucherData
 ): Promise<void> => {
   const blob = await generateCashReceiptVoucherPDF(data);
-  const url = URL.createObjectURL(blob);
-  const printFrame = document.createElement("iframe");
-  printFrame.style.display = "none";
-  document.body.appendChild(printFrame);
-
-  printFrame.onload = () => {
-    if (printFrame.contentWindow) {
-      printPdfFrameWithFallback(printFrame, url, {
-        logLabel: "cash receipt voucher PDF",
-      });
-      const cleanup = () => {
-        if (document.body.contains(printFrame)) {
-          document.body.removeChild(printFrame);
-        }
-        URL.revokeObjectURL(url);
-        window.removeEventListener("focus", cleanup);
-      };
-      window.addEventListener("focus", cleanup, { once: true });
-    }
-  };
-  printFrame.src = url;
+  printPdfBlob(
+    blob,
+    `Cash Receipt Voucher ${data.voucher_number} - ${formatDate(
+      data.voucher_date
+    )} - ${TIENHOCK_INFO.name}`
+  );
 };
 
 export { CashReceiptVoucherDocument };

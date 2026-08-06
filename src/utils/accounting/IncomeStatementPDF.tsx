@@ -217,7 +217,9 @@ const IncomeStatementPDFDocument: React.FC<IncomeStatementPDFDocumentProps> = ({
   data,
 }) => {
   return (
-    <Document>
+    <Document
+      title={`Income Statement ${data.period.start_date} to ${data.period.end_date} - ${TIENHOCK_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -348,5 +350,8 @@ export const generateIncomeStatementPDF = async (
     <IncomeStatementPDFDocument data={data} />
   ).toBlob();
 
-  printPdfBlob(blob, "income statement PDF");
+  printPdfBlob(
+    blob,
+    `Income Statement ${data.period.start_date} to ${data.period.end_date} - ${TIENHOCK_INFO.name}`
+  );
 };

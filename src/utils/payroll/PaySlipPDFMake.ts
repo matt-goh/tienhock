@@ -2710,7 +2710,7 @@ const buildPayrollSlipContent = (
 export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
   const {
     payroll,
-    companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+    companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
     staffDetails,
     midMonthPayroll,
     mode = "both",
@@ -2741,7 +2741,12 @@ export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
   );
 
   // Document definition
+  const employeeId = payroll.employee_id || "unknown";
   const docDefinition: TDocumentDefinitions = {
+    info: {
+      title: `Payslip ${employeeId} ${monthName} ${year}`,
+      author: companyName,
+    },
     pageSize: "A4",
     pageMargins: [20, 20, 20, 20],
     defaultStyle: {
@@ -2769,7 +2774,6 @@ export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
   };
 
   // Generate and download PDF
-  const employeeId = payroll.employee_id || "unknown";
   const fileName = `PaySlip-${employeeId}-${year}-${month}.pdf`;
 
   pdfMake.createPdf(docDefinition).download(fileName);
@@ -2780,7 +2784,7 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     const {
       payroll,
-      companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+      companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
       staffDetails,
       midMonthPayroll,
       mode = "both",
@@ -2813,6 +2817,10 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
     );
 
     const docDefinition: TDocumentDefinitions = {
+      info: {
+        title: `Payslip ${payroll.employee_id || "unknown"} ${monthName} ${year}`,
+        author: companyName,
+      },
       pageSize: "A4",
       pageMargins: [20, 20, 20, 20],
       defaultStyle: {
@@ -2864,7 +2872,7 @@ interface MidMonthPayrollType {
 export const getBatchPaySlipPDFBlob = (
   payrolls: EmployeePayroll[],
   staffDetailsMap?: Record<string, StaffDetails>,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   midMonthPayrollsMap?: Record<string, MidMonthPayrollType | null>,
   mode: PayslipPrintMode = "both",
 ): Promise<Blob> => {
@@ -2905,7 +2913,15 @@ export const getBatchPaySlipPDFBlob = (
       );
     });
 
+    const batchYear = payrolls[0]?.year ?? new Date().getFullYear();
+    const batchMonth = payrolls[0]?.month ?? new Date().getMonth() + 1;
+    const batchMonthName = getMonthName(batchMonth);
+
     const docDefinition: TDocumentDefinitions = {
+      info: {
+        title: `Payslips ${batchMonthName} ${batchYear} (${payrolls.length}) - ${companyName}`,
+        author: companyName,
+      },
       pageSize: "A4",
       pageMargins: [20, 20, 20, 20],
       defaultStyle: {

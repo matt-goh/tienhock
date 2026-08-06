@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import { IconPrinter } from "@tabler/icons-react";
+import { format } from "date-fns";
 import Button from "../../../components/Button";
 import toast from "react-hot-toast";
 import {
@@ -130,7 +131,11 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
         }
 
         // Generate combined PDF
-        const pdfComponent = <Document title="e-invoices">{pdfPages}</Document>;
+        const pdfComponent = (
+          <Document title={`E-Invoices - ${format(new Date(), "yyyy-MM-dd")}`}>
+            {pdfPages}
+          </Document>
+        );
 
         // Create PDF blob and print it
         const pdfBlob = await pdf(pdfComponent).toBlob();
@@ -147,6 +152,10 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
             setTimeout(() => {
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "e-invoice PDF",
+                documentTitle: `E-Invoices - ${format(
+                  new Date(),
+                  "yyyy-MM-dd"
+                )}`,
               });
               setIsGenerating(false);
               setIsLoadingDialogVisible(false);
@@ -209,6 +218,9 @@ const EInvoicePrintHandler: React.FC<PrintHandlerProps> = ({
             setTimeout(() => {
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "e-invoice PDF",
+                documentTitle: `${
+                  isJellyPolly ? "JP" : "TH"
+                }_einvoice-${einvoice.internal_id}`,
               });
               setIsGenerating(false);
               setIsLoadingDialogVisible(false);

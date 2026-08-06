@@ -4,6 +4,7 @@ import { AdjustmentDocument } from "../../../types/types";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { generateAdjustmentDocPDFBlob } from "./AdjustmentDocPDFHandler";
+import { generateAdjustmentDocPDFFilename } from "./generateAdjustmentDocPDFFilename";
 import { printPdfFrameWithFallback } from "../../pdfPrintFallback";
 
 type CompanyContext = "tienhock" | "jellypolly";
@@ -78,6 +79,10 @@ const AdjustmentDocPrintOverlay = ({
             setTimeout(() => {
               printPdfFrameWithFallback(printFrame, pdfUrl, {
                 logLabel: "adjustment document PDF",
+                documentTitle: generateAdjustmentDocPDFFilename(
+                  docs,
+                  companyContext
+                ).replace(".pdf", ""),
               });
               cleanup();
             }, 500);

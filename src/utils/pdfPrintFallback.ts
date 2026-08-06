@@ -4,6 +4,11 @@ interface PrintPdfFrameOptions {
   fallbackWindow?: Window | null;
   focusBeforePrint?: boolean;
   logLabel?: string;
+  // Temporarily replaces the page title while the print dialog is open.
+  // Chrome/Windows name the saved PDF from the top-level page title when
+  // printing an iframe, so this is what makes "Save as PDF" use a good name
+  // (PDF metadata titles alone don't reach the filename).
+  documentTitle?: string;
 }
 
 export interface PrintPdfFrameResult {
@@ -14,7 +19,10 @@ export interface PrintPdfFrameResult {
 // Convenience wrapper: prints a PDF Blob via a hidden iframe using
 // printPdfFrameWithFallback, then cleans up the iframe and object URL when the
 // window regains focus (i.e. after the print dialog / fallback tab closes).
-export const printPdfBlob = (pdfBlob: Blob, logLabel: string = "PDF"): void => {
+export const printPdfBlob = (
+  pdfBlob: Blob,
+  documentTitle: string = "PDF"
+): void => {
   const url = URL.createObjectURL(pdfBlob);
   const printFrame = document.createElement("iframe");
   printFrame.style.display = "none";
@@ -22,7 +30,10 @@ export const printPdfBlob = (pdfBlob: Blob, logLabel: string = "PDF"): void => {
 
   printFrame.onload = () => {
     if (printFrame.contentWindow) {
-      printPdfFrameWithFallback(printFrame, url, { logLabel });
+      printPdfFrameWithFallback(printFrame, url, {
+        logLabel: documentTitle,
+        documentTitle,
+      });
       const cleanup = () => {
         if (document.body.contains(printFrame)) {
           document.body.removeChild(printFrame);
@@ -45,7 +56,23 @@ export const printPdfFrameWithFallback = (
     fallbackWindow = null,
     focusBeforePrint = false,
     logLabel = "PDF",
+    documentTitle,
   } = options;
+
+  const originalDocumentTitle: string = document.title;
+  let documentTitleRestored: boolean = false;
+  const restoreDocumentTitle = (): void => {
+    if (documentTitleRestored) return;
+    documentTitleRestored = true;
+    document.title = originalDocumentTitle;
+  };
+  if (documentTitle) {
+    document.title = documentTitle;
+    window.addEventListener("focus", restoreDocumentTitle, { once: true });
+    // Safety net: some browsers never fire the focus event after a modal
+    // print dialog, so don't leave the tab title swapped indefinitely.
+    setTimeout(restoreDocumentTitle, 120000);
+  }
 
   try {
     if (focusBeforePrint) {

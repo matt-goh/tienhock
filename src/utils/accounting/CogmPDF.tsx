@@ -195,7 +195,9 @@ interface CogmPDFDocumentProps {
 
 const CogmPDFDocument: React.FC<CogmPDFDocumentProps> = ({ data }) => {
   return (
-    <Document>
+    <Document
+      title={`COGM ${data.period.start_date} to ${data.period.end_date} - ${TIENHOCK_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -330,5 +332,8 @@ const CogmPDFDocument: React.FC<CogmPDFDocumentProps> = ({ data }) => {
 export const generateCogmPDF = async (data: CogmData): Promise<void> => {
   const blob = await pdf(<CogmPDFDocument data={data} />).toBlob();
 
-  printPdfBlob(blob, "COGM PDF");
+  printPdfBlob(
+    blob,
+    `COGM ${data.period.start_date} to ${data.period.end_date} - ${TIENHOCK_INFO.name}`
+  );
 };

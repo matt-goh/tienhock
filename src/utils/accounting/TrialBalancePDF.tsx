@@ -230,7 +230,11 @@ const TrialBalancePDFDocument: React.FC<TrialBalancePDFDocumentProps> = ({
   );
 
   return (
-    <Document>
+    <Document
+      title={`Trial Balance as at ${data.period.end_date} - ${
+        branding?.companyName ?? TIENHOCK_INFO.name
+      }`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -327,5 +331,10 @@ export const generateTrialBalancePDF = async (
     />
   ).toBlob();
 
-  printPdfBlob(blob, "trial balance PDF");
+  printPdfBlob(
+    blob,
+    `Trial Balance as at ${data.period.end_date} - ${
+      branding?.companyName ?? TIENHOCK_INFO.name
+    }`
+  );
 };

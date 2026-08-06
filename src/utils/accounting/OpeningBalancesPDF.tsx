@@ -214,7 +214,11 @@ const OpeningBalancesPDFDocument: React.FC<{
   );
 
   return (
-    <Document>
+    <Document
+      title={`Opening Balances as at ${data.asOfDate} - ${
+        data.companyName ?? TIENHOCK_INFO.name
+      }`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Auditor header block */}
         <View style={styles.headerBlock}>
@@ -318,5 +322,10 @@ export const generateOpeningBalancesPDF = async (
     <OpeningBalancesPDFDocument data={data} />
   ).toBlob();
 
-  printPdfBlob(blob, "opening balances PDF");
+  printPdfBlob(
+    blob,
+    `Opening Balances as at ${data.asOfDate} - ${
+      data.companyName ?? TIENHOCK_INFO.name
+    }`
+  );
 };

@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { pdf, Document } from "@react-pdf/renderer";
 import { IconDownload, IconFileDownload } from "@tabler/icons-react";
+import { format } from "date-fns";
 import Button from "../../../components/Button";
 import toast from "react-hot-toast";
 import {
@@ -109,7 +110,11 @@ const EInvoicePDFHandler: React.FC<PDFDownloadHandlerProps> = ({
         }
 
         // Generate combined PDF
-        const pdfComponent = <Document title="e-invoices">{pdfPages}</Document>;
+        const pdfComponent = (
+          <Document title={`E-Invoices - ${format(new Date(), "yyyy-MM-dd")}`}>
+            {pdfPages}
+          </Document>
+        );
 
         // Download logic
         const pdfBlob = await pdf(pdfComponent).toBlob();

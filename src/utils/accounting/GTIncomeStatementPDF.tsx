@@ -335,7 +335,9 @@ const GTIncomeStatementPDFDocument: React.FC<
   };
 
   return (
-    <Document>
+    <Document
+      title={`Income Statement ${data.period.start_date} to ${data.period.end_date} - ${GREENTARGET_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -411,5 +413,8 @@ export const generateGTIncomeStatementPDF = async (
     <GTIncomeStatementPDFDocument data={data} />
   ).toBlob();
 
-  printPdfBlob(blob, "income statement PDF");
+  printPdfBlob(
+    blob,
+    `Income Statement ${data.period.start_date} to ${data.period.end_date} - ${GREENTARGET_INFO.name}`
+  );
 };
