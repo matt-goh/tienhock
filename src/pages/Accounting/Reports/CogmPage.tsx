@@ -113,7 +113,7 @@ const CogmPage: React.FC = () => {
   return (
     <div className="w-full">
       {/* Header: period on the left, actions on the right */}
-      <div className="mb-4 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+      <div className="mb-2 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <MonthNavigator
             selectedMonth={selectedMonth}

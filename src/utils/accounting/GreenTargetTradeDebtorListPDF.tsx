@@ -268,6 +268,7 @@ export const printGreenTargetTradeDebtorListPDF = async (
     }
     printPdfFrameWithFallback(printFrame, pdfUrl, {
       logLabel: "Green Target legacy Trade Debtor List PDF",
+      documentTitle: `GT Sub-Schedules as at ${data.statement_date}`,
     });
     window.addEventListener("focus", cleanup, { once: true });
   };

@@ -543,7 +543,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
           drops to its own row on mobile. Sticks to the top so the active date
           range and filters stay visible while scrolling the list; the negative
           margins let it span the page container's horizontal padding */}
-      <div className="sticky top-0 z-30 -mx-4 -mt-3 px-4 pt-3 pb-3 border-b border-default-200 dark:border-gray-700 bg-white/95 dark:bg-gray-950/95 backdrop-blur flex flex-wrap items-center gap-x-2 gap-y-3">
+      <div className="sticky top-0 z-30 -mx-4 -mt-2.5 px-4 pt-2.5 pb-3 border-b border-default-200 dark:border-gray-700 bg-white/95 dark:bg-gray-950/95 backdrop-blur flex flex-wrap items-center gap-x-2 gap-y-3">
         {/* Title */}
         <div className="order-1 flex items-center gap-2 flex-shrink-0">
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
@@ -563,37 +563,51 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
         </div>
 
         {/* Search - first row left of the date controls; own row on mobile */}
-        <div className="relative order-3 w-full md:order-2 md:w-64 md:ml-auto">
-          <IconSearch
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-default-400"
-            stroke={1.5}
-          />
-          <input
-            type="text"
-            placeholder="Search reference or description..."
-            className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            onBlur={() => commitSearch()}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.currentTarget.blur();
-              }
-            }}
-          />
-          {searchInput && (
+        <div className="order-3 w-full md:order-2 md:w-auto md:ml-auto flex items-center gap-3 min-w-0">
+          {/* Clear Filters - beside the search box */}
+          {hasActiveFilters && (
             <button
-              onClick={() => {
-                setSearchInput("");
-                setSearchTerm("");
-                setPage(1);
-              }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
-              title="Clear search"
+              onClick={clearFilters}
+              className="flex items-center gap-1 text-sm text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100 flex-shrink-0"
+              title="Clear filters"
             >
-              <IconX size={16} />
+              <IconRefresh size={16} />
+              Clear
             </button>
           )}
+
+          <div className="relative flex-1 min-w-0 md:w-64 md:flex-none">
+            <IconSearch
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-default-400"
+              stroke={1.5}
+            />
+            <input
+              type="text"
+              placeholder="Search reference or description..."
+              className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onBlur={() => commitSearch()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.currentTarget.blur();
+                }
+              }}
+            />
+            {searchInput && (
+              <button
+                onClick={() => {
+                  setSearchInput("");
+                  setSearchTerm("");
+                  setPage(1);
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
+                title="Clear search"
+              >
+                <IconX size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Filters - own row below the title/date controls; all pills flow in one wrapping line */}
@@ -656,17 +670,6 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             );
           })}
 
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 text-sm text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100"
-              title="Clear filters"
-            >
-              <IconRefresh size={16} />
-              Clear
-            </button>
-          )}
         </div>
 
         {/* Date Controls and Actions */}

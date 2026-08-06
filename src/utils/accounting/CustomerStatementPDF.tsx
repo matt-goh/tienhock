@@ -484,6 +484,7 @@ export const generateCustomerStatementPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "customer statement PDF",
+            documentTitle: `Statement of Account - ${data.customer.id} - ${data.statement_date}`,
           });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {

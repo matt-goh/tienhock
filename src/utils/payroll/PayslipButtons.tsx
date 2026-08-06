@@ -63,7 +63,7 @@ export interface BatchPayslipButtonProps {
  */
 export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
   payroll,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   fileName,
   buttonText = "Download PDF",
   disabled = false,
@@ -132,7 +132,7 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
  */
 export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   payrolls,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   fileName,
   buttonText,
   disabled = false,
@@ -206,7 +206,7 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
  */
 export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
   payroll,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   buttonText = "Print Payslip",
   disabled = false,
   icon = true,
@@ -292,7 +292,7 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
  */
 export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   payrolls,
-  companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
+  companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   buttonText,
   disabled = false,
   icon = true,

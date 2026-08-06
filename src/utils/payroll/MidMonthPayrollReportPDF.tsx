@@ -558,6 +558,9 @@ export const generateMidMonthPayrollReportPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "mid-month payroll report PDF",
+            documentTitle: `Mid-Month Payroll Report ${getMonthName(
+              data.month
+            )} ${data.year}`,
           });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {

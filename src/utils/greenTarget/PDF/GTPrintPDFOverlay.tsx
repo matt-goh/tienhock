@@ -117,6 +117,10 @@ const GTPrintPDFOverlay = ({
                 {
                   focusBeforePrint: true,
                   logLabel: "Green Target invoice PDF",
+                  documentTitle: generateGTPDFFilename(invoices).replace(
+                    ".pdf",
+                    ""
+                  ),
                 }
               );
               if (printResult.opened) {

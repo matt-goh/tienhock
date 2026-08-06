@@ -283,7 +283,9 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
       // Generate a single document with all statements
       const pdfComponent = (
-        <Document title={`Statements_${format(new Date(), "yyyy-MM-dd")}`}>
+        <Document
+          title={`Green Target Statements - ${format(new Date(), "yyyy-MM-dd")}`}
+        >
           {pages}
         </Document>
       );
@@ -313,6 +315,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                 fallbackWindow,
                 focusBeforePrint: true,
                 logLabel: "Green Target statement PDF",
+                documentTitle: `Green Target Statements - ${format(
+                  new Date(),
+                  "yyyy-MM-dd"
+                )}`,
               });
 
             if (printResult.opened && !printResult.usedFallback) {

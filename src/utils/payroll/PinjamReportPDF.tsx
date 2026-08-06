@@ -754,7 +754,8 @@ const outputPdf = async (
   doc: React.ReactElement,
   fileName: string,
   action: "download" | "print",
-  logLabel: string
+  logLabel: string,
+  documentTitle: string
 ) => {
   const pdfBlob = await pdf(doc).toBlob();
   const url = URL.createObjectURL(pdfBlob);
@@ -774,7 +775,7 @@ const outputPdf = async (
 
     printFrame.onload = () => {
       if (printFrame.contentWindow) {
-        printPdfFrameWithFallback(printFrame, url, { logLabel });
+        printPdfFrameWithFallback(printFrame, url, { logLabel, documentTitle });
         const cleanup = () => {
           if (document.body.contains(printFrame)) {
             document.body.removeChild(printFrame);
@@ -799,7 +800,10 @@ export const generatePinjamReportPDF = async (
       <PinjamReportPDF data={data} />,
       `${fileLabel}_Report_${getMonthName(data.month)}_${data.year}.pdf`,
       action,
-      "pinjam report PDF"
+      "pinjam report PDF",
+      `${data.reportLabel ?? "Pinjam"} Report ${getMonthName(
+        data.month
+      )} ${data.year}`
     );
   } catch (error) {
     console.error("Error generating PDF:", error);
@@ -817,7 +821,10 @@ export const generatePinjamBreakdownPDF = async (
       <PinjamBreakdownPDF data={data} />,
       `${fileLabel}_Breakdown_${getMonthName(data.month)}_${data.year}.pdf`,
       action,
-      "pinjam breakdown PDF"
+      "pinjam breakdown PDF",
+      `${data.reportLabel ?? "Pinjam"} Breakdown ${getMonthName(
+        data.month
+      )} ${data.year}`
     );
   } catch (error) {
     console.error("Error generating PDF:", error);

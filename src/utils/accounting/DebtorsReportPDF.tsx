@@ -563,6 +563,9 @@ export const generateDebtorsReportPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "debtors report PDF",
+            documentTitle: `${
+              options?.companyName || TIENHOCK_INFO.name
+            } Debtors Report ${data.report_date}`,
           });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {

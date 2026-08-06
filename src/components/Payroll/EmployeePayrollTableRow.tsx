@@ -74,7 +74,7 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
     const details = getStaffDetails();
 
     await printPayslip(employeePayroll, details, {
-      companyName: "TIEN HOCK FOOD INDUSTRIES S/B",
+      companyName: "TIEN HOCK FOOD INDUSTRIES SDN BHD",
       midMonthPayroll,
       onBeforePrint: () => {
         setShowPrintOverlay(true);

@@ -25,7 +25,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 30,
     paddingLeft: 40,
     paddingRight: 40,
     fontFamily: "Helvetica",
@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 7,
     gap: 12,
   },
   logo: {
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     fontFamily: "Courier-Bold",
   },
   generatedAt: {
-    marginTop: 15,
+    marginTop: 9,
     fontSize: 7,
     color: colors.textMuted,
     textAlign: "right",
@@ -242,7 +242,9 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
   data,
 }) => {
   return (
-    <Document>
+    <Document
+      title={`Balance Sheet as at ${data.period.as_of_date} - ${TIENHOCK_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -458,5 +460,8 @@ export const generateBalanceSheetPDF = async (
     <BalanceSheetPDFDocument data={data} />
   ).toBlob();
 
-  printPdfBlob(blob, "balance sheet PDF");
+  printPdfBlob(
+    blob,
+    `Balance Sheet as at ${data.period.as_of_date} - ${TIENHOCK_INFO.name}`
+  );
 };

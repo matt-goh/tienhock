@@ -434,7 +434,7 @@ const sortProductsByCategory = (products: any[]): any[] => {
 export type SalesSummaryScope = "tienhock" | "jp";
 
 const COMPANY_NAME_BY_SCOPE: Record<SalesSummaryScope, string> = {
-  tienhock: "TIEN HOCK FOOD INDUSTRIES S/B",
+  tienhock: "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   jp: "JELLY POLLY FOOD INDUSTRIES",
 };
 
@@ -557,6 +557,7 @@ export const generateSalesSummaryPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "sales summary PDF",
+            documentTitle: `Sales Summary - ${monthYearFormatted}`,
           });
           // Robust cleanup
           const cleanup = () => {

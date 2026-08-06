@@ -31,7 +31,7 @@ const colors = {
 const styles = StyleSheet.create({
   page: {
     paddingTop: 20,
-    paddingBottom: 40,
+    paddingBottom: 30,
     paddingLeft: 40,
     paddingRight: 40,
     fontFamily: "Helvetica",
@@ -50,7 +50,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 7,
     gap: 12,
   },
   logo: {
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   generatedAt: {
-    marginTop: 15,
+    marginTop: 9,
     fontSize: 7,
     color: colors.textMuted,
     textAlign: "right",
@@ -289,7 +289,9 @@ const GTBalanceSheetPDFDocument: React.FC<GTBalanceSheetPDFDocumentProps> = ({
   };
 
   return (
-    <Document>
+    <Document
+      title={`Balance Sheet as at ${data.period.as_of_date} - ${GREENTARGET_INFO.name}`}
+    >
       <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
@@ -387,5 +389,8 @@ export const generateGTBalanceSheetPDF = async (
 ): Promise<void> => {
   const blob = await pdf(<GTBalanceSheetPDFDocument data={data} />).toBlob();
 
-  printPdfBlob(blob, "balance sheet PDF");
+  printPdfBlob(
+    blob,
+    `Balance Sheet as at ${data.period.as_of_date} - ${GREENTARGET_INFO.name}`
+  );
 };

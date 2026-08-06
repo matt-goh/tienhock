@@ -262,6 +262,7 @@ export const printGreenTargetDebtorSubSchedulePDF = async (
 
     printPdfFrameWithFallback(printFrame, pdfUrl, {
       logLabel: "Green Target CD/SD debtor sub-schedule PDF",
+      documentTitle: `CD_SD Trade Debtor Sub-Schedule ${data.statement_date}`,
     });
 
     const cleanup = (): void => {

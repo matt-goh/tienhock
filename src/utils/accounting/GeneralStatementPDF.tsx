@@ -358,6 +358,7 @@ export const generateGeneralStatementPDF = async (
         if (printFrame.contentWindow) {
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "general statement PDF",
+            documentTitle: `Trade Debtor List as at ${data.statement_date}`,
           });
           const cleanup = () => {
             if (document.body.contains(printFrame)) {

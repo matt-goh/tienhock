@@ -30,6 +30,60 @@ requires separate approval).
 
 ---
 
+## Removed 6 Aug 2026 (second batch) — 1 file (bill 2005042 same-day counter cash → CH_REV1)
+
+Applied to **dev and production** on 2026-08-06, then removed per the project convention. The file
+existed at commit **`cb895076`** — recover with
+`git show cb895076:dev/migrations/2026-08-06_invoice_2005042_same_day_cash_chrev1.sql`.
+
+Production pre-state was verified to match dev **exactly** before the run (same ids `257`/`12100`/
+`12164`/`12165`, same amounts, dates and shapes), which matters because this file resolves rows by
+hardcoded id rather than by fingerprint. Run over SSH as the `tienhock` OS user with
+`psql -d tienhock_prod -v ON_ERROR_STOP=1 -f /tmp/chrev1_2005042.sql`, sha256 of the copied file
+checked against the local one first (`3c60971d…`), temp file deleted afterwards.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-06_invoice_2005042_same_day_cash_chrev1.sql` | Bill `2005042` (DKJ, RM988, 28/07/2026) was paid RM392 physical cash at the counter **on its own sale day** plus RM596 online. `receipt-service.js` hardcoded `method === 'cash' ? 'CH_REV2'` with no date test, so the counter cash was filed as a late debtor collection. This repoints receipt `257` and its journal `12165` debit line from **CH_REV2 to CH_REV1**, and corrects the mis-keyed reference `C2005041` → `C2005042` on the receipt, the journal header, the journal line and the `payments` row (`2005041` is a different customer's bill, NEVER-S). The bill stays a credit **INVOICE** and its revenue stays in **CR_SALES** — only *where the cash sits* changes. Net ledger effect: CH_REV2 −392.00, CH_REV1 +392.00 on 28/07/2026; totals unchanged. Guarded, idempotent (`ALREADY APPLIED` no-op branch confirmed by a second dev run), fail-closed, one transaction. Companion code: `resolveCashHoldingAccount` in `src/routes/accounting/cash-holding-account.js`, shared by receipt posting and imported-payment duplicate lookup. | dev ✓, prod ✓ (both 2026-08-06) |
+
+**Evidence for the rule** (re-derived from the immutable Jan–May legacy import, not assumed).
+Cash-holding **debit** lines split cleanly by date with **no exceptions**: CH_REV1 holds 1,184
+`CASH BILL…` lines **plus 5 receipts against an invoice, all same-day**; CH_REV2 holds **90
+receipts, every one a later collection**, and **zero** `CASH BILL` lines. The five same-day CH_REV1
+receipts — `C2004611` KITANI 200.00, `C63366` YONGMAJU 3.00, `C026174` IRENE 0.30, `C2004725` 1M
+761.70, `C2004791` BIG-T 1,217.50 — are all against credit **INVOICES** whose sales were credited to
+**CR_SALES**, which is exactly bill 2005042's shape. So the CH_REV1/CH_REV2 split is a **date** rule,
+not a document-type rule: bill type decides the revenue account, payment date decides the cash
+account. (The code comment saying "91 cash receipts against invoices" undercounts — the real total is
+**95**; 4 were missed by a zero-padded/pre-2026 reference match: `023384`, `026135-1`, `015309`,
+`015306`. All four resolve to **later** collections, reinforcing the rule.)
+
+> **Superseded first attempt:** an earlier file in this series,
+> `2026-08-06_invoice_2005042_cash_bill_restore.sql`, converted the bill to a **CASH** bill and moved
+> the full RM988 from CR_SALES to CASH_SALES. That was based on a wrong reading of CH_REV1 (assuming
+> it was for cash bills only) and **was reverted before this file ran**; the shipped migration opens
+> with a precondition that refuses to run unless the bill is back in its correct INVOICE/CR_SALES
+> shape. No revenue reclassification was ever needed, and the confirmation requested from AMY on that
+> point is moot.
+
+**Production verification after the run** (independent queries, not the migration's own notices):
+journal `12165` = DR `CH_REV1` 392.00 / CR `DKJ` 392.00, header **and** line `display_reference`
+`C2005042`; receipt `257` = `CH_REV1` / `C2005042` / posted; payment `5970` reference `C2005042`;
+journal `12100` untouched (DR `DKJ` 988.00 / CR `CR_SALES` 988.00); online receipt `256` / journal
+`12164` untouched (DR `BANK_PBB` 596.00 / CR `DKJ` 596.00); invoice still `INVOICE` / `paid` /
+`balance_due` 0; `DKJ.credit_used` 0.00; **zero** `C2005041` references remain database-wide;
+28/07/2026 posted holding movement now CH_REV1 DR 10,187.00 / CH_REV2 DR 720.00.
+
+> **Server-access note (corrects gotcha (a) in the 2 Aug GT-P5 section):** `sudo` on the Hetzner box
+> requires a password, so `sudo -u postgres psql …` **cannot** be run over a non-interactive SSH
+> session (`sudo: a terminal is required to read the password`); the only NOPASSWD rule is
+> `/usr/local/sbin/deploy-tienhock-nginx`. The `tienhock` OS user, however, connects to the
+> production database directly via peer auth — `psql -d tienhock_prod -c "…"` works with no sudo and
+> no `.env` sourcing. The earlier "the `tienhock` user has no matching role" note was only about
+> psql's *default database name*: `-d tienhock_prod` is all that was missing.
+
+---
+
 ## Removed 6 Aug 2026 — 2 files (June 2026 legacy reclassification: moves + E8–E11, then E1–E7 + MRM/MGT offsets)
 
 Applied to **dev and production** on 2026-08-06 (dev via the Phase 2 execution, prod by the user),

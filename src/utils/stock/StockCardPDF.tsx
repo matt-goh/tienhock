@@ -267,5 +267,8 @@ export const generateStockCardPDF = async (
   data: StockCardData
 ): Promise<void> => {
   const blob: Blob = await pdf(<StockCardPDFDocument data={data} />).toBlob();
-  printPdfBlob(blob, "stock card PDF");
+  printPdfBlob(
+    blob,
+    `Stock Card ${data.productId} (${data.productDescription}) - ${data.periodLabel}`
+  );
 };

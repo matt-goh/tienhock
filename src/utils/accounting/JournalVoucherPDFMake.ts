@@ -311,5 +311,5 @@ export const generateJournalVoucherPDF = async (
     pdfMake.createPdf(docDefinition).getBlob(resolve);
   });
 
-  printPdfBlob(pdfBlob, `journal voucher ${data.reference_no}`);
+  printPdfBlob(pdfBlob, `Journal Voucher ${data.reference_no}`);
 };
