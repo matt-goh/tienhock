@@ -21,8 +21,10 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-06",
-    ms: "Borang invois baharu (Tien Hock dan Jelly Polly): ruangan Tarikh kini menggunakan pemilih kalendar dengan anak panah untuk ke hari sebelum atau selepas. Ruangan Masa tidak berubah.",
-    en: "New invoice form (Tien Hock and Jelly Polly): the Date field now uses a calendar picker with arrows to step to the previous or next day. The Time field is unchanged.",
+  {
+    date: "2026-08-06",
+    ms: "Borang invois (Tien Hock, Jelly Polly dan Green Target): ruangan Tarikh kini menggunakan pemilih kalendar dengan anak panah untuk ke hari sebelum atau selepas. Pada borang Tien Hock dan Jelly Polly, ruangan Jenis, Tarikh dan Masa kini berkongsi satu baris, begitu juga Pelanggan dan ID Pelanggan.",
+    en: "Invoice forms (Tien Hock, Jelly Polly and Green Target): the Date field now uses a calendar picker with arrows to step to the previous or next day. On the Tien Hock and Jelly Polly forms, Type, Date and Time now share one row, as do Customer and Customer ID.",
   },
   {
     date: "2026-08-06",

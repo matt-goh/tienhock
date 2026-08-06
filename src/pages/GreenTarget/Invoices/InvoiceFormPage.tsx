@@ -33,6 +33,7 @@ import {
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import { SelectOption } from "../../../components/FormComponents";
+import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
   GTInvoiceAccountFieldsHandle,
@@ -127,6 +128,14 @@ const toLocalDateInputValue = (value: string | null | undefined): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return format(date, "yyyy-MM-dd");
+};
+
+// TimeNavigator works in Date objects while the form keeps a plain yyyy-MM-dd
+// string, so the string is read back as a LOCAL calendar day, never via UTC.
+const fromLocalDateInputValue = (value: string): Date | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
 };
 
 // Payment method options
@@ -719,6 +728,13 @@ const InvoiceFormPage: React.FC = () => {
     }
   };
 
+  const handleDateIssuedChange = (range: TimeRange): void => {
+    setFormData((p: Invoice): Invoice => ({
+      ...p,
+      date_issued: format(range.start, "yyyy-MM-dd"),
+    }));
+  };
+
   // Apply a new rental selection and keep the derived customer in sync.
   const applyRentalSelection = (nextSelectedRentals: Rental[]): void => {
     setSelectedRentals(nextSelectedRentals);
@@ -1271,25 +1287,20 @@ const InvoiceFormPage: React.FC = () => {
 
             {/* Invoice Date */}
             <div className="space-y-2">
-              <label
-                htmlFor="date_issued"
-                className="block text-sm font-medium text-default-700 dark:text-gray-200"
-              >
+              <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
                 Invoice Date <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                id="date_issued"
-                name="date_issued"
-                value={formData.date_issued}
-                onChange={handleInputChange}
+              </span>
+              <TimeNavigator
+                range={{
+                  start: fromLocalDateInputValue(formData.date_issued),
+                  end: fromLocalDateInputValue(formData.date_issued),
+                }}
+                onChange={handleDateIssuedChange}
+                modes={["day"]}
+                presets={false}
+                allowFuture
+                size="md"
                 disabled={isSaving || documentIdentityLocked}
-                required
-                className={clsx(
-                  "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
-                  "bg-white dark:bg-gray-700",
-                  "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                )}
               />
             </div>
           </div>
