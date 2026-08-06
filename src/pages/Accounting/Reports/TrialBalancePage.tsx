@@ -5,6 +5,7 @@ import React, {
   useEffect,
   useLayoutEffect,
   useCallback,
+  useMemo,
   useRef,
 } from "react";
 import {
@@ -30,9 +31,20 @@ import Button from "../../../components/Button";
 import Checkbox from "../../../components/Checkbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
+import TrialBalanceOrderButton from "../../../components/Accounting/TrialBalanceOrderButton";
+import TrialBalanceOrderModal from "../../../components/Accounting/TrialBalanceOrderModal";
 import Pagination from "../../../components/Invoice/Pagination";
 import { api } from "../../../routes/utils/api";
 import { generateTrialBalancePDF } from "../../../utils/accounting/TrialBalancePDF";
+import { useAccountCodesCache } from "../../../utils/accounting/useAccountingCache";
+import {
+  buildNotesByCode,
+  loadTrialBalanceOrderPreference,
+  saveTrialBalanceOrderPreference,
+  sortTrialBalanceAccounts,
+  type FinancialStatementNoteLike,
+  type TrialBalanceOrderPreference,
+} from "../../../utils/accounting/trialBalanceOrder";
 import { GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
@@ -65,12 +77,14 @@ interface CachedTrialBalanceFilters {
   searchTerm: string;
   selectedLedgerType: string;
   hideZeroBalance: boolean;
+  onlyShowMonthAccounts: boolean;
   page: number;
   pageSize: number;
 }
 
 // Restores the month, search, ledger-type, zero-balance toggle, page and page
-// size so returning from an account ledger lands on the same view.
+// size — plus the order modal's month-accounts filter — so returning from an
+// account ledger lands on the same view.
 const loadCachedFilters = (storageKey: string): CachedTrialBalanceFilters => {
   const now = new Date();
   const fallback: CachedTrialBalanceFilters = {
@@ -78,6 +92,7 @@ const loadCachedFilters = (storageKey: string): CachedTrialBalanceFilters => {
     searchTerm: "",
     selectedLedgerType: "",
     hideZeroBalance: true,
+    onlyShowMonthAccounts: true,
     page: 1,
     pageSize: DEFAULT_PAGE_SIZE,
   };
@@ -99,6 +114,7 @@ const loadCachedFilters = (storageKey: string): CachedTrialBalanceFilters => {
           ? parsed.selectedLedgerType
           : "",
       hideZeroBalance: parsed.hideZeroBalance !== false,
+      onlyShowMonthAccounts: parsed.onlyShowMonthAccounts !== false,
       page:
         typeof parsed.page === "number" && parsed.page >= 1 ? parsed.page : 1,
       pageSize:
@@ -119,6 +135,7 @@ interface TrialBalanceAccount {
   ledger_type: string;
   fs_note: string | null;
   note_name: string | null;
+  sort_order?: number | null;
   debit: number;
   credit: number;
   balance: number;
@@ -199,12 +216,41 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
   const [hideZeroBalance, setHideZeroBalance] = useState<boolean>(
     () => loadCachedFilters(filtersStorageKey).hideZeroBalance
   );
+  const [onlyShowMonthAccounts, setOnlyShowMonthAccounts] = useState<boolean>(
+    () => loadCachedFilters(filtersStorageKey).onlyShowMonthAccounts
+  );
   const [currentPage, setCurrentPage] = useState<number>(
     () => loadCachedFilters(filtersStorageKey).page
   );
   const [pageSize, setPageSize] = useState<number>(
     () => loadCachedFilters(filtersStorageKey).pageSize
   );
+  const [orderPreference, setOrderPreference] =
+    useState<TrialBalanceOrderPreference>(() =>
+      loadTrialBalanceOrderPreference(company)
+    );
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
+  const [fsNotes, setFsNotes] = useState<FinancialStatementNoteLike[]>([]);
+  const { accountCodes, isLoading: accountCodesLoading } =
+    useAccountCodesCache(company, isOrderModalOpen);
+
+  // The standard order needs each account's financial-statement note category,
+  // which comes from the notes catalogue (the account-codes API only carries
+  // the note reference).
+  useEffect(() => {
+    let isCurrent = true;
+    api
+      .get(`${reportsBasePath}/notes`)
+      .then((rows: FinancialStatementNoteLike[]) => {
+        if (isCurrent) setFsNotes(Array.isArray(rows) ? rows : []);
+      })
+      .catch((error: unknown) => {
+        console.error("Error fetching financial statement notes:", error);
+      });
+    return (): void => {
+      isCurrent = false;
+    };
+  }, [reportsBasePath]);
 
   // The sticky header is a variable height (filters wrap on narrow screens), so
   // the table head has to be offset by whatever it currently measures.
@@ -270,6 +316,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
           searchTerm,
           selectedLedgerType,
           hideZeroBalance,
+          onlyShowMonthAccounts,
           page: currentPage,
           pageSize,
         })
@@ -283,6 +330,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     searchTerm,
     selectedLedgerType,
     hideZeroBalance,
+    onlyShowMonthAccounts,
     currentPage,
     pageSize,
   ]);
@@ -314,8 +362,9 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     const month = selectedMonth.getMonth() + 1;
 
     const params = buildFilterParams();
-    params.set("limit", String(pageSize));
-    params.set("offset", String((currentPage - 1) * pageSize));
+    // Fetch the whole filtered set (no limit/offset) so the user's chosen
+    // account order can be applied in the browser before client-side
+    // pagination. The PDF export already relies on omitting limit.
 
     try {
       setLoading(true);
@@ -331,7 +380,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, buildFilterParams, currentPage, pageSize, reportsBasePath]);
+  }, [selectedMonth, buildFilterParams, reportsBasePath]);
 
   useEffect(() => {
     fetchTrialBalance();
@@ -365,6 +414,14 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     setCurrentPage(1);
   };
 
+  const handleOrderPreferenceChange = (
+    next: TrialBalanceOrderPreference
+  ): void => {
+    setOrderPreference(next);
+    saveTrialBalanceOrderPreference(company, next);
+    setCurrentPage(1);
+  };
+
   const handlePrintPDF = async (): Promise<void> => {
     if (!trialBalance) return;
 
@@ -376,9 +433,15 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
       const fullData: TrialBalanceData = await api.get(
         `${reportsBasePath}/trial-balance/${year}/${month}?${buildFilterParams().toString()}`
       );
+      const orderedFullAccounts = sortTrialBalanceAccounts(
+        fullData.accounts,
+        orderPreference,
+        company,
+        buildNotesByCode(fsNotes)
+      );
       await generateTrialBalancePDF(
         fullData,
-        fullData.accounts,
+        orderedFullAccounts,
         isGreenTarget
           ? {
               companyName: GREENTARGET_INFO.name,
@@ -401,10 +464,39 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     }).format(amount);
   };
 
-  // Search/hide-zero/pagination are applied server-side
-  const accounts = trialBalance?.accounts || [];
-  const totalFiltered = trialBalance?.pagination?.total || 0;
+  // Search/hide-zero are applied server-side; ordering and pagination are
+  // applied here so the user's chosen account order drives the whole report.
+  const notesByCode = useMemo(
+    () => buildNotesByCode(fsNotes),
+    [fsNotes]
+  );
+  // The account codes that actually appear in the selected month's Trial
+  // Balance (full filtered set, no pagination) — used by the order modal's
+  // "only show this month" filter.
+  const monthTrialBalanceCodes = useMemo(
+    () =>
+      new Set<string>(
+        (trialBalance?.accounts ?? []).map((account) => account.code)
+      ),
+    [trialBalance]
+  );
+  const fullAccounts = trialBalance?.accounts || [];
+  const orderedFullAccounts = useMemo(
+    () =>
+      sortTrialBalanceAccounts(
+        fullAccounts,
+        orderPreference,
+        company,
+        notesByCode
+      ),
+    [fullAccounts, orderPreference, company, notesByCode]
+  );
+  const totalFiltered = orderedFullAccounts.length;
   const totalPages = Math.max(1, Math.ceil(totalFiltered / pageSize));
+  const accounts = orderedFullAccounts.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
 
   const getMonthName = (date: Date): string => {
     return date.toLocaleString("default", { month: "long", year: "numeric" });
@@ -519,6 +611,14 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2">
+          <TrialBalanceOrderButton
+            preference={orderPreference}
+            onModeChange={(mode) =>
+              handleOrderPreferenceChange({ ...orderPreference, mode })
+            }
+            onOpen={() => setIsOrderModalOpen(true)}
+          />
+
           {/* Source Guide (TH-specific) */}
           {!isGreenTarget && <ReportSourceGuide report="trial_balance" />}
 
@@ -789,6 +889,20 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
           </div>
         </div>
       )}
+
+      <TrialBalanceOrderModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        company={company}
+        accountCodes={accountCodes}
+        accountCodesLoading={accountCodesLoading}
+        fsNotes={fsNotes}
+        preference={orderPreference}
+        onPreferenceChange={handleOrderPreferenceChange}
+        onlyShowMonthAccounts={onlyShowMonthAccounts}
+        onOnlyShowMonthAccountsChange={setOnlyShowMonthAccounts}
+        monthAccountCodes={monthTrialBalanceCodes}
+      />
     </div>
   );
 };
