@@ -225,17 +225,22 @@ export async function applyOverpayment(client, payload, userId) {
     // 5b. REC journal DR CUST_DEP / CR customer debtor child
     const referenceNo = await generateReceiptReference(client, applyDate);
     const journalResult = await client.query(
+      // display_reference is the visible Journal No.; reference_no stays the
+      // hidden internal REC-YYYYMM-NNNN id. Applying held credit carries no
+      // bank or cheque reference of its own, so the invoice it settles is the
+      // user-facing value (no `C` prefix — that marks counter cash).
       `INSERT INTO journal_entries (
          reference_no, entry_type, entry_date, description,
-         total_debit, total_credit, status,
+         total_debit, total_credit, status, display_reference,
          source_type, source_id, created_at, created_by
-       ) VALUES ($1, 'REC', $2, $3, $4, $4, 'posted', 'payment', $5, NOW(), $6)
+       ) VALUES ($1, 'REC', $2, $3, $4, $4, 'posted', $5, 'payment', $6, NOW(), $7)
        RETURNING id`,
       [
         referenceNo,
         applyDate,
         `Overpayment applied - INV/NO: ${a.invoice_id} - ${customerId}`,
         a.amount,
+        String(a.invoice_id),
         String(payment.payment_id),
         userId || null,
       ]
