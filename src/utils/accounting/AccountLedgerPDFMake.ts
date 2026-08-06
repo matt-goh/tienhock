@@ -397,6 +397,10 @@ export const generateAccountLedgerPDF = async (
   const logoDataUrl: string | null =
     options?.includeLogo !== false ? await loadLogoDataUrl() : null;
   const reportTitle: string = options?.title || "Bank Statement";
+  const periodLabel =
+    data.period.mode === "range"
+      ? `${fmtDate(data.period.start_date)} – ${fmtDate(data.period.end_date)}`
+      : `${MONTH_NAMES[data.period.month - 1]} ${data.period.year}`;
   const docDefinition = buildDocDefinition(
     data,
     logoDataUrl,
