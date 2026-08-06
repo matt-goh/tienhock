@@ -3,10 +3,13 @@
 // journal (docs/Account/INVOICE_PAYMENT_ACCOUNTING_PROGRESS.md §4).
 //
 // Journal shapes:
-//   Physical cash for old credit invoices (payment_method 'cash'):
-//     one DR CH_REV2 line PER invoice allocation, each with its own visible
+//   Physical cash (payment_method 'cash'):
+//     one DR holding line PER invoice allocation, each with its own visible
 //     C{invoice} reference (legacy prints one holding-ledger row per invoice),
-//     then CR TR per allocation. Cash stays in CH_REV2 until an RV bank-in.
+//     then CR TR per allocation. The holding account is chosen by DATE, not by
+//     document type (see resolveCashHoldingAccount): CH_REV1 when the cash is
+//     taken on the invoice's own sale day, CH_REV2 when it is collected later.
+//     Cash stays in its holding account until an RV bank-in.
 //   Direct bank / online / cleared cheque:
 //     ONE aggregated DR bank line (visible Journal ref like TF040626-2,
 //     Cheque ref like TF040626), then CR TR itemized per allocation.
@@ -39,8 +42,151 @@ import {
   previewImportedPaymentReconciliation,
 } from "./imported-payment-reconciliation.js";
 import { requireChequeClearanceDate } from "../utils/cheque-clearance-date.js";
+import {
+  syncSalesJournalEntry,
+  invoiceLocalDateString,
+} from "./sales-journal.js";
+import { getCashSalesPools } from "./bank-in-service.js";
+import { resolveCashHoldingAccount } from "./cash-holding-account.js";
 
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
+
+/**
+ * SQL for the amount of an invoice a receipt may still settle.
+ *
+ * A credit INVOICE simply exposes its outstanding balance. A settled CASH bill
+ * carries balance_due 0 because syncSalesJournalEntry auto-collects it into
+ * CH_REV1, so what it can still take is that automatic collection: recording a
+ * genuine bank/online receipt against a cash bill re-classifies part of the
+ * counter cash as banked money (the CH_REV1 line shrinks by the same amount).
+ *
+ * The two are ADDED rather than switched between, because a cash bill is not
+ * always in its settled state: while it is being created its balance is still
+ * its full total and no auto-collection row exists yet, which is exactly when
+ * the split-tender receipts are written.
+ */
+export const SETTLEABLE_AMOUNT_SQL = `
+  CASE WHEN i.paymenttype = 'CASH' THEN COALESCE(i.balance_due, 0) + COALESCE((
+         SELECT SUM(p.amount_paid) FROM payments p
+          WHERE p.invoice_id = i.id
+            AND p.is_auto_collection = true
+            AND (p.status IS NULL OR p.status = 'active')
+       ), 0)
+       ELSE COALESCE(i.balance_due, 0) END`;
+
+/**
+ * The settleable amount of already-locked invoice rows, keyed by invoice id.
+ * `rows` must carry id, paymenttype and balance_due.
+ */
+async function getSettleableAmounts(client, rows) {
+  const map = {};
+  const cashIds = [];
+  for (const row of rows) {
+    map[row.id] = round2(row.balance_due);
+    if (row.paymenttype === "CASH") cashIds.push(row.id);
+  }
+  if (cashIds.length > 0) {
+    const result = await client.query(
+      `SELECT invoice_id, COALESCE(SUM(amount_paid), 0) AS auto_collected
+         FROM payments
+        WHERE invoice_id = ANY($1::varchar[])
+          AND is_auto_collection = true
+          AND (status IS NULL OR status = 'active')
+        GROUP BY invoice_id`,
+      [cashIds]
+    );
+    for (const row of result.rows) {
+      map[row.invoice_id] = round2(
+        (map[row.invoice_id] || 0) + parseFloat(row.auto_collected)
+      );
+    }
+  }
+  return map;
+}
+
+/**
+ * Re-syncs the invoice-owned 'S' journal of every CASH bill a receipt touched,
+ * then restores that bill's balance invariant.
+ *
+ * Genuine receipts shrink the automatic CH_REV1 collection (and cancelling one
+ * restores it), so the sales journal must be rebuilt after any receipt
+ * lifecycle event that changed what a cash bill has genuinely collected. A cash
+ * bill then carries no balance at all, because the rebuilt collection absorbs
+ * whatever the receipts do not cover — unless an uncleared cheque suppresses
+ * auto-collection entirely, in which case the uncollected remainder stays due
+ * until it clears (the same rule the invoice edit path applies).
+ *
+ * Must be called AFTER the compat payment rows reach their final status, since
+ * that is what syncSalesJournalEntry measures.
+ */
+async function resyncCashBillSalesJournals(client, invoiceIds, userId) {
+  const ids = [...new Set(invoiceIds)].filter(Boolean).sort();
+  if (ids.length === 0) return;
+  const result = await client.query(
+    `SELECT * FROM invoices
+      WHERE id = ANY($1::varchar[]) AND paymenttype = 'CASH'
+        AND invoice_status <> 'cancelled'
+      ORDER BY id
+        FOR UPDATE`,
+    [ids]
+  );
+  if (result.rows.length === 0) return;
+
+  // Shrinking a day's CH_REV1 collection cannot take it below the cash already
+  // banked in from that day's pool, or the RV would be over-banked. Lock the
+  // affected pools first so a concurrent bank-in cannot slip in between the
+  // rebuild and the check.
+  const affectedDates = [
+    ...new Set(
+      result.rows.map((invoice) => invoiceLocalDateString(invoice.createddate))
+    ),
+  ].sort();
+  for (const date of affectedDates) {
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtext('chrev1_pool_' || $1::text))`,
+      [date]
+    );
+  }
+
+  for (const invoice of result.rows) {
+    await syncSalesJournalEntry(client, invoice, userId || null);
+
+    const genuine = await client.query(
+      `SELECT
+          COALESCE(SUM(amount_paid) FILTER (WHERE status IS NULL OR status = 'active'), 0) AS paid,
+          COUNT(*) FILTER (WHERE status = 'pending') AS pending
+         FROM payments
+        WHERE invoice_id = $1
+          AND is_auto_collection = false
+          AND (status IS NULL OR status IN ('active', 'pending'))`,
+      [invoice.id]
+    );
+    const balanceDue =
+      parseInt(genuine.rows[0].pending, 10) > 0
+        ? round2(
+            Math.max(
+              0,
+              round2(invoice.totalamountpayable) - round2(genuine.rows[0].paid)
+            )
+          )
+        : 0;
+    await client.query(
+      `UPDATE invoices SET balance_due = $1, invoice_status = $2 WHERE id = $3`,
+      [balanceDue, balanceDue <= 0 ? "paid" : "Unpaid", invoice.id]
+    );
+  }
+
+  const { pools } = await getCashSalesPools(client);
+  const poolByDate = Object.fromEntries(pools.map((pool) => [pool.source_date, pool]));
+  for (const date of affectedDates) {
+    const pool = poolByDate[date];
+    if (pool && pool.remaining < -0.005) {
+      throw new Error(
+        `Cash sales for ${date} have already been banked in. RM${Math.abs(pool.remaining).toFixed(2)} more was banked than this change leaves as counter cash — reverse that bank-in first.`
+      );
+    }
+  }
+}
 
 /** Normalize a date input (yyyy-MM-dd string, ISO timestamp, unix ms, Date) to a LOCAL yyyy-MM-dd string. */
 export function toLocalDateString(value) {
@@ -173,17 +319,23 @@ async function lockInvoices(client, allocs) {
       throw new Error(`Invoice ${id} is cancelled and cannot receive payments`);
     }
   }
-  // Per-invoice over-settlement check (sum of this receipt's allocations per invoice)
+  // Per-invoice over-settlement check (sum of this receipt's allocations per
+  // invoice), measured against the settleable amount: the outstanding balance
+  // for a credit invoice, the automatic CH_REV1 collection for a cash bill.
+  const settleable = await getSettleableAmounts(client, result.rows);
+  for (const id of ids) map[id].settleable_amount = settleable[id] || 0;
   const perInvoice = {};
   for (const a of allocs) {
     if (a.type !== "invoice") continue;
     perInvoice[a.invoice_id] = round2((perInvoice[a.invoice_id] || 0) + a.amount);
   }
   for (const [id, amt] of Object.entries(perInvoice)) {
-    const balance = round2(map[id].balance_due);
-    if (amt > balance + 0.005) {
+    const limit = round2(map[id].settleable_amount);
+    if (amt > limit + 0.005) {
       throw new Error(
-        `Invoice ${id}: allocation ${amt.toFixed(2)} exceeds balance due ${balance.toFixed(2)}. Record the excess as an overpayment allocation instead.`
+        map[id].paymenttype === "CASH"
+          ? `Cash bill ${id}: allocation ${amt.toFixed(2)} exceeds the ${limit.toFixed(2)} still recorded as counter cash. A cash bill can only re-classify money it has already collected.`
+          : `Invoice ${id}: allocation ${amt.toFixed(2)} exceeds balance due ${limit.toFixed(2)}. Record the excess as an overpayment allocation instead.`
       );
     }
   }
@@ -330,7 +482,10 @@ export async function createReceipt(client, payload, userId) {
         ? requireChequeClearanceDate(payload.posting_date, receivedDate)
         : toLocalDateString(payload.posting_date || payload.received_date);
   }
-  const debitAccount = method === "cash" ? "CH_REV2" : determineBankAccount(method, payload.bank_account);
+  const debitAccount =
+    method === "cash"
+      ? await resolveCashHoldingAccount(client, allocs, receivedDate)
+      : determineBankAccount(method, payload.bank_account);
 
   // Never post a second receipt when the same invoice/reference/amount is
   // already proven by the immutable legacy import. This preflight runs before
@@ -440,6 +595,25 @@ export async function createReceipt(client, payload, userId) {
     ...new Set(allocs.filter((a) => a.type === "invoice").map((a) => a.invoice_id)),
   ].sort();
 
+  // A cash bill's own collection already sits in CH_REV1. Only a non-cash
+  // receipt says something new about it (that part of the money was banked
+  // instead), and only an immediately posting one: a pending cheque would
+  // suppress the whole automatic collection until it clears, which is the
+  // credit-invoice workflow, not a counter sale.
+  const cashBillIds = invoiceIds.filter((id) => invoiceMap[id]?.paymenttype === "CASH");
+  if (cashBillIds.length > 0) {
+    if (method === "cash") {
+      throw new Error(
+        `Cash bill ${cashBillIds[0]} already records its cash collection. Only a bank transfer, online payment or cleared cheque can be recorded against a cash bill.`
+      );
+    }
+    if (isPending) {
+      throw new Error(
+        `Cash bill ${cashBillIds[0]} cannot hold an uncleared cheque. Enter the cheque's bank clearance date to record it, or key the sale as a credit invoice instead.`
+      );
+    }
+  }
+
   const description = (payload.description || "").trim() || defaultDescription(allocs);
   const descriptionOverridden = Boolean((payload.description || "").trim());
   const displayReference =
@@ -509,7 +683,7 @@ export async function createReceipt(client, payload, userId) {
         a.amount,
         method,
         rowRef || null,
-        debitAccount === "CH_REV2" ? "CASH" : debitAccount,
+        method === "cash" ? "CASH" : debitAccount,
         payload.notes || (a.type === "excess" ? "Overpaid amount" : null),
         rowStatus,
         a.allocation_id,
@@ -520,6 +694,9 @@ export async function createReceipt(client, payload, userId) {
 
   if (!isPending) {
     await postReceiptJournal(client, receipt, allocs, invoiceMap, userId);
+    // The genuine receipt now covers part of a cash bill, so its automatic
+    // CH_REV1 collection must shrink by the same amount.
+    await resyncCashBillSalesJournals(client, cashBillIds, userId);
   }
 
   const fresh = await client.query(`SELECT * FROM receipts WHERE id = $1`, [receipt.id]);
@@ -1237,6 +1414,14 @@ export async function confirmReceipt(client, receiptId, options, userId) {
     [receiptId]
   );
 
+  await resyncCashBillSalesJournals(
+    client,
+    Object.values(invoiceMap)
+      .filter((invoice) => invoice.paymenttype === "CASH")
+      .map((invoice) => invoice.id),
+    userId
+  );
+
   const fresh = await client.query(`SELECT * FROM receipts WHERE id = $1`, [receiptId]);
   return { receipt: fresh.rows[0], journal_entry_id: journalEntryId };
 }
@@ -1326,6 +1511,9 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
         const inv = invoiceMap[r.invoice_id];
         if (!inv) continue;
         const amount = round2(r.amount);
+        // A cash bill stays fully settled: the cancelled receipt's amount goes
+        // back to its automatic CH_REV1 collection, not to a balance due.
+        if (inv.paymenttype === "CASH") continue;
         const newBalance = round2(
           Math.min(parseFloat(inv.totalamountpayable || 0), round2(inv.balance_due) + amount)
         );
@@ -1367,6 +1555,17 @@ export async function cancelReceipt(client, receiptId, reason, userId) {
             cancelled_by = $3, updated_at = NOW(), updated_by = $3
       WHERE id = $1`,
     [receiptId, reason || null, userId || null]
+  );
+
+  // Only once the compat payment rows are cancelled does the sales journal see
+  // the money as no longer genuinely collected — the cash bills' automatic
+  // CH_REV1 collection grows back by exactly the cancelled amount.
+  await resyncCashBillSalesJournals(
+    client,
+    allocResult.rows
+      .filter((row) => row.allocation_type === "invoice")
+      .map((row) => row.invoice_id),
+    userId
   );
 
   const fresh = await client.query(`SELECT * FROM receipts WHERE id = $1`, [receiptId]);

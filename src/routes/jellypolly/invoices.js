@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { format } from "date-fns";
 import JPEInvoiceApiClientFactory from "../../utils/JellyPolly/einvoice/JPEInvoiceApiClientFactory.js";
+import { normalizeSaleTenders } from "../sales/invoices/saleTenders.js";
 
 // Helper function to update customer credit
 const updateCustomerCredit = async (client, customerId, amount) => {
@@ -929,6 +930,9 @@ export default function (pool, config) {
       // Initial balance and status - Check for CASH type
       const totalPayable = parseFloat(invoice.totalamountpayable || 0);
       const isCash = invoice.paymenttype === "CASH";
+      // What was tendered at the counter: one entry per way the customer paid
+      // (part cash + part online is one bill, two tenders).
+      const saleTenders = normalizeSaleTenders(invoice, totalPayable, isCash);
       const balance_due = isCash ? 0 : totalPayable; // Zero balance for CASH
       const invoice_status =
         isCash || totalPayable === 0 ? "paid" : "Unpaid"; // CASH and zero-value bills have nothing left to collect
@@ -985,11 +989,11 @@ export default function (pool, config) {
         }
       }
 
-      // If it's a CASH invoice, create automatic payment record
+      // If it's a CASH invoice, create the automatic payment record(s). A bill
+      // settled in more than one way at the counter (e.g. part cash, part
+      // online) records one payment row per tender; the single payment_method
+      // shorthand still produces exactly one row for the full amount.
       if (isCash && totalPayable > 0) {
-        // Check if payment details were provided in the request
-        const paymentMethod = invoice.payment_method || "cash";
-        const paymentReference = invoice.payment_reference || null;
         const paymentNotes =
           invoice.payment_notes || "Automatic payment for CASH invoice";
         const paymentDate = format(
@@ -1003,15 +1007,17 @@ export default function (pool, config) {
             payment_reference, notes, status, posting_date
           ) VALUES ($1, $2, $3, $4, $5, $6, 'active', $7)
         `;
-        await client.query(paymentQuery, [
-          createdInvoice.id,
-          paymentDate,
-          totalPayable,
-          paymentMethod, // Use provided payment method
-          paymentReference, // Use provided reference
-          paymentNotes, // Use provided notes or default
-          paymentDate, // posting_date (own parameter: date column, not timestamp)
-        ]);
+        for (const tender of saleTenders) {
+          await client.query(paymentQuery, [
+            createdInvoice.id,
+            paymentDate,
+            tender.amount,
+            tender.payment_method,
+            tender.payment_reference,
+            paymentNotes,
+            paymentDate, // posting_date (own parameter: date column, not timestamp)
+          ]);
+        }
       }
 
       // Update customer credit if INVOICE type - NO CHANGE HERE
@@ -1045,6 +1051,10 @@ export default function (pool, config) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error submitting invoice:", error);
+      // Tender validation errors carry a user-facing message.
+      if (error.status === 400) {
+        return res.status(400).json({ message: error.message });
+      }
       // Send specific duplicate error if applicable
       if (error.message && error.message.includes("already exists")) {
         res.status(409).json({ message: error.message });

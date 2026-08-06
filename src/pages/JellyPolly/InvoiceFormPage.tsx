@@ -26,8 +26,25 @@ import {
   createPayment,
 } from "../../utils/JellyPolly/InvoiceUtils";
 import { isZeroValueBill } from "../../utils/invoice/invoiceDisplayStatus";
+import {
+  SaleTender,
+  addTender,
+  createTender,
+  roundTenderAmount,
+  sumTenders,
+  syncTenderAmounts,
+  tenderNeedsReference,
+  tenderReferenceLabel,
+  toTenderPayload,
+  validateTenders,
+} from "../../utils/invoice/saleTenders";
 import toast from "react-hot-toast";
-import { IconSquare, IconSquareCheckFilled } from "@tabler/icons-react";
+import {
+  IconPlus,
+  IconSquare,
+  IconSquareCheckFilled,
+  IconTrash,
+} from "@tabler/icons-react";
 import { FormInput } from "../../components/FormComponents";
 import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import { api } from "../../routes/utils/api";
@@ -59,9 +76,36 @@ const InvoiceFormPage: React.FC = () => {
   );
   const [customerIdNumber, setCustomerIdNumber] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(false);
-  const [paymentMethod, setPaymentMethod] =
-    useState<Payment["payment_method"]>("cash");
-  const [paymentReference, setPaymentReference] = useState("");
+  // What was tendered for this bill. One line behaves exactly as a single
+  // payment method did; adding a line lets a bill be part cash and part
+  // transfer/online, and a credit invoice may be part-paid now with the
+  // balance collected days later.
+  const [tenders, setTenders] = useState<SaleTender[]>(() => [
+    createTender("cash"),
+  ]);
+  const isSplitTender: boolean = tenders.length > 1;
+
+  const handleTenderChange = (key: string, patch: Partial<SaleTender>): void =>
+    setTenders((current: SaleTender[]) =>
+      current.map((tender: SaleTender) =>
+        tender.key === key
+          ? {
+              ...tender,
+              ...patch,
+              // Typing an amount stops it tracking the bill total.
+              amountTouched:
+                patch.amount !== undefined ? true : tender.amountTouched,
+            }
+          : tender
+      )
+    );
+
+  const handleTenderRemove = (key: string): void =>
+    setTenders((current: SaleTender[]) =>
+      current.length <= 1
+        ? current
+        : current.filter((tender: SaleTender) => tender.key !== key)
+    );
 
   // --- MODAL STATE ---
   const [isEinvoiceSubmitting, setIsEinvoiceSubmitting] = useState(false); // Specific loading state for e-invoice API call
@@ -154,6 +198,14 @@ const InvoiceFormPage: React.FC = () => {
       setIsPaid(true);
     }
   }, [invoiceData?.paymenttype, isPaid]);
+
+  // Keep a lone untouched payment amount equal to the bill as line items change.
+  useEffect(() => {
+    const total = roundTenderAmount(
+      Number(invoiceData?.totalamountpayable || 0)
+    );
+    setTenders((current: SaleTender[]) => syncTenderAmounts(current, total));
+  }, [invoiceData?.totalamountpayable]);
 
   const fetchCustomerProducts = useCallback(
     async (customerId: string) => {
@@ -505,6 +557,20 @@ const InvoiceFormPage: React.FC = () => {
   };
 
   // --- UPDATED CREATE INVOICE ---
+  // A single tender always covers the whole bill. Once split, each line
+  // carries its own amount; a credit invoice may leave a balance outstanding
+  // while a cash bill must be settled in full.
+  const billTotal: number = roundTenderAmount(
+    Number(invoiceData?.totalamountpayable || 0)
+  );
+  const tenderedTotal: number = sumTenders(tenders);
+  const tenderRemaining: number = roundTenderAmount(billTotal - tenderedTotal);
+  const tendersBalance: boolean = Math.abs(tenderRemaining) <= 0.005;
+  const allowPartialTender: boolean = invoiceData?.paymenttype !== "CASH";
+
+  const handleTenderAdd = (): void =>
+    setTenders((current: SaleTender[]) => addTender(current, billTotal));
+
   const handleCreateInvoice = async () => {
     if (!invoiceData || isSaving) return; // Use overall isSaving for initial block
 
@@ -532,7 +598,7 @@ const InvoiceFormPage: React.FC = () => {
       });
     }
     if (isPaid) {
-      if (!paymentMethod) errors.push("Payment Method is required.");
+      errors.push(...validateTenders(tenders, billTotal, allowPartialTender));
     }
     if (errors.length > 0) {
       errors.forEach((err) => toast.error(err, { duration: 4000 }));
@@ -554,16 +620,14 @@ const InvoiceFormPage: React.FC = () => {
       // 2. Create Invoice
       toast.loading("Creating invoice...", { id: toastId });
 
-      // UPDATED: Prepare invoice data with payment information for CASH invoices
+      // Everything tendered for this bill, one entry per way it was paid.
+      const tenderPayload = toTenderPayload(tenders, billTotal);
+
       let invoiceDataToSubmit = { ...invoiceData };
       if (invoiceData.paymenttype === "CASH" && isPaid) {
         invoiceDataToSubmit = {
           ...invoiceDataToSubmit,
-          payment_method: paymentMethod,
-          payment_reference:
-            paymentMethod === "cheque" || paymentMethod === "bank_transfer"
-              ? paymentReference
-              : undefined,
+          payments: tenderPayload,
           payment_notes: "Payment automatically recorded for CASH invoices",
         };
       }
@@ -580,22 +644,22 @@ const InvoiceFormPage: React.FC = () => {
 
         // Don't attempt to create a payment for CASH invoices - they are automatically paid by the backend
         if (invoiceData.paymenttype !== "CASH") {
-          const paymentData: Omit<Payment, "payment_id" | "created_at"> = {
-            invoice_id: invoiceIdForNavigation, // Use the saved ID
-            payment_date: new Date(
-              Number(invoiceData.createddate)
-            ).toISOString(),
-            amount_paid: savedInvoice.totalamountpayable,
-            payment_method: paymentMethod,
-            payment_reference:
-              paymentMethod === "cash" || paymentMethod === "online"
-                ? undefined
-                : paymentReference || undefined,
-          };
           try {
-            await createPayment(paymentData);
+            for (const tender of tenderPayload) {
+              await createPayment({
+                invoice_id: invoiceIdForNavigation,
+                payment_date: new Date(
+                  Number(invoiceData.createddate)
+                ).toISOString(),
+                amount_paid: tender.amount,
+                payment_method: tender.payment_method,
+                payment_reference: tender.payment_reference,
+              } as Omit<Payment, "payment_id" | "created_at">);
+            }
             toast.success(
-              `Invoice ${invoiceIdForNavigation} created and paid!`,
+              tenderRemaining > 0.005
+                ? `Invoice ${invoiceIdForNavigation} created — RM${tenderRemaining.toFixed(2)} still outstanding.`
+                : `Invoice ${invoiceIdForNavigation} created and paid!`,
               {
                 id: toastId,
               }
@@ -874,40 +938,101 @@ const InvoiceFormPage: React.FC = () => {
                 </button>
               </div>
               {isPaid && (
-                <div className="flex flex-wrap items-end gap-3 w-full">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Payment Method
-                    </label>
-                    <PillSelect<string>
-                      value={paymentMethod}
-                      onChange={(value: string) =>
-                        setPaymentMethod(value as Payment["payment_method"])
-                      }
-                      options={PAYMENT_METHOD_OPTIONS}
+                <div className="w-full space-y-3">
+                  {tenders.map((tender: SaleTender, index: number) => (
+                    <div
+                      key={tender.key}
+                      className="flex flex-wrap items-end gap-3 w-full"
+                    >
+                      <div className="space-y-2">
+                        <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                          {isSplitTender
+                            ? `Payment ${index + 1}`
+                            : "Payment Method"}
+                        </label>
+                        <PillSelect<string>
+                          value={tender.payment_method}
+                          onChange={(value: string) =>
+                            handleTenderChange(tender.key, {
+                              payment_method:
+                                value as Payment["payment_method"],
+                            })
+                          }
+                          options={PAYMENT_METHOD_OPTIONS}
+                          disabled={isSaving}
+                          ariaLabel={`Payment method ${index + 1}`}
+                          size="md"
+                        />
+                      </div>
+                      <div className="w-full sm:w-40">
+                        <FormInput
+                          name={`tenderAmount-${tender.key}`}
+                          label="Amount"
+                          type="number"
+                          step="0.01"
+                          value={tender.amount}
+                          onChange={(e) =>
+                            handleTenderChange(tender.key, {
+                              amount: e.target.value,
+                            })
+                          }
+                          placeholder="0.00"
+                          disabled={isSaving}
+                        />
+                      </div>
+                      {tenderNeedsReference(tender.payment_method) && (
+                        <FormInput
+                          name={`tenderReference-${tender.key}`}
+                          label={tenderReferenceLabel(tender.payment_method)}
+                          value={tender.payment_reference}
+                          onChange={(e) =>
+                            handleTenderChange(tender.key, {
+                              payment_reference: e.target.value,
+                            })
+                          }
+                          placeholder="Enter reference"
+                          disabled={isSaving}
+                        />
+                      )}
+                      {isSplitTender && (
+                        <button
+                          type="button"
+                          onClick={() => handleTenderRemove(tender.key)}
+                          disabled={isSaving}
+                          className="mb-1.5 rounded-md p-1.5 text-default-500 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
+                          title={`Remove payment ${index + 1}`}
+                        >
+                          <IconTrash size={18} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleTenderAdd}
                       disabled={isSaving}
-                      ariaLabel="Payment method"
-                      size="md"
-                    />
+                      className="inline-flex items-center gap-1 text-sm font-medium text-sky-600 transition-colors hover:text-sky-700 disabled:opacity-50 dark:text-sky-400 dark:hover:text-sky-300"
+                    >
+                      <IconPlus size={16} />
+                      {isSplitTender ? "Add another payment" : "Split payment"}
+                    </button>
+                    {billTotal > 0.005 && !tendersBalance && (
+                      <span
+                        className={`text-sm font-medium ${
+                          tenderRemaining > 0 && allowPartialTender
+                            ? "text-sky-600 dark:text-sky-400"
+                            : "text-amber-600 dark:text-amber-400"
+                        }`}
+                      >
+                        {tenderRemaining < 0
+                          ? `RM${Math.abs(tenderRemaining).toFixed(2)} over the RM${billTotal.toFixed(2)} bill`
+                          : allowPartialTender
+                          ? `RM${tenderRemaining.toFixed(2)} of RM${billTotal.toFixed(2)} stays outstanding — collect it later`
+                          : `RM${tenderRemaining.toFixed(2)} left of RM${billTotal.toFixed(2)} — a cash bill must be paid in full`}
+                      </span>
+                    )}
                   </div>
-                  {(paymentMethod === "cheque" ||
-                    paymentMethod === "bank_transfer" ||
-                    paymentMethod === "online") && (
-                    <FormInput
-                      name="paymentReference"
-                      label={
-                        paymentMethod === "cheque"
-                          ? "Cheque Number"
-                          : paymentMethod === "online"
-                          ? "Transaction ID"
-                          : "Transaction Ref"
-                      }
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      placeholder="Enter reference"
-                      disabled={isSaving}
-                    />
-                  )}
                 </div>
               )}
             </div>

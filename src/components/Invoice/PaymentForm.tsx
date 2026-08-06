@@ -306,6 +306,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         all: "true", // Add this to get all invoices without pagination
       });
 
+      // Tien Hock also offers cash bills whose counter cash has not been fully
+      // accounted for: they are always 'paid', so the status filter alone
+      // would hide a same-day sale that was partly paid by transfer/online.
+      if (useGroupedReceipt) {
+        params.append("settleable", "true");
+      }
+
       params.append("startDate", invoiceDateRange.start.getTime().toString());
       params.append("endDate", invoiceDateRange.end.getTime().toString());
 
@@ -331,7 +338,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       const filteredInvoices = invoices.filter(
         (invoice) =>
           !invoicesWithPendingPayments.has(invoice.id) &&
-          Number(invoice.balance_due) > 0
+          (invoice.settleable_amount !== undefined
+            ? Number(invoice.settleable_amount)
+            : Number(invoice.balance_due)) > 0
       );
 
       if (requestId === invoiceRequestIdRef.current) {
@@ -519,14 +528,65 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
   const roundMoney = (value: number): number => Math.round(value * 100) / 100;
 
+  /**
+   * How much a payment may still be recorded against an invoice.
+   *
+   * A credit invoice exposes its outstanding balance. A Tien Hock CASH bill is
+   * settled the moment it is issued, so what it can still take is the counter
+   * cash held in CH_REV1 — recording a transfer/online receipt against it says
+   * that part of the sale was banked rather than taken over the counter.
+   * Companies whose endpoint does not report it fall back to the balance due.
+   */
+  const settleableOf = (invoice: InvoiceData): number =>
+    invoice.settleable_amount !== undefined
+      ? Number(invoice.settleable_amount)
+      : Number(invoice.balance_due);
+
+  const isCashBill = (invoice: InvoiceData): boolean =>
+    invoice.paymenttype === "CASH";
+
+  /** A cash bill's collection is already cash; only banked money adds anything. */
+  const hasCashBillSelected: boolean = selectedInvoices.some(
+    (item: InvoicePaymentAllocation) => isCashBill(item.invoice)
+  );
+
+  /**
+   * Only a credit invoice can be overpaid. A cash bill carries no balance at
+   * all, so comparing against it would flag every amount as an overpayment.
+   */
+  const isOverpaymentAllocation = (item: InvoicePaymentAllocation): boolean =>
+    !isCashBill(item.invoice) &&
+    item.amountToPay > Number(item.invoice.balance_due);
+
+  // Against a cash bill only banked money says something new: cash is already
+  // what the bill recorded, and a cheque keyed here is always pending, which
+  // would suppress the bill's whole cash collection until it cleared.
+  const paymentMethodOptions: ReadonlyArray<
+    PillSelectOption<RecordablePaymentMethod>
+  > = hasCashBillSelected
+    ? PAYMENT_METHOD_OPTIONS.filter(
+        (option) => option.value !== "cash" && option.value !== "cheque"
+      )
+    : PAYMENT_METHOD_OPTIONS;
+
+  // Selecting a cash bill can invalidate the method already chosen (the form
+  // opens on "cheque"), so fall back to a method that is still offered.
+  useEffect((): void => {
+    if (!hasCashBillSelected) return;
+    setFormData((current: PaymentFormData) =>
+      current.payment_method === "cash" || current.payment_method === "cheque"
+        ? { ...current, payment_method: "online" }
+        : current
+    );
+  }, [hasCashBillSelected]);
+
   /** Total the selected amounts settle of one customer's invoice balances. */
   const settleSumForCustomer = (customerId: string): number =>
     roundMoney(
       selectedInvoices
         .filter((item) => item.invoice.customerid === customerId)
         .reduce(
-          (sum, item) =>
-            sum + Math.min(item.amountToPay, Number(item.invoice.balance_due)),
+          (sum, item) => sum + Math.min(item.amountToPay, settleableOf(item.invoice)),
           0
         )
     );
@@ -564,9 +624,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
     const moneyAllocations: ReceiptPaymentAllocation[] = [];
     for (const { invoice, amountToPay } of selectedInvoices) {
-      const balance = Number(invoice.balance_due);
+      const settleable = settleableOf(invoice);
       const applied = appliedByInvoice.get(invoice.id) || 0;
-      const regular = roundMoney(Math.min(amountToPay, balance) - applied);
+      const regular = roundMoney(Math.min(amountToPay, settleable) - applied);
       if (regular > 0.005) {
         moneyAllocations.push({
           type: "invoice",
@@ -574,11 +634,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           amount: regular,
         });
       }
-      if (amountToPay > balance) {
+      // A cash bill owes nothing, so anything above its collected cash is a
+      // keying error rather than an overpayment (validated before submit).
+      if (amountToPay > settleable && !isCashBill(invoice)) {
         moneyAllocations.push({
           type: "excess",
           customer_id: invoice.customerid,
-          amount: roundMoney(amountToPay - balance),
+          amount: roundMoney(amountToPay - settleable),
         });
       }
     }
@@ -676,9 +738,25 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       return;
     }
 
+    // A cash bill owes nothing, so it can never be overpaid: anything above
+    // the cash it collected is a keying error, not a customer credit.
+    const overCollectedCashBill = selectedInvoices.find(
+      ({ invoice, amountToPay }) =>
+        isCashBill(invoice) && amountToPay > settleableOf(invoice) + 0.005
+    );
+    if (overCollectedCashBill) {
+      toast.error(
+        `Cash bill ${overCollectedCashBill.invoice.id} only collected ${formatCurrency(
+          settleableOf(overCollectedCashBill.invoice)
+        )} in cash — a payment against it cannot exceed that`
+      );
+      return;
+    }
+
     // Check for ALL overpayments
     const overpaymentInvoices = selectedInvoices.filter(
-      ({ invoice, amountToPay }) => amountToPay > invoice.balance_due
+      ({ invoice, amountToPay }) =>
+        !isCashBill(invoice) && amountToPay > invoice.balance_due
     );
 
     if (overpaymentInvoices.length > 0 && !useGroupedReceipt) {
@@ -912,10 +990,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         );
       return existing
         ? currentInvoices
-        : [
-            ...currentInvoices,
-            { invoice, amountToPay: Number(invoice.balance_due) },
-          ];
+        : [...currentInvoices, { invoice, amountToPay: settleableOf(invoice) }];
     });
   };
 
@@ -1041,7 +1116,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                           payment_method: value,
                         })
                       }
-                      options={PAYMENT_METHOD_OPTIONS}
+                      options={paymentMethodOptions}
                       disabled={isSubmitting || bankingFieldsLocked}
                       ariaLabel="Payment method"
                     size="md"
@@ -1212,20 +1287,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       {selectedInvoices.length}
                     </span>
                   </div>
-                  {selectedInvoices.some(
-                    ({ invoice, amountToPay }: InvoicePaymentAllocation) =>
-                      amountToPay > invoice.balance_due
-                  ) && (
+                  {selectedInvoices.some(isOverpaymentAllocation) && (
                     <span className="rounded-full bg-purple-100 px-2 py-1 text-xs text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
-                      {
-                        selectedInvoices.filter(
-                          ({
-                            invoice,
-                            amountToPay,
-                          }: InvoicePaymentAllocation) =>
-                            amountToPay > invoice.balance_due
-                        ).length
-                      }{" "}
+                      {selectedInvoices.filter(isOverpaymentAllocation).length}{" "}
                       {useGroupedReceipt ? "Overpayment(s)" : "Above balance"}
                     </span>
                   )}
@@ -1248,10 +1312,15 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                         invoice,
                         amountToPay,
                       }: InvoicePaymentAllocation) => {
-                        const isOverpayment: boolean =
-                          amountToPay > invoice.balance_due;
+                        const isOverpayment: boolean = isOverpaymentAllocation({
+                          invoice,
+                          amountToPay,
+                        });
                         const isInvalidAmount: boolean =
-                          !Number.isFinite(amountToPay) || amountToPay <= 0;
+                          !Number.isFinite(amountToPay) ||
+                          amountToPay <= 0 ||
+                          (isCashBill(invoice) &&
+                            amountToPay > settleableOf(invoice) + 0.005);
                         const isUnsupportedOverpayment: boolean =
                           isOverpayment && !useGroupedReceipt;
                         const overpaidAmount: number = isOverpayment
@@ -1298,10 +1367,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                             <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(120px,0.8fr)] items-end gap-3 border-t border-gray-200 pt-3 dark:border-gray-700">
                               <div>
                                 <span className="block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Balance due
+                                  {isCashBill(invoice) ? "Cash collected" : "Balance due"}
                                 </span>
                                 <span className="mt-1 block text-sm font-semibold text-gray-900 dark:text-gray-100">
-                                  {formatCurrency(invoice.balance_due)}
+                                  {formatCurrency(settleableOf(invoice))}
                                 </span>
                               </div>
                               <label>
@@ -1365,13 +1434,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     )}
 
                     {useGroupedReceipt &&
-                      selectedInvoices.some(
-                        ({
-                          invoice,
-                          amountToPay,
-                        }: InvoicePaymentAllocation) =>
-                          amountToPay > invoice.balance_due
-                      ) && (
+                      selectedInvoices.some(isOverpaymentAllocation) && (
                         <div className="rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm dark:border-purple-800 dark:bg-purple-950/30">
                           <div className="flex justify-between gap-3 text-purple-700 dark:text-purple-300">
                             <span>Applied to invoices</span>
@@ -1380,15 +1443,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 selectedInvoices.reduce(
                                   (
                                     sum: number,
-                                    {
-                                      invoice,
-                                      amountToPay,
-                                    }: InvoicePaymentAllocation
+                                    item: InvoicePaymentAllocation
                                   ) =>
                                     sum +
                                     Math.min(
-                                      amountToPay,
-                                      invoice.balance_due
+                                      item.amountToPay,
+                                      settleableOf(item.invoice)
                                     ),
                                   0
                                 )
@@ -1402,16 +1462,13 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                 selectedInvoices.reduce(
                                   (
                                     sum: number,
-                                    {
-                                      invoice,
-                                      amountToPay,
-                                    }: InvoicePaymentAllocation
+                                    item: InvoicePaymentAllocation
                                   ) =>
                                     sum +
-                                    Math.max(
-                                      0,
-                                      amountToPay - invoice.balance_due
-                                    ),
+                                    (isOverpaymentAllocation(item)
+                                      ? item.amountToPay -
+                                        Number(item.invoice.balance_due)
+                                      : 0),
                                   0
                                 )
                               )}
