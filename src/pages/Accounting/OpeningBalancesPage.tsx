@@ -7,7 +7,14 @@
 // Replaces the one-account-at-a-time OpeningBalanceModal flow: type into the
 // Debit or Credit cell of any row, then save every change in one transaction.
 // Clearing both cells of an anchored account removes that anchor on save.
-import React, { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   Listbox,
   ListboxButton,
@@ -21,6 +28,7 @@ import {
   IconSearch,
   IconCheck,
   IconChevronDown,
+  IconChevronRight,
   IconFilter,
   IconX,
   IconDeviceFloppy,
@@ -89,6 +97,40 @@ const FILTER_OPTIONS: { value: RowFilter; label: string }[] = [
 ];
 
 const STORAGE_KEY = "openingBalancesFilters";
+
+// The folded note sections are preserved under their own key rather than inside
+// the filter blob, so the two can never invalidate each other. An empty array
+// (everything expanded) is a real state, so a missing key is the only default.
+const COLLAPSED_SECTIONS_STORAGE_KEY = "openingBalances.collapsedSections";
+
+const readStoredCollapsedSections = (): string[] => {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const stored: string | null = window.localStorage.getItem(
+      COLLAPSED_SECTIONS_STORAGE_KEY
+    );
+    if (stored === null) return [];
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((key: unknown): key is string => typeof key === "string");
+  } catch (_error: unknown) {
+    return [];
+  }
+};
+
+const storeCollapsedSections = (collapsed: Set<string>): void => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      COLLAPSED_SECTIONS_STORAGE_KEY,
+      JSON.stringify([...collapsed])
+    );
+  } catch (_error: unknown) {
+    // Best-effort when browser storage is unavailable.
+  }
+};
 
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-MY", {
@@ -171,6 +213,14 @@ interface NoteSection {
 
 const inputClasses: string =
   "w-full h-8 px-2 rounded border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 text-right text-sm focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors";
+
+// Each header cell sticks on its own and carries its own background, so the
+// rows scrolling underneath never show through.
+const headerCellClasses: string =
+  "sticky z-20 bg-gray-50 dark:bg-gray-900 px-3 py-2.5 font-semibold text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700";
+
+const footerCellClasses: string =
+  "sticky bottom-0 z-20 bg-gray-100 dark:bg-gray-900 px-3 py-2.5 font-bold text-gray-900 dark:text-white border-t-2 border-gray-300 dark:border-gray-600";
 
 interface BalanceRowProps {
   account: OpeningBalanceAccount;
@@ -303,6 +353,36 @@ const OpeningBalancesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, DraftRow>>({});
   const [showDiscardDialog, setShowDiscardDialog] = useState<boolean>(false);
+  // Note sections the user has folded away, restored from the last visit. Keyed
+  // by section key, so a reload that returns a different set of notes simply
+  // leaves stale keys unused.
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
+    () => new Set(readStoredCollapsedSections())
+  );
+  // The sticky header is a variable height (filters wrap on narrow screens), so
+  // the table head has to be offset by whatever it currently measures.
+  const [pageHeaderHeight, setPageHeaderHeight] = useState<number>(0);
+  const pageHeaderRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const headerElement: HTMLDivElement | null = pageHeaderRef.current;
+    if (!headerElement) return;
+
+    const updateHeaderHeight = (): void => {
+      setPageHeaderHeight(headerElement.getBoundingClientRect().height);
+    };
+
+    updateHeaderHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateHeaderHeight);
+      return (): void => window.removeEventListener("resize", updateHeaderHeight);
+    }
+
+    const resizeObserver = new ResizeObserver(updateHeaderHeight);
+    resizeObserver.observe(headerElement);
+    return (): void => resizeObserver.disconnect();
+  }, []);
 
   const cached = useMemo(() => {
     try {
@@ -352,6 +432,11 @@ const OpeningBalancesPage: React.FC = () => {
       // Ignore storage failures so the page stays usable.
     }
   }, [asOfDate, rowFilter, searchTerm, includeInactive, showNotes]);
+
+  // Preserve the collapsed note sections across navigations.
+  useEffect(() => {
+    storeCollapsedSections(collapsedSections);
+  }, [collapsedSections]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -530,6 +615,49 @@ const OpeningBalancesPage: React.FC = () => {
     );
   }, [sectionTotals]);
 
+  // Pending and invalid rows stay countable while a section is collapsed, so
+  // folding a section can never hide work that still blocks the save.
+  const sectionRowCounts = useMemo((): Record<
+    string,
+    { dirty: number; invalid: number }
+  > => {
+    const counts: Record<string, { dirty: number; invalid: number }> = {};
+    sections.forEach((section) => {
+      const count = { dirty: 0, invalid: 0 };
+      section.accounts.forEach((account) => {
+        if (dirtyCodeSet.has(account.code)) count.dirty += 1;
+        const draft: DraftRow | undefined = drafts[account.code];
+        if (draft && !isDraftValid(draft)) count.invalid += 1;
+      });
+      counts[section.key] = count;
+    });
+    return counts;
+  }, [sections, drafts, dirtyCodeSet]);
+
+  const allSectionsCollapsed: boolean =
+    sections.length > 0 &&
+    sections.every((section) => collapsedSections.has(section.key));
+
+  const toggleSection = useCallback((key: string): void => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleAllSections = (): void => {
+    setCollapsedSections(
+      allSectionsCollapsed
+        ? new Set()
+        : new Set(sections.map((section) => section.key))
+    );
+  };
+
   const handlePrintPDF = async (): Promise<void> => {
     if (!data) return;
     if (hasUnsavedChanges) {
@@ -570,8 +698,14 @@ const OpeningBalancesPage: React.FC = () => {
 
   return (
     <div className="w-full">
+      {/* Sticky band: the filters, actions and the balance status stay visible
+          while the (long) account sheet scrolls underneath. */}
+      <div
+        ref={pageHeaderRef}
+        className="sticky top-0 z-30 -mx-4 -mt-3 mb-3 space-y-2 border-b border-default-200 bg-white/95 px-4 pb-2 pt-3 backdrop-blur dark:border-gray-700 dark:bg-gray-950/95"
+      >
       {/* Header: date + filters on the left, actions on the right */}
-      <div className="mb-3 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <TimeNavigator
             range={{
@@ -585,6 +719,7 @@ const OpeningBalancesPage: React.FC = () => {
             allowFuture
             size="sm"
             placeholder="As of date"
+            pickerPlacement="bottom-left"
           />
 
           {/* Existing anchor dates as one-click chips */}
@@ -741,6 +876,16 @@ const OpeningBalancesPage: React.FC = () => {
           <Button
             size="sm"
             variant="outline"
+            icon={allSectionsCollapsed ? IconChevronRight : IconChevronDown}
+            iconSize={16}
+            onClick={handleToggleAllSections}
+            disabled={sections.length === 0}
+          >
+            {allSectionsCollapsed ? "Expand all" : "Collapse all"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
             icon={IconRefresh}
             iconSize={16}
             onClick={fetchBalances}
@@ -765,7 +910,7 @@ const OpeningBalancesPage: React.FC = () => {
       {dateTotals && (
         <div
           className={clsx(
-            "mb-3 px-4 py-2.5 rounded-lg border flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm",
+            "px-4 py-2.5 rounded-lg border flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm",
             isBalanced
               ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800"
               : "bg-amber-50 dark:bg-amber-900/30 border-amber-200 dark:border-amber-800"
@@ -801,6 +946,7 @@ const OpeningBalancesPage: React.FC = () => {
           </div>
         </div>
       )}
+      </div>
 
       {error && (
         <div className="mb-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
@@ -813,29 +959,53 @@ const OpeningBalancesPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : (
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto">
+        // No overflow wrapper anywhere above the table: an `overflow` ancestor
+        // becomes the sticky containing block, which would pin the column
+        // header inside the card instead of under the page header.
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div>
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
+              {/* Sticky lives on the cells, not the thead/tr — the row wrappers
+                  are not reliably stickable. Offset by the page header's height
+                  so the columns stack directly beneath it. */}
+              <thead>
                 <tr>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300 w-32">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-left w-32 rounded-tl-lg")}
+                  >
                     Code
                   </th>
-                  <th className="px-3 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-left")}
+                  >
                     Particulars
                   </th>
-                  <th className="px-2 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-300 w-36">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-right w-36")}
+                  >
                     Debit (RM)
                   </th>
-                  <th className="px-2 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-300 w-36">
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "text-right w-36")}
+                  >
                     Credit (RM)
                   </th>
                   {showNotes && (
-                    <th className="px-2 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300 w-64">
+                    <th
+                      style={{ top: pageHeaderHeight }}
+                      className={clsx(headerCellClasses, "text-left w-64")}
+                    >
                       Notes
                     </th>
                   )}
-                  <th className="w-10" />
+                  <th
+                    style={{ top: pageHeaderHeight }}
+                    className={clsx(headerCellClasses, "w-10 rounded-tr-lg")}
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -849,21 +1019,69 @@ const OpeningBalancesPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  sections.map((section) => (
+                  sections.map((section) => {
+                    const isCollapsed: boolean = collapsedSections.has(
+                      section.key
+                    );
+                    const counts: { dirty: number; invalid: number } =
+                      sectionRowCounts[section.key] || { dirty: 0, invalid: 0 };
+
+                    return (
                     <Fragment key={section.key}>
-                      <tr className="bg-gray-100/80 dark:bg-gray-900/60">
+                      <tr
+                        tabIndex={0}
+                        aria-expanded={!isCollapsed}
+                        title={
+                          isCollapsed
+                            ? `Show ${section.name}`
+                            : `Hide ${section.name}`
+                        }
+                        onClick={() => toggleSection(section.key)}
+                        onKeyDown={(
+                          e: React.KeyboardEvent<HTMLTableRowElement>
+                        ) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleSection(section.key);
+                          }
+                        }}
+                        className="bg-gray-100/80 dark:bg-gray-900/60 cursor-pointer hover:bg-gray-200/70 dark:hover:bg-gray-900"
+                      >
                         <td
                           colSpan={2}
                           className="px-3 py-1.5 font-semibold text-default-800 dark:text-gray-100"
                         >
-                          {section.name}
-                          {section.note && (
-                            <span className="ml-1.5 font-normal text-xs text-default-500 dark:text-gray-400">
-                              Note {section.note}
+                          <span className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                            {isCollapsed ? (
+                              <IconChevronRight
+                                size={14}
+                                className="text-default-500 dark:text-gray-400"
+                              />
+                            ) : (
+                              <IconChevronDown
+                                size={14}
+                                className="text-default-500 dark:text-gray-400"
+                              />
+                            )}
+                            {section.name}
+                            {section.note && (
+                              <span className="font-normal text-xs text-default-500 dark:text-gray-400">
+                                Note {section.note}
+                              </span>
+                            )}
+                            <span className="font-normal text-xs text-default-400 dark:text-gray-500">
+                              ({section.accounts.length})
                             </span>
-                          )}
-                          <span className="ml-1.5 font-normal text-xs text-default-400 dark:text-gray-500">
-                            ({section.accounts.length})
+                            {counts.dirty > 0 && (
+                              <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                                {counts.dirty} unsaved
+                              </span>
+                            )}
+                            {counts.invalid > 0 && (
+                              <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                                {counts.invalid} invalid
+                              </span>
+                            )}
                           </span>
                         </td>
                         <td className="px-2 py-1.5 text-right font-semibold text-default-700 dark:text-gray-200">
@@ -879,49 +1097,52 @@ const OpeningBalancesPage: React.FC = () => {
                         {showNotes && <td />}
                         <td />
                       </tr>
-                      {section.accounts.map((account) => (
-                        <BalanceRow
-                          key={account.code}
-                          account={account}
-                          draft={
-                            drafts[account.code] || {
-                              debit: "",
-                              credit: "",
-                              notes: "",
+                      {!isCollapsed &&
+                        section.accounts.map((account) => (
+                          <BalanceRow
+                            key={account.code}
+                            account={account}
+                            draft={
+                              drafts[account.code] || {
+                                debit: "",
+                                credit: "",
+                                notes: "",
+                              }
                             }
-                          }
-                          showNotes={showNotes}
-                          isDirty={dirtyCodeSet.has(account.code)}
-                          disabled={saving}
-                          onChange={handleDraftChange}
-                        />
-                      ))}
+                            showNotes={showNotes}
+                            isDirty={dirtyCodeSet.has(account.code)}
+                            disabled={saving}
+                            onChange={handleDraftChange}
+                          />
+                        ))}
                     </Fragment>
-                  ))
+                    );
+                  })
                 )}
               </tbody>
-              <tfoot className="bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600 sticky bottom-0">
+              {/* Same rule as the header: sticky on the cells, not the tfoot */}
+              <tfoot>
                 <tr>
                   <td
                     colSpan={2}
-                    className="px-3 py-2.5 font-bold text-gray-900 dark:text-white text-right"
+                    className={clsx(footerCellClasses, "text-right")}
                   >
                     TOTALS (shown rows):
                   </td>
-                  <td className="px-2 py-2.5 text-right font-bold text-gray-900 dark:text-white">
+                  <td className={clsx(footerCellClasses, "text-right")}>
                     {formatCurrency(draftTotals.debit)}
                   </td>
-                  <td className="px-2 py-2.5 text-right font-bold text-gray-900 dark:text-white">
+                  <td className={clsx(footerCellClasses, "text-right")}>
                     {formatCurrency(draftTotals.credit)}
                   </td>
-                  {showNotes && <td />}
-                  <td />
+                  {showNotes && <td className={footerCellClasses} />}
+                  <td className={footerCellClasses} />
                 </tr>
               </tfoot>
             </table>
           </div>
 
-          <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+          <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
             <span>
               {data?.accounts.length || 0} accounts shown ·{" "}
               {data?.shown_totals.count || 0} with an opening balance

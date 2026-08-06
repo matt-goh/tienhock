@@ -47,6 +47,13 @@ interface TimeNavigatorProps {
   placeholder?: string;
   /** Disable the trigger and stepping arrows */
   disabled?: boolean;
+  /**
+   * Where the popover sits under the trigger (default: bottom-center).
+   * "bottom-left" anchors it to the trigger's left edge so it opens to the
+   * right — use it when the navigator sits near the left edge of the page,
+   * where a centred popover would hang off-screen.
+   */
+  pickerPlacement?: "bottom-center" | "bottom-left";
   className?: string;
   triggerClassName?: string;
 }
@@ -542,6 +549,7 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
   showArrows = true,
   placeholder,
   disabled = false,
+  pickerPlacement = "bottom-center",
   className,
   triggerClassName,
 }) => {
@@ -833,7 +841,12 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
       {/* Popover */}
       {isOpen && (
         <div
-          className="absolute left-1/2 top-full z-50 mt-2 -translate-x-1/2 w-[300px] rounded-xl border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl p-3 animate-fadeIn"
+          className={clsx(
+            "absolute top-full z-50 mt-2 w-[300px] rounded-xl border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl p-3 animate-fadeIn",
+            pickerPlacement === "bottom-left"
+              ? "left-0"
+              : "left-1/2 -translate-x-1/2"
+          )}
           role="dialog"
         >
           {/* Granularity tabs */}
