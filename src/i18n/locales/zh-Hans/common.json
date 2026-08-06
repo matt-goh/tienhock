@@ -52,6 +52,7 @@
   "Loading...": "加载中...",
   "Select...": "请选择...",
   "Search...": "搜索...",
+  "Rows per page": "每页行数",
   "Nothing found.": "未找到结果。",
   "Load more... ({{hidden}} more)": "加载更多...（还有 {{hidden}} 项）",
 
