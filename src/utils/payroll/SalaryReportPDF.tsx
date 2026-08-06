@@ -1316,9 +1316,9 @@ export const generateSalaryReportPDF = async (
           printPdfFrameWithFallback(printFrame, url, {
             logLabel: "salary report PDF",
             documentTitle: `Salary Report ${
-              periodType === "yearly"
-                ? year
-                : `${getMonthName(month || 1)} ${year}`
+              props.periodType === "yearly"
+                ? props.year
+                : `${getMonthName(props.month || 1)} ${props.year}`
             }`,
           });
           const cleanup = () => {
