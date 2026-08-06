@@ -14,6 +14,7 @@ import { JOB_CONFIGS } from "../configs/payrollJobConfigs";
 import DebtorsReportPage from "./Accounting/DebtorsReportPage";
 import AccountCodeListPage from "./Accounting/AccountCodeListPage";
 import AccountCodeFormPage from "./Accounting/AccountCodeFormPage";
+import OpeningBalancesPage from "./Accounting/OpeningBalancesPage";
 import JournalEntryListPage from "./Accounting/JournalEntryListPage";
 import JournalEntryPage from "./Accounting/JournalEntryPage";
 import JournalDetailsPage from "./Accounting/JournalDetailsPage";
@@ -485,6 +486,14 @@ export const TienHockNavData: SidebarItem[] = [
             component: AccountCodeFormPage,
           },
         ],
+      },
+      {
+        name: "Opening Balances",
+        path: "/accounting/opening-balances",
+        component: OpeningBalancesPage,
+        group: "Setup",
+        dropdownColumn: ACCOUNTING_DROPDOWN_COLUMNS.setup.key,
+        dropdownColumnOrder: ACCOUNTING_DROPDOWN_COLUMNS.setup.order,
       },
       {
         name: "Account Mappings",
