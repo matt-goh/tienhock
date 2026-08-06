@@ -13,12 +13,6 @@ import {
   TIENHOCK_INFO,
 } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import {
-  COMPUTER_FORM_WIDTH,
-  PdfPaperSize,
-  getPaperSizePreference,
-  getPdfMakePageSize,
-} from "../pdf/paperSize";
 
 // Initialize pdfmake with the bundled fonts (same pattern as PaySlipPDFMake)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
@@ -133,8 +127,7 @@ const buildDocDefinition = (
   companyName: string,
   referenceLabel: string,
   chequeLabel: string,
-  derivedOpeningLabel: string,
-  paperSize: PdfPaperSize
+  derivedOpeningLabel: string
 ): TDocumentDefinitions => {
   // Calendar months keep the "June 2026" label; arbitrary ranges show the dates.
   const periodLabel =
@@ -299,17 +292,12 @@ const buildDocDefinition = (
     "0"
   )}:${String(generatedAt.getMinutes()).padStart(2, "0")}`;
 
-  // Full-width rule below the letterhead. A4 keeps its tuned 559pt content
-  // width; the wider computer form spans its own (684 - 2*18 margins).
-  const ruleWidth: number =
-    paperSize === "computerForm" ? COMPUTER_FORM_WIDTH - 36 : 559;
-
   return {
     info: {
       title: `${reportTitle} ${data.account.code} ${periodLabel}`,
       author: companyName,
     },
-    pageSize: getPdfMakePageSize(paperSize),
+    pageSize: "A4",
     pageOrientation: "portrait",
     pageMargins: [18, 18, 18, 40],
     defaultStyle: { fontSize: 8, lineHeight: 1.15, color: colors.textPrimary },
@@ -328,7 +316,7 @@ const buildDocDefinition = (
       letterhead,
       {
         canvas: [
-          { type: "line", x1: 0, y1: 0, x2: ruleWidth, y2: 0, lineWidth: 1.2, lineColor: colors.borderDark },
+          { type: "line", x1: 0, y1: 0, x2: 559, y2: 0, lineWidth: 1.2, lineColor: colors.borderDark },
         ],
         margin: [0, 0, 0, 10],
       },
@@ -398,7 +386,6 @@ export const generateAccountLedgerPDF = async (
     referenceLabel?: string;
     chequeLabel?: string;
     derivedOpeningLabel?: string;
-    paperSize?: PdfPaperSize;
   }
 ): Promise<void> => {
   const companyInfo: CompanyInfo = options?.companyInfo || TIENHOCK_INFO;
@@ -418,8 +405,7 @@ export const generateAccountLedgerPDF = async (
     companyName,
     referenceLabel,
     chequeLabel,
-    derivedOpeningLabel,
-    options?.paperSize ?? getPaperSizePreference()
+    derivedOpeningLabel
   );
 
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {

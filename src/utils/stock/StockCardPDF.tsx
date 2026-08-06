@@ -20,11 +20,6 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../pdf/paperSize";
 import { StockMovement } from "../../types/types";
 
 export interface StockCardTotals {
@@ -195,17 +190,12 @@ const StockCardTableHeader: React.FC = () => (
   </View>
 );
 
-const StockCardPDFDocument: React.FC<{
-  data: StockCardData;
-  paperSize?: PdfPaperSize;
-}> = ({ data, paperSize }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
-  return (
+const StockCardPDFDocument: React.FC<{ data: StockCardData }> = ({ data }) => (
   <Document
     title={`Stock Card ${data.productId}`}
     author={TIENHOCK_INFO.name}
   >
-    <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+    <Page size="A4" style={styles.page}>
       <View style={styles.header}>
         <Image src={TienHockLogo} style={styles.logo} />
         <View style={styles.headerTextContainer}>
@@ -271,15 +261,11 @@ const StockCardPDFDocument: React.FC<{
       />
     </Page>
   </Document>
-  );
-};
+);
 
 export const generateStockCardPDF = async (
-  data: StockCardData,
-  paperSize?: PdfPaperSize
+  data: StockCardData
 ): Promise<void> => {
-  const blob: Blob = await pdf(
-    <StockCardPDFDocument data={data} paperSize={paperSize} />
-  ).toBlob();
+  const blob: Blob = await pdf(<StockCardPDFDocument data={data} />).toBlob();
   printPdfBlob(blob, "stock card PDF");
 };

@@ -11,11 +11,6 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  type PdfPaperSize,
-} from "../pdf/paperSize";
 
 const colors = {
   textPrimary: "#0f172a",
@@ -241,17 +236,14 @@ const formatCurrency = (amount: number): string => {
 
 interface BalanceSheetPDFDocumentProps {
   data: BalanceSheetData;
-  paperSize?: PdfPaperSize;
 }
 
 const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
   data,
-  paperSize,
 }) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   return (
     <Document>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={TienHockLogo} style={styles.logo} />
@@ -460,11 +452,10 @@ const BalanceSheetPDFDocument: React.FC<BalanceSheetPDFDocumentProps> = ({
 };
 
 export const generateBalanceSheetPDF = async (
-  data: BalanceSheetData,
-  paperSize?: PdfPaperSize
+  data: BalanceSheetData
 ): Promise<void> => {
   const blob = await pdf(
-    <BalanceSheetPDFDocument data={data} paperSize={paperSize} />
+    <BalanceSheetPDFDocument data={data} />
   ).toBlob();
 
   printPdfBlob(blob, "balance sheet PDF");

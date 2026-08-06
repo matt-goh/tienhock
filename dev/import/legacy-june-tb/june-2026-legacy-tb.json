@@ -1,0 +1,8852 @@
+[
+ {
+  "code": "ABB",
+  "particular": "ALLIANCE BANK MALAYSIA BHD",
+  "appx": "19",
+  "debit": 204.26,
+  "credit": 0,
+  "page": 1,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "ACD EPF",
+  "particular": "ACCRUAL (DIRECTORS' EPF)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "ACD PCB",
+  "particular": "ACCRUAL (DIRECTORS' PCB PAYABLES)",
+  "appx": "1",
+  "debit": 7231.6,
+  "credit": 0,
+  "page": 1,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "ACD SAL",
+  "particular": "ACCRUAL (DIRECTORS' SALARY)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 79261.19,
+  "page": 1,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "ACD SIP",
+  "particular": "ACCRUAL (DIRECTORS' SIP)",
+  "appx": "1",
+  "debit": 474.5,
+  "credit": 0,
+  "page": 1,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "ACD SC",
+  "particular": "ACCRUAL (DIRECTORS' SOCSO)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 260.35,
+  "page": 1,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "ACWJ SAL",
+  "particular": "ACCRUAL THJ (SALARY PAYABLES)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "ACW EPF",
+  "particular": "ACCRUAL (EPF)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 31301,
+  "page": 1,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "ACW PCB",
+  "particular": "ACCRUAL (PCB PAYABLES)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 9217.82,
+  "page": 1,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "ACW SAL",
+  "particular": "ACCRUAL (SALARY PAYABLES)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 59027.75,
+  "page": 1,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "ACW SIP",
+  "particular": "ACCRUAL (SIP)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 963.1,
+  "page": 1,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "ACW SC",
+  "particular": "ACCRUAL (SOCSO)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 4415.3,
+  "page": 1,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "AC AR",
+  "particular": "ACCRUAL-ARENAX S/B",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "AC DRF",
+  "particular": "ACCRUAL-DIRECTOR FEE",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "AC INS",
+  "particular": "ACCRUAL-INSURANCE",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "AC LEVY",
+  "particular": "ACCRUAL (LEVY CURRENT)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 1323.24,
+  "page": 1,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "AC SESB",
+  "particular": "ACCRUAL (SESB)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 7249.95,
+  "page": 1,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "AC SF",
+  "particular": "ACCRUAL-S.F TYRE",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "AC TAX",
+  "particular": "ACCRUAL (SALES TAX)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "AC TM",
+  "particular": "ACCRUAL (TELEKOM)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 1210.6,
+  "page": 1,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "AD FB",
+  "particular": "ACC.DEPR-FACTORY BUILDING",
+  "appx": "4",
+  "debit": 0,
+  "credit": 442765.79,
+  "page": 1,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "AD FF",
+  "particular": "ACCUM.DEPR-FURNITURE & FITTING",
+  "appx": "4",
+  "debit": 0,
+  "credit": 44413.97,
+  "page": 1,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "AD MV",
+  "particular": "ACCUM.DEPR-MOTOR VEHICLE",
+  "appx": "4",
+  "debit": 0,
+  "credit": 1122950.84,
+  "page": 1,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "AD OE",
+  "particular": "ACCUM.DEPR-OFFICE EQUIPMENT",
+  "appx": "4",
+  "debit": 0,
+  "credit": 240181.55,
+  "page": 1,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "AD PL",
+  "particular": "ACC.DEPR-PARTITION AND LAND",
+  "appx": "4",
+  "debit": 0,
+  "credit": 40053.2,
+  "page": 1,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "AD PM",
+  "particular": "ACCUM.DEPR-PLANT AND MACHINERY",
+  "appx": "4",
+  "debit": 0,
+  "credit": 1137175.87,
+  "page": 1,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "AD RV",
+  "particular": "ACCUM.DEPR-RENOVATION",
+  "appx": "4",
+  "debit": 0,
+  "credit": 809359.51,
+  "page": 1,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "ARI",
+  "particular": "ALLOWANCE FOR IMPAIRMENT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "AD B",
+  "particular": "ACCUM.DEPR-BUILDING (ADDITIONAL)",
+  "appx": "4",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "BBD",
+  "particular": "BAD DEBTS WRITTEN OFF",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "BE MB",
+  "particular": "MACHINE BIHUN",
+  "appx": "5-1",
+  "debit": 14359,
+  "credit": 0,
+  "page": 1,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "BE PB",
+  "particular": "PACKING BIHUN",
+  "appx": "5-1",
+  "debit": 17156,
+  "credit": 0,
+  "page": 1,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "BFT KOW",
+  "particular": "KOWAS TRANSPORT SDN BHD",
+  "appx": "3-6",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "BFT LS",
+  "particular": "LEASING LOGISTIC (EM) SDN BHD",
+  "appx": "3-6",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "BK",
+  "particular": "BOOKKEEPING FEE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "BLEV",
+  "particular": "LEVY CONTRIBUTIONS",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 1,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "BL MB",
+  "particular": "MACHINE BIHUN",
+  "appx": "5-1",
+  "debit": 1031.7,
+  "credit": 0,
+  "page": 1,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "BL PB",
+  "particular": "PACKING BIHUN",
+  "appx": "5-1",
+  "debit": 1357.35,
+  "credit": 0,
+  "page": 1,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "BRM",
+  "particular": "REPAIR AND MAINTENANCE (BIHUN)",
+  "appx": "5",
+  "debit": 14890.36,
+  "credit": 0,
+  "page": 1,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "BSC MB",
+  "particular": "MACHINE BIHUN",
+  "appx": "5-1",
+  "debit": 2586.6,
+  "credit": 0,
+  "page": 1,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "BSC PB",
+  "particular": "PACKING BIHUN",
+  "appx": "5-1",
+  "debit": 2212.3,
+  "credit": 0,
+  "page": 1,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "BSIP MB",
+  "particular": "SIP CONTRIBUTIONS (MESIN BIHUN)",
+  "appx": "5-1",
+  "debit": 194,
+  "credit": 0,
+  "page": 1,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "BSIP PB",
+  "particular": "SIP CONTRIBUTIONS (PACKING BIHUN)",
+  "appx": "5-1",
+  "debit": 223.4,
+  "credit": 0,
+  "page": 1,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "BS IL",
+  "particular": "IKUT LORI-COMMISSION BIHUN",
+  "appx": "5-1",
+  "debit": 18244.7,
+  "credit": 0,
+  "page": 1,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "BS MB",
+  "particular": "MESIN & SANGKUT BIHUN",
+  "appx": "5-1",
+  "debit": 143310.1,
+  "credit": 0,
+  "page": 1,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "BS PB",
+  "particular": "PACKING BIHUN",
+  "appx": "5-1",
+  "debit": 138304.17,
+  "credit": 0,
+  "page": 2,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "BS SM",
+  "particular": "SALESMAN-COMMISSION BIHUN",
+  "appx": "5-1",
+  "debit": 39225.83,
+  "credit": 0,
+  "page": 2,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "BT6304",
+  "particular": "BATTERY SYC 6304",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "BT1325",
+  "particular": "BATTERY SB1325",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "BT2035",
+  "particular": "BATTERY SAA2035H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "BT920",
+  "particular": "BATTERY QCV920",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "BT2962",
+  "particular": "BATTERY SA2962M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "BT4688",
+  "particular": "BATTERY SA4688N",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "BT5163",
+  "particular": "BATTERY SA5163R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "BT6323",
+  "particular": "BATTERY SAB6323H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "BT6389",
+  "particular": "BATTERY SAB6389C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "BT6893",
+  "particular": "BATTERY SAB6893C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "BT7369",
+  "particular": "BATTERY SA7369R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "BT7118",
+  "particular": "BATTERY SB7118C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "BT75",
+  "particular": "BATTERY - HITACHI EX75",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "BT830",
+  "particular": "BATTERY SA830E",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "BT8726",
+  "particular": "BATTERY SA8726M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "BT8155",
+  "particular": "BATTERY SAB8155W",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "BT9698",
+  "particular": "BATTERY SAB9698C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "BT9753",
+  "particular": "BATTERY SAB9753H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "BT9897",
+  "particular": "BATTERY SAB9897R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "BT9882",
+  "particular": "BATTERY SWJ9882",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "BT9901",
+  "particular": "BATTERY SAB9901Y",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "BT9922",
+  "particular": "BATTERY SD9922H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "BT3080",
+  "particular": "BATTERY SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "BTBFORK",
+  "particular": "BATTERY FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "BTCASE",
+  "particular": "BATTERY CASE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "BTFORK",
+  "particular": "BATTERY FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "BTFS",
+  "particular": "BATTERY- FORKLIFT SHOVEL",
+  "appx": "5",
+  "debit": 260,
+  "credit": 0,
+  "page": 2,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "BTTS",
+  "particular": "BATTERY TOYOTA SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "BTHT15",
+  "particular": "BATTERY HITACHI EX60-SAB9515M(B)",
+  "appx": "5",
+  "debit": 260,
+  "credit": 0,
+  "page": 2,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "BTHT18",
+  "particular": "BATTERY HITACHI EX60-SAB9518M(K)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "BTISEKI",
+  "particular": "BATTERY TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 260,
+  "credit": 0,
+  "page": 2,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "BTJCB",
+  "particular": "BATTERY JCB BACKHOE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "BTKE",
+  "particular": "BATTERY-KOMATSU EXCAVATOR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "BTH135",
+  "particular": "BATTERY HITACHI EX135UR",
+  "appx": "5",
+  "debit": 520,
+  "credit": 0,
+  "page": 2,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "BT1016",
+  "particular": "BATTERY -SD1016T",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "BTOTH",
+  "particular": "BATTERY OTHERS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "BTRA",
+  "particular": "TRANSPORTATION",
+  "appx": "5",
+  "debit": 2739,
+  "credit": 0,
+  "page": 2,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "BUM",
+  "particular": "UPKEEP OF MACHINERY (BIHUN)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "CASH",
+  "particular": "CASH IN HAND(MBH)",
+  "appx": "6",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "CASH SALES",
+  "particular": "CASH SALES",
+  "appx": "7",
+  "debit": 0,
+  "credit": 1251011.5,
+  "page": 2,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "CA 6389",
+  "particular": "PREPAYMENT (SAB6389C)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "CA 6893",
+  "particular": "PREPAYMENT (SAB6893C)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "CA 9515",
+  "particular": "PREPAYMENT (SAB9515M)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "CA 9518",
+  "particular": "PREPAYMENT (SAB9518M)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 2,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "CA HINO",
+  "particular": "PREPAYMENT (SD1016T)",
+  "appx": "8",
+  "debit": 5328,
+  "credit": 0,
+  "page": 3,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "CA CFH",
+  "particular": "OTHER DEBTORS (CHUNG FOOK HIUNG)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "CA CY",
+  "particular": "O/DEBTOR-CY ENTERPRISE",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "CA DHC",
+  "particular": "DEPOSIT (HAN CHIN ENGINEERING)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "CA DHS",
+  "particular": "DAIHATSU (M) SDN BHD",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "CA DPO",
+  "particular": "DEPOSIT,PREPAYMENT AND OTHER DEBTORS",
+  "appx": "8",
+  "debit": 8900,
+  "credit": 0,
+  "page": 3,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "CA DSESB",
+  "particular": "SESB (NEW METER)",
+  "appx": "8",
+  "debit": 3080,
+  "credit": 0,
+  "page": 3,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "CA GT",
+  "particular": "O/DEBTOR-GREEN TARGET",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "CA HAR",
+  "particular": "HARAPAN MENANG SDN BHD",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "CA LLS",
+  "particular": "DEPOSIT (LLS-JELLY POLLY)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "CA MBHJ",
+  "particular": "JELLY POLLY FOOD IND",
+  "appx": "8",
+  "debit": 7000.8,
+  "credit": 0,
+  "page": 3,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "CA NICH",
+  "particular": "PREPAYMENT (NICHIYU BATTERY FORKLIFT T",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "CA PILL",
+  "particular": "PREPAYMENT (PILLOW SEAL PACKAGING MACH",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "CA SCB",
+  "particular": "PREPAYMENT (STANDARD CHARTERED BANK)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "CA SEBJ",
+  "particular": "SESB (JELLY POLLY)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "CA THJ",
+  "particular": "THJ (MBH EXCHANGE)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "CA THJJ",
+  "particular": "TIEN HOCK (JELLY)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "CA TRJ",
+  "particular": "DEBTORS (THJ)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "CA TRM",
+  "particular": "DEBTORS (MBH)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "CA WA",
+  "particular": "WORKER'S ADVANCE",
+  "appx": "8",
+  "debit": 73070.24,
+  "credit": 0,
+  "page": 3,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "CGM",
+  "particular": "COST OF GOODS MANUFACTURED",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "CH REV1",
+  "particular": "CASH SALES RECEIVED",
+  "appx": "6",
+  "debit": 34190.55,
+  "credit": 0,
+  "page": 3,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "CH REV2",
+  "particular": "CASH RECEIVED/CR. SALES",
+  "appx": "6",
+  "debit": 117.55,
+  "credit": 0,
+  "page": 3,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "CL ABB",
+  "particular": "ALLIANCE BANK (TERM LOAN-AGROFOOD)",
+  "appx": "11",
+  "debit": 182600.38,
+  "credit": 0,
+  "page": 3,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "CL GT",
+  "particular": "GREEN TARGET (BW/KB)",
+  "appx": "8",
+  "debit": 12415.6,
+  "credit": 0,
+  "page": 3,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "CL GT(SEB)",
+  "particular": "GREEN TARGET (SEB)",
+  "appx": "10",
+  "debit": 0,
+  "credit": 4115.15,
+  "page": 3,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "CL GTH",
+  "particular": "AMOUNT DUE TO DIRECTOR (GTH)",
+  "appx": "9",
+  "debit": 0,
+  "credit": 995260.94,
+  "page": 3,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "CL GF",
+  "particular": "GREEN FAMILY ORGANIC HERBAL RESORT S/B",
+  "appx": "8",
+  "debit": 31696.82,
+  "credit": 0,
+  "page": 3,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "CL JP",
+  "particular": "JELLY-POLLY (SEB)",
+  "appx": "10",
+  "debit": 0,
+  "credit": 3126.15,
+  "page": 3,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "CL OCA",
+  "particular": "OTHER CREDITOR AND ACCRUALS",
+  "appx": "10",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "CL LOT36",
+  "particular": "PBB (2144372929-00010) LOT36",
+  "appx": "11",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "CL LOT44",
+  "particular": "PBB (2144373014-00010) LOT44",
+  "appx": "11",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "CL PB13",
+  "particular": "PBB (A/C:2015941133-13)",
+  "appx": "11",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "CL PB16",
+  "particular": "PBB (A/C:2015941133-16)",
+  "appx": "11",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "CL PB20",
+  "particular": "PBB (A/A: DGG/000399/20)",
+  "appx": "11",
+  "debit": 0,
+  "credit": 250095.13,
+  "page": 3,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "CL PSU",
+  "particular": "PERKESO (PSU)",
+  "appx": "10",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "CL SCB",
+  "particular": "SCB LOAN (A/C:60003294)",
+  "appx": "11",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "CL TAX",
+  "particular": "TAXATION",
+  "appx": "12",
+  "debit": 220650.97,
+  "credit": 0,
+  "page": 3,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "CL THJ",
+  "particular": "THJ(JELLY POLLY FOOD IND)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KA",
+  "particular": "KALIAN LOGISTICS SDN BHD",
+  "appx": "13",
+  "debit": 496,
+  "credit": 0,
+  "page": 3,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "CL WSF",
+  "particular": "AMOUNT DUE TO DIRECTOR (WSF)",
+  "appx": "9",
+  "debit": 0,
+  "credit": 1581274.76,
+  "page": 3,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "CR AG",
+  "particular": "AGRICORE CS SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "CR ALL",
+  "particular": "ALLWIN STATIONERY",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "CR BF",
+  "particular": "BORNEO FLEXIBLE PACKAGING SDN BHD",
+  "appx": "13",
+  "debit": 6500,
+  "credit": 0,
+  "page": 3,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "CR BR",
+  "particular": "BUKIT RAYA SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "CR BS",
+  "particular": "BESTWISE SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 3,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "CR BOR",
+  "particular": "BORNEO REGAL SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "CR BWM",
+  "particular": "BIGWHEEL MARKETING SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "CR CHE",
+  "particular": "CHEMECH VENTURES",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "CR CLS",
+  "particular": "CLS GEMILANG ENTERPRISE",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "CR CB",
+  "particular": "CHOO BEE HARDWARE (SABAH) S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "CR CESB",
+  "particular": "C.E.S.B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "CR COM",
+  "particular": "COMCOBEST SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "CR DER",
+  "particular": "DERMYPACK PLASTIC (M) SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "CR DH",
+  "particular": "DE HOME LEGEND SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "CR DX",
+  "particular": "DINXINGS (M) SDN BHD",
+  "appx": "13",
+  "debit": 0.02,
+  "credit": 0,
+  "page": 4,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "CR DEL",
+  "particular": "DELIG SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "CR FR",
+  "particular": "LEBERI @ FRANCIS B MARIAM",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "CR GEN",
+  "particular": "GENERAL PLASTIC TRADING CO",
+  "appx": "13",
+  "debit": 144.69,
+  "credit": 0,
+  "page": 4,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "CR GT",
+  "particular": "GREEN TARGET WASTE TREATMENT IND S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "CR EX",
+  "particular": "EXPOGAYA SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "CR HM",
+  "particular": "HOMCO MARKETING",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "CR HAR",
+  "particular": "HARRISONS SABAH SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "CR HBR",
+  "particular": "HARBOUR-LINK LINES SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "CR EV",
+  "particular": "EVERGREEN MARINE CORP (M) S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "CR JP",
+  "particular": "JELLY-POLLY FOOD INDUSTRIES",
+  "appx": "13",
+  "debit": 8952,
+  "credit": 0,
+  "page": 4,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "CR IM",
+  "particular": "IMBASJAYA SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "CR IBS",
+  "particular": "IBS PLACTIC TRD SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "CR IND",
+  "particular": "INDAHMANIS LABEL STICKER & PACKAGING S",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "CR JB",
+  "particular": "JOHOR BAHRU FLOUR MILL S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 35000,
+  "page": 4,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "CR JL",
+  "particular": "JOO LOONG TRADING CO",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "CR JM",
+  "particular": "JONG MA CHEMICAL SDN BHD",
+  "appx": "13",
+  "debit": 912.5,
+  "credit": 0,
+  "page": 4,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KB",
+  "particular": "KILANG BERAS RAKYAT SEKINCHAN S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KBX",
+  "particular": "KOTABOX PACKAGING SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KBR",
+  "particular": "KB RICE",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KL",
+  "particular": "KONG LONG HUAT CHEMICALS SDN BHD",
+  "appx": "13",
+  "debit": 1690.7,
+  "credit": 0,
+  "page": 4,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KK",
+  "particular": "K.K.MACHINERY SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KKR",
+  "particular": "KK RICE VERMICELLI SDN BHD",
+  "appx": "13",
+  "debit": 55435,
+  "credit": 0,
+  "page": 4,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "CR KOW",
+  "particular": "KOWAS TRANPSORT SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "CR LS",
+  "particular": "LEESING LOGISTICS (EM) S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "CR LD",
+  "particular": "LAHAD DATU FLOUR MILL SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 25492.43,
+  "page": 4,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "CR LYF",
+  "particular": "LEONG YUN FAH SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "CR MB",
+  "particular": "MULTI-BEST TRADING SDN BHD",
+  "appx": "13",
+  "debit": 280,
+  "credit": 0,
+  "page": 4,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "CR MIB",
+  "particular": "MIBA LOGISTICS & FORWARDING SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "CR MIE",
+  "particular": "MARITIME & INDUSTRIAL ENGINEERS SDN BH",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "CR MJ",
+  "particular": "MOON JADE TRADING",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "CR MY",
+  "particular": "MYCO2 (PG) SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "CR NS",
+  "particular": "NITSEI SAGO INDUSTRIES SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 55435,
+  "page": 4,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "CR UE",
+  "particular": "UNIMECH ENGINEERING (JB) S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "CR PK",
+  "particular": "PERCETAKAN KOLOMBONG RIA SDN BHD",
+  "appx": "13",
+  "debit": 1150,
+  "credit": 0,
+  "page": 4,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "CR UC",
+  "particular": "UNIMEKAR CHEMICALS SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "CR PAC",
+  "particular": "PACIFIC SELATAN AGENCY SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 4,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "CR PH",
+  "particular": "PHOUNG HUAT ENTERPRISE S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "CR PM",
+  "particular": "PAUMIN HARDWARE SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "CR PN",
+  "particular": "PUNCAK NIAGA",
+  "appx": "13",
+  "debit": 0,
+  "credit": 24638.3,
+  "page": 5,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "CR RF",
+  "particular": "RESOURCE FOOD SUPPLIES (M) SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "CR RED",
+  "particular": "REDOX CHEMICALS SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SH",
+  "particular": "SWEE HIN CHAN CO SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SALES",
+  "particular": "CREDIT SALES",
+  "appx": "7",
+  "debit": 0,
+  "credit": 2809907.38,
+  "page": 5,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SHAN",
+  "particular": "SHANDONG HAOFUXING INTERNATIONAL TRD C",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SGEN",
+  "particular": "SA GENERAL PLASTICS TRD SDN BHD",
+  "appx": "13",
+  "debit": 3000.1,
+  "credit": 0,
+  "page": 5,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SL",
+  "particular": "SAGO-LINK SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SSJ",
+  "particular": "SYARIKAT SHAH JAYA",
+  "appx": "13",
+  "debit": 0,
+  "credit": 4000,
+  "page": 5,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "CR ST",
+  "particular": "STELLAR PLASTIK SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SW",
+  "particular": "SERBA WANGI SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "CR TKC",
+  "particular": "TAN KIEN CHONG (SABAH) SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SY",
+  "particular": "SHIN YANG SHIPPING SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SSL",
+  "particular": "SAN SENG LEE (KEDAH) SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SD",
+  "particular": "SUDI LAJU SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SZ",
+  "particular": "SAZARICE SDN BHD",
+  "appx": "13",
+  "debit": 101.25,
+  "credit": 0,
+  "page": 5,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "CR SRI",
+  "particular": "SRI MAJU JAYA TRADING",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "CR UN",
+  "particular": "UNIANG PLASTIC INDUSTRIES (SABAH) SDN",
+  "appx": "13",
+  "debit": 6279.4,
+  "credit": 0,
+  "page": 5,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "CR UD",
+  "particular": "UNIRAW DAIRIES & FOOD S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "CR WH",
+  "particular": "WIN HIN MACHINERY (M) SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "CR QH",
+  "particular": "QINGDAO HONGFULEI TRADE CO,.LTD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "CR QF",
+  "particular": "Q-FLEX IND (M) SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "CR QS",
+  "particular": "QINGDAO SHENGDA COMMERCIAL & TRADE CO.",
+  "appx": "13",
+  "debit": 1070.68,
+  "credit": 0,
+  "page": 5,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "CR NCT",
+  "particular": "NCT FORWARDING & SHIPPING S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "CR PSA",
+  "particular": "PACIFIC SELATAN AGENCY S/B",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "CR MTT",
+  "particular": "MTT SHIPPING SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 211.8,
+  "page": 5,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "CR YES",
+  "particular": "YESOKEY FOOD SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "CR TOM",
+  "particular": "TOMHER INDUSTRIAL SDN BHD",
+  "appx": "13",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B21",
+  "particular": "9.80 X 30KG (HWN)-BIHUN 2UDG MERAH/PUT",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B22",
+  "particular": "8.00 X 30KG -BIHUN 2UDG GREEN",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B23",
+  "particular": "BIHUN 300GM WEQQ",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BP600",
+  "particular": "BIHUN PLASTIK PUTIH 600GM",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B24",
+  "particular": "BIHUN 600GM WEQQ",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B2UD",
+  "particular": "BIHUN CAP 2 UDG",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B31",
+  "particular": "8.80 X 22KG (DMP)- BIHUN CAP 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B32",
+  "particular": "8.80 X 30KG (GEN)-BIHUN 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B33",
+  "particular": "8.80 X 32.5KG (GEN)-BIHUN CAP 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B34",
+  "particular": "8.80 X 33KG (GEN)-BIHUN CAP 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B35",
+  "particular": "8.80 X 28KG (DMP)-BIHUN CAP 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B36",
+  "particular": "8.80 X 30KG (DMP)-BIHUN 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B37",
+  "particular": "8.80 X 27.3KG (DMP)-BIHUN 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B3UD",
+  "particular": "BIHUN CAP 3 UDG",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B5KG1",
+  "particular": "7.04 X 25KG (STELLAR)-BIHUN MERAH 5KG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "CS B600G",
+  "particular": "BIHUN 3UDG/MEQ 600G",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 5,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BAPL",
+  "particular": "BIHUN CAP APPLE",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BBER1",
+  "particular": "BERAS (KK1)",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BBER2",
+  "particular": "BERAS (KK2)",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BBER3",
+  "particular": "BERAS (KK3)",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BBER4",
+  "particular": "BERAS (KILANG BERAS RAKYAT)",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BBER5",
+  "particular": "BERAS D1-DINXINGS",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BBER6",
+  "particular": "BERAS D2-DINXINGS",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BJAG1",
+  "particular": "JAGUNG (HOMCO)",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BJAG2",
+  "particular": "JAGUNG (RESOURCE)",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BJAG3",
+  "particular": "JAGUNG (LYF)",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BJAG4",
+  "particular": "JAGUNG",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BKOW1",
+  "particular": "KOWAS TRANSPORT S/B",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BLS1",
+  "particular": "LEASING LOGISTIC S/B",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BM1",
+  "particular": "6.00 X 35KG-BIHUN MERAH 5KG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BNL3",
+  "particular": "BIHUN NO  LABEL 3KG",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BNL5",
+  "particular": "BIHUN NO LABEL 5KG",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BP1",
+  "particular": "7.04 X 25KG (STELLAR)-BIHUN PUTIH NIPI",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BP2",
+  "particular": "7.48 X 25KG (STELLAR)-BIHUN PUTIH NIPI",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BP3",
+  "particular": "13 X 34 X 0.035 (MERAH-NIPIS)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BPB1",
+  "particular": "7.04 X 25KG (STELLAR)-BIHUN PUTIH TERB",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BPB2",
+  "particular": "6.99 X 25KG (STELLAR)- BIHUN PUTIH TER",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BPT1",
+  "particular": "6.20 X 25KG (STELLAR)-BIHUN PUTIH TEBA",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BSAG1",
+  "particular": "SAGO",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BSAG2",
+  "particular": "SAGO",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BSDM1",
+  "particular": "SODIUM METALBISULPHITE",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BSDM2",
+  "particular": "SODIUM METALBISULPHITE",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BTAP1",
+  "particular": "SELOTAPE",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BTAP2",
+  "particular": "SELOTAPE (MERAH)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BTH21",
+  "particular": "TH-2",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BTM",
+  "particular": "BIHUN CAP TUKANG MASAK",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BTM1",
+  "particular": "9.50 X 25KG -BIHUN CAP TUKANG MASAK",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BUP",
+  "particular": "BIHUN CAP UDANG PADI",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "CS BUP1",
+  "particular": "8.00 X 30KG -BIHUN UDANG PADI",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "CS KOW",
+  "particular": "KOWAS TRANSPORT SDN BHD",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "CS LS",
+  "particular": "LEASING LOGISTIC (EM) SDN BHD",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M1",
+  "particular": "19 X 30 X 0.05 MERAH-LEBAR",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M2",
+  "particular": "18 X 29 X 0.025 MERAH-LEBAL",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M21",
+  "particular": "9.30 X 25KG (H)- MEE 2UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M22",
+  "particular": "8.80 X 30KG (DMP)- MEE 2 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M23",
+  "particular": "8.80 X 31.5KG.(GEN)- MEE 2 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M24",
+  "particular": "8.80 X 30KG (GEN) - MEE 2 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M25",
+  "particular": "7.58 X 40KG (HANWEN)- MEE 2 UDG MERAH",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M26",
+  "particular": "9.00 X 30KG (GEN)-2UDG 150G",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M27",
+  "particular": "2 UDG 150G-MEQ (9.50 X 30KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M28",
+  "particular": "2 UDG 150G-MEQ (9.50 X 18.5KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M29",
+  "particular": "2 UDG 150G-MEQ (9.50X12.7KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 6,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M2UD",
+  "particular": "MEE CAP 2 UDANG",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MK",
+  "particular": "MEE 3UDG/MEQ 350G",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MK5",
+  "particular": "MI KUNING 350G X 5PKT",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M30",
+  "particular": "2UDG 150G-MEQ (9.10X25KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M31",
+  "particular": "9.30 X 25KG (H)- MEE 3 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M32",
+  "particular": "8.80 X 27KG (DMP)- MEE 3 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M33",
+  "particular": "8.80 X 22KG (DMP)- MEE 3 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M34",
+  "particular": "8.80 X 28KG (DMP)-MEE 3 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M35",
+  "particular": "8.80 X 22.3KG (DMP)- MEE 3 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M36",
+  "particular": "8.80 X 30KG (GEN) - MEE 3 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M37",
+  "particular": "8.80 X 29.5KG (GEN) - MEE 3 UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M38",
+  "particular": "8.80 X 30KG (GEN)- MEE 3UDG",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M39",
+  "particular": "3 UDG 180G-MEQ (9.50 X 30KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M3UD",
+  "particular": "MEE CAP 3 UDANG",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M40",
+  "particular": "3UGD 180G-MEQ (9.50 X 24.5KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M41",
+  "particular": "2UDG 150-MEQ (9.10X23.6KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M42",
+  "particular": "3UDG 180G-MEQ (9.10X25KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M43",
+  "particular": "3UDG 180G-MEQ (9.10X10KG)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M44",
+  "particular": "MI KUNING SABAH 500G",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M45",
+  "particular": "MEE 3UDG 180GM WEQQ",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M46",
+  "particular": "MEE 2UDG 150GM WEQQ",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M47",
+  "particular": "MEE 360GM WEQQ",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M48",
+  "particular": "LABEL 1.5KG WEQQ",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M49",
+  "particular": "MEE 420G WEQQ",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M50",
+  "particular": "STICKER LABEL RAMEE",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M51",
+  "particular": "PLASTIC ROLL (MEE 2UDG 150G)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M52",
+  "particular": "PLASTIC ROLL (MEE 3UDG 180G)",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "CS M420G",
+  "particular": "MEE 420G-WEQQ",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "CS ME3",
+  "particular": "6.70 X 60KG- MEE EKONOMI 380G",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "CS ME4",
+  "particular": "9.80 X 30KG -MEE EKONOMI 400G",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MGRM1",
+  "particular": "GARAM",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MGRM2",
+  "particular": "GARAM",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "CS ML1",
+  "particular": "6.35 X 25KG (STELLAR)- MEE MERAH MNL",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "CS ML2",
+  "particular": "6.40 X 25KG (STELLAR)-MEE MERAH MNL",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MM1",
+  "particular": "6.00 X 25KG (STELLAR)-MEE MERAH NIPIS",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MM2",
+  "particular": "6.40 X 25KG (STELLAR)-MEE MERAH NIPIS",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MME",
+  "particular": "5.50 X 35KG -MEE MERAH EKONOMI",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MRAM",
+  "particular": "RAMEN 500GM",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MNL1",
+  "particular": "MEE NO LABEL 1.5KG",
+  "appx": "14-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MP1",
+  "particular": "6.40 X 25KG (STELLAR)-MEE PUTIH NIPIS",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MP2",
+  "particular": "6.00 X 25KG (STELLAR)-MEE PUTIH NIPIS",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MSOD1",
+  "particular": "SODA ASH",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MSOD2",
+  "particular": "SODA ASH",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MT1",
+  "particular": "7.80 X 25KG -MEE MERAH TEBAL",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MTAP1",
+  "particular": "SELOTAPE",
+  "appx": "14-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MTEP1",
+  "particular": "TEPUNG",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 7,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MTEP2",
+  "particular": "TEPUNG",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MTEP3",
+  "particular": "STORK W 25KG",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MTH11",
+  "particular": "TH-1",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "CS MSD",
+  "particular": "SODIUM TRIPOLYPHOSPHATE",
+  "appx": "14-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "DPE",
+  "particular": "DEPRECIATION OF PROPERTY, PLANT & EQUI",
+  "appx": "15",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "DEP SAA453",
+  "particular": "DEPOSIT RECEIVED-VISA TRANSPORT CO",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "DF TAX",
+  "particular": "DEFERRED TAX LIABILITIES",
+  "appx": "1",
+  "debit": 0,
+  "credit": 26016.16,
+  "page": 8,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "FD PBB",
+  "particular": "FIXED DEPOSIT (NO:1326699817)",
+  "appx": "19",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 6323",
+  "particular": "H/P NEW MYVI 1.3 (SAB6323H)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 6389",
+  "particular": "H/P DAIHATSU V116-HU (SAB6389C)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 6893",
+  "particular": "H/P DAIHATSU V116-HU (SAB6893C)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 9515",
+  "particular": "HP-ORIX (SAB9515M)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 9518",
+  "particular": "HP-ORIX (SAB9518M)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 9698",
+  "particular": "H/P HONDA FREED I-VTEC A (SAB9698C)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 9753",
+  "particular": "H/P NEW TOYOTA RUSH 1.5S A/T (SAB9753H",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 9897",
+  "particular": "ISUZU D-MAX 2.5 4X4 (MANUAL)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 9922",
+  "particular": "H/P TOYOTA LAND CRUISER PRADO (SD9922H",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA 3080",
+  "particular": "H/P PROTON IRIZ (SAB3080B)",
+  "appx": "16",
+  "debit": 134.5,
+  "credit": 0,
+  "page": 8,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA HINO",
+  "particular": "HINO  LORRY SD1016T",
+  "appx": "16",
+  "debit": 0,
+  "credit": 21432,
+  "page": 8,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA NIC",
+  "particular": "H/P NICHIYU BATTERY FORKLIFT TRUCK FB2",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA SWJ988",
+  "particular": "TOYOTA HILUX DOUBLE CAB",
+  "appx": "16",
+  "debit": 0,
+  "credit": 112571.68,
+  "page": 8,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA QCV920",
+  "particular": "PERODUA ATIVA QCV920",
+  "appx": "16",
+  "debit": 12000,
+  "credit": 0,
+  "page": 8,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "HPA PILL",
+  "particular": "PILLOW SEAL PACKAGING MACHINE (AC:KK13",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB HINO",
+  "particular": "HINO  LORRY",
+  "appx": "16",
+  "debit": 4027.87,
+  "credit": 0,
+  "page": 8,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 6323",
+  "particular": "INTEREST IN SUSPENSE (SAB6323H)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 6389",
+  "particular": "INTEREST IN SUSPENSE (SAB6389C)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 6893",
+  "particular": "INTEREST IN SUSPENSE (SAB6893C)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 9515",
+  "particular": "HP INTEREST IN SUSPENSE-SAB9515M",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 9518",
+  "particular": "HP INTEREST IN SUSPENSE-SAB9518M",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 9698",
+  "particular": "INTEREST IN SUSPENSE (SAB9698C)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 9753",
+  "particular": "INTEREST IN SUSPENSE (SAB9753H)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 3080",
+  "particular": "INTEREST IN SUSPENSE",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB 9922",
+  "particular": "INTEREST IN SUSPENSE (SD9922H)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB NIC",
+  "particular": "INTEREST IN SUSPENSE (NICHIYU BATTERY",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB PILL",
+  "particular": "INTEREST IN SUSPENSE (PILLOW MACHINE)",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB QCV920",
+  "particular": "HIRE PURCHASE INTEREST IN SUSPENSE (QC",
+  "appx": "16",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "HPB SWJ988",
+  "particular": "TOYOTA HILUX DOUBLE CAB",
+  "appx": "16",
+  "debit": 18809.47,
+  "credit": 0,
+  "page": 8,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "HPI",
+  "particular": "HIRE PURCHASE INTEREST",
+  "appx": "23",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "HR",
+  "particular": "HIRING OF PLANT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "INPUT.TAX",
+  "particular": "INPUT TAX",
+  "appx": "17",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "INS920",
+  "particular": "INSURANCE QCV920",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "INS6304",
+  "particular": "INSURANCE SYC 6304",
+  "appx": "5",
+  "debit": 416.43,
+  "credit": 0,
+  "page": 8,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "INS1325",
+  "particular": "INSURANCE SB1325",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "INS2035",
+  "particular": "INSURANCE SAA2035H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "INS2962",
+  "particular": "INSURANCE SA2962M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "INS4688",
+  "particular": "INSURANCE SA4688N",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 8,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "INS5163",
+  "particular": "INSURANCE SA5163R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "INS6323",
+  "particular": "INSURANCE SAB6323H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "INS6389",
+  "particular": "INSURANCE SAB6389C",
+  "appx": "5",
+  "debit": 748.15,
+  "credit": 0,
+  "page": 9,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "INS6893",
+  "particular": "INSURANCE SAB6893C",
+  "appx": "5",
+  "debit": 748.15,
+  "credit": 0,
+  "page": 9,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "INS7369",
+  "particular": "INSURANCE SA7369R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "INS8155",
+  "particular": "INSURANCE SAB8155W",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "INS7118",
+  "particular": "INSURANCE SB7118C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "INS75",
+  "particular": "INSURANCE-HITACHI EX75",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "INS830",
+  "particular": "INSURANCE SA830E",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "INS8726",
+  "particular": "INSURANCE SA8726M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "INS9698",
+  "particular": "INSURANCE SAB9698C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "INS9753",
+  "particular": "INSURANCE SAB9753H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "INS9897",
+  "particular": "INSURANCE SAB9897R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "INS9901",
+  "particular": "INSURANCE SAB9901Y",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "INS9922",
+  "particular": "INSURANCE SD9922H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "INS9882",
+  "particular": "IINSURANCE SWJ9882",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "INS3080",
+  "particular": "INSURANCE SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "INS1016",
+  "particular": "INSURANCE SD1016T",
+  "appx": "5",
+  "debit": 1944.22,
+  "credit": 0,
+  "page": 9,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "INSBFORK",
+  "particular": "INSURANCE BATTERY FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "INSCASE",
+  "particular": "INSURANCE CASE 580F",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "INSFORK",
+  "particular": "INSURANCE FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "INSFS",
+  "particular": "INSURANCE-FORKLIFT SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "INSTS",
+  "particular": "INSURANCE-TOYOTA SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "INSHT15",
+  "particular": "INSURANCE HITACHI EX60-SAB9515M(B)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "INSHT18",
+  "particular": "INSURANCE HITACHI EX60-SAB9518M(K)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "INSJCB",
+  "particular": "INSURANCE JCB BACKHOE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "INSKE",
+  "particular": "INSURANCE-KOMATSU EXCAVATOR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "INSOTH",
+  "particular": "INSURANCE OTHERS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "INSH135",
+  "particular": "INSURANCE HITACHI EX135UR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "INSISEKI",
+  "particular": "INSURANCE TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "INS 2035",
+  "particular": "PREPAYMENT-INSURANCE (SAA2035H)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "INS 6323",
+  "particular": "PREPAYMENT -INUSRANCE (SAB6323H)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "INS 6389",
+  "particular": "PREPAYMENT (INSURANCE SAB6389C)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "INS 6893",
+  "particular": "PREPAYMENT (INSURANCE SAB6893C)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "IN OTH",
+  "particular": "OTHER INCOME",
+  "appx": "18-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "IN PSU",
+  "particular": "PERKESO (PROGRAM SUBSIDI UPAH)",
+  "appx": "18-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "IN AI",
+  "particular": "ALLOWANCE FOR IMPAIRMENT",
+  "appx": "18-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "IN PPE",
+  "particular": "GAIN ON DISPOSAL OF PROPERTY,PLANT AND",
+  "appx": "18-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "LC FAC",
+  "particular": "PREPAYMENT-LICENCE (FACTORY)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "LC TRA",
+  "particular": "PREPAYMENT-LICENCE (TRADE)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "MBADV",
+  "particular": "ADVERTISEMENT",
+  "appx": "5",
+  "debit": 300,
+  "credit": 0,
+  "page": 9,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "MBAR",
+  "particular": "AUDITORS REMUNERATION",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "MBBC",
+  "particular": "BANK CHARGES",
+  "appx": "5",
+  "debit": 253.5,
+  "credit": 0,
+  "page": 9,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "MBBD",
+  "particular": "BAD DEBTS WRITTEN OFF",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "MBC",
+  "particular": "CLEANING EXPENSES",
+  "appx": "5",
+  "debit": 4954.85,
+  "credit": 0,
+  "page": 9,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "MBD",
+  "particular": "BAD DEBTS WRITTEN OFF",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 9,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "MBDON",
+  "particular": "DONATIONS",
+  "appx": "5",
+  "debit": 200,
+  "credit": 0,
+  "page": 10,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "MBDRB",
+  "particular": "DIRECTORS REMUNERATION-BONUS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "MBDRE",
+  "particular": "DIRECTORS REMUNERATION-EPF",
+  "appx": "5",
+  "debit": 8814,
+  "credit": 0,
+  "page": 10,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "MBDRS",
+  "particular": "DIRECTORS REMUNERATION-SALARY",
+  "appx": "5",
+  "debit": 67813.95,
+  "credit": 0,
+  "page": 10,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "MBDRSC",
+  "particular": "DIRECTORS REMUNERATION-SOCSO",
+  "appx": "5",
+  "debit": 963.3,
+  "credit": 0,
+  "page": 10,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "MBEN",
+  "particular": "ENTERTAINMENT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "MBEW",
+  "particular": "ELECTRICITY AND WATER",
+  "appx": "5",
+  "debit": 93405.25,
+  "credit": 0,
+  "page": 10,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE IL",
+  "particular": "IKUT LORI",
+  "appx": "5-1",
+  "debit": 7923,
+  "credit": 0,
+  "page": 10,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE JB",
+  "particular": "JAGA BOILER",
+  "appx": "5-1",
+  "debit": 668,
+  "credit": 0,
+  "page": 10,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE LH",
+  "particular": "LORI HABUK",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE M",
+  "particular": "MAINTENANCE",
+  "appx": "5-1",
+  "debit": 9468,
+  "credit": 0,
+  "page": 10,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE O",
+  "particular": "OFFICE",
+  "appx": "5",
+  "debit": 20575,
+  "credit": 0,
+  "page": 10,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE PK",
+  "particular": "PEKEBUN",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE SM",
+  "particular": "SALESMAN",
+  "appx": "5-1",
+  "debit": 10327,
+  "credit": 0,
+  "page": 10,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "MBE TS",
+  "particular": "TUKANG SAPU",
+  "appx": "5-1",
+  "debit": 1299,
+  "credit": 0,
+  "page": 10,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "MBIF",
+  "particular": "INSPECTION FEE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "MBINS",
+  "particular": "INSURANCE",
+  "appx": "5",
+  "debit": 217.36,
+  "credit": 0,
+  "page": 10,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "MBKH",
+  "particular": "BURNING MATERIALS (HABUK/KAYU)",
+  "appx": "5",
+  "debit": 27125.3,
+  "credit": 0,
+  "page": 10,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "MBLC",
+  "particular": "LICENCE FEE",
+  "appx": "5",
+  "debit": 405,
+  "credit": 0,
+  "page": 10,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "MBLEV",
+  "particular": "LEVY CONTRIBUTIONS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "MBLP",
+  "particular": "LEGAL AND PROFESSIONAL FEE",
+  "appx": "5",
+  "debit": 10,
+  "credit": 0,
+  "page": 10,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL IL",
+  "particular": "IKUT LORI",
+  "appx": "5-1",
+  "debit": 604.44,
+  "credit": 0,
+  "page": 10,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL JB",
+  "particular": "JAGA BOILER",
+  "appx": "5-1",
+  "debit": 49.02,
+  "credit": 0,
+  "page": 10,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL LH",
+  "particular": "LORI HABUK",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL M",
+  "particular": "MAINTENANCE",
+  "appx": "5-1",
+  "debit": 489.03,
+  "credit": 0,
+  "page": 10,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL O",
+  "particular": "OFFICE",
+  "appx": "5",
+  "debit": 1958,
+  "credit": 0,
+  "page": 10,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL PK",
+  "particular": "PEKEBUN",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL SM",
+  "particular": "SALESMAN",
+  "appx": "5-1",
+  "debit": 752.19,
+  "credit": 0,
+  "page": 10,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "MBL TS",
+  "particular": "TUKANG SAPU",
+  "appx": "5-1",
+  "debit": 98.89,
+  "credit": 0,
+  "page": 10,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "MBMED",
+  "particular": "MEDICAL FEE",
+  "appx": "5",
+  "debit": 4403.65,
+  "credit": 0,
+  "page": 10,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "MBNEW",
+  "particular": "NEWSPAPER AND PERIODICALS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "MBOR",
+  "particular": "OFFICE REFRESHMENT",
+  "appx": "5",
+  "debit": 7972.2,
+  "credit": 0,
+  "page": 10,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "MBPEN",
+  "particular": "PENALTY",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "MBPS",
+  "particular": "PRINTING AND STATIONERY",
+  "appx": "5",
+  "debit": 3899.38,
+  "credit": 0,
+  "page": 10,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "MBREN",
+  "particular": "RENT AND RATES",
+  "appx": "5",
+  "debit": 8997.45,
+  "credit": 0,
+  "page": 10,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "MBRM",
+  "particular": "REPAIR AND MAINTENANCE (MEE+BIHUN)",
+  "appx": "5",
+  "debit": 5382.11,
+  "credit": 0,
+  "page": 10,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "MBRMB",
+  "particular": "REPAIR AND MAINTENANCE (BOILER)",
+  "appx": "5",
+  "debit": 69796.8,
+  "credit": 0,
+  "page": 10,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "MBRMF",
+  "particular": "REPAIR AND MAINTENANCE (FACTORY)",
+  "appx": "5",
+  "debit": 36069.39,
+  "credit": 0,
+  "page": 10,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "MBRMO",
+  "particular": "REPAIR AND MAINTENANCE (OFFICE)",
+  "appx": "5",
+  "debit": 8708.7,
+  "credit": 0,
+  "page": 10,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSAF",
+  "particular": "SAFETY & HEALTH EXPENSES",
+  "appx": "5",
+  "debit": 9557.01,
+  "credit": 0,
+  "page": 10,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC IL",
+  "particular": "IKUT LORI",
+  "appx": "5-1",
+  "debit": 1064,
+  "credit": 0,
+  "page": 10,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC JB",
+  "particular": "JAGA BOILER",
+  "appx": "5-1",
+  "debit": 66.1,
+  "credit": 0,
+  "page": 10,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC LH",
+  "particular": "LORI HABUK",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC M",
+  "particular": "MAINTENANCE",
+  "appx": "5-1",
+  "debit": 2523.15,
+  "credit": 0,
+  "page": 10,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC O",
+  "particular": "OFFICE",
+  "appx": "5",
+  "debit": 2979,
+  "credit": 0,
+  "page": 10,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC PK",
+  "particular": "PEKEBUN",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 10,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC SM",
+  "particular": "SALESMAN",
+  "appx": "5-1",
+  "debit": 1224.6,
+  "credit": 0,
+  "page": 11,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSC TS",
+  "particular": "TUKANG SAPU",
+  "appx": "5-1",
+  "debit": 197.7,
+  "credit": 0,
+  "page": 11,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSEC",
+  "particular": "SECRETARIAL AND FILLING FEES",
+  "appx": "5",
+  "debit": 590,
+  "credit": 0,
+  "page": 11,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSF",
+  "particular": "SUBSCRIPTION FEE (MEE/BIHUN)",
+  "appx": "5",
+  "debit": 4001.45,
+  "credit": 0,
+  "page": 11,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP O",
+  "particular": "SIP CONTRIBUTIONS (OFFICE)",
+  "appx": "5",
+  "debit": 340.4,
+  "credit": 0,
+  "page": 11,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP SM",
+  "particular": "SIP CONTRIBUTIONS (SALESMAN)",
+  "appx": "5-1",
+  "debit": 100.8,
+  "credit": 0,
+  "page": 11,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP IL",
+  "particular": "SIP CONTRIBUTIONS (IKUT LORI)",
+  "appx": "5-1",
+  "debit": 121.6,
+  "credit": 0,
+  "page": 11,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP JB",
+  "particular": "SIP CONTRIBUTIONS (JAGA BOILER)",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP MM",
+  "particular": "SIP CONTRIBUTIONS (MESIN MEE)",
+  "appx": "5-1",
+  "debit": 162.2,
+  "credit": 0,
+  "page": 11,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP PM",
+  "particular": "SIP CONTRIBUTIONS (PACKING MEE)",
+  "appx": "5-1",
+  "debit": 114.05,
+  "credit": 0,
+  "page": 11,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP M",
+  "particular": "SIP CONTRIBUTIONS (MAINTENANCE)",
+  "appx": "5-1",
+  "debit": 180.75,
+  "credit": 0,
+  "page": 11,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP TS",
+  "particular": "SIP CONTRIBUTIONS (TUKANG SAPU)",
+  "appx": "5-1",
+  "debit": 22.6,
+  "credit": 0,
+  "page": 11,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSIP LH",
+  "particular": "SIP CONTRIBUTIONS (LORI HABUK)",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "MBDRSIP",
+  "particular": "DIRECTOR REMUNERATION (SIP)",
+  "appx": "5",
+  "debit": 51,
+  "credit": 0,
+  "page": 11,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSM K",
+  "particular": "KILANG",
+  "appx": "5",
+  "debit": 15794.98,
+  "credit": 0,
+  "page": 11,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSM O",
+  "particular": "OFFICE",
+  "appx": "5",
+  "debit": 11242,
+  "credit": 0,
+  "page": 11,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSM SM",
+  "particular": "SALESMAN",
+  "appx": "5",
+  "debit": 14047.35,
+  "credit": 0,
+  "page": 11,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "MBST",
+  "particular": "STAFF TRAINING",
+  "appx": "5",
+  "debit": 1300,
+  "credit": 0,
+  "page": 11,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSUN",
+  "particular": "SUNDRY EXPENSES",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "MBSVT",
+  "particular": "SERVICE TAX",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS ILO",
+  "particular": "IKUT LORI-OTHERS",
+  "appx": "5-1",
+  "debit": 28402.92,
+  "credit": 0,
+  "page": 11,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS JB",
+  "particular": "JAGA BOILER",
+  "appx": "5-1",
+  "debit": 29863.88,
+  "credit": 0,
+  "page": 11,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS LH",
+  "particular": "LORI HABUK",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS M",
+  "particular": "MAINTENANCE (KERJA LUAR KILANG)",
+  "appx": "5-1",
+  "debit": 196739.22,
+  "credit": 0,
+  "page": 11,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS O",
+  "particular": "OFFICE",
+  "appx": "5",
+  "debit": 187848.5,
+  "credit": 0,
+  "page": 11,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS PK",
+  "particular": "PEKEBUN",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS SMO",
+  "particular": "SALESMAN-OTHERS",
+  "appx": "5-1",
+  "debit": 10615.94,
+  "credit": 0,
+  "page": 11,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "MBS TS",
+  "particular": "TUKANG SAPU",
+  "appx": "5-1",
+  "debit": 11338.8,
+  "credit": 0,
+  "page": 11,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "MBTEL",
+  "particular": "POSTAGE AND TELEPHONE",
+  "appx": "5",
+  "debit": 8332.96,
+  "credit": 0,
+  "page": 11,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "MBTRA",
+  "particular": "TRANSPORTATION",
+  "appx": "5",
+  "debit": 1538.32,
+  "credit": 0,
+  "page": 11,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "MBTRV",
+  "particular": "TRAVELLING AND ACCOMMODATION",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "MBUF",
+  "particular": "UPKEEP OF FACTORY",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "MBUM",
+  "particular": "UPKEEP OF MACHINERY",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "MBUMB",
+  "particular": "UPKEEP OF MACHINERY (BOILER)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "MBUMF",
+  "particular": "UPKEEP OF MACHINERY (FACTORY)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "MBUMO",
+  "particular": "UPKEEP OF MACHINERY (OFFICE)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "MBWP",
+  "particular": "WORKPASS",
+  "appx": "5",
+  "debit": 6815.8,
+  "credit": 0,
+  "page": 11,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "MGT",
+  "particular": "REPAIR & MAINTENANCE (MENGGATAL)",
+  "appx": "5",
+  "debit": 28139.45,
+  "credit": 0,
+  "page": 11,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "ME MM",
+  "particular": "MESIN MEE",
+  "appx": "5-1",
+  "debit": 11244,
+  "credit": 0,
+  "page": 11,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "ME PM",
+  "particular": "PACKING MEE",
+  "appx": "5-1",
+  "debit": 8568,
+  "credit": 0,
+  "page": 11,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "MLEV",
+  "particular": "LEVY CONTRIBUTIONS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "ML MM",
+  "particular": "MACHINE MEE",
+  "appx": "5-1",
+  "debit": 783.1,
+  "credit": 0,
+  "page": 11,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "ML PM",
+  "particular": "PACKING MEE",
+  "appx": "5-1",
+  "debit": 672,
+  "credit": 0,
+  "page": 11,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "MRET",
+  "particular": "RETURN OFF OF GOODS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 11,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "MRM",
+  "particular": "REPAIR AND MAINTENANCE (MEE)",
+  "appx": "5",
+  "debit": 23078.62,
+  "credit": 0,
+  "page": 11,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "MSC MM",
+  "particular": "MACHINE MEE",
+  "appx": "5-1",
+  "debit": 1514.75,
+  "credit": 0,
+  "page": 11,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "MSC PM",
+  "particular": "PACKING MEE",
+  "appx": "5-1",
+  "debit": 1229.6,
+  "credit": 0,
+  "page": 12,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "MS IL",
+  "particular": "IKUT LORI-COMMISSION MEE",
+  "appx": "5-1",
+  "debit": 12859.43,
+  "credit": 0,
+  "page": 12,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "MS MM",
+  "particular": "MESIN & SANGKUT MEE",
+  "appx": "5-1",
+  "debit": 78513.48,
+  "credit": 0,
+  "page": 12,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "MS PM",
+  "particular": "PACKING MEE",
+  "appx": "5-1",
+  "debit": 72131.85,
+  "credit": 0,
+  "page": 12,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "MS SM",
+  "particular": "SALESMAN-COMMISSION MEE",
+  "appx": "5-1",
+  "debit": 29079.93,
+  "credit": 0,
+  "page": 12,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "MTRA",
+  "particular": "TRANSPORTATION",
+  "appx": "5",
+  "debit": 607.7,
+  "credit": 0,
+  "page": 12,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "MUM",
+  "particular": "UPKEEP OF MACHINERY (MEE)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA FB",
+  "particular": "FACTORY BUILDING",
+  "appx": "4",
+  "debit": 3060302.82,
+  "credit": 0,
+  "page": 12,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA FF",
+  "particular": "FURNITURE & FITTING",
+  "appx": "4",
+  "debit": 47138.82,
+  "credit": 0,
+  "page": 12,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA MV",
+  "particular": "MOTOR VEHICLE",
+  "appx": "4",
+  "debit": 1326578.1,
+  "credit": 0,
+  "page": 12,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA OE",
+  "particular": "OFFICE EQUIPMENT",
+  "appx": "4",
+  "debit": 242543.28,
+  "credit": 0,
+  "page": 12,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA PL",
+  "particular": "PARTITION AND LAND",
+  "appx": "4",
+  "debit": 3288992.46,
+  "credit": 0,
+  "page": 12,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA PM",
+  "particular": "PLANT AND MACHINERY",
+  "appx": "4",
+  "debit": 1332021.15,
+  "credit": 0,
+  "page": 12,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA RV",
+  "particular": "RENOVATION",
+  "appx": "4",
+  "debit": 1142934.23,
+  "credit": 0,
+  "page": 12,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "NCA CW",
+  "particular": "CAPITAL WORK IN PROGRESS",
+  "appx": "4",
+  "debit": 844165.12,
+  "credit": 0,
+  "page": 12,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "NT 7484",
+  "particular": "NT.213077484",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "OC BW",
+  "particular": "O/CREDITOR (BIGWHEEL GREEN TYRE)",
+  "appx": "1",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "OC CMK",
+  "particular": "O/CREDITOR-CMK",
+  "appx": "1",
+  "debit": 10200,
+  "credit": 0,
+  "page": 12,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "OC MIL",
+  "particular": "O/CREDITOR-MILTI SEVERICTUS",
+  "appx": "1",
+  "debit": 0,
+  "credit": 33638.54,
+  "page": 12,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL6304",
+  "particular": "OIL SYC6304",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL1325",
+  "particular": "DIESEL SB1325",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL2035",
+  "particular": "DIESEL SAA2035H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL2962",
+  "particular": "DIESEL SA2962M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL4688",
+  "particular": "DIESEL SA4688N",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL5163",
+  "particular": "DIESEL SA5163R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL6323",
+  "particular": "DIESEL SAB6323H",
+  "appx": "5",
+  "debit": 758.5,
+  "credit": 0,
+  "page": 12,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL6389",
+  "particular": "DIESEL SAB6389C",
+  "appx": "5",
+  "debit": 4176.45,
+  "credit": 0,
+  "page": 12,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL6893",
+  "particular": "DIESEL SAB6893C",
+  "appx": "5",
+  "debit": 2647.5,
+  "credit": 0,
+  "page": 12,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL7369",
+  "particular": "DIESEL SA7369R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL7118",
+  "particular": "OIL SB7118C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL8155",
+  "particular": "OIL SAB8155W",
+  "appx": "5",
+  "debit": 130,
+  "credit": 0,
+  "page": 12,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL75",
+  "particular": "DIESEL -HITACHI EX75",
+  "appx": "5",
+  "debit": 308,
+  "credit": 0,
+  "page": 12,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL830",
+  "particular": "DIESEL SA830E",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL8726",
+  "particular": "DIESEL SA8726M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL9698",
+  "particular": "DIESEL SAB9698C",
+  "appx": "5",
+  "debit": 849.8,
+  "credit": 0,
+  "page": 12,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL9753",
+  "particular": "DIESEL SAB9753H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL9897",
+  "particular": "DIESEL SAB9897R",
+  "appx": "5",
+  "debit": 2290,
+  "credit": 0,
+  "page": 12,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL9901",
+  "particular": "DIESEL SAB9901Y",
+  "appx": "5",
+  "debit": 4000,
+  "credit": 0,
+  "page": 12,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL9922",
+  "particular": "DIESEL SD9922H",
+  "appx": "5",
+  "debit": 3813.09,
+  "credit": 0,
+  "page": 12,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL9882",
+  "particular": "DIESEL SWJ9882",
+  "appx": "5",
+  "debit": 1212.15,
+  "credit": 0,
+  "page": 12,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL3080",
+  "particular": "OIL SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL1016",
+  "particular": "DIESEL SD1016T",
+  "appx": "5",
+  "debit": 1530,
+  "credit": 0,
+  "page": 12,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "OILCASE",
+  "particular": "DIESEL CASE 580F",
+  "appx": "5",
+  "debit": 493,
+  "credit": 0,
+  "page": 12,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "OILFORK",
+  "particular": "DIESEL FORKLIFT",
+  "appx": "5",
+  "debit": 1651,
+  "credit": 0,
+  "page": 12,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "OILFS",
+  "particular": "DIESEL-FORKLIFT SHOVEL",
+  "appx": "5",
+  "debit": 1566,
+  "credit": 0,
+  "page": 12,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "OILTS",
+  "particular": "DIESEL- TOYOTA SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 12,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "OILHT15",
+  "particular": "DIESEL HITACHI EX60-SAB9515M(B)",
+  "appx": "5",
+  "debit": 1283,
+  "credit": 0,
+  "page": 13,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "OILHT18",
+  "particular": "DIESEL HITACHI EX60-SAB9518M(K)",
+  "appx": "5",
+  "debit": 2687,
+  "credit": 0,
+  "page": 13,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "OILJCB",
+  "particular": "DIESEL JCB BACKHOE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "OILKE",
+  "particular": "DIESEL-KOMATSU EXCAVATOR",
+  "appx": "5",
+  "debit": 1512,
+  "credit": 0,
+  "page": 13,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "OILOTH",
+  "particular": "OIL OTHERS",
+  "appx": "5",
+  "debit": 8369.4,
+  "credit": 0,
+  "page": 13,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "OILH135",
+  "particular": "DIESEL HITACHI EX135UR",
+  "appx": "5",
+  "debit": 522,
+  "credit": 0,
+  "page": 13,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "OILISEKI",
+  "particular": "DIESEL TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 215,
+  "credit": 0,
+  "page": 13,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "OIL920",
+  "particular": "OIL - QCV920",
+  "appx": "5",
+  "debit": 203.3,
+  "credit": 0,
+  "page": 13,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B21",
+  "particular": "9.80 X 30KG (HWN)-BIHUN 2UDG MERAH/PUT",
+  "appx": "3-7",
+  "debit": 4306.25,
+  "credit": 0,
+  "page": 13,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B22",
+  "particular": "8.00 X 30KG -BIHUN 2 UDG GREEN",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B23",
+  "particular": "BIHUN 300GM WEQQ",
+  "appx": "3-7",
+  "debit": 2887.5,
+  "credit": 0,
+  "page": 13,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B24",
+  "particular": "BIHUN 600GM WEQQ",
+  "appx": "3-7",
+  "debit": 3162.5,
+  "credit": 0,
+  "page": 13,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BP600",
+  "particular": "BIHUN PLASTIK PUTIH 600GM",
+  "appx": "3-7",
+  "debit": 883.4,
+  "credit": 0,
+  "page": 13,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B2UD",
+  "particular": "BIHUN CAP 2 UDANG",
+  "appx": "3-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B31",
+  "particular": "8.80 X 22KG (DMP)-BIHUN 3 UDG",
+  "appx": "3-7",
+  "debit": 712.5,
+  "credit": 0,
+  "page": 13,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B32",
+  "particular": "8.80 X 30KG (GEN)-BIHUN 3UDG",
+  "appx": "3-7",
+  "debit": 11275,
+  "credit": 0,
+  "page": 13,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B33",
+  "particular": "8.80 X 32.5KG (GEN)- BIHUN 3 UDG",
+  "appx": "3-7",
+  "debit": 7510.8,
+  "credit": 0,
+  "page": 13,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B34",
+  "particular": "8.80 X 33KG (GEN)-BIHUN 3UDG",
+  "appx": "3-7",
+  "debit": 1939,
+  "credit": 0,
+  "page": 13,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B35",
+  "particular": "8.80 X 28KG (DMP)-BIHUN 3UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B36",
+  "particular": "8.80 X 30KG (DMP)-BIHUN 3 UDG",
+  "appx": "3-7",
+  "debit": 2375,
+  "credit": 0,
+  "page": 13,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B37",
+  "particular": "8.80 X 27.3KG (DMP)-BIHUN 3 UDG",
+  "appx": "3-7",
+  "debit": 16145.6,
+  "credit": 0,
+  "page": 13,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B3UD",
+  "particular": "BIHUN CAP 3 UDG",
+  "appx": "3-1",
+  "debit": 18463.5,
+  "credit": 0,
+  "page": 13,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B5KG1",
+  "particular": "7.04 X 25KG (STELLAR)- BIHUN MERAH 5KG",
+  "appx": "3-7",
+  "debit": 743.75,
+  "credit": 0,
+  "page": 13,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "OS B600G",
+  "particular": "BIHUN 3UD/MEQ 600G",
+  "appx": "3-1",
+  "debit": 12276,
+  "credit": 0,
+  "page": 13,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BAPL",
+  "particular": "BIHUN CAP APPLE",
+  "appx": "3-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BBER1",
+  "particular": "BERAS (KK1)",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BBER2",
+  "particular": "BERAS (KK2)",
+  "appx": "3-3",
+  "debit": 22442.5,
+  "credit": 0,
+  "page": 13,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BBER3",
+  "particular": "BERAS (KK3)",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BBER4",
+  "particular": "BERAS(KILANG BERAS RAKYAT)",
+  "appx": "3-3",
+  "debit": 122082.5,
+  "credit": 0,
+  "page": 13,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BBER5",
+  "particular": "BERAS D1-DINXINGS",
+  "appx": "3-3",
+  "debit": 113975,
+  "credit": 0,
+  "page": 13,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BBER6",
+  "particular": "BERAS D2-DINXINGS",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BJAG1",
+  "particular": "JAGUNG (HOMCO)",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BJAG2",
+  "particular": "JAGUNG (RESOURCE)",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BJAG3",
+  "particular": "JAGUNG (LYF)",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BJAG4",
+  "particular": "JAGUNG",
+  "appx": "3-3",
+  "debit": 11872,
+  "credit": 0,
+  "page": 13,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BKOW1",
+  "particular": "KOWAS TRANSPORT SDN BHD",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BLS1",
+  "particular": "LEASING LOGISTIC S/B",
+  "appx": "3-3",
+  "debit": 52180,
+  "credit": 0,
+  "page": 13,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BM1",
+  "particular": "6.00 X 35KG -BIHUN MERAH NIPIS",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BNL3",
+  "particular": "BIHUN NO  LABEL 3KG",
+  "appx": "3-1",
+  "debit": 573.5,
+  "credit": 0,
+  "page": 13,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BNL5",
+  "particular": "BIHUN NO LABEL 5KG",
+  "appx": "3-1",
+  "debit": 3059,
+  "credit": 0,
+  "page": 13,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BP1",
+  "particular": "7.04 X 25KG (STELLAR)- BIHUN PUTIH NIP",
+  "appx": "3-7",
+  "debit": 2137.5,
+  "credit": 0,
+  "page": 13,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BP2",
+  "particular": "7.48 X 25KG (STELLAR)-BIHUN PUTIH NIPI",
+  "appx": "3-7",
+  "debit": 6375.6,
+  "credit": 0,
+  "page": 13,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BP3",
+  "particular": "13 X 34 X 0.035 (MERAH-NIPIS)",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 13,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BPB1",
+  "particular": "7.04 X 25KG (STELLAR)-BIHUN PUTIH TERB",
+  "appx": "3-7",
+  "debit": 5100,
+  "credit": 0,
+  "page": 13,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BPB2",
+  "particular": "6.99 X 25KG (STELLAR)-BIHUN PUTIH TERB",
+  "appx": "3-7",
+  "debit": 234.6,
+  "credit": 0,
+  "page": 13,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BPT1",
+  "particular": "6.20 X 25KG (STELLAR)- BIHUN PUTIH TEB",
+  "appx": "3-7",
+  "debit": 4090.63,
+  "credit": 0,
+  "page": 13,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BSAG1",
+  "particular": "SAGO",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BSAG2",
+  "particular": "SAGO",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BSDM1",
+  "particular": "SODIUM METALBISULPHITE",
+  "appx": "3-3",
+  "debit": 948.75,
+  "credit": 0,
+  "page": 14,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BSDM2",
+  "particular": "SODIUM METALBISULPHITE",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BTAP1",
+  "particular": "SELOTAPE",
+  "appx": "3-7",
+  "debit": 1384.5,
+  "credit": 0,
+  "page": 14,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BTAP2",
+  "particular": "SELOTAPE MERAH",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BTH21",
+  "particular": "TH-2",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BTH22",
+  "particular": "TH-2",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BTM",
+  "particular": "BIHUN CAP TUKANG MASAK",
+  "appx": "3-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BTM1",
+  "particular": "9.50 X 25KG -BIHUN TUKANG MASAK",
+  "appx": "3-7",
+  "debit": 5275,
+  "credit": 0,
+  "page": 14,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BUP",
+  "particular": "BIHUN CAP UDANG PADI",
+  "appx": "3-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "OS BUP1",
+  "particular": "8.00 X 30KG -BIHUN UDANG PADI",
+  "appx": "3-7",
+  "debit": 2493.75,
+  "credit": 0,
+  "page": 14,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "OS KOW",
+  "particular": "KOWAS TRANSPORT SDN BHD",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "OS LS",
+  "particular": "LEASING LOGISTIC (EM) SDN BHD",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M1",
+  "particular": "19 X 30 X 0.05 MERAH LEBAR",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M2",
+  "particular": "18 X 29 X 0.05 MERAH-TEBAL",
+  "appx": "3-7",
+  "debit": 2381.25,
+  "credit": 0,
+  "page": 14,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M21",
+  "particular": "9.30 X 25KG (H) -MEE 2 UDG",
+  "appx": "3-7",
+  "debit": 3836.25,
+  "credit": 0,
+  "page": 14,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M22",
+  "particular": "8.80 X 30KG (DMP)-MEE 2UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M23",
+  "particular": "8.80 X 31.5KG (GEN)-MEE 2UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M24",
+  "particular": "8.80 X 30KG (GEN) -MEE 2UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M25",
+  "particular": "7.58 X 40KG (HWN)-MEE 2UDG MERAH",
+  "appx": "3-7",
+  "debit": 1061.2,
+  "credit": 0,
+  "page": 14,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M26",
+  "particular": "9.00 X 30KG (GEN)-2UDG 150G",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M27",
+  "particular": "2UDG 150-MEQ (9.50 X30KG)",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M28",
+  "particular": "2UDG 150G-MEQ (9.50 X 18.5KG)",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M29",
+  "particular": "2UDG 150G-MEQ (9.50 X 12.7)",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M2UD",
+  "particular": "MEE CAP 2 UDANG",
+  "appx": "3-1",
+  "debit": 3763.2,
+  "credit": 0,
+  "page": 14,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MK",
+  "particular": "MEE 3UDG/MEQ 350G",
+  "appx": "3-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MK5",
+  "particular": "MI KUNING 350G X 5PKT",
+  "appx": "3-1",
+  "debit": 4600,
+  "credit": 0,
+  "page": 14,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M30",
+  "particular": "2UDG 150G-MEQ (9.10X25KG)",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M31",
+  "particular": "9.30 X 25KG (H)-MEE 3UDG",
+  "appx": "3-7",
+  "debit": 3255,
+  "credit": 0,
+  "page": 14,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M32",
+  "particular": "8.80 X 27KG (DMP)-MEE 3UDG",
+  "appx": "3-7",
+  "debit": 348.8,
+  "credit": 0,
+  "page": 14,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M33",
+  "particular": "8.80 X 22KG (DMP)-MEE 3UDG",
+  "appx": "3-7",
+  "debit": 5775,
+  "credit": 0,
+  "page": 14,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M34",
+  "particular": "8.80 X 28KG (DMP)-MEE 3UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M35",
+  "particular": "8.80 X 22.30KG (DMP)-MEE 3UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M36",
+  "particular": "8.80 X 30KG (GEN)- MEE 3 UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M37",
+  "particular": "8.80 X 29.5KG (GEN)-MEE 3UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M38",
+  "particular": "8.80 X 30KG (GEN) - MEE 3UDG",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M39",
+  "particular": "3 UDG 180G-MEQ (9.50 X 30KG)",
+  "appx": "3-7",
+  "debit": 575,
+  "credit": 0,
+  "page": 14,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M3UD",
+  "particular": "MEE CAP 3 UDANG",
+  "appx": "3-1",
+  "debit": 5566,
+  "credit": 0,
+  "page": 14,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M40",
+  "particular": "3 UGS 180G-MEQ (9.50 X 24.5KG)",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M41",
+  "particular": "2UDG 150G-MEQ (9.10X23.6KG)",
+  "appx": "3-7",
+  "debit": 1650,
+  "credit": 0,
+  "page": 14,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M42",
+  "particular": "3UDG 180G-MEQ (9.10X25KG)",
+  "appx": "3-7",
+  "debit": 2709.6,
+  "credit": 0,
+  "page": 14,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M43",
+  "particular": "3UDG 180G-MEQ (9.10X10KG)",
+  "appx": "3-7",
+  "debit": 9490.26,
+  "credit": 0,
+  "page": 14,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M44",
+  "particular": "MI KUNING SABAH 500G",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 14,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M45",
+  "particular": "3UDG 180GM-WEQQ",
+  "appx": "3-7",
+  "debit": 7783.9,
+  "credit": 0,
+  "page": 14,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M46",
+  "particular": "2UDG 150GM-WEQQ",
+  "appx": "3-7",
+  "debit": 2256.25,
+  "credit": 0,
+  "page": 14,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M47",
+  "particular": "MEE 360GM WEQQ",
+  "appx": "3-7",
+  "debit": 2493.75,
+  "credit": 0,
+  "page": 15,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M48",
+  "particular": "LABEL 1.5KG WEQQ",
+  "appx": "3-7",
+  "debit": 3590.92,
+  "credit": 0,
+  "page": 15,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M49",
+  "particular": "MEE 420G WEQQ",
+  "appx": "3-7",
+  "debit": 2612.5,
+  "credit": 0,
+  "page": 15,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M50",
+  "particular": "STICKER LABEL RAMEE",
+  "appx": "3-7",
+  "debit": 15939,
+  "credit": 0,
+  "page": 15,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M51",
+  "particular": "PLASTIC ROLL (MEE 2UDG 150G)",
+  "appx": "3-7",
+  "debit": 8844,
+  "credit": 0,
+  "page": 15,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M52",
+  "particular": "PLASTIC ROLL (MEE 3UDG 180G)",
+  "appx": "3-7",
+  "debit": 9372,
+  "credit": 0,
+  "page": 15,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "OS M420G",
+  "particular": "MEE 420G WEQQ",
+  "appx": "3-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "OS ME3",
+  "particular": "6.70 X 60KG - MEE EKONOMI 380G",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "OS ME4",
+  "particular": "9.80 X 30KG - MEE EKONOMI 400G",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MGRM1",
+  "particular": "GARAM",
+  "appx": "3-3",
+  "debit": 195.47,
+  "credit": 0,
+  "page": 15,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MGRM2",
+  "particular": "GARAM",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "OS ML1",
+  "particular": "6.35 X 25KG (STELLAR)-MEE MERAH MNL",
+  "appx": "3-7",
+  "debit": 11121.44,
+  "credit": 0,
+  "page": 15,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "OS ML2",
+  "particular": "6.40 X 25KG (STELLAR)- MEE MERAH MNL",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MM1",
+  "particular": "6.00 X 25KG (STELLAR) - MEE MERAH NIPI",
+  "appx": "3-7",
+  "debit": 9960,
+  "credit": 0,
+  "page": 15,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MM2",
+  "particular": "6.40 X 25KG (STELLAR) - MEE MERAH NIPI",
+  "appx": "3-7",
+  "debit": 132,
+  "credit": 0,
+  "page": 15,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MME",
+  "particular": "5.50 X 35KG - MEE MERAH EKONOMI",
+  "appx": "3-7",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MNL1",
+  "particular": "MEE NO LABEL 1.5KG",
+  "appx": "3-1",
+  "debit": 36092,
+  "credit": 0,
+  "page": 15,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MRAM",
+  "particular": "RAMEN 500GM",
+  "appx": "3-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MP1",
+  "particular": "6.40 X 25KG (STELLAR)- MEE PUTIH NIPIS",
+  "appx": "3-7",
+  "debit": 1872.3,
+  "credit": 0,
+  "page": 15,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MP2",
+  "particular": "6.00 X 25KG (STELLAR)- MEE PUTIH NIPIS",
+  "appx": "3-7",
+  "debit": 5720,
+  "credit": 0,
+  "page": 15,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MSOD1",
+  "particular": "SODA ASH",
+  "appx": "3-3",
+  "debit": 660.96,
+  "credit": 0,
+  "page": 15,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MSOD2",
+  "particular": "SODA ASH",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MT1",
+  "particular": "7.80 X 25KG - MEE MERAH TEBAL",
+  "appx": "3-7",
+  "debit": 2062.5,
+  "credit": 0,
+  "page": 15,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MTAP1",
+  "particular": "SELOTAPE",
+  "appx": "3-7",
+  "debit": 104.65,
+  "credit": 0,
+  "page": 15,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MTEP1",
+  "particular": "TEPUNG 50KG",
+  "appx": "3-3",
+  "debit": 16034.4,
+  "credit": 0,
+  "page": 15,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MTEP2",
+  "particular": "TEPUNG",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MTEP3",
+  "particular": "STORK W 25KG",
+  "appx": "3-3",
+  "debit": 8109.92,
+  "credit": 0,
+  "page": 15,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MTH11",
+  "particular": "TH-1",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MTH12",
+  "particular": "TH-1",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "OS MSD",
+  "particular": "SODIUM TRIPOLYPHOSPHATE",
+  "appx": "3-3",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "OT IN",
+  "particular": "OTHER INCOME",
+  "appx": "18-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "OUTPUT.TAX",
+  "particular": "OUTPUT TAX",
+  "appx": "17",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "PBB 1",
+  "particular": "PBB BANK-MBH (3170049926)",
+  "appx": "19",
+  "debit": 212738.37,
+  "credit": 0,
+  "page": 15,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "PBB 2",
+  "particular": "PBB BANK-THJ (3988503005)",
+  "appx": "19",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "PM BPMB",
+  "particular": "BIG PLASTICK-BIHUN",
+  "appx": "3-2",
+  "debit": 24958,
+  "credit": 0,
+  "page": 15,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "PM BPMS",
+  "particular": "SMALL PLASTICK-BIHUN",
+  "appx": "3-2",
+  "debit": 49426.5,
+  "credit": 0,
+  "page": 15,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "PM BTAP",
+  "particular": "SELOTAPE-BIHUN",
+  "appx": "3-2",
+  "debit": 3744,
+  "credit": 0,
+  "page": 15,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "PM MPMB",
+  "particular": "BIG PLASTICK-MEE",
+  "appx": "3-2",
+  "debit": 15840,
+  "credit": 0,
+  "page": 15,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "PM MPMS",
+  "particular": "SMALL PLASTICK-MEE",
+  "appx": "3-2",
+  "debit": 21812.84,
+  "credit": 0,
+  "page": 15,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "PM MTAP",
+  "particular": "SELOTAPE-MEE",
+  "appx": "3-2",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "PPE",
+  "particular": "PROPERTY, PLANT & EQUIPMENT WRITTEN OF",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "PT6304",
+  "particular": "PATCHING & TUBE SYC6304",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "PT9901",
+  "particular": "PATCHING & TUBE (SAB9901Y)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "PT3080",
+  "particular": "PATCHING & TUBE SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "PT9922",
+  "particular": "VRE-PATCHING TUBE (SD9922H)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 15,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "PT9882",
+  "particular": "PATCHING & TUBE (SWJ9882)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "PT9698",
+  "particular": "VRE-PATCHING TUBE (SAB9698C)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "PT6323",
+  "particular": "VRE-PATCHING TUBE (SAB6323H)",
+  "appx": "5",
+  "debit": 10,
+  "credit": 0,
+  "page": 16,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "PT7369",
+  "particular": "VRE-PATCHING TUBE (SA7369R)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "PT2962",
+  "particular": "VRE-PATCHING TUBE (SA2962M)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "PT4688",
+  "particular": "VRE-PATCHING TUBE (SA4688N)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "PT6893",
+  "particular": "VRE-PATCHING TUBE (SAB6893C)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "PT6389",
+  "particular": "VRE-PATCHING TUBE (SAB6389C)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "PT1325",
+  "particular": "VRE-PATCHING TUBE (SB1325)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "PT920",
+  "particular": "VRE-PATCHING TUBE (QCV920)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "PTOTH",
+  "particular": "VRE-PATCHING TUBE (OTHERS)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "PTBFORK",
+  "particular": "VRE-PATCHING TUBE (BATTERY FORK)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "PT8726",
+  "particular": "VRE-PATCHING TUBE (SA8726M)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "PT9753",
+  "particular": "VRE-PATHCING TUBE (SAB9753H)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "PT9897",
+  "particular": "VRE-PATCHING TUBE (SAB9798T)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "PT8155",
+  "particular": "VRE-PATCHING TUBE (SAB8155W)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "PT7118",
+  "particular": "VRE-PATCHING TUBE (SB7118C)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "PT1016",
+  "particular": "VRE-PATCHING TUBE (SD1016T)",
+  "appx": "5",
+  "debit": 50,
+  "credit": 0,
+  "page": 16,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "PTFORK",
+  "particular": "VRE-PATCHING TUBE (FORKLIFT)",
+  "appx": "5",
+  "debit": 85,
+  "credit": 0,
+  "page": 16,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "PTJCB",
+  "particular": "VRE-PATCHING TUBE (JCB BAKCHOE)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "PTFS",
+  "particular": "VRE-PATCHING TUBE (FORK.SHOVEL)",
+  "appx": "5",
+  "debit": 145,
+  "credit": 0,
+  "page": 16,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "PTTS",
+  "particular": "VRE-PATCHING TUBE (TOYOTA SHOVEL)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "PTKE",
+  "particular": "VRE-PATCHING TUBE (KOMTASU EXT)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "PTCASE",
+  "particular": "VRE-PATCHING TUBE (CASE)",
+  "appx": "5",
+  "debit": 120,
+  "credit": 0,
+  "page": 16,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "PTH135",
+  "particular": "VRE-PATCHING & TUBE(HITACHIE EX135UR)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "PTISEKI",
+  "particular": "VRE-PATCHING TUBE TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "PU BBER",
+  "particular": "BERAS",
+  "appx": "3-5",
+  "debit": 708905.9,
+  "credit": 0,
+  "page": 16,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "PU BJAG",
+  "particular": "JAGUNG",
+  "appx": "3-5",
+  "debit": 190320,
+  "credit": 0,
+  "page": 16,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "PU BSAG",
+  "particular": "SAGO",
+  "appx": "3-5",
+  "debit": 575643,
+  "credit": 0,
+  "page": 16,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "PU BSDM",
+  "particular": "SODIUM METALBISULPHITE",
+  "appx": "3-5",
+  "debit": 1375,
+  "credit": 0,
+  "page": 16,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "PU BTH2",
+  "particular": "TH-2",
+  "appx": "3-5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "PU ICE",
+  "particular": "ICEPOLLY",
+  "appx": "3-5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "PU MBCHEM",
+  "particular": "MARITIME INDUSTRIAL & ENGINEERS S/B",
+  "appx": "3-4",
+  "debit": 3280,
+  "credit": 0,
+  "page": 16,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "PU MGRM",
+  "particular": "GARAM",
+  "appx": "3-5",
+  "debit": 2212.5,
+  "credit": 0,
+  "page": 16,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "PU MSOD",
+  "particular": "SODA ASH",
+  "appx": "3-5",
+  "debit": 1200,
+  "credit": 0,
+  "page": 16,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "PU MTAR",
+  "particular": "TARTRAZINE",
+  "appx": "3-5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "PU MTEP",
+  "particular": "TEPUNG",
+  "appx": "3-5",
+  "debit": 399200,
+  "credit": 0,
+  "page": 16,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "PU MTH1",
+  "particular": "TH-1",
+  "appx": "3-5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "PU THJ",
+  "particular": "PURCHASE (THJ)",
+  "appx": "3-5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "PU MSD",
+  "particular": "SODIUM TRIPOLYPHOSPHATE",
+  "appx": "3-5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "QR 281",
+  "particular": "PREPAYMENT-QUIT RENT (NT213090281)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "QR 564",
+  "particular": "PREPAYMENT-QUIT RENT (NT21514564)",
+  "appx": "8",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "R1325",
+  "particular": "REPAIR SB1325",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "R2035",
+  "particular": "REPAIR SAA2035H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "R2962",
+  "particular": "REPAIR SA2962M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "R4688",
+  "particular": "REPAIR SA4688N",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 16,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "R5163",
+  "particular": "REPAIR SA5163R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "R6323",
+  "particular": "REPAIR SAB6323H",
+  "appx": "5",
+  "debit": 456,
+  "credit": 0,
+  "page": 17,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "R6389",
+  "particular": "REPAIR SAB6389C",
+  "appx": "5",
+  "debit": 10717.6,
+  "credit": 0,
+  "page": 17,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "R6893",
+  "particular": "REPAIR SAB6893C",
+  "appx": "5",
+  "debit": 2160.6,
+  "credit": 0,
+  "page": 17,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "R7369",
+  "particular": "REPAIR SA7369R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "R7118",
+  "particular": "REPAIR SB7118C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "R8155",
+  "particular": "REPAIR SAB8155W",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "R1016",
+  "particular": "REPAIR SD1016T",
+  "appx": "5",
+  "debit": 283,
+  "credit": 0,
+  "page": 17,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "R75",
+  "particular": "REPAIR- HITACHI EX75",
+  "appx": "5",
+  "debit": 120,
+  "credit": 0,
+  "page": 17,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "R830",
+  "particular": "REPAIR SA830E",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "R8726",
+  "particular": "REPAIR SA8726M",
+  "appx": "5",
+  "debit": 520,
+  "credit": 0,
+  "page": 17,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "R9698",
+  "particular": "REPAIR SAB9698C",
+  "appx": "5",
+  "debit": 1870,
+  "credit": 0,
+  "page": 17,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "R9753",
+  "particular": "REPAIR SAB9753H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "R9897",
+  "particular": "REPAIR SAB9897R",
+  "appx": "5",
+  "debit": 100,
+  "credit": 0,
+  "page": 17,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "R9901",
+  "particular": "REPAIR SAB9901Y",
+  "appx": "5",
+  "debit": 1109.6,
+  "credit": 0,
+  "page": 17,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "R920",
+  "particular": "REPAIR QCV920",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "R9882",
+  "particular": "REPAIR SWJ9882",
+  "appx": "5",
+  "debit": 998,
+  "credit": 0,
+  "page": 17,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "R9922",
+  "particular": "REPAIR SD9922H",
+  "appx": "5",
+  "debit": 2839,
+  "credit": 0,
+  "page": 17,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "R6304",
+  "particular": "REPAIR SYC6304",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "R3080",
+  "particular": "REPAIR SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "RBFORK",
+  "particular": "REPAIR BATTERY FORKLIFT",
+  "appx": "5",
+  "debit": 440,
+  "credit": 0,
+  "page": 17,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "RCASE",
+  "particular": "REPAIR CASE 580F",
+  "appx": "5",
+  "debit": 764.5,
+  "credit": 0,
+  "page": 17,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "RFORK",
+  "particular": "REPAIR FORKLIFT",
+  "appx": "5",
+  "debit": 105,
+  "credit": 0,
+  "page": 17,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "RFS",
+  "particular": "REPAIR-FORKLIFT SHOVEL",
+  "appx": "5",
+  "debit": 270.6,
+  "credit": 0,
+  "page": 17,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "RTS",
+  "particular": "REPAIR-TOYOTA SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "RHT15",
+  "particular": "REPAIR HITACHI EX60-SAB9515M(B)",
+  "appx": "5",
+  "debit": 983.5,
+  "credit": 0,
+  "page": 17,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "RHT18",
+  "particular": "REPAIR HITACHI EX60-SAB9518M(K)",
+  "appx": "5",
+  "debit": 4240.1,
+  "credit": 0,
+  "page": 17,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "RJCB",
+  "particular": "REPAIR JCB BACKHOE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "RKE",
+  "particular": "REPAIR-KOMAYSU EXCAVATOR",
+  "appx": "5",
+  "debit": 565,
+  "credit": 0,
+  "page": 17,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "RH135",
+  "particular": "REPAIR HITACHI EX135UR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "RISEKI",
+  "particular": "REPAIR TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 287,
+  "credit": 0,
+  "page": 17,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "ROTH",
+  "particular": "REPAOR TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 5930.05,
+  "credit": 0,
+  "page": 17,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "RP",
+  "particular": "REPAIR OTHERS",
+  "appx": "20",
+  "debit": 0,
+  "credit": 5612866.1,
+  "page": 17,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "SA",
+  "particular": "RETAINED PROFIT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "SC",
+  "particular": "STAFF AMENITIES",
+  "appx": "21",
+  "debit": 0,
+  "credit": 200000,
+  "page": 17,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "SL THJ",
+  "particular": "SHARE CAPITAL",
+  "appx": "7",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "SS",
+  "particular": "SALES  (ICEPOLLY/JELLY)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "SU",
+  "particular": "SUBSCRIPTION FEE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "SV920",
+  "particular": "SERVICE QCV920",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "SV1325",
+  "particular": "SATFF UNIFORM",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "SV6304",
+  "particular": "SERVICE SYC6304",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "SV2035",
+  "particular": "SERVICE SB1325",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "SV2962",
+  "particular": "SERVICE SAA2035H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "SV4688",
+  "particular": "SERVICE SA2962M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "SV5163",
+  "particular": "SERVICE SA4688N",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 17,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "SV6323",
+  "particular": "SERVICE SA5163R",
+  "appx": "5",
+  "debit": 280,
+  "credit": 0,
+  "page": 17,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "SV6389",
+  "particular": "SERVICE SAB6323H",
+  "appx": "5",
+  "debit": 80,
+  "credit": 0,
+  "page": 18,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "SV6893",
+  "particular": "SERVICE SAB6389C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "SV7369",
+  "particular": "SERVICE SAB6893C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "SV8155",
+  "particular": "SERVICE SA7369R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "SV7118",
+  "particular": "SERVICE SAB8155W",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "SV1016",
+  "particular": "SERVICE SD1016T",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "SV75",
+  "particular": "SERVICE SB7118C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "SV830",
+  "particular": "SERVICE - HITACHI EX75",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "SV8726",
+  "particular": "SERVICE SA830E",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "SV9698",
+  "particular": "SERVICE SA8726M",
+  "appx": "5",
+  "debit": 195,
+  "credit": 0,
+  "page": 18,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "SV9753",
+  "particular": "SERVICE SAB9698C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "SV9897",
+  "particular": "SERVICE SAB9753H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "SV9901",
+  "particular": "SERVICE SAB9897R",
+  "appx": "5",
+  "debit": 42,
+  "credit": 0,
+  "page": 18,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "SV9922",
+  "particular": "SERVICE SAB9901Y",
+  "appx": "5",
+  "debit": 779,
+  "credit": 0,
+  "page": 18,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "SV9882",
+  "particular": "SERVICE SWJ9882",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "SV3080",
+  "particular": "SERVICE SD9922H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "SVBFORK",
+  "particular": "SERVICE SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "SVCASE",
+  "particular": "SERVICE BATTERY FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "SVFORK",
+  "particular": "SERVICE CASE 580F",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "SVFS",
+  "particular": "SERVICE FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "SVTS",
+  "particular": "SERVICE-FORKLIFT SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "SVHT15",
+  "particular": "SERVICE - TOYOTA SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "SVHT18",
+  "particular": "SERVICE HITACHI EX60-SAB9515M(B)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "SVISEKI",
+  "particular": "SERVICE TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "SVJCB",
+  "particular": "SERVICE HITACHI EX60-SAB9518M(K)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "SVKE",
+  "particular": "SERVICE JCB BACKHOE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "SVOTH",
+  "particular": "SERVICE-KOMATSU EXCAVATOR",
+  "appx": "5",
+  "debit": 389,
+  "credit": 0,
+  "page": 18,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "SVH135",
+  "particular": "SERVICE OTHERS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX920",
+  "particular": "ROAD TAX QCV920",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX1325",
+  "particular": "SERVICE HITACHI EX135UR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX2035",
+  "particular": "ROAD TAX SB1325",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX2962",
+  "particular": "ROAD TAX SAA2035H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX3080",
+  "particular": "ROAD TAX SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX4688",
+  "particular": "ROAD TAX SA2962M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX5163",
+  "particular": "ROAD TAX SA4688N",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX6323",
+  "particular": "ROAD TAX SA5163R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX6389",
+  "particular": "ROAD TAX SAB6323H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX6893",
+  "particular": "ROAD TAX SAB6389C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX7369",
+  "particular": "ROAD TAX SAB6893C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX8155",
+  "particular": "ROAD TAX SA7369R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX7118",
+  "particular": "ROAD TAX SAB8155W",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX75",
+  "particular": "ROAD TAX SB7118C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX830",
+  "particular": "ROADTAX - HITACHI EX75",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX8726",
+  "particular": "ROAD TAX SA830E",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX9698",
+  "particular": "ROAD TAX SA8726M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX9753",
+  "particular": "ROAD TAX SAB9698C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 18,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX9897",
+  "particular": "ROAD TAX SAB9753H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX6304",
+  "particular": "ROAD TAX SYC6304",
+  "appx": "5",
+  "debit": 20,
+  "credit": 0,
+  "page": 19,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX9901",
+  "particular": "ROAD TAX SAB9897R",
+  "appx": "5",
+  "debit": 73,
+  "credit": 0,
+  "page": 19,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX9922",
+  "particular": "ROAD TAX SAB9901Y",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX9882",
+  "particular": "ROAD TAX SWJ9882",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX1016",
+  "particular": "ROAD TAX SD1016T",
+  "appx": "5",
+  "debit": 68,
+  "credit": 0,
+  "page": 19,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXBFORK",
+  "particular": "ROAD TAX SD9922H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXCASE",
+  "particular": "ROAD TAX BATTERY FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXFORK",
+  "particular": "ROAD TAX CASE 580F",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXHT15",
+  "particular": "ROAD TAX FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXHT18",
+  "particular": "ROAD TAX HITACHI EX60-SAB9515M(B)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXJCB",
+  "particular": "ROAD TAX HITACHI EX60-SAB9518M(K)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXH135",
+  "particular": "ROAD TAX JCB BACKHOE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 13,
+  "margin_mark": false
+ },
+ {
+  "code": "TAXOTH",
+  "particular": "ROAD TAX HITACHI EX135UR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 14,
+  "margin_mark": false
+ },
+ {
+  "code": "TAX EXP",
+  "particular": "ROAD TAX OTHERS",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 15,
+  "margin_mark": false
+ },
+ {
+  "code": "THJ CK",
+  "particular": "TAX EXPENSES",
+  "appx": "5-1",
+  "debit": 1063.2,
+  "credit": 0,
+  "page": 19,
+  "row": 16,
+  "margin_mark": false
+ },
+ {
+  "code": "THJ E",
+  "particular": "TIEN HOCK (JELLY) -SALARY C.KHIN SIONG",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 17,
+  "margin_mark": false
+ },
+ {
+  "code": "THJ L",
+  "particular": "TIEN HOCK (JELLY)",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 18,
+  "margin_mark": false
+ },
+ {
+  "code": "THJ SC",
+  "particular": "TIEN HOCK (JELLY)",
+  "appx": "5-1",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 19,
+  "margin_mark": false
+ },
+ {
+  "code": "THJ SM",
+  "particular": "TIEN HOCK (JELLY)",
+  "appx": "5-1",
+  "debit": 1014.15,
+  "credit": 0,
+  "page": 19,
+  "row": 20,
+  "margin_mark": false
+ },
+ {
+  "code": "TPI",
+  "particular": "TIEN HOCK (JELLY) -SALARY SALESMAN",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 21,
+  "margin_mark": false
+ },
+ {
+  "code": "TY1325",
+  "particular": "TERM LOAN INTEREST",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 22,
+  "margin_mark": false
+ },
+ {
+  "code": "TY6304",
+  "particular": "TYRE SYC6304",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 23,
+  "margin_mark": false
+ },
+ {
+  "code": "TY2035",
+  "particular": "TYRE SB1325",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 24,
+  "margin_mark": false
+ },
+ {
+  "code": "TY2962",
+  "particular": "TYRE SAA2035H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 25,
+  "margin_mark": false
+ },
+ {
+  "code": "TY920",
+  "particular": "TYRE QCV920",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 26,
+  "margin_mark": false
+ },
+ {
+  "code": "TY4688",
+  "particular": "TYRE SA2962M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 27,
+  "margin_mark": false
+ },
+ {
+  "code": "TY5163",
+  "particular": "TYRE SA4688N",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 28,
+  "margin_mark": false
+ },
+ {
+  "code": "TY6323",
+  "particular": "TYRE SA5163R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 29,
+  "margin_mark": false
+ },
+ {
+  "code": "TY6389",
+  "particular": "TYRE SAB6323H",
+  "appx": "5",
+  "debit": 1600,
+  "credit": 0,
+  "page": 19,
+  "row": 30,
+  "margin_mark": false
+ },
+ {
+  "code": "TY6893",
+  "particular": "TYRE SAB6389C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 31,
+  "margin_mark": false
+ },
+ {
+  "code": "TY7369",
+  "particular": "TYRE SAB6893C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 32,
+  "margin_mark": false
+ },
+ {
+  "code": "TY7118",
+  "particular": "TYRE SA7369R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 33,
+  "margin_mark": false
+ },
+ {
+  "code": "TY8155",
+  "particular": "TYRE SB7118C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 34,
+  "margin_mark": false
+ },
+ {
+  "code": "TY75",
+  "particular": "TYRE SAB8155W",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 35,
+  "margin_mark": false
+ },
+ {
+  "code": "TY830",
+  "particular": "TYRE - HITACHI EX75",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 36,
+  "margin_mark": false
+ },
+ {
+  "code": "TY8726",
+  "particular": "TYRE SA830E",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 37,
+  "margin_mark": false
+ },
+ {
+  "code": "TY9698",
+  "particular": "TYRE SA8726M",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 38,
+  "margin_mark": false
+ },
+ {
+  "code": "TY9753",
+  "particular": "TYRE SAB9698C",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 39,
+  "margin_mark": false
+ },
+ {
+  "code": "TY9897",
+  "particular": "TYRE SAB9753H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 40,
+  "margin_mark": false
+ },
+ {
+  "code": "TY9901",
+  "particular": "TYRE SAB9897R",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 41,
+  "margin_mark": false
+ },
+ {
+  "code": "TY9922",
+  "particular": "TYRE SAB9901Y",
+  "appx": "5",
+  "debit": 2560,
+  "credit": 0,
+  "page": 19,
+  "row": 42,
+  "margin_mark": false
+ },
+ {
+  "code": "TY9882",
+  "particular": "TYRE SWJ9882",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 43,
+  "margin_mark": false
+ },
+ {
+  "code": "TY3080",
+  "particular": "TYRE SD9922H",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 44,
+  "margin_mark": false
+ },
+ {
+  "code": "TY1016",
+  "particular": "TYRE SD1016T",
+  "appx": "5",
+  "debit": 320,
+  "credit": 0,
+  "page": 19,
+  "row": 45,
+  "margin_mark": false
+ },
+ {
+  "code": "TYBFORK",
+  "particular": "TYRE SAB3080B",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 19,
+  "row": 46,
+  "margin_mark": false
+ },
+ {
+  "code": "TYCASE",
+  "particular": "TYRE BATTERY FORKLIFT",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 1,
+  "margin_mark": false
+ },
+ {
+  "code": "TYFORK",
+  "particular": "TYRE CASE 580F",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 2,
+  "margin_mark": false
+ },
+ {
+  "code": "TYFS",
+  "particular": "TYRE FORKLIFT",
+  "appx": "5",
+  "debit": 735,
+  "credit": 0,
+  "page": 20,
+  "row": 3,
+  "margin_mark": false
+ },
+ {
+  "code": "TYTS",
+  "particular": "TYRE-FORKLIFT SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 4,
+  "margin_mark": false
+ },
+ {
+  "code": "TYHT15",
+  "particular": "TYRE -TOYOTA SHOVEL",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 5,
+  "margin_mark": false
+ },
+ {
+  "code": "TYHT18",
+  "particular": "TYRE HITACHI EX60-SAB9515M(B)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 6,
+  "margin_mark": false
+ },
+ {
+  "code": "TYISEKI",
+  "particular": "TYRE TRACTOR ISEKI",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 7,
+  "margin_mark": false
+ },
+ {
+  "code": "TYJCB",
+  "particular": "TYRE HITACHI EX60-SAB9518M(K)",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 8,
+  "margin_mark": false
+ },
+ {
+  "code": "TYKE",
+  "particular": "TYRE JCB BACKHOE",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 9,
+  "margin_mark": false
+ },
+ {
+  "code": "TYH135",
+  "particular": "TYRE-KOMATSU EXCAVATOR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 10,
+  "margin_mark": false
+ },
+ {
+  "code": "TYOTH",
+  "particular": "TYRE HITACHI EX135UR",
+  "appx": "5",
+  "debit": 0,
+  "credit": 0,
+  "page": 20,
+  "row": 11,
+  "margin_mark": false
+ },
+ {
+  "code": "DEBTOR",
+  "particular": "TYRE OTHERS",
+  "appx": "22",
+  "debit": 557428.88,
+  "credit": 0,
+  "page": 20,
+  "row": 12,
+  "margin_mark": false
+ },
+ {
+  "code": "CL AFI",
+  "particular": "ALLOWANCE FOR IMPAIRMENT",
+  "appx": "8",
+  "debit": 0,
+  "credit": 25696.82,
+  "page": 20,
+  "row": 13,
+  "margin_mark": false
+ }
+]

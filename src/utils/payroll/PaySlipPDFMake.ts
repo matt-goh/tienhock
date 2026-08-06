@@ -19,11 +19,6 @@ import {
   groupConsolidatedItemsByType,
   ConsolidatedPayrollItem,
 } from "./payrollUtils";
-import {
-  getPaperSizePreference,
-  getPdfMakePageSize,
-  PdfPaperSize,
-} from "../pdf/paperSize";
 
 // Initialize pdfmake with fonts (uses bundled Roboto font which is similar to Helvetica)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
@@ -276,7 +271,6 @@ interface PaySlipPDFProps {
   };
   midMonthPayroll?: MidMonthPayroll | null;
   mode?: PayslipPrintMode;
-  paperSize?: PdfPaperSize;
 }
 
 // Helper functions
@@ -2720,7 +2714,6 @@ export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
     staffDetails,
     midMonthPayroll,
     mode = "both",
-    paperSize = getPaperSizePreference(),
   } = props;
 
   if (!payroll) {
@@ -2749,7 +2742,7 @@ export const generatePaySlipPDF = (props: PaySlipPDFProps): void => {
 
   // Document definition
   const docDefinition: TDocumentDefinitions = {
-    pageSize: getPdfMakePageSize(paperSize),
+    pageSize: "A4",
     pageMargins: [20, 20, 20, 20],
     defaultStyle: {
       fontSize: 9,
@@ -2791,7 +2784,6 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
       staffDetails,
       midMonthPayroll,
       mode = "both",
-      paperSize = getPaperSizePreference(),
     } = props;
 
     if (!payroll) {
@@ -2821,7 +2813,7 @@ export const getPaySlipPDFBlob = (props: PaySlipPDFProps): Promise<Blob> => {
     );
 
     const docDefinition: TDocumentDefinitions = {
-      pageSize: getPdfMakePageSize(paperSize),
+      pageSize: "A4",
       pageMargins: [20, 20, 20, 20],
       defaultStyle: {
         fontSize: 9,
@@ -2875,7 +2867,6 @@ export const getBatchPaySlipPDFBlob = (
   companyName = "TIEN HOCK FOOD INDUSTRIES S/B",
   midMonthPayrollsMap?: Record<string, MidMonthPayrollType | null>,
   mode: PayslipPrintMode = "both",
-  paperSize: PdfPaperSize = getPaperSizePreference(),
 ): Promise<Blob> => {
   return new Promise((resolve, reject) => {
     if (!payrolls || payrolls.length === 0) {
@@ -2915,7 +2906,7 @@ export const getBatchPaySlipPDFBlob = (
     });
 
     const docDefinition: TDocumentDefinitions = {
-      pageSize: getPdfMakePageSize(paperSize),
+      pageSize: "A4",
       pageMargins: [20, 20, 20, 20],
       defaultStyle: {
         fontSize: 9,

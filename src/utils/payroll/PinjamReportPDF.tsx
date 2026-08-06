@@ -11,11 +11,6 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../pdf/paperSize";
 
 // Color palette for professional appearance
 const colors = {
@@ -556,12 +551,10 @@ const PinjamRow: React.FC<{
 const PinjamReportPDF: React.FC<{
   data: PinjamReportPDFData;
   companyName?: string;
-  paperSize?: PdfPaperSize;
-}> = ({ data, companyName, paperSize }) => {
+}> = ({ data, companyName }) => {
   const resolvedCompanyName =
     companyName ?? data.companyName ?? TIENHOCK_INFO.name;
   const resolvedLogo = data.logoSrc ?? TienHockLogo;
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportLabel = data.reportLabel ?? "Pinjam";
   const gajiLabel = data.gajiLabel ?? "Gaji/Genap";
   const reportTitle = `${getMonthName(data.month)} ${data.year} ${reportLabel} Report`;
@@ -571,7 +564,7 @@ const PinjamReportPDF: React.FC<{
     <Document
       title={`${reportLabel} Report ${getMonthName(data.month)} ${data.year}`}
     >
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={resolvedLogo} style={styles.logo} />
@@ -672,12 +665,10 @@ const PinjamReportPDF: React.FC<{
 const PinjamBreakdownPDF: React.FC<{
   data: PinjamReportPDFData;
   companyName?: string;
-  paperSize?: PdfPaperSize;
-}> = ({ data, companyName, paperSize }) => {
+}> = ({ data, companyName }) => {
   const resolvedCompanyName =
     companyName ?? data.companyName ?? TIENHOCK_INFO.name;
   const resolvedLogo = data.logoSrc ?? TienHockLogo;
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportLabel = data.reportLabel ?? "Pinjam";
   const reportTitle = `${getMonthName(data.month)} ${data.year} ${reportLabel} Breakdown`;
   const pinjamByType = aggregatePinjamByType(data.data);
@@ -687,7 +678,7 @@ const PinjamBreakdownPDF: React.FC<{
     <Document
       title={`${reportLabel} Breakdown ${getMonthName(data.month)} ${data.year}`}
     >
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         <View style={styles.header}>
           <Image src={resolvedLogo} style={styles.logo} />
           <View style={styles.headerTextContainer}>
@@ -800,13 +791,12 @@ const outputPdf = async (
 
 export const generatePinjamReportPDF = async (
   data: PinjamReportPDFData,
-  action: "download" | "print",
-  paperSize?: PdfPaperSize
+  action: "download" | "print"
 ) => {
   try {
     const fileLabel = (data.reportLabel ?? "Pinjam").replace(/\s+/g, "_");
     await outputPdf(
-      <PinjamReportPDF data={data} paperSize={paperSize} />,
+      <PinjamReportPDF data={data} />,
       `${fileLabel}_Report_${getMonthName(data.month)}_${data.year}.pdf`,
       action,
       "pinjam report PDF"
@@ -819,13 +809,12 @@ export const generatePinjamReportPDF = async (
 
 export const generatePinjamBreakdownPDF = async (
   data: PinjamReportPDFData,
-  action: "download" | "print",
-  paperSize?: PdfPaperSize
+  action: "download" | "print"
 ) => {
   try {
     const fileLabel = (data.reportLabel ?? "Pinjam").replace(/\s+/g, "_");
     await outputPdf(
-      <PinjamBreakdownPDF data={data} paperSize={paperSize} />,
+      <PinjamBreakdownPDF data={data} />,
       `${fileLabel}_Breakdown_${getMonthName(data.month)}_${data.year}.pdf`,
       action,
       "pinjam breakdown PDF"

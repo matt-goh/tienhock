@@ -115,8 +115,9 @@ export interface GreenTargetReceiptGroupJournal {
 // stored on the payment: one invoice can cover several rentals.
 export interface GreenTargetReceiptAllocationRental {
   rental_id: number;
-  tong_no: string;
-  date_placed: string;
+  // The dumpster and both dates are optional Green Target metadata.
+  tong_no: string | null;
+  date_placed: string | null;
   date_picked: string | null;
   location_site: string | null;
   location_address: string | null;

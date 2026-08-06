@@ -668,183 +668,187 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
   return (
     <div className="w-full space-y-3">
-      {/* Header: product line + month on the left, actions on the right */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Product line switcher */}
-          <div className="flex overflow-hidden rounded-md border border-default-300 dark:border-gray-600">
-            {(["mee", "bihun"] as ProductLine[]).map((line) => (
-              <button
-                key={line}
-                type="button"
-                onClick={() => setProductLine(line)}
-                className={clsx(
-                  "px-3 py-1.5 text-sm font-medium transition-colors",
-                  productLine === line
-                    ? "bg-sky-500 text-white"
-                    : "bg-white text-default-600 hover:bg-default-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                )}
-              >
-                {line.toUpperCase()}
-              </button>
-            ))}
+      {/* Sticky band: the header controls and the summary strip stay visible
+          while the (long) report body scrolls underneath. */}
+      <div className="sticky top-0 z-30 -mx-4 -mt-3 space-y-2 border-b border-default-200 bg-white/95 px-4 pb-2 pt-3 backdrop-blur dark:border-gray-700 dark:bg-gray-950/95">
+        {/* Header: product line + month on the left, actions on the right */}
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Product line switcher */}
+            <div className="flex overflow-hidden rounded-md border border-default-300 dark:border-gray-600">
+              {(["mee", "bihun"] as ProductLine[]).map((line) => (
+                <button
+                  key={line}
+                  type="button"
+                  onClick={() => setProductLine(line)}
+                  className={clsx(
+                    "px-3 py-1.5 text-sm font-medium transition-colors",
+                    productLine === line
+                      ? "bg-sky-500 text-white"
+                      : "bg-white text-default-600 hover:bg-default-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  )}
+                >
+                  {line.toUpperCase()}
+                </button>
+              ))}
+            </div>
+
+            <MonthNavigator
+              selectedMonth={selectedMonth}
+              onChange={handleMonthChange}
+              minDate={REPORT_MIN_MONTH}
+              size="sm"
+            />
           </div>
 
-          <MonthNavigator
-            selectedMonth={selectedMonth}
-            onChange={handleMonthChange}
-            minDate={REPORT_MIN_MONTH}
-            size="sm"
-          />
-        </div>
-
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            icon={IconRefresh}
-            iconSize={16}
-            onClick={fetchReport}
-            disabled={loading}
-            title="Refresh"
-            additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            icon={IconAdjustments}
-            iconSize={16}
-            onClick={() => setIsMappingModalOpen(true)}
-          >
-            Mappings
-          </Button>
-          {/* Print the selected month: one product line, or both */}
-          {(["mee", "bihun", "all"] as PrintTarget[]).map((target) => (
+          {/* Actions */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button
-              key={target}
               size="sm"
-              variant={target === "all" ? "filled" : "outline"}
-              color="sky"
-              icon={IconPrinter}
+              variant="outline"
+              icon={IconRefresh}
               iconSize={16}
-              onClick={() => handlePrintPDF(target)}
-              disabled={
-                exporting !== null ||
-                !report ||
-                (target !== "all" && !report.reports[target])
-              }
+              onClick={fetchReport}
+              disabled={loading}
+              title="Refresh"
+              additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              icon={IconAdjustments}
+              iconSize={16}
+              onClick={() => setIsMappingModalOpen(true)}
             >
-              {exporting === target
-                ? "Preparing..."
-                : target === "all"
-                ? "Print All"
-                : `Print ${target.toUpperCase()}`}
+              Mappings
             </Button>
-          ))}
+            {/* Print the selected month: one product line, or both */}
+            {(["mee", "bihun", "all"] as PrintTarget[]).map((target) => (
+              <Button
+                key={target}
+                size="sm"
+                variant={target === "all" ? "filled" : "outline"}
+                color="sky"
+                icon={IconPrinter}
+                iconSize={16}
+                onClick={() => handlePrintPDF(target)}
+                disabled={
+                  exporting !== null ||
+                  !report ||
+                  (target !== "all" && !report.reports[target])
+                }
+              >
+                {exporting === target
+                  ? "Preparing..."
+                  : target === "all"
+                  ? "Print All"
+                  : `Print ${target.toUpperCase()}`}
+              </Button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* Compact summary strip */}
-      {lineReport && (
-        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm px-0.5">
-          <span className="font-medium text-default-700 dark:text-gray-200">
-            {view === "pl" ? "Estimated P&L" : "Estimated Unit Cost"} —{" "}
-            {productLine.toUpperCase()}
-            <span className="ml-1.5 font-normal text-default-500 dark:text-gray-400">
-              {lineReport.period.label}
+        {/* Compact summary strip */}
+        {lineReport && (
+          <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm px-0.5">
+            <span className="font-medium text-default-700 dark:text-gray-200">
+              {view === "pl" ? "Estimated P&L" : "Estimated Unit Cost"} —{" "}
+              {productLine.toUpperCase()}
+              <span className="ml-1.5 font-normal text-default-500 dark:text-gray-400">
+                {lineReport.period.label}
+              </span>
             </span>
-          </span>
-          {view === "pl" ? (
-            <>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Sales{" "}
-                <span className="font-semibold text-default-700 dark:text-gray-200">
-                  {formatCurrency(lineReport.pl.totals.amount)}
+            {view === "pl" ? (
+              <>
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Sales{" "}
+                  <span className="font-semibold text-default-700 dark:text-gray-200">
+                    {formatCurrency(lineReport.pl.totals.amount)}
+                  </span>
                 </span>
-              </span>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Usage{" "}
-                <span className="font-semibold text-default-700 dark:text-gray-200">
-                  {formatCurrency(lineReport.pl.usage)}
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Usage{" "}
+                  <span className="font-semibold text-default-700 dark:text-gray-200">
+                    {formatCurrency(lineReport.pl.usage)}
+                  </span>
                 </span>
-              </span>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                P/L{" "}
-                <span
-                  className={clsx(
-                    "font-semibold",
-                    signedAmountClass(lineReport.pl.profitLoss)
-                  )}
-                >
-                  {formatCurrency(lineReport.pl.profitLoss)}
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  P/L{" "}
+                  <span
+                    className={clsx(
+                      "font-semibold",
+                      signedAmountClass(lineReport.pl.profitLoss)
+                    )}
+                  >
+                    {formatCurrency(lineReport.pl.profitLoss)}
+                  </span>
                 </span>
-              </span>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Final P/L{" "}
-                <span
-                  className={clsx(
-                    "font-semibold",
-                    signedAmountClass(lineReport.pl.finalProfitLoss)
-                  )}
-                >
-                  {formatCurrency(lineReport.pl.finalProfitLoss)}
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Final P/L{" "}
+                  <span
+                    className={clsx(
+                      "font-semibold",
+                      signedAmountClass(lineReport.pl.finalProfitLoss)
+                    )}
+                  >
+                    {formatCurrency(lineReport.pl.finalProfitLoss)}
+                  </span>
                 </span>
-              </span>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Accumulative{" "}
-                <span
-                  className={clsx(
-                    "font-semibold",
-                    signedAmountClass(lineReport.pl.accumulative)
-                  )}
-                >
-                  {formatCurrency(lineReport.pl.accumulative)}
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Accumulative{" "}
+                  <span
+                    className={clsx(
+                      "font-semibold",
+                      signedAmountClass(lineReport.pl.accumulative)
+                    )}
+                  >
+                    {formatCurrency(lineReport.pl.accumulative)}
+                  </span>
                 </span>
-              </span>
-            </>
-          ) : (
-            <>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Production{" "}
-                <span className="font-semibold text-default-700 dark:text-gray-200">
-                  {formatBags(lineReport.unitCost.production.bags)} bags
+              </>
+            ) : (
+              <>
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Production{" "}
+                  <span className="font-semibold text-default-700 dark:text-gray-200">
+                    {formatBags(lineReport.unitCost.production.bags)} bags
+                  </span>
                 </span>
-              </span>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Bags sold{" "}
-                <span className="font-semibold text-default-700 dark:text-gray-200">
-                  {formatBags(lineReport.unitCost.bagsSold)}
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Bags sold{" "}
+                  <span className="font-semibold text-default-700 dark:text-gray-200">
+                    {formatBags(lineReport.unitCost.bagsSold)}
+                  </span>
                 </span>
-              </span>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Total{" "}
-                <span className="font-semibold text-default-700 dark:text-gray-200">
-                  {formatCurrency(lineReport.unitCost.total.amount)}
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Total{" "}
+                  <span className="font-semibold text-default-700 dark:text-gray-200">
+                    {formatCurrency(lineReport.unitCost.total.amount)}
+                  </span>
+                  <span className="ml-1 text-default-500 dark:text-gray-400">
+                    ({formatUnit(lineReport.unitCost.total.unit)} / bag)
+                  </span>
                 </span>
-                <span className="ml-1 text-default-500 dark:text-gray-400">
-                  ({formatUnit(lineReport.unitCost.total.unit)} / bag)
+                <StripDot />
+                <span className="text-default-600 dark:text-gray-300">
+                  Final unit cost{" "}
+                  <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                    {formatUnit(lineReport.unitCost.finalUnitCost)} / bag
+                  </span>
                 </span>
-              </span>
-              <StripDot />
-              <span className="text-default-600 dark:text-gray-300">
-                Final unit cost{" "}
-                <span className="font-semibold text-emerald-700 dark:text-emerald-300">
-                  {formatUnit(lineReport.unitCost.finalUnitCost)} / bag
-                </span>
-              </span>
-            </>
-          )}
-        </div>
-      )}
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Error State */}
       {error && (

@@ -10,6 +10,7 @@ import {
   toLocalAccountingDateString,
 } from "./posting-lock.js";
 import { resolveDebtorChildCode } from "./debtorSync.js";
+import { resolveCashHoldingAccount } from "./cash-holding-account.js";
 
 export const IMPORTED_PAYMENT_RECONCILIATION_MATCH_CODE =
   "IMPORTED_PAYMENT_RECONCILIATION_MATCH";
@@ -170,10 +171,11 @@ function parseReconciliationStateMarker(notes) {
 }
 
 /**
+ * @param {object} client
  * @param {ImportedPaymentReconciliationPayload} payload
- * @returns {NormalizedReconciliationRequest}
+ * @returns {Promise<NormalizedReconciliationRequest>}
  */
-function normalizeRequest(payload) {
+async function normalizeRequest(client, payload) {
   if (!payload || !Array.isArray(payload.allocations)) {
     throwReconciliationError(
       "Historical ledger reconciliation requires one invoice allocation.",
@@ -224,7 +226,15 @@ function normalizeRequest(payload) {
     );
   }
 
-  let debitAccount = "CH_REV2";
+  // Cash is held in CH_REV1 or CH_REV2 depending on whether it was taken on
+  // the invoice's own sale day. The evidence lookup below filters imported
+  // journal lines by this account, so it must resolve exactly as the receipt
+  // service would or a genuine duplicate could be missed.
+  let debitAccount = await resolveCashHoldingAccount(
+    client,
+    [{ type: "invoice", invoice_id: invoiceId }],
+    enteredPaymentDate
+  );
   if (paymentMethod !== "cash") {
     debitAccount = String(payload.bank_account || "BANK_PBB").trim();
     if (!["BANK_PBB", "BANK_ABB"].includes(debitAccount)) {
@@ -314,7 +324,7 @@ async function getCustomerReconciliationState(
  * @returns {Promise<{request: NormalizedReconciliationRequest, preview: ImportedPaymentReconciliationPreview, debtorAccountCode: string}>}
  */
 async function validateImportedPayment(client, payload, lockRows) {
-  const request = normalizeRequest(payload);
+  const request = await normalizeRequest(client, payload);
   const invoiceLockClause = lockRows ? "FOR UPDATE OF i, c" : "";
   const invoiceResult = await client.query(
     `SELECT i.id, i.customerid, i.paymenttype, i.totalamountpayable,
@@ -997,7 +1007,7 @@ export async function assertNoExactImportedDebitMovement(
  * @returns {Promise<{preview: ImportedPaymentReconciliationPreview, payment: object, credit_used: number, already_reconciled: boolean}>}
  */
 export async function reconcileImportedPayment(client, payload, userId) {
-  const normalizedRequest = normalizeRequest(payload);
+  const normalizedRequest = await normalizeRequest(client, payload);
   if (
     normalizedRequest.expectedJournalId === null ||
     normalizedRequest.expectedLineId === null

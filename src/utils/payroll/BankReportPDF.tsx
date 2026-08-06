@@ -11,11 +11,6 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../pdf/paperSize";
 
 // Color palette for professional appearance
 const colors = {
@@ -409,12 +404,10 @@ const PaymentGroup: React.FC<{
 const BankReportPDF: React.FC<{
   data: BankReportPDFData;
   companyName?: string;
-  paperSize?: PdfPaperSize;
-}> = ({ data, companyName, paperSize }) => {
+}> = ({ data, companyName }) => {
   const resolvedCompanyName =
     companyName ?? data.companyName ?? TIENHOCK_INFO.name;
   const resolvedLogo = data.logoSrc ?? TienHockLogo;
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportTitle = `${getMonthName(data.month)} ${data.year} Gaji Report`;
 
   const groupedData = groupByPaymentPreference(data.data);
@@ -424,7 +417,7 @@ const BankReportPDF: React.FC<{
 
   return (
     <Document title={`Bank Report ${getMonthName(data.month)} ${data.year}`}>
-      <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+      <Page size="A4" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={resolvedLogo} style={styles.logo} />
@@ -514,11 +507,10 @@ const BankReportPDF: React.FC<{
 // PDF Generation Function
 export const generateBankReportPDF = async (
   data: BankReportPDFData,
-  action: "download" | "print",
-  paperSize?: PdfPaperSize
+  action: "download" | "print"
 ) => {
   try {
-    const doc = <BankReportPDF data={data} paperSize={paperSize} />;
+    const doc = <BankReportPDF data={data} />;
     const pdfBlob = await pdf(doc).toBlob();
 
     const fileName = `Bank_Report_${getMonthName(data.month)}_${data.year}.pdf`;

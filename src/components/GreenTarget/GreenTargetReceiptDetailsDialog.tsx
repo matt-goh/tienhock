@@ -884,7 +884,9 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                               `Rental ${rental.rental_id}`
                                             }
                                           >
-                                            Tong {rental.tong_no}
+                                            {rental.tong_no
+                                              ? `Tong ${rental.tong_no}`
+                                              : `Rental #${rental.rental_id}`}
                                           </Link>
                                         )
                                       )}

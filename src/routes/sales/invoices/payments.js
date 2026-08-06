@@ -6,6 +6,7 @@ import {
   confirmReceipt,
   cancelReceipt,
   toLocalDateString,
+  SETTLEABLE_AMOUNT_SQL,
 } from "../../accounting/receipt-service.js";
 import { fetchUnappliedOverpayments } from "../../accounting/overpayments.js";
 import { applyOverpayment } from "../../accounting/overpayment-apply.js";
@@ -350,9 +351,10 @@ export default function (pool) {
 
       // 1. Get Invoice details & Lock the row
       const invoiceQuery = `
-      SELECT id, customerid, paymenttype, totalamountpayable, balance_due, invoice_status
-      FROM invoices
-      WHERE id = $1 FOR UPDATE
+      SELECT i.id, i.customerid, i.paymenttype, i.totalamountpayable, i.balance_due,
+             i.invoice_status, ${SETTLEABLE_AMOUNT_SQL} as settleable_amount
+      FROM invoices i
+      WHERE i.id = $1 FOR UPDATE
     `;
       const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
 
@@ -360,7 +362,13 @@ export default function (pool) {
         throw new Error(`Invoice ${invoice_id} not found.`);
       }
       const invoice = invoiceResult.rows[0];
-      const currentBalance = parseFloat(invoice.balance_due || 0);
+      const isCashBill = invoice.paymenttype === "CASH";
+      // A cash bill is always 'paid' with no balance due: what it can still
+      // settle is the counter cash the invoice journal holds in CH_REV1, which
+      // a bank/online receipt re-classifies as banked money.
+      const currentBalance = isCashBill
+        ? parseFloat(invoice.settleable_amount || 0)
+        : parseFloat(invoice.balance_due || 0);
       const paymentAmount = parseFloat(amount_paid);
 
       // 2. Check invoice status
@@ -369,19 +377,26 @@ export default function (pool) {
           `Invoice ${invoice_id} is cancelled and cannot receive payments.`
         );
       }
-      if (
-        String(invoice.invoice_status || "").toLowerCase() === "paid" ||
-        currentBalance <= 0.005
-      ) {
+      if (currentBalance <= 0.005) {
         const error = new Error(
-          `Invoice ${invoice_id} is already settled. Reload the payment list before recording another payment.`
+          isCashBill
+            ? `Cash bill ${invoice_id} has no counter cash left to re-classify. Reload the payment list before recording another payment.`
+            : `Invoice ${invoice_id} is already settled. Reload the payment list before recording another payment.`
         );
         error.status = 409;
         throw error;
       }
 
       // 3. Split into an invoice allocation (up to balance due) plus a
-      // customer-owned excess allocation for any overpayment.
+      // customer-owned excess allocation for any overpayment. A cash bill has
+      // no debt to overpay, so its allocation is capped at the counter cash.
+      if (isCashBill && paymentAmount > currentBalance + 0.005) {
+        const error = new Error(
+          `Cash bill ${invoice_id} only has RM${currentBalance.toFixed(2)} recorded as counter cash. A cash bill cannot be overpaid — record at most that amount.`
+        );
+        error.status = 400;
+        throw error;
+      }
       const isOverpayment = paymentAmount > currentBalance;
       const regularAmount = isOverpayment ? currentBalance : paymentAmount;
       const overpaidAmount = isOverpayment

@@ -87,11 +87,15 @@ async function getChRev1Anchor(client) {
  * `opening` is the aggregate pre-cutover pool (anchor-based).
  */
 export async function getCashSalesPools(client) {
+  // 'S' = a cash bill's own collection. 'REC' = cash taken at the counter on
+  // the sale day of a CREDIT invoice, which the legacy ledger also files under
+  // CH_REV1 (CASH SALES RECEIVED) and banks in with that day's pool. Both must
+  // be counted or receipt-sourced cash could never be banked.
   const collected = await client.query(
     `SELECT je.entry_date AS source_date, SUM(jel.debit_amount)::numeric(12,2) AS collected
        FROM journal_entry_lines jel
        JOIN journal_entries je ON je.id = jel.journal_entry_id
-      WHERE je.status = 'posted' AND je.entry_type = 'S'
+      WHERE je.status = 'posted' AND je.entry_type IN ('S', 'REC')
         AND jel.account_code = 'CH_REV1' AND jel.debit_amount > 0
         AND je.entry_date >= $1
       GROUP BY je.entry_date`,

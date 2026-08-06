@@ -85,6 +85,9 @@ interface PickupDestination {
   sort_order: number;
 }
 
+// The dumpster and both dates are optional: a Green Target rental exists to
+// hold the customer's site and to carry the invoice/payment chain, while the
+// physical tong movement is tracked outside the system.
 interface Rental {
   rental_id?: number;
   customer_id: number;
@@ -134,7 +137,7 @@ const RentalFormPage: React.FC = () => {
     location_id: null,
     tong_no: "",
     driver: "",
-    date_placed: format(new Date(), "yyyy-MM-dd"),
+    date_placed: "",
     date_picked: null,
     remarks: null,
   });
@@ -230,10 +233,11 @@ const RentalFormPage: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const fetchDumpsterAvailability = async () => {
-      if (!formData.date_placed) return;
-
-      // Normalize date format
-      const normalizedDate = formData.date_placed.split("T")[0];
+      // With no placement date the rental books no period, so today's
+      // availability is used purely to populate (and annotate) the list.
+      const normalizedDate = formData.date_placed
+        ? formData.date_placed.split("T")[0]
+        : format(new Date(), "yyyy-MM-dd");
 
       // Skip if we've already fetched for this date
       if (previousDateRef.current === normalizedDate && dumpsterAvailability)
@@ -483,12 +487,13 @@ const RentalFormPage: React.FC = () => {
 
   // **RESTORED Dumpster Availability Check Logic**
   const checkDumpsterAvailability = useCallback(() => {
-    if (!formData.date_placed || !formData.tong_no || !dumpsterAvailability) {
-      // Only return false if date and tong are selected but availability isn't loaded yet or failed
-      if (formData.date_placed && formData.tong_no && !dumpsterAvailability)
-        return false;
-      // Otherwise, consider it valid until prerequisites are met
-      return true;
+    // No dumpster or no placement date means the rental reserves nothing, so
+    // there is no availability to violate.
+    if (!formData.date_placed || !formData.tong_no) return true;
+
+    if (!dumpsterAvailability) {
+      // Date and tong are both chosen but availability hasn't loaded (or failed)
+      return false;
     }
 
     // Edit mode with unchanged values is always valid
@@ -592,31 +597,13 @@ const RentalFormPage: React.FC = () => {
       toast.error("Please select a customer");
       return false;
     }
-    if (!formData.date_placed) {
-      toast.error("Please select a placement date");
-      return false;
-    }
-    try {
-      new Date(formData.date_placed);
-    } catch {
-      toast.error("Invalid placement date format");
-      return false;
-    }
-    if (formData.date_picked) {
-      try {
-        new Date(formData.date_picked);
-      } catch {
-        toast.error("Invalid pickup date format");
-        return false;
-      }
+    // The dumpster and both dates are optional; they are only validated
+    // against each other when they are actually filled in.
+    if (formData.date_picked && formData.date_placed) {
       if (new Date(formData.date_picked) < new Date(formData.date_placed)) {
         toast.error("Pickup date cannot be earlier than placement date.");
         return false;
       }
-    }
-    if (!formData.tong_no) {
-      toast.error("Please select a dumpster");
-      return false;
     }
     if (!formData.driver) {
       toast.error("Please select a driver");
@@ -655,12 +642,23 @@ const RentalFormPage: React.FC = () => {
     e.preventDefault();
     if (!validateForm()) return;
     setIsSaving(true);
-    const payload: Omit<Rental, "customer_name" | "location_address"> = {
+    // Empty optional fields are sent as explicit nulls so the backend clears
+    // them rather than keeping the stored value.
+    const payload: {
+      customer_id: number;
+      location_id: number | null;
+      tong_no: string | null;
+      driver: string;
+      date_placed: string | null;
+      date_picked: string | null;
+      remarks: string | null;
+      pickup_destination: string | null;
+    } = {
       customer_id: Number(formData.customer_id),
       location_id: formData.location_id ? Number(formData.location_id) : null,
-      tong_no: formData.tong_no,
+      tong_no: formData.tong_no || null,
       driver: formData.driver,
-      date_placed: formData.date_placed,
+      date_placed: formData.date_placed || null,
       date_picked: formData.date_picked || null,
       remarks: formData.remarks || null,
       pickup_destination: formData.pickup_destination || null,
@@ -813,9 +811,11 @@ const RentalFormPage: React.FC = () => {
                 </h1>
                 <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                   {isEditMode
-                    ? `Update details for the rental placed on ${formatDateForInput(
-                        initialFormData?.date_placed ?? null
-                      )}.`
+                    ? initialFormData?.date_placed
+                      ? `Update details for the rental placed on ${formatDateForInput(
+                          initialFormData.date_placed
+                        )}.`
+                      : "Update the details of this rental."
                     : "Fill in the details."}
                 </p>
               </div>
@@ -1094,7 +1094,10 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="date_placed"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Placement Date <span className="text-red-500">*</span>
+                    Placement Date{" "}
+                    <span className="text-xs text-default-500 dark:text-gray-400">
+                      (Optional)
+                    </span>
                   </label>
                   <div className="mt-2">
                     <input
@@ -1103,7 +1106,6 @@ const RentalFormPage: React.FC = () => {
                       name="date_placed"
                       value={formData.date_placed}
                       onChange={handleDateChange}
-                      required
                       className={clsx(
                         "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
@@ -1126,7 +1128,7 @@ const RentalFormPage: React.FC = () => {
                       name="date_picked"
                       value={formData.date_picked ?? ""}
                       onChange={handleDateChange}
-                      min={formData.date_placed}
+                      min={formData.date_placed || undefined}
                       className={clsx(
                         "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                         "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
@@ -1140,13 +1142,15 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="tong_no-button"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Dumpster <span className="text-red-500">*</span>
+                    Dumpster{" "}
+                    <span className="text-xs text-default-500 dark:text-gray-400">
+                      (Optional)
+                    </span>
                   </label>
                   <div className="mt-2">
                     <Listbox
                       value={formData.tong_no}
                       onChange={handleDumpsterChange}
-                      disabled={!formData.date_placed}
                       name="tong_no"
                     >
                       <div className="relative">
@@ -1154,17 +1158,17 @@ const RentalFormPage: React.FC = () => {
                           id="tong_no-button"
                           className={clsx(
                             "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm",
-                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                            !formData.date_placed
-                              ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 cursor-not-allowed"
-                              : ""
+                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
                           )}
                         >
-                          <span className="block truncate">
-                            {formData.tong_no ||
-                              (!formData.date_placed
-                                ? "Select date first"
-                                : "Select Dumpster")}
+                          <span
+                            className={clsx(
+                              "block truncate",
+                              !formData.tong_no &&
+                                "italic text-gray-500 dark:text-gray-400"
+                            )}
+                          >
+                            {formData.tong_no || "No Dumpster"}
                           </span>
                           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -1185,8 +1189,37 @@ const RentalFormPage: React.FC = () => {
                               "mt-1"
                             )}
                           >
-                            {dumpsterOptions.length === 0 &&
-                            formData.date_placed ? (
+                            <ListboxOption
+                              key="none"
+                              value=""
+                              className={({ active }) =>
+                                clsx(
+                                  "relative cursor-default select-none py-2 pl-3 pr-10",
+                                  active
+                                    ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
+                                    : "text-gray-900 dark:text-gray-100"
+                                )
+                              }
+                            >
+                              {({ selected }) => (
+                                <>
+                                  <span
+                                    className={clsx(
+                                      "block truncate italic text-gray-500 dark:text-gray-400",
+                                      selected ? "font-medium" : "font-normal"
+                                    )}
+                                  >
+                                    No Dumpster
+                                  </span>
+                                  {selected && (
+                                    <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
+                                      <IconCheck size={20} />
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </ListboxOption>
+                            {dumpsterOptions.length === 0 ? (
                               <div className="relative cursor-default select-none py-2 px-4 text-gray-500 dark:text-gray-400">
                                 Loading...
                               </div>

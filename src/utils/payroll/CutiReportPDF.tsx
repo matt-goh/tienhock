@@ -11,11 +11,6 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../pdf/paperSize";
 
 // Color palette for professional appearance
 const colors = {
@@ -965,21 +960,15 @@ const MonthlyLeaveTable: React.FC<{
 const SingleCutiReportPDF: React.FC<{
   data: CutiReportData;
   companyName?: string;
-  paperSize?: PdfPaperSize;
-}> = ({ data, companyName, paperSize }) => {
+}> = ({ data, companyName }) => {
   const resolvedCompanyName =
     companyName ?? data.companyName ?? TIENHOCK_INFO.name;
   const resolvedLogo = data.logoSrc ?? TienHockLogo;
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportTitle = `${data.employee.name} - Leave Report ${data.year}`;
 
   return (
     <Document title={`Leave Report ${data.employee.name} ${data.year}`}>
-      <Page
-        size={getReactPdfPageSize(effectivePaperSize, true)}
-        orientation="landscape"
-        style={styles.page}
-      >
+      <Page size="A4" orientation="landscape" style={styles.page}>
         {/* Header */}
         <View style={styles.header}>
           <Image src={resolvedLogo} style={styles.logo} />
@@ -1023,22 +1012,16 @@ const SingleCutiReportPDF: React.FC<{
 const BatchCutiReportPDF: React.FC<{
   data: CutiBatchReportData;
   companyName?: string;
-  paperSize?: PdfPaperSize;
-}> = ({ data, companyName, paperSize }) => {
+}> = ({ data, companyName }) => {
   const resolvedCompanyName =
     companyName ?? data.companyName ?? TIENHOCK_INFO.name;
   const resolvedLogo = data.logoSrc ?? TienHockLogo;
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
   const reportTitle = `Batch Leave Report ${data.year} - ${data.summary.totalEmployees} Employees`;
 
   return (
     <Document title={`Batch Leave Report ${data.year}`}>
       {data.employees.map((employeeData, index) => (
-        <Page
-          key={employeeData.employee.id}
-          size={getReactPdfPageSize(effectivePaperSize)}
-          style={styles.page}
-        >
+        <Page key={employeeData.employee.id} size="A4" style={styles.page}>
           {/* Header */}
           <View style={styles.header}>
             <Image src={resolvedLogo} style={styles.logo} />
@@ -1086,11 +1069,10 @@ const BatchCutiReportPDF: React.FC<{
 // PDF Generation Functions
 export const generateSingleCutiReportPDF = async (
   data: CutiReportData,
-  action: "download" | "print",
-  paperSize?: PdfPaperSize
+  action: "download" | "print"
 ) => {
   try {
-    const doc = <SingleCutiReportPDF data={data} paperSize={paperSize} />;
+    const doc = <SingleCutiReportPDF data={data} />;
     const pdfBlob = await pdf(doc).toBlob();
 
     const fileName = `Leave_Report_${data.employee.name.replace(/\s+/g, "_")}_${
@@ -1137,11 +1119,10 @@ export const generateSingleCutiReportPDF = async (
 
 export const generateBatchCutiReportPDF = async (
   data: CutiBatchReportData,
-  action: "download" | "print",
-  paperSize?: PdfPaperSize
+  action: "download" | "print"
 ) => {
   try {
-    const doc = <BatchCutiReportPDF data={data} paperSize={paperSize} />;
+    const doc = <BatchCutiReportPDF data={data} />;
     const pdfBlob = await pdf(doc).toBlob();
 
     const fileName = `Batch_Leave_Report_${data.year}_${data.summary.totalEmployees}_Employees.pdf`;

@@ -15,7 +15,11 @@ import {
   cancelSalesJournalEntry,
   invoiceLocalDateString,
 } from "../../accounting/sales-journal.js";
-import { createReceipt } from "../../accounting/receipt-service.js";
+import {
+  createReceipt,
+  SETTLEABLE_AMOUNT_SQL,
+} from "../../accounting/receipt-service.js";
+import { normalizeSaleTenders } from "./saleTenders.js";
 import {
   assertTienHockAccountingDateUnlocked,
   isAccountingPeriodLockedError,
@@ -421,6 +425,7 @@ export default function (pool, config) {
         invoiceStatus,
         eInvoiceStatus,
         search,
+        settleable,
       } = req.query;
 
       // Skip pagination if 'all' parameter is true
@@ -435,6 +440,7 @@ export default function (pool, config) {
           i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
           i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
           i.invoice_status, i.einvoice_status, i.balance_due,
+          ${SETTLEABLE_AMOUNT_SQL} as settleable_amount,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
           c.name as customerName, c.tin_number as customerTin, c.id_number as customerIdNumber, c.phone_number, c.id_type as customerIdType,
@@ -561,10 +567,20 @@ export default function (pool, config) {
       if (invoiceStatus) {
         const statusParam = `$${filterParamCounter++}`;
         filterParams.push(invoiceStatus.split(","));
-        whereClause += ` AND i.invoice_status = ANY(${statusParam})`;
+        // `settleable=true` widens a status filter with everything a payment
+        // can still be recorded against. A cash bill is always 'paid', but the
+        // part of it still sitting in CH_REV1 can be re-classified as banked
+        // money, so the payment picker must be able to see it.
+        whereClause +=
+          settleable === "true"
+            ? ` AND (i.invoice_status = ANY(${statusParam}) OR (i.invoice_status != 'cancelled' AND (${SETTLEABLE_AMOUNT_SQL}) > 0))`
+            : ` AND i.invoice_status = ANY(${statusParam})`;
       } else {
         // Default filter to exclude cancelled invoices
         whereClause += ` AND i.invoice_status != 'cancelled'`;
+        if (settleable === "true") {
+          whereClause += ` AND (${SETTLEABLE_AMOUNT_SQL}) > 0`;
+        }
       }
       if (eInvoiceStatus) {
         const eStatusParam = `$${filterParamCounter++}`;
@@ -670,6 +686,7 @@ export default function (pool, config) {
         rounding: parseFloat(row.rounding || 0),
         totalamountpayable: parseFloat(row.totalamountpayable || 0),
         balance_due: parseFloat(row.balance_due || 0),
+        settleable_amount: parseFloat(row.settleable_amount || 0),
         invoice_status: row.invoice_status,
         einvoice_status: row.einvoice_status,
         uuid: row.uuid,
@@ -2263,6 +2280,7 @@ export default function (pool, config) {
           i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
           i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
           i.invoice_status, i.einvoice_status, i.balance_due,
+          ${SETTLEABLE_AMOUNT_SQL} as settleable_amount,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
           c.name as customerName, c.tin_number, c.id_number, c.phone_number,
@@ -2324,6 +2342,7 @@ export default function (pool, config) {
         rounding: parseFloat(invoice.rounding || 0),
         totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
         balance_due: parseFloat(invoice.balance_due || 0),
+        settleable_amount: parseFloat(invoice.settleable_amount || 0),
         invoice_status: invoice.invoice_status,
         einvoice_status: invoice.einvoice_status,
         uuid: invoice.uuid,
@@ -2474,10 +2493,17 @@ export default function (pool, config) {
       // bill settled by transfer/online/cheque at sale time starts with its
       // full balance and is settled by a genuine receipt below (a pending
       // cheque keeps the balance open until it clears).
+      //
+      // Split tender: `invoice.payments` lists what was actually taken at the
+      // counter (e.g. RM392 cash + RM596 online). Every non-cash line becomes
+      // its own receipt; the cash line is left to the automatic CH_REV1
+      // collection, which absorbs whatever the receipts do not cover. A single
+      // `payment_method` is the one-line shorthand and still works.
       const totalPayable = parseFloat(invoice.totalamountpayable || 0);
       const isCash = invoice.paymenttype === "CASH";
-      const saleMethod = isCash ? invoice.payment_method || "cash" : null;
-      const autoCollected = isCash && saleMethod === "cash";
+      const saleTenders = normalizeSaleTenders(invoice, totalPayable, isCash);
+      const nonCashTenders = saleTenders.filter((t) => t.payment_method !== "cash");
+      const autoCollected = isCash && nonCashTenders.length === 0;
       const balance_due = autoCollected ? 0 : totalPayable;
       const invoice_status =
         autoCollected || totalPayable === 0 ? "paid" : "Unpaid";
@@ -2534,23 +2560,27 @@ export default function (pool, config) {
         }
       }
 
-      // CASH bill settled by a non-cash method at sale time: record a genuine
-      // receipt (DR bank / CR TR; a cheque stays pending until cleared). The
-      // cash-method auto-collection is handled by syncSalesJournalEntry below.
-      if (isCash && totalPayable > 0 && saleMethod !== "cash") {
-        await createReceipt(
-          client,
-          {
-            payment_method: saleMethod,
-            bank_account: invoice.bank_account || "BANK_PBB",
-            display_reference: invoice.payment_reference || null,
-            received_date: invoiceLocalDateString(createdInvoice.createddate),
-            allocations: [
-              { type: "invoice", invoice_id: createdInvoice.id, amount: totalPayable },
-            ],
-          },
-          req.user?.id || null
-        );
+      // CASH bill settled (wholly or partly) by a non-cash method at sale
+      // time: one genuine receipt per tender line (DR bank / CR debtor; a
+      // cheque stays pending until cleared). Whatever is left over is the cash
+      // taken at the counter, and syncSalesJournalEntry auto-collects it into
+      // CH_REV1 below.
+      if (isCash && totalPayable > 0) {
+        for (const tender of nonCashTenders) {
+          await createReceipt(
+            client,
+            {
+              payment_method: tender.payment_method,
+              bank_account: tender.bank_account || "BANK_PBB",
+              display_reference: tender.payment_reference || null,
+              received_date: invoiceLocalDateString(createdInvoice.createddate),
+              allocations: [
+                { type: "invoice", invoice_id: createdInvoice.id, amount: tender.amount },
+              ],
+            },
+            req.user?.id || null
+          );
+        }
       }
 
       // Post the invoice-owned journal (CASH: DR CH_REV1 / CR CASH_SALES with
@@ -2593,6 +2623,10 @@ export default function (pool, config) {
           code: error.code,
           message: error.message,
         });
+      }
+      // Tender validation and receipt errors carry a user-facing message.
+      if (error.status === 400) {
+        return res.status(400).json({ message: error.message });
       }
       // Send specific duplicate error if applicable
       if (error.message && error.message.includes("already exists")) {

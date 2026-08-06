@@ -10,11 +10,6 @@ import type { AdjustmentDocType } from "../../../../types/types";
 import { GREENTARGET_INFO } from "../../../invoice/einvoice/companyInfo";
 import GreenTargetLogo from "../../../GreenTargetLogo.png";
 import { formatAdjustmentDocId } from "../../../adjustments/formatDocId";
-import {
-  getPaperSizePreference,
-  getReactPdfPageSize,
-  PdfPaperSize,
-} from "../../../pdf/paperSize";
 
 const TYPE_LABEL: Record<AdjustmentDocType, { title: string; footer: string }> = {
   credit_note: { title: "CREDIT NOTE", footer: "Credit Note" },
@@ -239,20 +234,14 @@ const styles = StyleSheet.create({
 interface Props {
   data: GTAdjustmentDocPDFData;
   qrCodeData?: string | null;
-  paperSize?: PdfPaperSize;
 }
 
-const GTAdjustmentDocPDF: React.FC<Props> = ({
-  data,
-  qrCodeData,
-  paperSize,
-}) => {
-  const effectivePaperSize = paperSize ?? getPaperSizePreference();
+const GTAdjustmentDocPDF: React.FC<Props> = ({ data, qrCodeData }) => {
   const isValidated = Boolean(qrCodeData);
   const typeMeta = TYPE_LABEL[data.doc.type];
 
   return (
-    <Page size={getReactPdfPageSize(effectivePaperSize)} style={styles.page}>
+    <Page size="A4" style={styles.page}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.companySection}>

@@ -1,8 +1,20 @@
 // src/routes/greentarget/rentals.js
 import { Router } from "express";
+import { format } from "date-fns";
 
 export default function (pool) {
   const router = Router();
+
+  // Stored `date` columns come back from the pool as Date objects, while the
+  // request body carries plain yyyy-MM-dd strings; both are normalised here so
+  // "changed?" comparisons are done on the same shape.
+  const toYmd = (value) => {
+    if (!value) return null;
+    if (typeof value === "string") {
+      return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : format(new Date(value), "yyyy-MM-dd");
+    }
+    return format(new Date(value), "yyyy-MM-dd");
+  };
 
   // Local (Asia/Kuala_Lumpur) yyyy-MM-dd. Deriving this from toISOString() would
   // return the UTC date and shift a day back before 08:00 local time.
@@ -73,7 +85,6 @@ export default function (pool) {
       customer_id,
       location_id,
       tong_no,
-      active_only,
       no_invoice,
       search,
       start_date,
@@ -102,7 +113,8 @@ export default function (pool) {
                 'invoice_id', i.invoice_id,
                 'invoice_number', i.invoice_number,
                 'status', i.status,
-                'amount', i.total_amount
+                'amount', i.total_amount,
+                'balance_due', i.balance_due
               ) FROM greentarget.invoices i
               JOIN greentarget.invoice_rentals ir ON i.invoice_id = ir.invoice_id
               WHERE ir.rental_id = r.rental_id
@@ -121,7 +133,7 @@ export default function (pool) {
       FROM greentarget.rentals r
       JOIN greentarget.customers c ON r.customer_id = c.customer_id
       LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
-      JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+      LEFT JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
       LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
       `;
 
@@ -147,14 +159,6 @@ export default function (pool) {
         paramCounter++;
       }
 
-      if (active_only === "true") {
-        // A rental stays active until its pickup date has passed, so a
-        // future-dated pickup still counts as active.
-        whereClause += ` AND (r.date_picked IS NULL OR r.date_picked > $${paramCounter}::date)`;
-        filterParams.push(localToday());
-        paramCounter++;
-      }
-
       if (no_invoice === "true") {
         // Same rule the invoice form uses to decide a rental is still billable:
         // a cancelled invoice does not count as invoiced.
@@ -167,14 +171,17 @@ export default function (pool) {
         )`;
       }
 
+      // A rental with no placement date is never excluded by a placement-date
+      // filter -- the dates are optional now, so filtering them out would make
+      // date-less rentals unreachable from the list's default date range.
       if (start_date) {
-        whereClause += ` AND r.date_placed >= $${paramCounter}::date`;
+        whereClause += ` AND (r.date_placed IS NULL OR r.date_placed >= $${paramCounter}::date)`;
         filterParams.push(start_date);
         paramCounter++;
       }
 
       if (end_date) {
-        whereClause += ` AND r.date_placed <= $${paramCounter}::date`;
+        whereClause += ` AND (r.date_placed IS NULL OR r.date_placed <= $${paramCounter}::date)`;
         filterParams.push(end_date);
         paramCounter++;
       }
@@ -248,92 +255,101 @@ export default function (pool) {
     try {
       await client.query("BEGIN");
 
-      // Check if required fields are provided
-      if (!customer_id || !tong_no || !driver || !date_placed) {
-        throw new Error(
-          "Missing required fields: customer_id, tong_no, driver, date_placed"
-        );
+      // The dumpster and both dates are optional: the rental record exists to
+      // carry the customer's site and the invoice/payment chain, and the tong
+      // movement itself is tracked outside the system.
+      if (!customer_id || !driver) {
+        throw new Error("Missing required fields: customer_id, driver");
       }
 
       const currentDate = localToday();
       const date_picked = req.body.date_picked || null;
+      const tongNo = tong_no || null;
+      const datePlaced = date_placed || null;
 
-      // FIXED: Properly cast dates and use DATE type for the far future date
-      const overlapQuery = `
-      SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
-      FROM greentarget.rentals r
-      JOIN greentarget.customers c ON r.customer_id = c.customer_id
-      WHERE r.tong_no = $1 
-      AND (
-        ($2::date < COALESCE(r.date_picked, '9999-12-31'::date)) 
-        AND 
-        (r.date_placed < COALESCE($3::date, '9999-12-31'::date))
-      )
-    `;
+      // Availability only means something once a dumpster AND a placement date
+      // are both given; otherwise the rental occupies no dumpster/period.
+      if (tongNo && datePlaced) {
+        // FIXED: Properly cast dates and use DATE type for the far future date
+        // Only rentals that actually occupy a period can conflict, so the
+        // dateless ones are excluded from the overlap scan.
+        const overlapQuery = `
+          SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
+          FROM greentarget.rentals r
+          JOIN greentarget.customers c ON r.customer_id = c.customer_id
+          WHERE r.tong_no = $1
+          AND r.date_placed IS NOT NULL
+          AND (
+            ($2::date < COALESCE(r.date_picked, '9999-12-31'::date))
+            AND
+            (r.date_placed < COALESCE($3::date, '9999-12-31'::date))
+          )
+        `;
 
-      const overlapResult = await client.query(overlapQuery, [
-        tong_no,
-        date_placed,
-        date_picked,
-      ]);
-
-      if (overlapResult.rows.length > 0) {
-        // Special handling for transition day (moving out one customer, moving in another)
-        const sameDay = overlapResult.rows.some(
-          (rental) => rental.date_picked && rental.date_picked === date_placed
-        );
-
-        // Allow multiple 1-day rentals on the same transition day
-        // Check if this is a 1-day rental on a transition day
-        const isOneDayRental = date_picked && date_picked === date_placed;
-        const allConflictsAreTransitionDay = overlapResult.rows.every(
-          (rental) => rental.date_picked && rental.date_picked === date_placed
-        );
-
-        // Only allow if this is a transition day scenario or all conflicts are 1-day rentals on the same day
-        if (!(sameDay || (isOneDayRental && allConflictsAreTransitionDay))) {
-          const conflict = overlapResult.rows[0];
-          throw new Error(
-            `The selected dumpster is not available for the chosen period. ` +
-              `Dumpster ${tong_no} is rented by ${conflict.customer_name} ` +
-              `from ${conflict.date_placed} to ${
-                conflict.date_picked || "ongoing"
-              }`
-          );
-        }
-      }
-
-      // Check for future rentals when creating an indefinite rental
-      if (!date_picked) {
-        const futureRentalsQuery = `
-        SELECT r.rental_id, r.date_placed, c.name as customer_name 
-        FROM greentarget.rentals r
-        JOIN greentarget.customers c ON r.customer_id = c.customer_id
-        WHERE r.tong_no = $1 AND r.date_placed > $2::date
-        ORDER BY r.date_placed
-        LIMIT 1
-      `;
-
-        const futureRentalsResult = await client.query(futureRentalsQuery, [
-          tong_no,
-          date_placed,
+        const overlapResult = await client.query(overlapQuery, [
+          tongNo,
+          datePlaced,
+          date_picked,
         ]);
 
-        if (futureRentalsResult.rows.length > 0) {
-          const future = futureRentalsResult.rows[0];
-          throw new Error(
-            `Cannot create ongoing rental: dumpster is already booked starting ${future.date_placed} ` +
-              `for ${future.customer_name}`
+        if (overlapResult.rows.length > 0) {
+          // Special handling for transition day (moving out one customer, moving in another)
+          const sameDay = overlapResult.rows.some(
+            (rental) => rental.date_picked && rental.date_picked === datePlaced
+          );
+
+          // Allow multiple 1-day rentals on the same transition day
+          // Check if this is a 1-day rental on a transition day
+          const isOneDayRental = date_picked && date_picked === datePlaced;
+          const allConflictsAreTransitionDay = overlapResult.rows.every(
+            (rental) => rental.date_picked && rental.date_picked === datePlaced
+          );
+
+          // Only allow if this is a transition day scenario or all conflicts are 1-day rentals on the same day
+          if (!(sameDay || (isOneDayRental && allConflictsAreTransitionDay))) {
+            const conflict = overlapResult.rows[0];
+            throw new Error(
+              `The selected dumpster is not available for the chosen period. ` +
+                `Dumpster ${tongNo} is rented by ${conflict.customer_name} ` +
+                `from ${conflict.date_placed} to ${
+                  conflict.date_picked || "ongoing"
+                }`
+            );
+          }
+        }
+
+        // Check for future rentals when creating an indefinite rental
+        if (!date_picked) {
+          const futureRentalsQuery = `
+            SELECT r.rental_id, r.date_placed, c.name as customer_name
+            FROM greentarget.rentals r
+            JOIN greentarget.customers c ON r.customer_id = c.customer_id
+            WHERE r.tong_no = $1 AND r.date_placed > $2::date
+            ORDER BY r.date_placed
+            LIMIT 1
+          `;
+
+          const futureRentalsResult = await client.query(futureRentalsQuery, [
+            tongNo,
+            datePlaced,
+          ]);
+
+          if (futureRentalsResult.rows.length > 0) {
+            const future = futureRentalsResult.rows[0];
+            throw new Error(
+              `Cannot create ongoing rental: dumpster is already booked starting ${future.date_placed} ` +
+                `for ${future.customer_name}`
+            );
+          }
+        }
+
+        // Update dumpster status to 'rented' only if the rental starts today or earlier
+        if (datePlaced <= currentDate) {
+          await client.query(
+            `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
+            [tongNo]
           );
         }
-      }
-
-      // Update dumpster status to 'rented' only if the rental starts today or earlier
-      if (date_placed <= currentDate) {
-        await client.query(
-          `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
-          [tong_no]
-        );
       }
 
       // Update customer last_activity_date
@@ -361,9 +377,9 @@ export default function (pool) {
       const rentalResult = await client.query(rentalQuery, [
         customer_id,
         location_id || null,
-        tong_no,
+        tongNo,
         driver,
-        date_placed,
+        datePlaced,
         date_picked,
         remarks || null,
         pickup_destination || null,
@@ -412,36 +428,53 @@ export default function (pool) {
       const currentRental = currentRentalResult.rows[0];
       const currentDate = localToday();
 
+      // The dumpster and both dates are optional, so a field is only touched
+      // when the request actually carries it: an omitted field keeps its stored
+      // value, while an explicit null clears it.
+      const sent = (field) =>
+        Object.prototype.hasOwnProperty.call(req.body, field);
+
+      const currentTongNo = currentRental.tong_no ?? null;
+      const currentDatePlaced = toYmd(currentRental.date_placed);
+      const currentDatePicked = toYmd(currentRental.date_picked);
+
+      const newTongNo = sent("tong_no") ? tong_no || null : currentTongNo;
+      const newDatePlaced = sent("date_placed")
+        ? toYmd(date_placed)
+        : currentDatePlaced;
+      const newDatePicked = sent("date_picked")
+        ? toYmd(date_picked)
+        : currentDatePicked;
+
       // Validate dates if provided
-      if (date_placed && date_picked && date_placed > date_picked) {
+      if (newDatePlaced && newDatePicked && newDatePlaced > newDatePicked) {
         throw new Error("Placement date cannot be after pickup date");
       }
 
-      const newTongNo = tong_no || currentRental.tong_no;
-      const newDatePlaced = date_placed || currentRental.date_placed;
-      const newDatePicked =
-        date_picked !== undefined ? date_picked : currentRental.date_picked;
+      const datesChanged =
+        newDatePlaced !== currentDatePlaced ||
+        newDatePicked !== currentDatePicked;
 
-      if (
-        (date_placed && date_placed !== currentRental.date_placed) ||
-        (date_picked !== undefined && date_picked !== currentRental.date_picked)
-      ) {
+      // A rental with no dumpster or no placement date occupies no dumpster
+      // period, so there is nothing to check availability against.
+      if (datesChanged && newTongNo && newDatePlaced) {
         // Only check for overlaps if staying with the same dumpster
         // If changing dumpsters, the overlap check should use the new dumpster ID
-        const dumpsterToCheck = tong_no || currentRental.tong_no;
+        const dumpsterToCheck = newTongNo;
 
         // Only perform this check if we're NOT changing dumpsters
-        if (dumpsterToCheck === currentRental.tong_no) {
+        if (dumpsterToCheck === currentTongNo) {
           // Check for overlaps with other rentals for the same dumpster
           const overlapQuery = `
             SELECT r.rental_id, r.date_placed, r.date_picked, c.name as customer_name
             FROM greentarget.rentals r
             JOIN greentarget.customers c ON r.customer_id = c.customer_id
-            WHERE r.tong_no = $1 
+            WHERE r.tong_no = $1
             AND r.rental_id != $2
+            AND r.date_placed IS NOT NULL
             AND (
-              ($3::date < COALESCE(r.date_picked, '9999-12-31'::date)) 
-              AND 
+              ($3::date < COALESCE(r.date_picked, '9999-12-31'::date))
+              AND
               (r.date_placed < COALESCE($4::date, '9999-12-31'::date))
             )
           `;
@@ -477,81 +510,87 @@ export default function (pool) {
       }
 
       // Handle dumpster changes if tong_no is being updated
-      if (tong_no && tong_no !== currentRental.tong_no) {
-        // Check if the new dumpster is available for the period
-        const overlapQuery = `
-        SELECT COUNT(*) 
-        FROM greentarget.rentals 
-        WHERE tong_no = $1 AND rental_id != $2 AND (
-          (date_picked IS NULL OR $3 < date_picked) AND
-          (date_placed <= $3)
-        )
-      `;
-        const overlapResult = await client.query(overlapQuery, [
-          tong_no,
-          rental_id,
-          newDatePlaced,
-        ]);
+      if (newTongNo !== currentTongNo) {
+        if (newTongNo && newDatePlaced) {
+          // Check if the new dumpster is available for the period
+          const overlapQuery = `
+            SELECT COUNT(*)
+            FROM greentarget.rentals
+            WHERE tong_no = $1 AND rental_id != $2 AND (
+              (date_picked IS NULL OR $3 < date_picked) AND
+              (date_placed <= $3)
+            )
+          `;
+          const overlapResult = await client.query(overlapQuery, [
+            newTongNo,
+            rental_id,
+            newDatePlaced,
+          ]);
 
-        if (parseInt(overlapResult.rows[0].count) > 0) {
-          throw new Error(
-            `Dumpster ${tong_no} is not available for the chosen period`
-          );
+          if (parseInt(overlapResult.rows[0].count) > 0) {
+            throw new Error(
+              `Dumpster ${newTongNo} is not available for the chosen period`
+            );
+          }
         }
 
-        // Check if the new dumpster exists
-        const dumpsterQuery = `
-        SELECT status FROM greentarget.dumpsters WHERE tong_no = $1
-      `;
-        const dumpsterResult = await client.query(dumpsterQuery, [tong_no]);
+        if (newTongNo) {
+          // Check if the new dumpster exists
+          const dumpsterQuery = `
+            SELECT status FROM greentarget.dumpsters WHERE tong_no = $1
+          `;
+          const dumpsterResult = await client.query(dumpsterQuery, [newTongNo]);
 
-        if (dumpsterResult.rows.length === 0) {
-          throw new Error(`Dumpster ${tong_no} not found`);
+          if (dumpsterResult.rows.length === 0) {
+            throw new Error(`Dumpster ${newTongNo} not found`);
+          }
         }
 
-        // Update the old dumpster to Available if no other active rentals
-        const oldRentalsQuery = `
-        SELECT COUNT(*) FROM greentarget.rentals 
-        WHERE tong_no = $1 AND rental_id != $2 
-        AND date_picked IS NULL AND date_placed <= $3
-      `;
-        const oldRentalsResult = await client.query(oldRentalsQuery, [
-          currentRental.tong_no,
-          rental_id,
-          currentDate,
-        ]);
+        if (currentTongNo) {
+          // Update the old dumpster to Available if no other active rentals
+          const oldRentalsQuery = `
+            SELECT COUNT(*) FROM greentarget.rentals
+            WHERE tong_no = $1 AND rental_id != $2
+            AND date_picked IS NULL AND date_placed <= $3
+          `;
+          const oldRentalsResult = await client.query(oldRentalsQuery, [
+            currentTongNo,
+            rental_id,
+            currentDate,
+          ]);
 
-        if (parseInt(oldRentalsResult.rows[0].count) === 0) {
-          await client.query(
-            `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
-            [currentRental.tong_no]
-          );
+          if (parseInt(oldRentalsResult.rows[0].count) === 0) {
+            await client.query(
+              `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
+              [currentTongNo]
+            );
+          }
         }
 
         // Update the new dumpster to Rented if the rental is active now
-        if (newDatePlaced <= currentDate && !newDatePicked) {
+        if (newTongNo && newDatePlaced && newDatePlaced <= currentDate && !newDatePicked) {
           await client.query(
             `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
-            [tong_no]
+            [newTongNo]
           );
         }
-      } else {
+      } else if (currentTongNo) {
         // If setting date_picked and it wasn't set before, check if we should update dumpster status
-        if (date_picked && !currentRental.date_picked) {
+        if (newDatePicked && !currentDatePicked) {
           // Only update to Available if there are no other active rentals for this dumpster
           // and the pickup date is not in the future
           const today = localToday();
 
           // Only mark as Available if the pickup date is today or in the past
-          if (date_picked <= today) {
+          if (newDatePicked <= today) {
             const activeRentalsQuery = `
-            SELECT COUNT(*) FROM greentarget.rentals 
-            WHERE tong_no = $1 AND rental_id != $2 
+            SELECT COUNT(*) FROM greentarget.rentals
+            WHERE tong_no = $1 AND rental_id != $2
             AND (date_picked IS NULL OR date_picked > $3)
             AND date_placed <= $4
           `;
             const activeRentalsResult = await client.query(activeRentalsQuery, [
-              currentRental.tong_no,
+              currentTongNo,
               rental_id,
               today,
               today,
@@ -560,32 +599,35 @@ export default function (pool) {
             if (parseInt(activeRentalsResult.rows[0].count) === 0) {
               await client.query(
                 `UPDATE greentarget.dumpsters SET status = 'Available' WHERE tong_no = $1`,
-                [currentRental.tong_no]
+                [currentTongNo]
               );
             }
           }
         }
         // If removing a date_picked that was previously set, update dumpster status back to Rented
         else if (
-          currentRental.date_picked &&
-          date_picked === null &&
+          currentDatePicked &&
+          !newDatePicked &&
+          newDatePlaced &&
           newDatePlaced <= currentDate
         ) {
           await client.query(
             `UPDATE greentarget.dumpsters SET status = 'Rented' WHERE tong_no = $1`,
-            [currentRental.tong_no]
+            [currentTongNo]
           );
         }
       }
 
-      // Update the rental with all editable fields
+      // Update the rental with all editable fields. Every value is already
+      // resolved above (omitted = keep stored, null = clear), so nothing here
+      // falls back to COALESCE.
       const updateRentalQuery = `
       UPDATE greentarget.rentals
       SET
-        location_id = COALESCE($1, location_id),
-        tong_no = COALESCE($2, tong_no),
-        driver = COALESCE($3, driver),
-        date_placed = COALESCE($4, date_placed),
+        location_id = $1,
+        tong_no = $2,
+        driver = $3,
+        date_placed = $4,
         date_picked = $5,
         remarks = $6,
         pickup_destination = $7
@@ -594,13 +636,15 @@ export default function (pool) {
     `;
 
       const updateRentalResult = await client.query(updateRentalQuery, [
-        location_id || null,
-        tong_no || currentRental.tong_no,
+        sent("location_id") ? location_id || null : currentRental.location_id,
+        newTongNo,
         driver || currentRental.driver,
-        date_placed || currentRental.date_placed,
-        date_picked, // Allow setting to null
-        remarks, // Allow setting to null
-        pickup_destination !== undefined ? pickup_destination : currentRental.pickup_destination,
+        newDatePlaced,
+        newDatePicked,
+        sent("remarks") ? remarks || null : currentRental.remarks,
+        sent("pickup_destination")
+          ? pickup_destination || null
+          : currentRental.pickup_destination,
         rental_id,
       ]);
 
@@ -637,7 +681,7 @@ export default function (pool) {
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
-        JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+        LEFT JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
         WHERE r.rental_id = $1
       `;
 
@@ -695,7 +739,7 @@ export default function (pool) {
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
-        JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+        LEFT JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
         LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
         WHERE r.rental_id = $1
       `;
@@ -817,7 +861,7 @@ export default function (pool) {
         FROM greentarget.rentals r
         JOIN greentarget.customers c ON r.customer_id = c.customer_id
         LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
-        JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
+        LEFT JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
         LEFT JOIN greentarget.pickup_destinations pd ON r.pickup_destination = pd.code
         WHERE r.rental_id = $1
       `;

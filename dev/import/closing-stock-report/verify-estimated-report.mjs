@@ -99,22 +99,19 @@ const ROOT_MONEY_DELTAS = new Map([
   // Q15 RESOLVED 2026-07-28 in production (Rosa re-pointed the parked RM40 from
   // CA_WA to OIL6389 on PCE003/06; +RM20.00 per product line after the 50% split).
   // Both VRE-DIESEL rows now land exact and intentionally carry no expected delta.
-  [
-    "mee.unit.expenses.subtotal.amount",
-    { delta: 2094, reason: "documented JVSL snapshot and visible-row rounding residual" },
-  ],
-  [
-    "bihun.unit.expenses.subtotal.amount",
-    { delta: 2094, reason: "documented JVSL snapshot and visible-row rounding residual" },
-  ],
-  [
-    "mee.unit.machineRepair.amount",
-    { delta: 19129, reason: "Q13 formula confirmed; June source classification differs" },
-  ],
-  [
-    "bihun.unit.machineRepair.amount",
-    { delta: -27324, reason: "Q13 formula confirmed; June source classification differs" },
-  ],
+  // June reclass RESOLVED 2026-08-06 in dev (the guarded migrations
+  // 2026-08-05_june_legacy_reclass.sql and
+  // 2026-08-06_june_legacy_reclass_e1_e7_mrm_mgt.sql re-pointed the June 2026
+  // manual voucher lines so our June movements for the 17 reclassified accounts
+  // exactly match the legacy program's June movements; design doc
+  // docs/Account/JUNE_RECLASS_DESIGN.md). The former +RM20.94 shared-expenses
+  // subtotal residuals (both lines) and the machine-repair classification deltas
+  // (MEE +RM191.29, BIHUN -RM273.24, previously "June source classification
+  // differs") are gone: all four rows now land exact and intentionally carry no
+  // expected delta. The remaining non-zero derived deltas stem from the other
+  // documented causes only (Q10 legacy page-to-page residue, the Q11 PU_MSD /
+  // opening-stock / physical-return row deltas above, and the boss-confirmed
+  // JAGUNG scenario).
 ]);
 
 /** Read and parse the canonical June fixture. */

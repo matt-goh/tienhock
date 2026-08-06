@@ -14,11 +14,6 @@ import {
   TIENHOCK_INFO,
 } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
-import {
-  PdfPaperSize,
-  getPaperSizePreference,
-  getPdfMakePageSize,
-} from "../pdf/paperSize";
 
 // Initialize pdfmake with the bundled fonts (same pattern as AccountLedgerPDFMake)
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
@@ -109,8 +104,7 @@ const loadLogoDataUrl = async (logoUrl: string): Promise<string | null> => {
 
 const buildDocDefinition = (
   data: JournalVoucherPDFData,
-  logoDataUrl: string | null,
-  paperSize: PdfPaperSize
+  logoDataUrl: string | null
 ): TDocumentDefinitions => {
   const statusLabel =
     data.status === "cancelled" ? "CANCELLED" : "POSTED";
@@ -226,7 +220,7 @@ const buildDocDefinition = (
       title: `Journal Voucher ${data.reference_no}`,
       author: companyInfo.name,
     },
-    pageSize: getPdfMakePageSize(paperSize),
+    pageSize: "A4",
     pageOrientation: "portrait",
     pageMargins: [18, 18, 18, 30],
     defaultStyle: { fontSize: 8, lineHeight: 1.15, color: colors.textPrimary },
@@ -308,15 +302,10 @@ const buildDocDefinition = (
 // Builds the voucher PDF and opens the print dialog (with the shared mobile
 // new-tab fallback).
 export const generateJournalVoucherPDF = async (
-  data: JournalVoucherPDFData,
-  paperSize?: PdfPaperSize
+  data: JournalVoucherPDFData
 ): Promise<void> => {
   const logoDataUrl = await loadLogoDataUrl(data.logoUrl ?? TienHockLogo);
-  const docDefinition = buildDocDefinition(
-    data,
-    logoDataUrl,
-    paperSize ?? getPaperSizePreference()
-  );
+  const docDefinition = buildDocDefinition(data, logoDataUrl);
 
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {
     pdfMake.createPdf(docDefinition).getBlob(resolve);

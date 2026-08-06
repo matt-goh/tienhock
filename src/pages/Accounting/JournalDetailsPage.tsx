@@ -583,7 +583,12 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   color="rose"
                   icon={IconTrash}
                   iconPosition="left"
-                  disabled={isProcessing}
+                  disabled={isProcessing || isSourceOwned}
+                  title={
+                    isSourceOwned
+                      ? "This journal is owned by its source document - remove or cancel that document instead."
+                      : undefined
+                  }
                 >
                   Delete
                 </Button>

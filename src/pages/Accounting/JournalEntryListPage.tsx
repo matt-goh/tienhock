@@ -257,6 +257,11 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [entryToDelete, setEntryToDelete] =
     useState<JournalEntryListItem | null>(null);
+  // Cancel dialog - mirrors the details page's cancel action
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [entryToCancel, setEntryToCancel] =
+    useState<JournalEntryListItem | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [showDeleteErrorDialog, setShowDeleteErrorDialog] = useState(false);
   const [deleteErrorData, setDeleteErrorData] = useState<{
     message: string;
@@ -372,6 +377,35 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
     e.stopPropagation();
     setEntryToDelete(entry);
     setShowDeleteDialog(true);
+  };
+
+  const handleCancelClick = (
+    entry: JournalEntryListItem,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    setEntryToCancel(entry);
+    setShowCancelDialog(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!entryToCancel) return;
+
+    setIsCancelling(true);
+    try {
+      await api.post(`${apiBase}/journal-entries/${entryToCancel.id}/cancel`);
+      toast.success("Journal entry cancelled successfully");
+      setShowCancelDialog(false);
+      setEntryToCancel(null);
+      fetchEntries();
+    } catch (error: unknown) {
+      console.error("Error cancelling entry:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to cancel entry";
+      toast.error(errorMessage);
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -505,8 +539,11 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header - row 1: title, search, date controls; row 2: filter pills. Search drops to its own row on mobile */}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
+      {/* Header - row 1: title, search, date controls; row 2: filter pills. Search
+          drops to its own row on mobile. Sticks to the top so the active date
+          range and filters stay visible while scrolling the list; the negative
+          margins let it span the page container's horizontal padding */}
+      <div className="sticky top-0 z-30 -mx-4 -mt-3 px-4 pt-3 pb-3 border-b border-default-200 dark:border-gray-700 bg-white/95 dark:bg-gray-950/95 backdrop-blur flex flex-wrap items-center gap-x-2 gap-y-3">
         {/* Title */}
         <div className="order-1 flex items-center gap-2 flex-shrink-0">
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
@@ -756,13 +793,35 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                             >
                               <IconPencil size={18} />
                             </button>
+                            {/* Cancel - same rule as the details page: a
+                                source-owned journal must be cancelled through
+                                its source document, not here */}
+                            {entry.status !== "cancelled" && (
+                              <button
+                                onClick={(e) => handleCancelClick(entry, e)}
+                                disabled={Boolean(entry.source_type)}
+                                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-600 dark:disabled:hover:text-rose-400"
+                                title={
+                                  entry.source_type
+                                    ? "This journal is owned by its source document - cancel that document instead."
+                                    : "Cancel Entry"
+                                }
+                              >
+                                <IconX size={18} />
+                              </button>
+                            )}
                             {/* GT journals are posted-on-create with no draft
                                 state, so delete stays a Tien Hock action */}
                             {!isGreenTarget && (
                               <button
                                 onClick={(e) => handleDeleteClick(entry, e)}
-                                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                                title="Delete"
+                                disabled={Boolean(entry.source_type)}
+                                className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-600 dark:disabled:hover:text-rose-400"
+                                title={
+                                  entry.source_type
+                                    ? "This journal is owned by its source document - remove or cancel that document instead."
+                                    : "Delete"
+                                }
                               >
                                 <IconTrash size={18} />
                               </button>
@@ -844,6 +903,25 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
           </button>
         </div>
       )}
+
+      {/* Cancel Dialog */}
+      <ConfirmationDialog
+        isOpen={showCancelDialog}
+        onClose={() => {
+          if (!isCancelling) {
+            setShowCancelDialog(false);
+            setEntryToCancel(null);
+          }
+        }}
+        onConfirm={handleConfirmCancel}
+        title="Cancel Journal Entry"
+        message={`Are you sure you want to cancel entry "${
+          entryToCancel ? getVisibleReference(entryToCancel) : ""
+        }"? This will mark the entry as cancelled.`}
+        confirmButtonText="Cancel Entry"
+        variant="danger"
+        isConfirming={isCancelling}
+      />
 
       {/* Delete Dialog */}
       <ConfirmationDialog
