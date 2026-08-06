@@ -5,8 +5,9 @@ import { ExtendedInvoiceData, Customer } from "../../types/types"; // Use update
 import { FormInput } from "../FormComponents"; // Reusable components
 import PillSelect, { PillSelectOption } from "../PillSelect";
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
+import TimeNavigator, { TimeRange } from "../TimeNavigator";
 import {
-  formatDateForInput,
+  formatDateForAPI,
   parseDatabaseTimestamp,
 } from "../../utils/invoice/dateUtils";
 
@@ -88,6 +89,18 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
       }
     }
     onInputChange("createddate", newDate.getTime().toString());
+  };
+
+  // TimeNavigator works in Date objects; the invoice keeps a ms-timestamp
+  // string, so the picked day is fed back through the same date handler that
+  // preserves the existing time part.
+  const invoiceDate: Date | null = useMemo(
+    () => parseDatabaseTimestamp(invoice.createddate).date,
+    [invoice.createddate]
+  );
+
+  const handleDatePick = (range: TimeRange) => {
+    handleDateTimeChange("date", formatDateForAPI(range.start));
   };
 
   const salesmanOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
@@ -172,14 +185,20 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
         </div>
 
         {/* Date */}
-        <FormInput
-          name="date"
-          label={t("date", { ns: "common" })}
-          type="date"
-          value={formatDateForInput(invoice.createddate)}
-          onChange={(e) => handleDateTimeChange("date", e.target.value)}
-          disabled={readOnly} // Use readOnly
-        />
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            {t("date", { ns: "common" })}
+          </label>
+          <TimeNavigator
+            range={{ start: invoiceDate, end: invoiceDate }}
+            onChange={handleDatePick}
+            modes={["day"]}
+            presets={false}
+            allowFuture
+            size="md"
+            disabled={readOnly}
+          />
+        </div>
 
         {/* Time */}
         <FormInput
