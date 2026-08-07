@@ -66,17 +66,19 @@ export default function NavbarBookmarks({
 
   // Handle hover open/close for the main dropdown
   const handleDropdownMouseEnter = useCallback(() => {
+    if (bookmarks.length === 0) return;
     if (dropdownHoverTimeoutRef.current) {
       clearTimeout(dropdownHoverTimeoutRef.current);
     }
     setIsOpen(true);
-  }, []);
+  }, [bookmarks.length]);
 
   const handleDropdownMouseLeave = useCallback(() => {
+    if (bookmarks.length === 0) return;
     dropdownHoverTimeoutRef.current = setTimeout(() => {
       setIsOpen(false);
     }, 150);
-  }, []);
+  }, [bookmarks.length]);
 
   // Calculate dropdown position (centered under button using transform)
   useEffect(() => {
@@ -370,6 +372,11 @@ export default function NavbarBookmarks({
       >
         <button
           ref={buttonRef}
+          onClick={() => {
+            if (bookmarks.length === 0) {
+              setIsOpen((prev) => !prev);
+            }
+          }}
           className={`
             flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium
             transition-colors duration-150
