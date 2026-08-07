@@ -248,6 +248,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
             size="sm"
+            pickerPlacement="bottom-left-button"
           />
         </div>
 

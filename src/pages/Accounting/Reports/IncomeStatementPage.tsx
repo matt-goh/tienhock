@@ -270,6 +270,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
             size="sm"
+            pickerPlacement="bottom-left-button"
           />
         </div>
 

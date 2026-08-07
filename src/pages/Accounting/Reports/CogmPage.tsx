@@ -119,6 +119,7 @@ const CogmPage: React.FC = () => {
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
             size="sm"
+            pickerPlacement="bottom-left-button"
           />
         </div>
 
