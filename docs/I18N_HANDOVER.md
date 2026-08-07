@@ -6,7 +6,20 @@
 
 ## 0. CONTINUE HERE (fresh session)
 
-**Pick up exactly here:** start **B9** – `src/components/Payroll/**` (34 files). Split into B9a/B9b at a natural sub-directory boundary if slow. Payroll components that already receive translated props from the B8 pages: `ManageActivitiesModal` (dayType), `SalaryAmountTooltip` (label), `PrintPayslipButton`/`DownloadPayslipButton` (buttonText), `ActivitiesTooltip`. After B9: B10 (`src/pages/Stock/**` + `src/components/Stock/**`) → B11/B12 (Accounting) → B13–B16 (GreenTarget + JellyPolly) → B17/B18 (misc + residue). Follow the batch table in §6.
+**Pick up exactly here:** start **B9** – `src/components/Payroll/**` (34 files, all untouched). Recommended split:
+
+- **B9a** – `src/components/Payroll/ContributionRates/**` (9 files: `EPFRateEditModal`, `EPFRatesTab`, `IncomeTaxRateCreateModal`, `IncomeTaxRateEditModal`, `IncomeTaxRatesTab`, `SIPRateEditModal`, `SIPRatesTab`, `SOCSORateEditModal`, `SOCSORatesTab`).
+- **B9b** – the remaining 25 root files.
+
+No PDF document definitions exist under this glob (`CompanySalaryReportTables` only imports PDF types and renders a `Download PDF` button; `PayrollSectionPrintMenu` is a print menu) — nothing is excluded by §4.1.
+
+Payroll components that already receive translated props from the B8 pages (translate at the render sink inside B9): `ManageActivitiesModal` (dayType: "Biasa"/"Ahad"/"Umum"), `SalaryAmountTooltip` (label), `PrintPayslipButton`/`DownloadPayslipButton` (buttonText), `ActivitiesTooltip`.
+
+Run `node dev/i18n-extract.mjs --ns payroll --glob "src/components/Payroll/**/*.tsx"` before starting to see which candidate strings are missing; many keys already exist in `payroll` (694 keys/lang) — leave-type labels, day types, month names, Cancel/Save/Update/Refresh, etc.
+
+`npx tsc --noEmit` currently reports one pre-existing error in `src/pages/Accounting/Reports/AccountLedgerPage.tsx` (unrelated staged accounting work). Do not chase it; verify your batch is clean by confirming it is the ONLY error.
+
+After B9: B10 (`src/pages/Stock/**` + `src/components/Stock/**`) → B11/B12 (Accounting) → B13–B16 (GreenTarget + JellyPolly) → B17/B18 (misc + residue). Follow the batch table in §6.
 
 **Current namespace state:** registered in `src/i18n/index.ts`: `common`, `nav`, `home`, `invoice`, `auth`, `payments`, `adjustments`, `sales`, `catalogue` (819 keys/lang), `payroll` (694 keys/lang). `en/` stays sparse (semantic `common.*` only).
 
