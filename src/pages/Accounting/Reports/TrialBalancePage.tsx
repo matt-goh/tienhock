@@ -525,6 +525,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
             size="sm"
+            pickerPlacement="bottom-left-button"
           />
 
           {/* Search */}
