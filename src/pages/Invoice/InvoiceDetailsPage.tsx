@@ -16,7 +16,7 @@ import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
-import { FormInput, FormListbox } from "../../components/FormComponents";
+import { FormInput } from "../../components/FormComponents";
 import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import {
@@ -3551,17 +3551,19 @@ const InvoiceDetailsPage: React.FC = () => {
             </div>
 
             <div className="mb-4">
-              <FormListbox
-                name="salesman"
-                label={t("Select New Salesman")}
+              <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                {t("Select New Salesman")}
+              </label>
+              <PillSelect<string>
                 value={selectedSalesman}
-                onChange={(value) => setSelectedSalesman(value as string)}
-                options={salesmen.map((s) => ({
-                  id: s.id,
-                  name: s.name || s.id,
+                onChange={(value: string) => setSelectedSalesman(value)}
+                options={salesmen.map((salesman) => ({
+                  value: salesman.id,
+                  label: salesman.name || salesman.id,
                 }))}
-                placeholder={t("Select a salesman...")}
                 disabled={isUpdatingSalesman || isLoadingSalesmen}
+                ariaLabel={t("Select New Salesman")}
+                size="md"
               />
             </div>
 

@@ -224,7 +224,7 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
       </div>
 
       {/* Time */}
-      <div className="w-32 lg:w-28">
+      <div className="w-40 lg:w-36">
         <div className="space-y-2">
           <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
             {t("Time")}

@@ -12,9 +12,13 @@ import TimeNavigator, { TimeRange } from "../TimeNavigator";
 const pad2 = (value: number): string => String(value).padStart(2, "0");
 
 export const formatTimeValue = (date: Date | null): string =>
-  date ? `${pad2(date.getHours())}:${pad2(date.getMinutes())}` : "--:--";
+  date
+    ? `${pad2(date.getHours() % 12 || 12)}:${pad2(date.getMinutes())} ${
+        date.getHours() < 12 ? "AM" : "PM"
+      }`
+    : "--:--";
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1);
 const MINUTES = Array.from({ length: 60 }, (_, i) => i);
 
 interface TimeSelectorProps {
@@ -65,10 +69,18 @@ export const TimeSelector: React.FC<TimeSelectorProps> = ({
 
   const currentHour = value ? value.getHours() : 0;
   const currentMinute = value ? value.getMinutes() : 0;
+  const currentHour12 = currentHour % 12 || 12;
+  const isPM = currentHour >= 12;
 
-  const apply = (hour: number, minute: number, close: boolean): void => {
+  const apply = (
+    hour12: number,
+    minute: number,
+    pm: boolean,
+    close: boolean
+  ): void => {
     const base = value ? new Date(value) : new Date();
-    base.setHours(hour, minute, 0, 0);
+    const hour24 = pm ? (hour12 % 12) + 12 : hour12 % 12;
+    base.setHours(hour24, minute, 0, 0);
     onChange(base);
     if (close) setIsOpen(false);
   };
@@ -106,7 +118,7 @@ export const TimeSelector: React.FC<TimeSelectorProps> = ({
           size={iconSize}
           className="text-default-400 dark:text-gray-500 flex-shrink-0"
         />
-        <span className="whitespace-nowrap tabular-nums">
+        <span className="min-w-0 truncate tabular-nums">
           {formatTimeValue(value)}
         </span>
         <IconSelector
@@ -126,14 +138,14 @@ export const TimeSelector: React.FC<TimeSelectorProps> = ({
                 {t("Hour")}
               </p>
               <div className="grid max-h-44 grid-cols-4 gap-1 overflow-y-auto pr-1">
-                {HOURS.map((hour) => (
+                {HOURS_12.map((hour) => (
                   <button
                     key={hour}
                     type="button"
-                    onClick={() => apply(hour, currentMinute, false)}
+                    onClick={() => apply(hour, currentMinute, isPM, false)}
                     className={clsx(
                       "h-8 rounded-md text-xs font-medium tabular-nums transition-colors",
-                      hour === currentHour
+                      hour === currentHour12
                         ? "bg-sky-500 text-white"
                         : "text-default-700 dark:text-gray-200 hover:bg-sky-50 dark:hover:bg-sky-900/30"
                     )}
@@ -152,7 +164,9 @@ export const TimeSelector: React.FC<TimeSelectorProps> = ({
                   <button
                     key={minute}
                     type="button"
-                    onClick={() => apply(currentHour, minute, true)}
+                    onClick={() =>
+                      apply(currentHour12, minute, isPM, true)
+                    }
                     className={clsx(
                       "h-8 rounded-md text-xs font-medium tabular-nums transition-colors",
                       minute === currentMinute
@@ -165,6 +179,32 @@ export const TimeSelector: React.FC<TimeSelectorProps> = ({
                 ))}
               </div>
             </div>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => apply(currentHour12, currentMinute, false, false)}
+              className={clsx(
+                "h-8 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors",
+                !isPM
+                  ? "bg-sky-500 text-white"
+                  : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+              )}
+            >
+              AM
+            </button>
+            <button
+              type="button"
+              onClick={() => apply(currentHour12, currentMinute, true, false)}
+              className={clsx(
+                "h-8 rounded-md text-xs font-semibold uppercase tracking-wide transition-colors",
+                isPM
+                  ? "bg-sky-500 text-white"
+                  : "text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
+              )}
+            >
+              PM
+            </button>
           </div>
         </div>
       )}

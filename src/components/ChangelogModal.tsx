@@ -21,6 +21,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-07",
+    ms: "Jelly Polly: menukar tarikh/masa invois tidak lagi menulis semula tarikh pada pembayarannya. Pembayaran mengekalkan tarikh sebenar ia dibuat, jadi bayaran pendahuluan dan invois bertarikh lampau kekal betul.",
+    en: "Jelly Polly: changing an invoice's date/time no longer rewrites the dates on its payments. Payments keep the date they were actually made, so advance payments and backdated invoices stay correct.",
+  },
+  {
+    date: "2026-08-07",
+    ms: "Invois (Tien Hock dan Jelly Polly): semasa merekod bayaran pada borang invois, anda kini boleh memilih tarikh bayaran untuk setiap baris bayaran dan bukannya sentiasa menggunakan tarikh invois. Setiap bayaran lalai kepada hari yang sama dengan invois, dan setiap bayaran pecahan mengekalkan tarikh yang anda pilih untuknya.",
+    en: "Invoices (Tien Hock and Jelly Polly): when recording a payment on the invoice form you can now choose a payment date for each payment line instead of always using the invoice date. Every payment defaults to the same day as the invoice, and each split payment keeps the date you pick for it.",
+  },
+  {
+    date: "2026-08-07",
     ms: "Invois (Tien Hock dan Jelly Polly): pemilih tarikh dan masa pada borang invois serta dialog Change Date & Time kini menggunakan pemilih kalendar aplikasi dengan pemilih jam/minit yang kemas dan bukannya kotak masa lalai pelayar. Tingkah laku pembayaran dan perakaunan tidak berubah.",
     en: "Invoices (Tien Hock and Jelly Polly): the date and time picker on the invoice form and the Change Date & Time dialog now uses the app's calendar picker with a proper hour/minute selector instead of the browser's plain time box. Payment and accounting behaviour is unchanged.",
   },
