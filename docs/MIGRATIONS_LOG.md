@@ -96,6 +96,18 @@ coworker's legacy June ledgers for MRM/MGT), the boss-annotated `CORRECTED_JUNE_
 and the `dev/import/legacy-june-tb/june-2026-legacy-ledgers.json` fixture. Run in this order — file
 2 has a prerequisite guard that aborts unless file 1's move #14 is already present.
 
+> **PARTIALLY REVERSED 7 Aug 2026 — do not re-run either file.** Three corrections below turned out
+> to be wrong: the June legacy **print** they were derived from carried keying errors of the
+> coworker's own. She corrected them in the legacy program and in the ERP on 2026-08-07 (journals
+> `PCE004/06` 00:29, `PBE054/06` 00:46), reversing **move #3** (KFC LINTAS 40.00 stays in `MBSM_K`,
+> not `MBC`) and **E10+E11** (PAUMIN #2606-2133 splits `MBRMF` 565.00 / `MBSAF` 144.00, not
+> 465.00 / 244.00). Everything else in both files stands and is verified in production. Re-running
+> would trip the files' own guards and, if forced, reintroduce the three wrong classifications.
+> June movements are now MBC 919.10 · MBSM_K 3,126.49 · MBRMF 5,135.60 · MBSAF 1,329.55; every
+> other reconciled account is unchanged, all five vouchers still foot, and the June TB is still
+> 17,106,536.00/side. Full narrative:
+> [Account/JUNE_RECLASS_DESIGN.md](Account/JUNE_RECLASS_DESIGN.md) §e.
+
 | File | What it did | Status |
 |------|-------------|--------|
 | `2026-08-05_june_legacy_reclass.sql` | June 2026 legacy reclassification — SAFE SCOPE ONLY. Applied the **14 fixture-verified account_code moves** on manual source-less June C/B journals (PCE002/06, PCE004/06, PCE007/06, PCE008/06, PBE054/06) plus amount edits **E8–E11**. Moves: PCE004/06 MBOR→BRM 482.31 (JING XIAN YOU BIHUN food-grade rubber), MBOR→MBC 5.50 (EMART leg), MBSM_K→MBC 40.00 (KFC LINTAS), MBSM_K→MBOR 29.00 (LIDO MARKET), MBSM_O→MBSM_K 26.50 (HO KEE), OIL9698→OIL6323 30.00 (SHELL BUNDUSAN #01001886), BRM→MRM 9.05 (SHUANG MEI HARDWARE); PCE007/06 MBSM_K→MBSM_O 107.70 (ORIENTAL COFFEE), OILOTH→OIL920 40.00 (SHELL BUNDUSAN #01002075, inferred — no legacy OIL920 detail); PCE008/06 MBSM_K→MBOR 12.90 (MIX STORE), MBRM→MBRMF 400.00 (HV ELECTRICAL SINO copper cable), OIL9882→OIL9922 80.00 (SHELL SYT. EXCEL); PCE002/06 OIL9698→R9698 23.00 (KK SEAL) and 100.00 (DIGNITY BRAND). Edits: PCE008/06 MBRM 43.85→43.90 and 629.50→629.45; PBE054/06 MBRMF 565.00→465.00 + MBSAF 144.00→244.00 (one PAUMIN receipt, total 709.00 unchanged). **E1–E7 deliberately excluded** — they net +0.38 on PCE004/06 and only land together with the MRM (−0.32)/MGT (−0.06) offsets in file 2. Lines resolved by (journal reference, account, amount, particulars), never dev jel.id, so the file ports to prod unchanged. Post-assertions: every journal header total unchanged and still footing, 24 accounts at expected June movement (six with inline PENDING deltas), untouched controls, June TB stays 17,102,880.87/side. CR_LD +40.00 remains out of scope (source-document anomaly, design §d.3). Data correction only, no schema change. | dev ✓, prod ✓ (both 2026-08-06) |
