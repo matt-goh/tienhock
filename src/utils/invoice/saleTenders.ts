@@ -18,6 +18,11 @@ export interface SaleTender {
   amount: string;
   payment_reference: string;
   /**
+   * Payment date as yyyy-MM-dd. null means "follow the invoice date" so an
+   * untouched split payment stays on the same day as the bill.
+   */
+  payment_date: string | null;
+  /**
    * True once the user types an amount. Until then a lone tender tracks the
    * bill total as line items change, so the ordinary "paid in full" case needs
    * no typing at all — but the box is always visible and editable, which is
@@ -31,12 +36,14 @@ let tenderKeySeed = 0;
 export const createTender = (
   payment_method: Payment["payment_method"],
   amount = "",
-  amountTouched = false
+  amountTouched = false,
+  payment_date: string | null = null
 ): SaleTender => ({
   key: `tender-${++tenderKeySeed}`,
   payment_method,
   amount,
   payment_reference: "",
+  payment_date,
   amountTouched,
 });
 
@@ -184,6 +191,7 @@ export const toTenderPayload = (
   payment_method: Payment["payment_method"];
   amount: number;
   payment_reference?: string;
+  payment_date?: string | null;
 }[] => {
   if (billTotal <= 0.005) return [];
   return tenders
@@ -193,6 +201,7 @@ export const toTenderPayload = (
       payment_reference: tenderNeedsReference(tender.payment_method)
         ? tender.payment_reference.trim() || undefined
         : undefined,
+      payment_date: tender.payment_date,
     }))
     .filter((tender) => tender.amount > 0);
 };
