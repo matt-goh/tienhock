@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-07",
+    ms: "Halaman Payments (Tien Hock): senarai kini memaparkan 200 bayaran pada satu masa dengan butang Previous/Next dan nombor halaman, dan bukannya memuatkan semua bayaran sekaligus. Penapis dan carian masih digunakan pada keseluruhan set hasil, dan bayaran pending masih dipaparkan dahulu.",
+    en: "Payments page (Tien Hock): the list now shows 200 payments at a time with Previous/Next and page numbers, instead of loading every payment at once. Filters and search still apply to the whole result set, and pending payments are still shown first.",
+  },
+  {
+    date: "2026-08-07",
     ms: "Pembayaran (Tien Hock): anda kini boleh membetulkan tarikh kumpulan bayaran tunai, pindahan bank atau dalam talian terus dari halaman Payments atau butiran kumpulan bayaran. Resit, rekod pembayaran dan catatan jurnal yang disiarkan semuanya bergerak ke tarikh baharu. Tunai bergerak secara automatik antara akaun kutipan hari jualan dan kutipan kemudian apabila tarikh baharu ialah hari jualan invois. Bayaran tunai yang telah dibank masuk hanya boleh dipindahkan ke tarikh pada atau sebelum tarikh bank masuk; jika tidak, batalkan bank masuk dahulu. Bayaran cek mengekalkan tingkah laku sedia ada: hanya tarikh diterima yang berubah, dan jurnal kekal pada tarikh penjelasan cek.",
     en: "Payments (Tien Hock): you can now correct the date on a cash, bank transfer or online payment group directly from the Payments page or the payment group details. The receipt, its payment records and the posted journal entry all move to the new date together. Cash automatically moves between the same-day and later-collection accounts when the new date is the invoice's sale day. A cash payment that has already been banked in can only be moved to a date on or before its bank-in date; otherwise reverse the bank-in first. Cheque payments keep the existing behaviour: only the received date changes, and the journal stays on the cheque's clearance date.",
   },
