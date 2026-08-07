@@ -111,6 +111,7 @@ import greenTargetECarumanRouter from "./greentarget/e-caruman.js";
 import greenTargetCustomerSignupsRouter from "./greentarget/customer-signups.js";
 import greenTargetFinancialReportsRouter from "./greentarget/accounting/financial-reports.js";
 import greenTargetAccountLedgerRouter from "./greentarget/accounting/account-ledger.js";
+import greenTargetOpeningBalancesRouter from "./greentarget/accounting/opening-balances.js";
 import greenTargetJournalEntriesRouter from "./greentarget/accounting/journal-entries.js";
 import createGreenTargetAccountCodesRouter, {
   createGreenTargetLedgerTypesRouter,
@@ -382,6 +383,16 @@ export default function setupRoutes(app, pool) {
     "/greentarget/api/bank-statement",
     authMiddleware(pool),
     greenTargetAccountLedgerRouter(pool)
+  );
+  // Green Target opening-balance anchors: mutates the GT books, so it sits
+  // behind the same session auth + restore guard as the other GT accounting
+  // mutations. Path mirrors Tien Hock's so the shared pages swap base path
+  // only; every query is schema-qualified to `greentarget`.
+  app.use(
+    "/greentarget/api/opening-balances",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetOpeningBalancesRouter(pool)
   );
   // Green Target accounting lookups (G6) and mutations (G7+). Same
   // `greentarget` schema isolation; paths mirror Tien Hock's so the shared

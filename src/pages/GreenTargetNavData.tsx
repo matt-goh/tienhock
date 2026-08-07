@@ -49,6 +49,7 @@ import GTIncomeStatementPage from "./GreenTarget/Accounting/GTIncomeStatementPag
 import GTBalanceSheetPage from "./GreenTarget/Accounting/GTBalanceSheetPage";
 import GTAccountCodeListPage from "./GreenTarget/Accounting/GTAccountCodeListPage";
 import GTAccountCodeFormPage from "./GreenTarget/Accounting/GTAccountCodeFormPage";
+import GTOpeningBalancesPage from "./GreenTarget/Accounting/GTOpeningBalancesPage";
 import GTVoucherGeneratorPage from "./GreenTarget/Accounting/GTVoucherGeneratorPage";
 import GTDebtorSubSchedulePage from "./GreenTarget/Accounting/GTDebtorSubSchedulePage";
 
@@ -150,6 +151,12 @@ export const GreenTargetNavData: SidebarItem[] = [
             component: GTAccountCodeFormPage,
           },
         ],
+      },
+      {
+        name: "Opening Balances",
+        path: "/accounting/opening-balances",
+        component: GTOpeningBalancesPage,
+        group: "Setup",
       },
     ],
   },
