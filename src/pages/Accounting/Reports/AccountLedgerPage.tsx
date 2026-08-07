@@ -239,9 +239,8 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
   >([]);
   const [companyAccountsLoading, setCompanyAccountsLoading] =
     useState<boolean>(hasCompanyAccounts);
-  const accountCodes: AccountCode[] = hasCompanyAccounts
-    ? companyAccounts
-    : tienHockAccountCodes;
+  const accountCodes: (AccountCode & { is_subledger?: boolean })[] =
+    hasCompanyAccounts ? companyAccounts : tienHockAccountCodes;
   const accountsLoading: boolean = hasCompanyAccounts
     ? companyAccountsLoading
     : tienHockAccountsLoading;
