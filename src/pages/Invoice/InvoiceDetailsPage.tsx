@@ -1935,6 +1935,34 @@ const InvoiceDetailsPage: React.FC = () => {
               >
                 {t(getInvoiceDisplayStatusLabel(invoiceDisplayStatus))}
               </span>
+              {/* Invoice-owned sales journal link */}
+              {invoiceData.journal_entry_id && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/accounting/journal-entries/${invoiceData.journal_entry_id}`
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:underline"
+                  title={t("View journal entry")}
+                >
+                  <IconFileInvoice size={14} />
+                  {t("View Journal {{reference}}", {
+                    reference: invoiceData.journal_reference || invoiceData.id,
+                  })}
+                  {invoiceData.journal_status && (
+                    <span className="opacity-80">
+                      {" "}
+                      ({t(
+                        invoiceData.journal_status === "cancelled"
+                          ? "Cancelled"
+                          : "Posted"
+                      )})
+                    </span>
+                  )}
+                </button>
+              )}
               {/* E-Invoice Status Badge */}
               {eInvoiceStatusInfo && EInvoiceIcon && (
                 <a

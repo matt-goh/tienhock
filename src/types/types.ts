@@ -351,6 +351,10 @@ export interface ExtendedInvoiceData extends InvoiceData {
     amount: number;
     payment_reference?: string;
   }[];
+  // The invoice-owned sales journal (S), when one exists.
+  journal_entry_id?: number | null;
+  journal_reference?: string | null;
+  journal_status?: string | null;
   consolidated_part_of?: ConsolidatedInfo | null;
   adjustmentDocs?: AdjustmentDocument[];
   // Display-only classification from the invoice list API explaining why a bill
