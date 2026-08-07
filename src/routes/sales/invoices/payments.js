@@ -75,7 +75,7 @@ export default function (pool) {
               AND group_r.origin = r.origin
               AND group_r.status IN ('pending', 'posted')) as allocation_count,
           p.notes, p.created_at, p.status, p.cancellation_date,
-          je.reference_no as journal_reference_no
+          COALESCE(je.display_reference, je.reference_no) as journal_reference_no
         FROM payments p
         LEFT JOIN invoices i ON i.id = p.invoice_id
         LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
@@ -84,6 +84,7 @@ export default function (pool) {
           ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id,
             CASE WHEN p.is_auto_collection THEN i.journal_entry_id END)
         WHERE 1=1
+          AND NOT (p.is_auto_collection = true AND p.status = 'cancelled')
       `;
       const queryParams = [];
       let paramCounter = 1;
@@ -149,7 +150,7 @@ export default function (pool) {
             AND group_r.status IN ('pending', 'posted')) as allocation_count,
         p.notes, p.created_at, p.status, p.cancellation_date,
         i.customerid, i.salespersonid, c.name as customer_name,
-        je.reference_no as journal_reference_no
+        COALESCE(je.display_reference, je.reference_no) as journal_reference_no
       FROM payments p
       JOIN invoices i ON p.invoice_id = i.id
       LEFT JOIN customers c ON i.customerid = c.id
@@ -159,6 +160,7 @@ export default function (pool) {
         ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id,
           CASE WHEN p.is_auto_collection THEN i.journal_entry_id END)
       WHERE 1=1
+        AND NOT (p.is_auto_collection = true AND p.status = 'cancelled')
     `;
 
       const queryParams = [];
