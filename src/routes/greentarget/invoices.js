@@ -941,6 +941,7 @@ export default function (pool, defaultConfig) {
       debtor_account_code,
       revenue_account_code,
       revenue_splits,
+      delivery_order,
     } = req.body;
 
     const client = await pool.connect();
@@ -968,6 +969,12 @@ export default function (pool, defaultConfig) {
       if (isNaN(numTaxAmount) || numTaxAmount < 0) {
         throw new Error("Invalid tax_amount provided.");
       }
+      // Record-only Delivery Order (DO) reference: free text, never used by
+      // accounting, e-invoice, rental or payment logic.
+      const normalizedDeliveryOrder =
+        typeof delivery_order === "string" && delivery_order.trim()
+          ? delivery_order.trim().slice(0, 100)
+          : null;
 
       // Rentals must belong to this customer and must not already be billed on
       // another non-cancelled invoice (was enforced client-side only).
@@ -1038,9 +1045,9 @@ export default function (pool, defaultConfig) {
           invoice_number, type, customer_id,
           amount_before_tax, tax_amount, total_amount, date_issued,
           balance_due, debtor_account_code, receivable_account_code,
-          revenue_account_code
+          revenue_account_code, delivery_order
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *;
       `;
 
@@ -1056,6 +1063,7 @@ export default function (pool, defaultConfig) {
         debtorAssignment.debtorAccountCode,
         debtorAssignment.receivableAccountCode,
         headerRevenueAccount,
+        normalizedDeliveryOrder,
       ]);
 
       const createdInvoice = invoiceResult.rows[0];
@@ -1166,6 +1174,7 @@ export default function (pool, defaultConfig) {
       debtor_account_code,
       revenue_account_code,
       revenue_splits,
+      delivery_order,
     } = req.body;
 
     const numericInvoiceId = parseInt(invoice_id, 10);
@@ -1197,6 +1206,16 @@ export default function (pool, defaultConfig) {
           { statusCode: 409 }
         );
       }
+      const currentInvoice = invoiceCheck.rows[0];
+      // Record-only Delivery Order (DO) reference: free text, never used by
+      // accounting, e-invoice, rental or payment logic. Keeps its value when
+      // the caller does not send the field.
+      const normalizedDeliveryOrder =
+        delivery_order !== undefined
+          ? typeof delivery_order === "string" && delivery_order.trim()
+            ? delivery_order.trim().slice(0, 100)
+            : null
+          : currentInvoice.delivery_order;
 
       // Input validation
       if (!type || !customer_id || !amount_before_tax || !date_issued) {
@@ -1234,7 +1253,6 @@ export default function (pool, defaultConfig) {
           numericInvoiceId
         );
       }
-      const currentInvoice = invoiceCheck.rows[0];
       const customerChanged =
         Number(customer_id) !== Number(currentInvoice.customer_id);
       const debtorAssignment = await resolveGTDebtorAssignment(client, {
@@ -1500,7 +1518,8 @@ export default function (pool, defaultConfig) {
             receivable_account_code = $10,
             revenue_account_code = $11,
             balance_due = $12,
-            status = $13
+            status = $13,
+            delivery_order = $14
         WHERE invoice_id = $8
         RETURNING *;
       `;
@@ -1519,6 +1538,7 @@ export default function (pool, defaultConfig) {
         headerRevenueAccount,
         balanceDue.toFixed(2),
         nextStatus,
+        normalizedDeliveryOrder,
       ]);
 
       await replaceGTInvoiceRevenueSplits(

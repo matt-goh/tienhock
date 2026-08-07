@@ -729,6 +729,8 @@ export interface InvoiceGT {
   }>;
   cancellation_date?: string | null;
   cancellation_reason?: string;
+  // Optional record-only Delivery Order (DO) reference keyed on the invoice.
+  delivery_order?: string | null;
   adjustmentDocs?: GTAdjDocSummary[];
 }
 

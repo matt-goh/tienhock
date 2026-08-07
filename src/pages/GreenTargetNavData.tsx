@@ -16,7 +16,6 @@ import GreenTargetDumpsterFormPage from "./GreenTarget/Dumpsters/DumpsterFormPag
 import GreenTargetRentalListPage from "./GreenTarget/Rentals/RentalListPage";
 import GreenTargetRentalFormPage from "./GreenTarget/Rentals/RentalFormPage";
 import GreenTargetRentalDetailsPage from "./GreenTarget/Rentals/RentalDetailsPage";
-import GreenTargetDeliveryOrderPage from "./GreenTarget/Rentals/DeliveryOrderPage";
 import GreenTargetInvoiceListPage from "./GreenTarget/Invoices/InvoiceListPage";
 import GreenTargetInvoiceFormPage from "./GreenTarget/Invoices/InvoiceFormPage";
 import GreenTargetInvoiceDetailsPage from "./GreenTarget/Invoices/InvoiceDetailsPage";
@@ -338,11 +337,6 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "Edit Rental",
         path: "/rentals/:id/edit",
         component: GreenTargetRentalFormPage,
-      },
-      {
-        name: "Delivery Order",
-        path: "/rentals/:id/delivery-order",
-        component: GreenTargetDeliveryOrderPage,
       },
     ],
   },

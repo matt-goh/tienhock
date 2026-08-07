@@ -569,7 +569,7 @@ const GTInvoiceAccountFields = forwardRef<
   })();
 
   const body: React.ReactNode = (
-    <div className="space-y-4">
+    <div className="space-y-1.5">
       <div>
         <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
           Identiti Penghutang <span className="text-rose-500">*</span>
@@ -671,7 +671,7 @@ const GTInvoiceAccountFields = forwardRef<
             maxVisibleOptions={DEBTOR_SEARCH_LIMIT}
           />
 
-          <div className="min-h-5 text-xs">
+          <div className="mt-2 min-h-5 text-xs">
             {customerDefaultLoading ? (
               <span className="text-default-500 dark:text-gray-400">
                 Memuatkan identiti lalai pelanggan...

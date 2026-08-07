@@ -140,8 +140,6 @@ export const greenTargetApi = {
     api.put(`/greentarget/api/rentals/${id}`, data),
   deleteRental: (rentalId: number) =>
     api.delete(`/greentarget/api/rentals/${rentalId}`),
-  generateDeliveryOrder: (rentalId: any) =>
-    api.get(`/greentarget/api/rentals/${rentalId}/do`),
 
   // Invoice endpoints
   getInvoices: (
