@@ -14,6 +14,8 @@ import {
   GTStatementItem,
 } from "../../../utils/accounting/GTIncomeStatementPDF";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 
@@ -87,15 +89,21 @@ const GT_IS_AFTER_BLOCK: Partial<Record<string, GTISAfterBlockFigure[]>> = {
   ],
 };
 
-const formatGTLineItemLabel = (item: GTStatementItem): string => {
-  if (item.note) return `${item.name} (Note ${item.note})`;
-  if (item.note_marker) return `${item.name} (${item.note_marker})`;
+const formatGTLineItemLabel = (item: GTStatementItem, t: TFunction): string => {
+  if (item.note)
+    return t("{{name}} (Note {{note}})", { name: item.name, note: item.note });
+  if (item.note_marker)
+    return t("{{name}} ({{marker}})", {
+      name: item.name,
+      marker: item.note_marker,
+    });
   return item.name;
 };
 
 const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("accounting");
   const isGT = company === "greentarget";
   const [data, setData] = useState<IncomeStatementData | null>(null);
   const [gtData, setGtData] = useState<GTIncomeStatementData | null>(null);
@@ -127,12 +135,12 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
         setData(response);
       }
     } catch (err) {
-      setError("Failed to fetch income statement. Please try again later.");
+      setError(t("Failed to fetch income statement. Please try again later."));
       console.error("Error fetching income statement:", err);
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, isGT]);
+  }, [selectedMonth, isGT, t]);
 
   useEffect(() => {
     fetchData();
@@ -156,7 +164,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
         await generateGTIncomeStatementPDF(gtData);
       } catch (err) {
         console.error("Error printing PDF:", err);
-        toast.error("Failed to generate PDF");
+        toast.error(t("Failed to generate PDF"));
       } finally {
         setExporting(false);
       }
@@ -170,7 +178,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
       await generateIncomeStatementPDF(data);
     } catch (err) {
       console.error("Error printing PDF:", err);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setExporting(false);
     }
@@ -220,7 +228,9 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
           key={figure.ref}
           className="flex justify-between items-center text-lg font-bold py-4 border-y-2 border-gray-400 dark:border-gray-500 bg-blue-50 dark:bg-blue-900/30 -mx-6 px-6"
         >
-          <span className="text-gray-900 dark:text-white">{figure.label}</span>
+          <span className="text-gray-900 dark:text-white">
+            {figure.label ? t(figure.label) : null}
+          </span>
           <span
             className={`${
               amount >= 0
@@ -239,7 +249,9 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
         key={figure.ref}
         className="flex justify-between items-center text-base font-bold py-3 border-y-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 -mx-6 px-6"
       >
-        <span className="text-gray-900 dark:text-white">{figure.label}</span>
+        <span className="text-gray-900 dark:text-white">
+          {figure.label ? t(figure.label) : null}
+        </span>
         <span
           className={`${
             amount >= 0
@@ -285,7 +297,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             iconSize={16}
             onClick={fetchData}
             disabled={loading}
-            title="Refresh"
+            title={t("Refresh")}
             additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
           />
           <Button
@@ -297,7 +309,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             onClick={handlePrintPDF}
             disabled={exporting || (isGT ? !gtData : !data)}
           >
-            {exporting ? "Preparing..." : "Print"}
+            {exporting ? t("Preparing...") : t("Print")}
           </Button>
         </div>
       </div>
@@ -315,10 +327,13 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
           {/* Title Header */}
           <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center">
-              INCOME STATEMENT
+              {t("INCOME STATEMENT")}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
-              For the period {data.period.start_date} to {data.period.end_date}
+              {t("For the period {{start}} to {{end}}", {
+                start: data.period.start_date,
+                end: data.period.end_date,
+              })}
             </p>
           </div>
 
@@ -326,13 +341,16 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             {/* Revenue Section */}
             <div>
               <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                Revenue
+                {t("Revenue")}
               </h3>
               <div className="space-y-1">
                 {data.revenue.items.map((item) => (
                   <div key={item.note} className="flex justify-between text-sm">
                     <span className="text-gray-700 dark:text-gray-300">
-                      {item.name} (Note {item.note})
+                      {t("{{name}} (Note {{note}})", {
+                        name: item.name,
+                        note: item.note,
+                      })}
                     </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(item.amount)}
@@ -341,7 +359,9 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
                 ))}
               </div>
               <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-900 dark:text-white">Total Revenue</span>
+                <span className="text-gray-900 dark:text-white">
+                  {t("Total Revenue")}
+                </span>
                 <span className="text-gray-900 dark:text-white">
                   {formatCurrency(data.revenue.total)}
                 </span>
@@ -351,13 +371,16 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             {/* COGS Section */}
             <div>
               <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                Less: Cost of Goods Sold
+                {t("Less: Cost of Goods Sold")}
               </h3>
               <div className="space-y-1 pl-4">
                 {data.cost_of_goods_sold.items.map((item) => (
                   <div key={item.note} className="flex justify-between text-sm">
                     <span className="text-gray-700 dark:text-gray-300">
-                      {item.name} (Note {item.note})
+                      {t("{{name}} (Note {{note}})", {
+                        name: item.name,
+                        note: item.note,
+                      })}
                     </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(item.amount)}
@@ -366,7 +389,9 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
                 ))}
               </div>
               <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-900 dark:text-white">Total Cost of Goods Sold</span>
+                <span className="text-gray-900 dark:text-white">
+                  {t("Total Cost of Goods Sold")}
+                </span>
                 <span className="text-gray-900 dark:text-white">
                   ({formatCurrency(data.cost_of_goods_sold.total)})
                 </span>
@@ -376,10 +401,17 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             {/* Gross Profit */}
             <div className="flex justify-between items-center text-base font-bold py-3 border-y-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 -mx-6 px-6">
               <div>
-                <span className="text-gray-900 dark:text-white">GROSS PROFIT</span>
+                <span className="text-gray-900 dark:text-white">
+                  {t("GROSS PROFIT")}
+                </span>
                 {data.revenue.total > 0 && (
                   <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                    ({((data.gross_profit / data.revenue.total) * 100).toFixed(1)}% margin)
+                    {t("({{percent}}% margin)", {
+                      percent: (
+                        (data.gross_profit / data.revenue.total) *
+                        100
+                      ).toFixed(1),
+                    })}
                   </span>
                 )}
               </div>
@@ -393,13 +425,16 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             {/* Expenses Section */}
             <div>
               <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                Less: Operating Expenses
+                {t("Less: Operating Expenses")}
               </h3>
               <div className="space-y-1 pl-4">
                 {data.expenses.items.map((item) => (
                   <div key={item.note} className="flex justify-between text-sm">
                     <span className="text-gray-700 dark:text-gray-300">
-                      {item.name} (Note {item.note})
+                      {t("{{name}} (Note {{note}})", {
+                        name: item.name,
+                        note: item.note,
+                      })}
                     </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(item.amount)}
@@ -408,7 +443,9 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
                 ))}
               </div>
               <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-900 dark:text-white">Total Operating Expenses</span>
+                <span className="text-gray-900 dark:text-white">
+                  {t("Total Operating Expenses")}
+                </span>
                 <span className="text-gray-900 dark:text-white">
                   ({formatCurrency(data.expenses.total)})
                 </span>
@@ -418,10 +455,17 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             {/* Net Profit */}
             <div className="flex justify-between items-center text-lg font-bold py-4 border-y-2 border-gray-400 dark:border-gray-500 bg-blue-50 dark:bg-blue-900/30 -mx-6 px-6">
               <div>
-                <span className="text-gray-900 dark:text-white">NET PROFIT / (LOSS)</span>
+                <span className="text-gray-900 dark:text-white">
+                  {t("NET PROFIT / (LOSS)")}
+                </span>
                 {data.revenue.total > 0 && (
                   <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                    ({((data.net_profit / data.revenue.total) * 100).toFixed(1)}% margin)
+                    {t("({{percent}}% margin)", {
+                      percent: (
+                        (data.net_profit / data.revenue.total) *
+                        100
+                      ).toFixed(1),
+                    })}
                   </span>
                 )}
               </div>
@@ -436,7 +480,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Period: January - {getMonthName(selectedMonth)}
+              {t("Period:")} {t("January")} - {getMonthName(selectedMonth)}
             </p>
           </div>
         </div>
@@ -448,12 +492,16 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
           {/* Title Header */}
           <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center">
-              INCOME STATEMENT
+              {t("INCOME STATEMENT")}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
-              For the period {gtData.period.start_date} to{" "}
-              {gtData.period.end_date}
-              {gtData.period.basis === "year_to_date" ? " (Year to date)" : ""}
+              {t("For the period {{start}} to {{end}}", {
+                start: gtData.period.start_date,
+                end: gtData.period.end_date,
+              })}
+              {gtData.period.basis === "year_to_date"
+                ? t(" (Year to date)")
+                : ""}
             </p>
           </div>
 
@@ -482,7 +530,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
                           className="flex justify-between text-sm"
                         >
                           <span className="text-gray-700 dark:text-gray-300">
-                            {formatGTLineItemLabel(item)}
+                            {formatGTLineItemLabel(item, t)}
                           </span>
                           <span className="text-gray-900 dark:text-white">
                             {formatGTCurrency(item.amount)}
@@ -509,7 +557,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Period: January - {getMonthName(selectedMonth)}
+              {t("Period:")} {t("January")} - {getMonthName(selectedMonth)}
             </p>
           </div>
         </div>

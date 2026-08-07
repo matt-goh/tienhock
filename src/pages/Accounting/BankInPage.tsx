@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { IconBuildingBank, IconPlus } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
@@ -105,6 +106,7 @@ const fmtAmt = (v: number | string): string =>
   Number(v || 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const BankInPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const [bankIns, setBankIns] = useState<BankInRow[]>([]);
   const [pools, setPools] = useState<CashSalesPool[]>([]);
   const [openingPool, setOpeningPool] = useState<OpeningPool | null>(null);
@@ -163,11 +165,11 @@ const BankInPage: React.FC = () => {
       setReceipts(poolData?.cash_receipts || []);
     } catch (error) {
       console.error("Error loading bank-ins:", error);
-      toast.error("Failed to load bank-in data");
+      toast.error(t("Failed to load bank-in data"));
     } finally {
       setLoading(false);
     }
-  }, [filterStart, filterEnd]);
+  }, [filterStart, filterEnd, t]);
 
   useEffect(() => {
     fetchAll();
@@ -249,7 +251,7 @@ const BankInPage: React.FC = () => {
   const handlePreview = () => {
     const groups = buildGroups();
     if (groups.length === 0) {
-      toast.error("Select at least one cash-sales pool amount or receipt");
+      toast.error(t("Select at least one cash-sales pool amount or receipt"));
       return;
     }
     // Client-side over-banking hints (the backend re-validates under locks).
@@ -257,7 +259,10 @@ const BankInPage: React.FC = () => {
       const amt = parseFloat(poolAmounts[pool.source_date] || "");
       if (amt > 0 && amt > pool.remaining + 0.005) {
         toast.error(
-          `Pool ${fmtDMY(pool.source_date)}: amount exceeds the unbanked remainder ${fmtAmt(pool.remaining)}`
+          t("Pool {{date}}: amount exceeds the unbanked remainder {{amount}}", {
+            date: fmtDMY(pool.source_date),
+            amount: fmtAmt(pool.remaining),
+          })
         );
         return;
       }
@@ -267,7 +272,10 @@ const BankInPage: React.FC = () => {
       const amt = parseFloat(receiptAmounts[r.id] ?? String(r.remaining));
       if (amt > r.remaining + 0.005) {
         toast.error(
-          `Receipt ${r.display_reference || r.id}: amount exceeds the unbanked remainder ${fmtAmt(r.remaining)}`
+          t("Receipt {{ref}}: amount exceeds the unbanked remainder {{amount}}", {
+            ref: r.display_reference || r.id,
+            amount: fmtAmt(r.remaining),
+          })
         );
         return;
       }
@@ -278,7 +286,7 @@ const BankInPage: React.FC = () => {
 
   const handlePost = async () => {
     setIsSubmitting(true);
-    const toastId = toast.loading("Posting bank-in...");
+    const toastId = toast.loading(t("Posting bank-in..."));
     try {
       const result = await api.post("/api/bank-ins", {
         posting_date: postingDate,
@@ -286,12 +294,12 @@ const BankInPage: React.FC = () => {
         rv_number: rvNumber.trim() || undefined,
         groups: draftGroups,
       });
-      toast.success(result?.message || "Bank-in posted", { id: toastId });
+      toast.success(result?.message || t("Bank-in posted"), { id: toastId });
       resetForm();
       await fetchAll();
     } catch (error: any) {
       const message =
-        error.response?.data?.message || error.data?.message || error.message || "Failed to post bank-in";
+        error.response?.data?.message || error.data?.message || error.message || t("Failed to post bank-in");
       toast.error(message, { id: toastId });
     } finally {
       setIsSubmitting(false);
@@ -301,15 +309,15 @@ const BankInPage: React.FC = () => {
   const handlePostDrawing = async () => {
     const amount = round2(parseFloat(drawingAmount) || 0);
     if (!(amount > 0)) {
-      toast.error("Enter a positive amount");
+      toast.error(t("Enter a positive amount"));
       return;
     }
     if (!drawingDescription.trim()) {
-      toast.error("Description is required");
+      toast.error(t("Description is required"));
       return;
     }
     setIsSubmitting(true);
-    const toastId = toast.loading("Posting drawing journal...");
+    const toastId = toast.loading(t("Posting drawing journal..."));
     try {
       const result = await api.post("/api/bank-ins/drawing", {
         posting_date: postingDate,
@@ -319,14 +327,14 @@ const BankInPage: React.FC = () => {
         description: drawingDescription.trim(),
       });
       toast.success(
-        result?.message || "Drawing journal posted",
+        result?.message || t("Drawing journal posted"),
         { id: toastId }
       );
       resetForm();
       await fetchAll();
     } catch (error: any) {
       const message =
-        error.response?.data?.message || error.data?.message || error.message || "Failed to post drawing journal";
+        error.response?.data?.message || error.data?.message || error.message || t("Failed to post drawing journal");
       toast.error(message, { id: toastId });
     } finally {
       setIsSubmitting(false);
@@ -335,20 +343,22 @@ const BankInPage: React.FC = () => {
 
   const handleCancel = async () => {
     if (!cancelTarget) return;
-    const toastId = toast.loading(`Cancelling ${cancelTarget.rv_number}...`);
+    const toastId = toast.loading(t("Cancelling {{rv}}...", { rv: cancelTarget.rv_number }));
     try {
       await api.put(`/api/bank-ins/${cancelTarget.id}/cancel`, {
         reason: `Cancelled from Bank-In page`,
       });
       toast.success(
-        `${cancelTarget.rv_number} cancelled — amounts returned to their pools (the RV number stays reserved)`,
+        t("{{rv}} cancelled \u2014 amounts returned to their pools (the RV number stays reserved)", {
+          rv: cancelTarget.rv_number,
+        }),
         { id: toastId }
       );
       setCancelTarget(null);
       await fetchAll();
     } catch (error: any) {
       const message =
-        error.response?.data?.message || error.data?.message || error.message || "Failed to cancel";
+        error.response?.data?.message || error.data?.message || error.message || t("Failed to cancel");
       toast.error(message, { id: toastId });
     }
   };
@@ -381,11 +391,10 @@ const BankInPage: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <IconBuildingBank size={28} className="text-gray-700 dark:text-gray-200" />
-            Cash Bank-In (RV)
+            {t("Cash Bank-In (RV)")}
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            Bank undeposited cash from daily cash-sales pools (CH_REV1) and
-            credit-invoice cash receipts (CH_REV2)
+            {t("Bank undeposited cash from daily cash-sales pools (CH_REV1) and credit-invoice cash receipts (CH_REV2)")}
           </p>
         </div>
         {!formMode && (
@@ -396,14 +405,14 @@ const BankInPage: React.FC = () => {
                 setFilterStart(format(r.start, "yyyy-MM-dd"));
                 setFilterEnd(format(r.end, "yyyy-MM-dd"));
               }}
-              placeholder="All dates"
+              placeholder={t("All dates")}
               size="sm"
             />
             <Button color="sky" icon={IconPlus} onClick={() => setFormMode("bank_in")}>
-              New Bank-In
+              {t("New Bank-In")}
             </Button>
             <Button variant="outline" color="sky" icon={IconPlus} onClick={() => setFormMode("drawing")}>
-              New Drawing (CA_WA)
+              {t("New Drawing (CA_WA)")}
             </Button>
           </div>
         )}
@@ -414,7 +423,7 @@ const BankInPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                Date <span className="text-red-500">*</span>
+                {t("Date")} <span className="text-red-500">*</span>
               </label>
               <TimeNavigator
                 range={{ start: parseYmd(postingDate), end: parseYmd(postingDate) }}
@@ -424,14 +433,14 @@ const BankInPage: React.FC = () => {
                 showArrows={false}
                 allowFuture
                 disabled={isSubmitting}
-                placeholder="Pick date"
+                placeholder={t("Pick date")}
                 className="w-full"
                 triggerClassName="w-full justify-between"
               />
             </div>
             <FormListbox
               name="bank_account"
-              label="Bank Account"
+              label={t("Bank Account")}
               value={bankAccount}
               onChange={(value) => setBankAccount(value as string)}
               options={bankAccountOptions}
@@ -439,7 +448,7 @@ const BankInPage: React.FC = () => {
             />
             <FormInput
               name="rv_number"
-              label="RV Number"
+              label={t("RV Number")}
               value={rvNumber}
               onChange={(e) => setRvNumber(e.target.value.toUpperCase())}
               disabled={isSubmitting}
@@ -448,7 +457,7 @@ const BankInPage: React.FC = () => {
             />
             <FormInput
               name="drawing_amount"
-              label="Amount (RM)"
+              label={t("Amount (RM)")}
               type="number"
               step="0.01"
               value={drawingAmount}
@@ -460,7 +469,7 @@ const BankInPage: React.FC = () => {
           </div>
           <FormInput
             name="drawing_description"
-            label="Description"
+            label={t("Description")}
             value={drawingDescription}
             onChange={(e) => setDrawingDescription(e.target.value.toUpperCase())}
             disabled={isSubmitting}
@@ -468,20 +477,25 @@ const BankInPage: React.FC = () => {
             required
           />
           <p className="text-xs text-default-500 dark:text-gray-400 pl-1">
-            Posts {rvNumber || "RV—"}: DR {bankAccount} / CR CA_WA (WORKER'S ADVANCE) for RM{" "}
-            {fmtAmt(parseFloat(drawingAmount) || 0)}. It is listed with a "Drawing" badge — edit
-            or cancel it later from the Journal page.
+            {t(
+              "Posts {{rv}}: DR {{bank}} / CR CA_WA (WORKER'S ADVANCE) for RM {{amount}}. It is listed with a \"Drawing\" badge \u2014 edit or cancel it later from the Journal page.",
+              {
+                rv: rvNumber || "RV\u2014",
+                bank: bankAccount,
+                amount: fmtAmt(parseFloat(drawingAmount) || 0),
+              }
+            )}
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>
-              Close
+              {t("Close")}
             </Button>
             <Button
               color="sky"
               onClick={handlePostDrawing}
               disabled={isSubmitting || !(parseFloat(drawingAmount) > 0)}
             >
-              {isSubmitting ? "Posting..." : `Post ${rvNumber || "Drawing"}`}
+              {isSubmitting ? t("Posting...") : t("Post {{rv}}", { rv: rvNumber || t("Drawing") })}
             </Button>
           </div>
         </div>
@@ -492,7 +506,7 @@ const BankInPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                Bank-In Date <span className="text-red-500">*</span>
+                {t("Bank-In Date")} <span className="text-red-500">*</span>
               </label>
               <TimeNavigator
                 range={{ start: parseYmd(postingDate), end: parseYmd(postingDate) }}
@@ -502,14 +516,14 @@ const BankInPage: React.FC = () => {
                 showArrows={false}
                 allowFuture
                 disabled={isSubmitting || step === "preview"}
-                placeholder="Pick date"
+                placeholder={t("Pick date")}
                 className="w-full"
                 triggerClassName="w-full justify-between"
               />
             </div>
             <FormListbox
               name="bank_account"
-              label="Bank Account"
+              label={t("Bank Account")}
               value={bankAccount}
               onChange={(value) => setBankAccount(value as string)}
               options={bankAccountOptions}
@@ -517,7 +531,7 @@ const BankInPage: React.FC = () => {
             />
             <FormInput
               name="rv_number"
-              label="RV Number"
+              label={t("RV Number")}
               value={rvNumber}
               onChange={(e) => setRvNumber(e.target.value.toUpperCase())}
               disabled={isSubmitting || step === "preview"}
@@ -526,7 +540,7 @@ const BankInPage: React.FC = () => {
             />
             <div className="flex items-end pb-1">
               <div className="text-sm text-default-600 dark:text-gray-300">
-                Total: <span className="font-semibold">RM {fmtAmt(grandTotal)}</span>
+                {t("Total:")} <span className="font-semibold">RM {fmtAmt(grandTotal)}</span>
               </div>
             </div>
           </div>
@@ -536,31 +550,31 @@ const BankInPage: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <h2 className="text-sm font-semibold text-default-700 dark:text-gray-300 mb-2 pl-1">
-                    Cash-sales pools (CH_REV1)
+                    {t("Cash-sales pools (CH_REV1)")}
                   </h2>
                   <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-x-auto max-h-96 overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-default-50 dark:bg-gray-800 sticky top-0">
                         <tr className="text-left text-default-600 dark:text-gray-400">
-                          <th className="px-3 py-2">Sales Date</th>
-                          <th className="px-3 py-2 text-right">Collected</th>
-                          <th className="px-3 py-2 text-right">Banked</th>
-                          <th className="px-3 py-2 text-right">Remaining</th>
-                          <th className="px-3 py-2 text-right">Bank In</th>
+                          <th className="px-3 py-2">{t("Sales Date")}</th>
+                          <th className="px-3 py-2 text-right">{t("Collected")}</th>
+                          <th className="px-3 py-2 text-right">{t("Banked")}</th>
+                          <th className="px-3 py-2 text-right">{t("Remaining")}</th>
+                          <th className="px-3 py-2 text-right">{t("Bank In")}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {openingPool && openingPool.remaining > 0.005 && (
                           <tr className="border-t border-default-100 dark:border-gray-800 bg-amber-50/50 dark:bg-amber-900/10">
                             <td className="px-3 py-1.5" title={openingPool.note}>
-                              Pre-June opening cash
+                              {t("Pre-June opening cash")}
                             </td>
                             <td className="px-3 py-1.5 text-right">{fmtAmt(openingPool.anchor)}</td>
                             <td className="px-3 py-1.5 text-right">{fmtAmt(openingPool.banked)}</td>
                             <td className="px-3 py-1.5 text-right font-medium">
                               {fmtAmt(openingPool.remaining)}
                             </td>
-                            <td className="px-3 py-1.5 text-right text-default-400">via date below</td>
+                            <td className="px-3 py-1.5 text-right text-default-400">{t("via date below")}</td>
                           </tr>
                         )}
                         {pools
@@ -597,7 +611,7 @@ const BankInPage: React.FC = () => {
                         {pools.filter((p) => p.remaining > 0.005).length === 0 && (
                           <tr>
                             <td colSpan={5} className="px-3 py-4 text-center text-default-400">
-                              No unbanked cash-sales pools
+                              {t("No unbanked cash-sales pools")}
                             </td>
                           </tr>
                         )}
@@ -608,17 +622,17 @@ const BankInPage: React.FC = () => {
 
                 <div>
                   <h2 className="text-sm font-semibold text-default-700 dark:text-gray-300 mb-2 pl-1">
-                    Unbanked cash receipts (CH_REV2)
+                    {t("Unbanked cash receipts (CH_REV2)")}
                   </h2>
                   <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-x-auto max-h-96 overflow-y-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-default-50 dark:bg-gray-800 sticky top-0">
                         <tr className="text-left text-default-600 dark:text-gray-400">
                           <th className="px-3 py-2"></th>
-                          <th className="px-3 py-2">Reference</th>
-                          <th className="px-3 py-2">Customer</th>
-                          <th className="px-3 py-2 text-right">Remaining</th>
-                          <th className="px-3 py-2 text-right">Bank In</th>
+                          <th className="px-3 py-2">{t("Reference")}</th>
+                          <th className="px-3 py-2">{t("Customer")}</th>
+                          <th className="px-3 py-2 text-right">{t("Remaining")}</th>
+                          <th className="px-3 py-2 text-right">{t("Bank In")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -631,14 +645,14 @@ const BankInPage: React.FC = () => {
                                   setReceiptChecked({ ...receiptChecked, [r.id]: checked })
                                 }
                                 size={18}
-                                ariaLabel={`Select receipt ${r.display_reference || r.id}`}
+                                ariaLabel={t("Select receipt {{ref}}", { ref: r.display_reference || r.id })}
                               />
                             </td>
                             <td className="px-3 py-1.5" title={r.description || undefined}>
                               {r.display_reference || `#${r.id}`}
                               {r.origin === "import_opening" && (
                                 <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">
-                                  (opening)
+                                  {t("(opening)")}
                                 </span>
                               )}
                             </td>
@@ -662,7 +676,7 @@ const BankInPage: React.FC = () => {
                         {receipts.length === 0 && (
                           <tr>
                             <td colSpan={5} className="px-3 py-4 text-center text-default-400">
-                              No unbanked cash receipts
+                              {t("No unbanked cash receipts")}
                             </td>
                           </tr>
                         )}
@@ -674,10 +688,10 @@ const BankInPage: React.FC = () => {
 
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={resetForm} disabled={isSubmitting}>
-                  Close
+                  {t("Close")}
                 </Button>
                 <Button color="sky" onClick={handlePreview} disabled={isSubmitting || grandTotal <= 0}>
-                  Preview
+                  {t("Preview")}
                 </Button>
               </div>
             </>
@@ -707,15 +721,17 @@ const BankInPage: React.FC = () => {
                 ))}
               </div>
               <p className="text-xs text-default-500 dark:text-gray-400 pl-1">
-                Posts {rvNumber || "RV—"}: one bank debit per group above, with the CH_REV1/CH_REV2
-                credit aggregated per holding account. Descriptions are editable.
+                {t(
+                  "Posts {{rv}}: one bank debit per group above, with the CH_REV1/CH_REV2 credit aggregated per holding account. Descriptions are editable.",
+                  { rv: rvNumber || "RV\u2014" }
+                )}
               </p>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setStep("select")} disabled={isSubmitting}>
-                  Back
+                  {t("Back")}
                 </Button>
                 <Button color="sky" onClick={handlePost} disabled={isSubmitting}>
-                  {isSubmitting ? "Posting..." : `Post ${rvNumber || "Bank-In"}`}
+                  {isSubmitting ? t("Posting...") : t("Post {{rv}}", { rv: rvNumber || t("Bank-In") })}
                 </Button>
               </div>
             </>
@@ -727,12 +743,12 @@ const BankInPage: React.FC = () => {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 dark:bg-gray-900/50">
             <tr className="text-left text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-              <th className="px-4 py-3">Date</th>
-              <th className="px-4 py-3">RV No.</th>
-              <th className="px-4 py-3">Bank</th>
-              <th className="px-4 py-3">Groups</th>
-              <th className="px-4 py-3 text-right">Amount</th>
-              <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">{t("Date")}</th>
+              <th className="px-4 py-3">{t("RV No.")}</th>
+              <th className="px-4 py-3">{t("Bank")}</th>
+              <th className="px-4 py-3">{t("Groups")}</th>
+              <th className="px-4 py-3 text-right">{t("Amount")}</th>
+              <th className="px-4 py-3">{t("Status")}</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
@@ -756,7 +772,7 @@ const BankInPage: React.FC = () => {
                   )}
                   {b.kind !== "bank_in" && (
                     <span className="ml-2 inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-400 font-sans">
-                      {b.kind === "drawing" ? "Drawing" : "Manual"}
+                      {b.kind === "drawing" ? t("Drawing") : t("Manual")}
                     </span>
                   )}
                 </td>
@@ -775,13 +791,13 @@ const BankInPage: React.FC = () => {
                         : "inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-400 line-through"
                     }
                   >
-                    {b.status}
+                    {t(b.status)}
                   </span>
                 </td>
                 <td className="px-4 py-2.5 text-right">
                   {b.kind === "bank_in" && b.status === "posted" && (
                     <Button size="sm" variant="outline" color="rose" onClick={() => setCancelTarget(b)}>
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                   )}
                 </td>
@@ -791,8 +807,8 @@ const BankInPage: React.FC = () => {
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-default-400">
                   {filterStart || filterEnd
-                    ? "No bank-ins in this date range"
-                    : "No bank-ins yet"}
+                    ? t("No bank-ins in this date range")
+                    : t("No bank-ins yet")}
                 </td>
               </tr>
             )}
@@ -804,9 +820,12 @@ const BankInPage: React.FC = () => {
         isOpen={cancelTarget !== null}
         onClose={() => setCancelTarget(null)}
         onConfirm={handleCancel}
-        title={`Cancel ${cancelTarget?.rv_number || ""}?`}
-        message={`This reverses the bank-in journal and returns the cash to its pools/receipts. The RV number ${cancelTarget?.rv_number || ""} stays reserved and cannot be reused.`}
-        confirmButtonText="Cancel Bank-In"
+        title={t("Cancel {{rv}}?", { rv: cancelTarget?.rv_number || "" })}
+        message={t(
+          "This reverses the bank-in journal and returns the cash to its pools/receipts. The RV number {{rv}} stays reserved and cannot be reused.",
+          { rv: cancelTarget?.rv_number || "" }
+        )}
+        confirmButtonText={t("Cancel Bank-In")}
         variant="danger"
       />
     </div>

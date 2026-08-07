@@ -8,6 +8,7 @@ import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide"
 import { api } from "../../../routes/utils/api";
 import { generateCogmPDF } from "../../../utils/accounting/CogmPDF";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 
@@ -44,6 +45,7 @@ interface CogmData {
 }
 
 const CogmPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const [data, setData] = useState<CogmData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,12 +65,12 @@ const CogmPage: React.FC = () => {
       const response = await api.get(`/api/financial-reports/cogm/${year}/${month}`);
       setData(response);
     } catch (err) {
-      setError("Failed to fetch COGM report. Please try again later.");
+      setError(t("Failed to fetch COGM report. Please try again later."));
       console.error("Error fetching COGM:", err);
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, t]);
 
   useEffect(() => {
     fetchData();
@@ -89,7 +91,7 @@ const CogmPage: React.FC = () => {
       await generateCogmPDF(data);
     } catch (err) {
       console.error("Error printing PDF:", err);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setExporting(false);
     }
@@ -134,7 +136,7 @@ const CogmPage: React.FC = () => {
             iconSize={16}
             onClick={fetchData}
             disabled={loading}
-            title="Refresh"
+            title={t("Refresh")}
             additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
           />
           <Button
@@ -146,7 +148,7 @@ const CogmPage: React.FC = () => {
             onClick={handlePrintPDF}
             disabled={exporting || !data}
           >
-            {exporting ? "Preparing..." : "Print"}
+            {exporting ? t("Preparing...") : t("Print")}
           </Button>
         </div>
       </div>
@@ -164,10 +166,13 @@ const CogmPage: React.FC = () => {
           {/* Title Header */}
           <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center">
-              COST OF GOODS MANUFACTURED
+              {t("COST OF GOODS MANUFACTURED")}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
-              For the period {data.period.start_date} to {data.period.end_date}
+              {t("For the period {{start}} to {{end}}", {
+                start: data.period.start_date,
+                end: data.period.end_date,
+              })}
             </p>
           </div>
 
@@ -176,13 +181,16 @@ const CogmPage: React.FC = () => {
             {data.raw_materials.items.length > 0 && (
               <div>
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  Raw Materials
+                  {t("Raw Materials")}
                 </h3>
                 <div className="space-y-1 pl-4">
                   {data.raw_materials.items.map((item) => (
                     <div key={item.note} className="flex justify-between text-sm">
                       <span className="text-gray-700 dark:text-gray-300">
-                        {item.name} (Note {item.note})
+                        {t("{{name}} (Note {{note}})", {
+                          name: item.name,
+                          note: item.note,
+                        })}
                       </span>
                       <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
@@ -191,7 +199,9 @@ const CogmPage: React.FC = () => {
                   ))}
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">Total Raw Materials</span>
+                  <span className="text-gray-800 dark:text-gray-200">
+                    {t("Total Raw Materials")}
+                  </span>
                   <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.raw_materials.total)}
                   </span>
@@ -203,13 +213,16 @@ const CogmPage: React.FC = () => {
             {data.packing_materials.items.length > 0 && (
               <div>
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  Packing Materials
+                  {t("Packing Materials")}
                 </h3>
                 <div className="space-y-1 pl-4">
                   {data.packing_materials.items.map((item) => (
                     <div key={item.note} className="flex justify-between text-sm">
                       <span className="text-gray-700 dark:text-gray-300">
-                        {item.name} (Note {item.note})
+                        {t("{{name}} (Note {{note}})", {
+                          name: item.name,
+                          note: item.note,
+                        })}
                       </span>
                       <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
@@ -218,7 +231,9 @@ const CogmPage: React.FC = () => {
                   ))}
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">Total Packing Materials</span>
+                  <span className="text-gray-800 dark:text-gray-200">
+                    {t("Total Packing Materials")}
+                  </span>
                   <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.packing_materials.total)}
                   </span>
@@ -230,13 +245,16 @@ const CogmPage: React.FC = () => {
             {data.labor_costs.items.length > 0 && (
               <div>
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  Direct Labor
+                  {t("Direct Labor")}
                 </h3>
                 <div className="space-y-1 pl-4">
                   {data.labor_costs.items.map((item) => (
                     <div key={item.note} className="flex justify-between text-sm">
                       <span className="text-gray-700 dark:text-gray-300">
-                        {item.name} (Note {item.note})
+                        {t("{{name}} (Note {{note}})", {
+                          name: item.name,
+                          note: item.note,
+                        })}
                       </span>
                       <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
@@ -245,7 +263,9 @@ const CogmPage: React.FC = () => {
                   ))}
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">Total Direct Labor</span>
+                  <span className="text-gray-800 dark:text-gray-200">
+                    {t("Total Direct Labor")}
+                  </span>
                   <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.labor_costs.total)}
                   </span>
@@ -257,13 +277,16 @@ const CogmPage: React.FC = () => {
             {data.other_costs.items.length > 0 && (
               <div>
                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  Other Manufacturing Costs
+                  {t("Other Manufacturing Costs")}
                 </h3>
                 <div className="space-y-1 pl-4">
                   {data.other_costs.items.map((item) => (
                     <div key={item.note} className="flex justify-between text-sm">
                       <span className="text-gray-700 dark:text-gray-300">
-                        {item.name} (Note {item.note})
+                        {t("{{name}} (Note {{note}})", {
+                          name: item.name,
+                          note: item.note,
+                        })}
                       </span>
                       <span className="text-gray-900 dark:text-white">
                         {formatCurrency(item.amount)}
@@ -272,7 +295,9 @@ const CogmPage: React.FC = () => {
                   ))}
                 </div>
                 <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">Total Other Costs</span>
+                  <span className="text-gray-800 dark:text-gray-200">
+                    {t("Total Other Costs")}
+                  </span>
                   <span className="text-gray-900 dark:text-white">
                     {formatCurrency(data.other_costs.total)}
                   </span>
@@ -282,7 +307,9 @@ const CogmPage: React.FC = () => {
 
             {/* Total COGM */}
             <div className="flex justify-between text-lg font-bold py-4 border-y-2 border-gray-400 dark:border-gray-500 bg-amber-50 dark:bg-amber-900/30 -mx-6 px-6">
-              <span className="text-gray-900 dark:text-white">COST OF GOODS MANUFACTURED</span>
+              <span className="text-gray-900 dark:text-white">
+                {t("COST OF GOODS MANUFACTURED")}
+              </span>
               <span className="text-amber-700 dark:text-amber-400">
                 RM {formatCurrency(data.total_cogm)}
               </span>
@@ -292,7 +319,12 @@ const CogmPage: React.FC = () => {
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Period: {selectedMonth.toLocaleString("default", { month: "long", year: "numeric" })}
+              {t("Period: {{month}}", {
+                month: selectedMonth.toLocaleString("default", {
+                  month: "long",
+                  year: "numeric",
+                }),
+              })}
             </p>
           </div>
         </div>

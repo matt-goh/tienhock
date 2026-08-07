@@ -9,6 +9,7 @@ import {
 } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../../../routes/utils/api";
 import { Supplier } from "../../../types/types";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -36,6 +37,7 @@ const reviveFilters = (cached: any): SuppliersListFilters => ({
 });
 
 const SuppliersListPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
 
   // State
@@ -66,7 +68,7 @@ const SuppliersListPage: React.FC = () => {
       setSuppliers(response.suppliers || []);
     } catch (error) {
       console.error("Error fetching suppliers:", error);
-      toast.error("Failed to load suppliers");
+      toast.error(t("Failed to load suppliers"));
     } finally {
       setLoading(false);
     }
@@ -123,14 +125,20 @@ const SuppliersListPage: React.FC = () => {
 
     try {
       await api.delete(`/api/suppliers/${supplierToDelete.id}`);
-      toast.success(`Supplier '${supplierToDelete.name}' deactivated`);
+      toast.success(
+        t("Supplier '{{name}}' deactivated", {
+          name: supplierToDelete.name,
+        })
+      );
       setShowDeleteDialog(false);
       setSupplierToDelete(null);
       fetchSuppliers();
     } catch (error: unknown) {
       console.error("Error deactivating supplier:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to deactivate supplier";
+        error instanceof Error
+          ? error.message
+          : t("Failed to deactivate supplier");
       toast.error(errorMessage);
     }
   };
@@ -139,12 +147,16 @@ const SuppliersListPage: React.FC = () => {
     e.stopPropagation();
     try {
       await api.post(`/api/suppliers/${supplier.id}/reactivate`);
-      toast.success(`Supplier '${supplier.name}' reactivated`);
+      toast.success(
+        t("Supplier '{{name}}' reactivated", { name: supplier.name })
+      );
       fetchSuppliers();
     } catch (error: unknown) {
       console.error("Error reactivating supplier:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to reactivate supplier";
+        error instanceof Error
+          ? error.message
+          : t("Failed to reactivate supplier");
       toast.error(errorMessage);
     }
   };
@@ -156,7 +168,7 @@ const SuppliersListPage: React.FC = () => {
         {/* Left side: Title | Checkbox | Stats | Refresh */}
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Suppliers
+            {t("Suppliers")}
           </h1>
           <span className="text-default-300 dark:text-gray-600">|</span>
           <label className="flex items-center space-x-2 cursor-pointer">
@@ -167,22 +179,22 @@ const SuppliersListPage: React.FC = () => {
               className="rounded border-default-300 text-sky-600 focus:ring-sky-500"
             />
             <span className="text-sm text-default-700 dark:text-gray-200">
-              Show Inactive
+              {t("Show Inactive")}
             </span>
           </label>
           <span className="text-default-300 dark:text-gray-600">·</span>
           <span className="text-sm text-default-600 dark:text-gray-400">
-            Total:{" "}
+            {t("Total:")}{" "}
             <span className="font-medium text-default-900 dark:text-gray-100">
               {suppliers.filter((s) => s.is_active).length}
             </span>{" "}
-            active suppliers
+            {t("active suppliers")}
           </span>
           <span className="text-default-300 dark:text-gray-600">|</span>
           <button
             onClick={fetchSuppliers}
             className="p-1.5 text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100 hover:bg-default-100 dark:hover:bg-gray-700 rounded"
-            title="Refresh"
+            title={t("Refresh")}
           >
             <IconRefresh size={18} />
           </button>
@@ -197,7 +209,7 @@ const SuppliersListPage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search code, name, phone..."
+              placeholder={t("Search code, name, phone...")}
               className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 py-1.5 pl-9 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -206,7 +218,7 @@ const SuppliersListPage: React.FC = () => {
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
                 onClick={() => setSearchTerm("")}
-                title="Clear search"
+                title={t("Clear search")}
               >
                 ×
               </button>
@@ -220,7 +232,7 @@ const SuppliersListPage: React.FC = () => {
             iconPosition="left"
             size="sm"
           >
-            Add Supplier
+            {t("Add Supplier")}
           </Button>
         </div>
       </div>
@@ -236,22 +248,22 @@ const SuppliersListPage: React.FC = () => {
             <thead className="bg-default-100 dark:bg-gray-800">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
-                  Code
+                  {t("Code")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Name
+                  {t("Name")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-40">
-                  Contact
+                  {t("Contact")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
-                  Phone
+                  {t("Phone")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
-                  Status
+                  {t("Status")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
-                  Actions
+                  {t("Actions")}
                 </th>
               </tr>
             </thead>
@@ -287,7 +299,7 @@ const SuppliersListPage: React.FC = () => {
                             : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
                         }`}
                       >
-                        {supplier.is_active ? "Active" : "Inactive"}
+                        {supplier.is_active ? t("Active") : t("Inactive")}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-center text-sm">
@@ -298,7 +310,7 @@ const SuppliersListPage: React.FC = () => {
                             handleEditClick(supplier);
                           }}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconPencil size={18} />
                         </button>
@@ -306,7 +318,7 @@ const SuppliersListPage: React.FC = () => {
                           <button
                             onClick={(e) => handleDeleteClick(supplier, e)}
                             className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                            title="Deactivate"
+                            title={t("Deactivate")}
                           >
                             <IconTrash size={18} />
                           </button>
@@ -314,7 +326,7 @@ const SuppliersListPage: React.FC = () => {
                           <button
                             onClick={(e) => handleReactivate(supplier, e)}
                             className="text-green-600 dark:text-green-400 hover:text-green-800 dark:hover:text-green-300"
-                            title="Reactivate"
+                            title={t("Reactivate")}
                           >
                             <IconRefresh size={18} />
                           </button>
@@ -329,10 +341,10 @@ const SuppliersListPage: React.FC = () => {
                     colSpan={7}
                     className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
-                    No suppliers found.{" "}
+                    {t("No suppliers found.")}{" "}
                     {searchTerm
-                      ? "Try adjusting your search."
-                      : "Create one to get started."}
+                      ? t("Try adjusting your search.")
+                      : t("Create one to get started.")}
                   </td>
                 </tr>
               )}
@@ -346,8 +358,11 @@ const SuppliersListPage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Deactivate Supplier"
-        message={`Are you sure you want to deactivate supplier "${supplierToDelete?.name}"? The supplier can be reactivated later.`}
+        title={t("Deactivate Supplier")}
+        message={t(
+          'Are you sure you want to deactivate supplier "{{name}}"? The supplier can be reactivated later.',
+          { name: supplierToDelete?.name }
+        )}
         variant="danger"
       />
     </div>

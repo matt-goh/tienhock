@@ -15,6 +15,7 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import BackButton from "../../../components/BackButton";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -225,6 +226,7 @@ const formatDateTime = (value?: string | null): string => {
 };
 
 const GeneralPurchaseInvoiceFormPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -362,11 +364,11 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       );
     } catch (error) {
       console.error("Error loading general purchase:", error);
-      toast.error("Failed to load general purchase");
+      toast.error(t("Failed to load general purchase"));
     } finally {
       setLoading(false);
     }
-  }, [id, isEditMode]);
+  }, [id, isEditMode, t]);
 
   useEffect(() => {
     loadInvoice();
@@ -388,13 +390,18 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
 
   const generalStockCategoryOptions = useMemo(
     () => [
-      { id: "", name: "No General stock category" },
+      { id: "", name: t("No General stock category") },
       ...generalStockCategories.map((category: GeneralStockCategory) => ({
         id: String(category.id),
         name: category.name,
       })),
     ],
-    [generalStockCategories]
+    [generalStockCategories, t]
+  );
+
+  const translatedTaxTypeOptions = useMemo(
+    () => taxTypeOptions.map((option) => ({ ...option, name: t(option.name) })),
+    [t]
   );
 
   const selectedStockTargetIds = useMemo<number[]>(
@@ -610,15 +617,15 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
 
   const validateBeforeSave = (): boolean => {
     if (!supplier.supplier_name.trim()) {
-      toast.error("Supplier name is required");
+      toast.error(t("Supplier name is required"));
       return false;
     }
     if (!supplier.address_line_0.trim() || !supplier.city.trim()) {
-      toast.error("Supplier address and city are required");
+      toast.error(t("Supplier address and city are required"));
       return false;
     }
     if (lines.length === 0) {
-      toast.error("At least one line is required");
+      toast.error(t("At least one line is required"));
       return false;
     }
     const invalidLineIndex = lines.findIndex(
@@ -629,7 +636,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
           toNumber(line.balance_quantity) <= 0)
     );
     if (invalidLineIndex >= 0) {
-      toast.error(`Line ${invalidLineIndex + 1} is incomplete`);
+      toast.error(t("Line {{line}} is incomplete", {
+        line: invalidLineIndex + 1,
+      }));
       return false;
     }
     const duplicateLineIndex = lines.findIndex(
@@ -638,26 +647,34 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     if (duplicateLineIndex >= 0) {
       const duplicateRow = findDuplicateNewStockRow(lines[duplicateLineIndex]);
       toast.error(
-        `Line ${duplicateLineIndex + 1} matches existing General Stock item "${
-          duplicateRow?.description || ""
-        }". Select it in Stock Item to append balance instead.`
+        t(
+          'Line {{line}} matches existing General Stock item "{{description}}". Select it in Stock Item to append balance instead.',
+          {
+            line: duplicateLineIndex + 1,
+            description: duplicateRow?.description || "",
+          }
+        )
       );
       return false;
     }
     if (!formData.account_code.trim()) {
-      toast.error("GL account is required");
+      toast.error(t("GL account is required"));
       return false;
     }
     if (toNumber(formData.total_foreign_amount) <= 0) {
-      toast.error(`${formData.currency_code} total must be greater than zero`);
+      toast.error(
+        t("{{currency}} total must be greater than zero", {
+          currency: formData.currency_code,
+        })
+      );
       return false;
     }
     if (toNumber(formData.total_excluding_tax_myr) <= 0) {
-      toast.error("MYR subtotal must be greater than zero");
+      toast.error(t("MYR subtotal must be greater than zero"));
       return false;
     }
     if (toNumber(formData.tax_amount_myr) < 0) {
-      toast.error("Tax cannot be negative");
+      toast.error(t("Tax cannot be negative"));
       return false;
     }
     const paymentError: string | null = validateSupplierPaymentDraft(
@@ -758,14 +775,14 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         supportingDocumentFile.type || "application/octet-stream"
       );
       setSupportingDocumentFile(null);
-      toast.success("Supporting document uploaded");
+      toast.success(t("Supporting document uploaded"));
       return true;
     } catch (error: unknown) {
       console.error("Error uploading supporting document:", error);
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to upload supporting document"
+          : t("Failed to upload supporting document")
       );
       return false;
     } finally {
@@ -801,8 +818,10 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       return true;
     } catch (error: unknown) {
       const message: string =
-        error instanceof Error ? error.message : "Failed to record payment";
-      toast.error(`Purchase saved, but payment failed: ${message}`);
+        error instanceof Error ? error.message : t("Failed to record payment");
+      toast.error(
+        t("Purchase saved, but payment failed: {{message}}", { message })
+      );
       return false;
     }
   };
@@ -825,7 +844,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       outstandingPaymentAmount
     );
     if (recorded) {
-      toast.success("Supplier payment recorded");
+      toast.success(t("Supplier payment recorded"));
       await loadInvoice();
     }
     setSaving(false);
@@ -846,8 +865,8 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         );
         toast.success(
           paymentRecorded
-            ? "General purchase updated and paid"
-            : "General purchase updated"
+            ? t("General purchase updated and paid")
+            : t("General purchase updated")
         );
         await loadInvoice();
         return Number.parseInt(id, 10);
@@ -865,14 +884,16 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       );
       toast.success(
         paymentRecorded
-          ? "General purchase created and paid"
-          : "General purchase created"
+          ? t("General purchase created and paid")
+          : t("General purchase created")
       );
       navigate(`/stock/general-purchases/${newId}`, { replace: true });
       return newId;
     } catch (error: unknown) {
       console.error("Error saving general purchase:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save invoice");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to save invoice")
+      );
       return null;
     } finally {
       setSaving(false);
@@ -895,12 +916,14 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       });
 
       await uploadSupportingDocument(Number.parseInt(id, 10));
-      toast.success("Record fields saved");
+      toast.success(t("Record fields saved"));
       await loadInvoice();
     } catch (error: unknown) {
       console.error("Error saving record fields:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to save record fields"
+        error instanceof Error
+          ? error.message
+          : t("Failed to save record fields")
       );
     } finally {
       setSavingRecords(false);
@@ -927,7 +950,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to download supporting document"
+          : t("Failed to download supporting document")
       );
     }
   };
@@ -953,7 +976,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error viewing supporting document:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to load document"
+        error instanceof Error ? error.message : t("Failed to load document")
       );
     }
   };
@@ -972,14 +995,14 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     try {
       await api.delete(`/api/general-purchases/${id}/supporting-document`, {});
       setSupportingDocumentFile(null);
-      toast.success("Supporting document removed");
+      toast.success(t("Supporting document removed"));
       await loadInvoice();
     } catch (error: unknown) {
       console.error("Error removing supporting document:", error);
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to remove supporting document"
+          : t("Failed to remove supporting document")
       );
     }
   };
@@ -991,7 +1014,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     setSubmitting(true);
     try {
       await api.post(`/api/general-purchases/${invoiceId}/submit`, {});
-      toast.success("Submitted to MyInvois");
+      toast.success(t("Submitted to MyInvois"));
       if (isEditMode) {
         await loadInvoice();
       } else {
@@ -1002,7 +1025,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error submitting self-billed invoice:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to submit to MyInvois"
+        error instanceof Error
+          ? error.message
+          : t("Failed to submit to MyInvois")
       );
     } finally {
       setSubmitting(false);
@@ -1013,11 +1038,13 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     if (!id) return;
     try {
       await api.put(`/api/general-purchases/${id}/refresh-status`, {});
-      toast.success("Status refreshed");
+      toast.success(t("Status refreshed"));
       await loadInvoice();
     } catch (error: unknown) {
       console.error("Error refreshing self-billed status:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to refresh status");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to refresh status")
+      );
     }
   };
 
@@ -1025,11 +1052,13 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     if (!id) return;
     try {
       await api.post(`/api/general-purchases/${id}/clear-status`, {});
-      toast.success("E-invoice status cleared");
+      toast.success(t("E-invoice status cleared"));
       await loadInvoice();
     } catch (error: unknown) {
       console.error("Error clearing self-billed status:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to clear status");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to clear status")
+      );
     }
   };
 
@@ -1039,12 +1068,14 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
       await api.post(`/api/general-purchases/${id}/cancel`, {
         reason: "Cancelled via system",
       });
-      toast.success("General purchase cancelled");
+      toast.success(t("General purchase cancelled"));
       setShowCancelDialog(false);
       await loadInvoice();
     } catch (error: unknown) {
       console.error("Error cancelling self-billed invoice:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to cancel invoice");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to cancel invoice")
+      );
     }
   };
 
@@ -1052,11 +1083,13 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     if (!id) return;
     try {
       await api.delete(`/api/general-purchases/${id}`);
-      toast.success("General purchase deleted");
+      toast.success(t("General purchase deleted"));
       navigate("/stock/general-purchases");
     } catch (error: unknown) {
       console.error("Error deleting self-billed invoice:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to delete invoice");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to delete invoice")
+      );
     }
   };
 
@@ -1077,7 +1110,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
           <span className="text-default-300 dark:text-gray-600">|</span>
           <div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              {isEditMode ? "Foreign General Purchase" : "New Foreign General Purchase"}
+              {isEditMode
+                ? t("Foreign General Purchase")
+                : t("New Foreign General Purchase")}
             </h1>
             {isEditMode && existingInvoice && (
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
@@ -1089,14 +1124,16 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     existingInvoice.invoice_status
                   )}`}
                 >
-                  {getInvoiceStatusLabel(existingInvoice.invoice_status)}
+                  {t(getInvoiceStatusLabel(existingInvoice.invoice_status))}
                 </span>
                 <span
                   className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClasses(
                     existingInvoice.einvoice_status
                   )}`}
                 >
-                  E-Invoice: {getStatusLabel(existingInvoice.einvoice_status)}
+                  {t("E-Invoice: {{status}}", {
+                    status: t(getStatusLabel(existingInvoice.einvoice_status)),
+                  })}
                 </span>
               </div>
             )}
@@ -1106,15 +1143,21 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               <span className="text-default-300 dark:text-gray-600">|</span>
               <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
                 <div>
-                  <p className="text-default-400 dark:text-gray-500">UUID</p>
+                  <p className="text-default-400 dark:text-gray-500">
+                    {t("UUID")}
+                  </p>
                   <p className="max-w-[160px] truncate text-default-600 dark:text-gray-400">{existingInvoice.uuid}</p>
                 </div>
                 <div>
-                  <p className="text-default-400 dark:text-gray-500">Submission</p>
+                  <p className="text-default-400 dark:text-gray-500">
+                    {t("Submission")}
+                  </p>
                   <p className="max-w-[120px] truncate text-default-600 dark:text-gray-400">{existingInvoice.submission_uid || "-"}</p>
                 </div>
                 <div>
-                  <p className="text-default-400 dark:text-gray-500">Long ID</p>
+                  <p className="text-default-400 dark:text-gray-500">
+                    {t("Long ID")}
+                  </p>
                   <p className="max-w-[120px] truncate text-default-600 dark:text-gray-400">{existingInvoice.long_id || "-"}</p>
                 </div>
               </div>
@@ -1129,10 +1172,10 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-8 items-center gap-2 rounded-lg border border-default-300 bg-white px-3 text-sm font-medium text-default-700 hover:bg-default-50 hover:text-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700 dark:hover:text-sky-300"
-              title="View in MyInvois Portal"
+              title={t("View in MyInvois Portal")}
             >
               <IconExternalLink size={16} />
-              E-Invoice Details
+              {t("E-Invoice Details")}
             </a>
           )}
           {isEditMode && existingInvoice?.uuid && (
@@ -1144,7 +1187,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               className="h-8 rounded-lg"
               onClick={refreshStatus}
             >
-              Refresh E-Invoice
+              {t("Refresh E-Invoice")}
             </Button>
           )}
           {isEditMode && existingInvoice?.einvoice_status && canEdit && (
@@ -1156,7 +1199,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               className="h-8 rounded-lg"
               onClick={clearStatus}
             >
-              Clear Status
+              {t("Clear Status")}
             </Button>
           )}
           {isEditMode && existingInvoice?.invoice_status !== "cancelled" && (
@@ -1169,7 +1212,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               className="h-8 rounded-lg"
               onClick={() => setShowCancelDialog(true)}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
           )}
           {canEdit && (
@@ -1183,7 +1226,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               disabled={submitting || saving}
               onClick={submitInvoice}
             >
-              {submitting ? "Submitting..." : "Save & Submit e-Invoice"}
+              {submitting ? t("Submitting...") : t("Save & Submit e-Invoice")}
             </Button>
           )}
           {canEdit && (
@@ -1196,7 +1239,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               disabled={saving || submitting}
               onClick={saveInvoice}
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? t("Saving...") : t("Save")}
             </Button>
           )}
           {isEditMode && !canEdit && canEditRecords && (
@@ -1210,8 +1253,8 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               onClick={saveRecordFields}
             >
               {savingRecords || supportingDocumentUploading
-                ? "Saving..."
-                : "Save Records"}
+                ? t("Saving...")
+                : t("Save Records")}
             </Button>
           )}
         </div>
@@ -1224,17 +1267,17 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
           <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-                Purchase Information
+                {t("Purchase Information")}
               </h2>
               <div className="flex items-center gap-2 text-xs text-default-400 dark:text-gray-500">
                 <span className="rounded bg-default-100 px-1.5 py-0.5 dark:bg-gray-700">034</span>
-                <span>Importation of goods</span>
+                <span>{t("Importation of goods")}</span>
               </div>
             </div>
             <div className="grid gap-3 md:grid-cols-4">
               <FormInput
                 name="purchase_date"
-                label="Purchase Date"
+                label={t("Purchase Date")}
                 value={formData.purchase_date}
                 type="date"
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
@@ -1245,7 +1288,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="platform"
-                label="Platform"
+                label={t("Platform")}
                 value={formData.platform}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateFormField("platform", event.target.value)
@@ -1254,7 +1297,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="order_no"
-                label="Order No."
+                label={t("Order No.")}
                 value={formData.order_no}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateFormField("order_no", event.target.value)
@@ -1263,7 +1306,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="shipping_method"
-                label="Shipping Method"
+                label={t("Shipping Method")}
                 value={formData.shipping_method}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateFormField("shipping_method", event.target.value)
@@ -1272,7 +1315,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="shipping_number"
-                label="Shipping No."
+                label={t("Shipping No.")}
                 value={formData.shipping_number}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateFormField("shipping_number", event.target.value)
@@ -1286,7 +1329,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
           <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-3 flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-                Foreign Supplier
+                {t("Foreign Supplier")}
               </h2>
               <span className="rounded-full bg-sky-50 px-2.5 py-1 text-xs font-medium text-sky-700 dark:bg-sky-900/30 dark:text-sky-300">
                 TIN {supplier.tin_number}
@@ -1297,7 +1340,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               <div className="relative">
                 <FormInput
                   name="supplier_name"
-                  label="Supplier Name"
+                  label={t("Supplier Name")}
                   value={supplier.supplier_name}
                   onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                     setSupplierSearchFocused(true);
@@ -1346,7 +1389,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               </div>
               <FormInput
                 name="id_type"
-                label="ID Type"
+                label={t("ID Type")}
                 value={supplier.id_type}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateSupplierField("id_type", event.target.value)
@@ -1355,7 +1398,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="id_number"
-                label="Registration No."
+                label={t("Registration No.")}
                 value={supplier.id_number}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateSupplierField("id_number", event.target.value)
@@ -1364,7 +1407,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="address_line_0"
-                label="Address"
+                label={t("Address")}
                 value={supplier.address_line_0}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateSupplierField("address_line_0", event.target.value)
@@ -1374,7 +1417,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="city"
-                label="City"
+                label={t("City")}
                 value={supplier.city}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateSupplierField("city", event.target.value)
@@ -1384,7 +1427,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormListbox
                 name="country_code"
-                label="Country"
+                label={t("Country")}
                 value={supplier.country_code}
                 onChange={(value: string) =>
                   updateSupplierField("country_code", value)
@@ -1395,7 +1438,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="state_code"
-                label="State Code"
+                label={t("State Code")}
                 value={supplier.state_code}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateSupplierField("state_code", event.target.value)
@@ -1404,7 +1447,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="contact_number"
-                label="Contact"
+                label={t("Contact")}
                 value={supplier.contact_number}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   updateSupplierField("contact_number", event.target.value)
@@ -1419,10 +1462,13 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-default-200 px-3 py-2 dark:border-gray-700">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-                  Purchase Items
+                  {t("Purchase Items")}
                 </h2>
                 <p className="text-xs text-default-500 dark:text-gray-400">
-                  {itemCount} item{itemCount === 1 ? "" : "s"}
+                  {t(
+                    itemCount === 1 ? "{{count}} item" : "{{count}} items",
+                    { count: itemCount }
+                  )}
                 </p>
               </div>
               {canEditLineItems && (
@@ -1434,14 +1480,16 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                   className="h-8 rounded-lg"
                   onClick={addLineItem}
                 >
-                  Add Item
+                  {t("Add Item")}
                 </Button>
               )}
             </div>
 
             {!canEditLineItems && canEditRecords && (
               <div className="mx-3 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-                Only Balance Qty, General Category and supporting records can be edited for this purchase.
+                {t(
+                  "Only Balance Qty, General Category and supporting records can be edited for this purchase."
+                )}
               </div>
             )}
 
@@ -1464,10 +1512,10 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                           {index + 1}
                         </span>
                         <span className="text-sm font-medium text-default-800 dark:text-gray-100">
-                          Item {index + 1}
+                          {t("Item {{number}}", { number: index + 1 })}
                         </span>
                         <span className="rounded-full bg-white px-2 py-0.5 text-xs text-default-500 ring-1 ring-default-200 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700">
-                          {isAppend ? "Existing item" : "New item"}
+                          {isAppend ? t("Existing item") : t("New item")}
                         </span>
                       </div>
                       {canEditLineItems && lines.length > 1 && (
@@ -1475,7 +1523,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                           type="button"
                           onClick={() => removeLineItem(index)}
                           className="rounded p-1 text-rose-600 hover:bg-rose-50 hover:text-rose-800 focus:outline-none focus:ring-2 focus:ring-rose-500 dark:text-rose-300 dark:hover:bg-rose-900/30 dark:hover:text-rose-100"
-                          title="Remove item"
+                          title={t("Remove item")}
                         >
                           <IconTrash size={16} />
                         </button>
@@ -1485,7 +1533,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     <div className="mb-3 grid gap-3 lg:grid-cols-[minmax(220px,0.8fr)_minmax(260px,1fr)]">
                       <GeneralStockItemCombobox
                         name={`stock_append_target_${index}`}
-                        label="Stock Item"
+                        label={t("Stock Item")}
                         selectedRow={selectedStockRow}
                         rows={stockSearch.searchRows}
                         query={stockSearch.query}
@@ -1505,7 +1553,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                         <div className="flex items-center gap-2.5 rounded-lg border border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white px-3 py-2 dark:border-indigo-900/60 dark:from-indigo-900/20 dark:to-gray-800/40">
                           <div className="flex min-w-0 flex-col">
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-400 dark:text-indigo-300/70">
-                              Current
+                              {t("Current")}
                             </span>
                             <span className="text-sm font-medium tabular-nums text-default-700 dark:text-gray-200">
                               {formatQty(toNumber(selectedStockRow.current_stock))}
@@ -1517,7 +1565,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                           />
                           <div className="flex min-w-0 flex-col">
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500 dark:text-indigo-300">
-                              After purchase
+                              {t("After purchase")}
                             </span>
                             <span className="text-sm font-bold tabular-nums text-indigo-700 dark:text-indigo-200">
                               {formatQty(newBalance)}
@@ -1533,7 +1581,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(260px,1.2fr)_minmax(420px,1fr)]">
                       <div className="flex h-full flex-col gap-1.5">
                         <label className="block text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                          Item Description
+                          {t("Item Description")}
                         </label>
                         {canEditLineItems ? (
                           <textarea
@@ -1554,7 +1602,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                             rows={4}
                             disabled={isAppend}
                             className="min-h-[110px] flex-1 resize-y rounded-md border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
-                            placeholder="e.g. PVC tarpaulin 0.5mm, 2m x 100m"
+                            placeholder={t("e.g. PVC tarpaulin 0.5mm, 2m x 100m")}
                           />
                         ) : (
                           <div className="min-h-[110px] flex-1 whitespace-pre-wrap rounded-md border border-default-200 bg-white px-3 py-2 text-sm text-default-900 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100">
@@ -1566,7 +1614,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                       <div className="grid gap-3 sm:grid-cols-2">
                         <FormInput
                           name={`quantity_${index}`}
-                          label="Qty"
+                          label={t("Qty")}
                           value={line.quantity}
                           type="number"
                           min={0}
@@ -1578,7 +1626,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                         />
                         <FormInput
                           name={`unit_price_foreign_${index}`}
-                          label={`Unit (${formData.currency_code})`}
+                          label={t("Unit ({{currency}})", {
+                            currency: formData.currency_code,
+                          })}
                           value={line.unit_price_foreign}
                           type="number"
                           min={0}
@@ -1594,7 +1644,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                         />
                         <FormInput
                           name={`balance_quantity_${index}`}
-                          label="Balance Qty"
+                          label={t("Balance Qty")}
                           value={line.balance_quantity ?? ""}
                           type="number"
                           min={0}
@@ -1610,7 +1660,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                         />
                         <FormListbox
                           name={`general_stock_category_${index}`}
-                          label="General Category"
+                          label={t("General Category")}
                           value={
                             line.general_stock_category_id
                               ? String(line.general_stock_category_id)
@@ -1640,7 +1690,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
           <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
             <div className="mb-3 flex items-center gap-3">
               <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-                Supporting Document & Notes
+                {t("Supporting Document & Notes")}
               </h2>
             </div>
             <div className="grid gap-3 md:grid-cols-2 md:items-stretch">
@@ -1665,7 +1715,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                   </div>
                 ) : (
                   <p className="text-default-500 dark:text-gray-400">
-                    No document uploaded.
+                    {t("No document uploaded.")}
                   </p>
                 )}
 
@@ -1686,7 +1736,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
 
                 {!s3Enabled && (
                   <p className="mb-2 text-xs text-amber-600 dark:text-amber-400">
-                    Document upload unavailable — S3 storage not configured.
+                    {t(
+                      "Document upload unavailable \u2014 S3 storage not configured."
+                    )}
                   </p>
                 )}
                 <div className="mt-auto flex flex-wrap gap-2 pt-3">
@@ -1696,7 +1748,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     }`}
                   >
                     <IconUpload size={16} />
-                    {existingInvoice?.supporting_document_filename ? "Replace" : "Upload"}
+                    {existingInvoice?.supporting_document_filename
+                      ? t("Replace")
+                      : t("Upload")}
                     <input
                       type="file"
                       accept=".pdf,.doc,.docx,image/*"
@@ -1721,7 +1775,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                         className="h-8 rounded-lg"
                         onClick={viewSupportingDocument}
                       >
-                        View
+                        {t("View")}
                       </Button>
                     )}
                   {existingInvoice?.supporting_document_filename && (
@@ -1733,7 +1787,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                       className="h-8 rounded-lg"
                       onClick={downloadSupportingDocument}
                     >
-                      Download
+                      {t("Download")}
                     </Button>
                   )}
                   {existingInvoice?.supporting_document_filename && canEditRecords && (
@@ -1746,7 +1800,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                       className="h-8 rounded-lg"
                       onClick={removeSupportingDocument}
                     >
-                      Remove
+                      {t("Remove")}
                     </Button>
                   )}
                 </div>
@@ -1759,7 +1813,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     updateFormField("notes", event.target.value)
                   }
                   disabled={!canEdit}
-                  placeholder="Optional notes for this invoice"
+                  placeholder={t("Optional notes for this invoice")}
                   className="flex-1 w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
                 />
               </div>
@@ -1771,12 +1825,12 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         <aside className="space-y-2 xl:sticky xl:top-14 xl:self-start">
           <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-              Currency & Totals
+              {t("Currency & Totals")}
             </h2>
             <div className="grid gap-3">
               <FormListbox
                 name="currency_code"
-                label="Currency"
+                label={t("Currency")}
                 value={formData.currency_code}
                 onChange={(value: string) => updateFormField("currency_code", value)}
                 options={CURRENCY_OPTIONS}
@@ -1785,7 +1839,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="fx_rate"
-                label="FX Rate"
+                label={t("FX Rate")}
                 value={formData.fx_rate}
                 type="number"
                 step="0.0001"
@@ -1798,7 +1852,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="total_foreign_amount"
-                label={`${formData.currency_code} Total`}
+                label={t("{{currency}} Total", {
+                  currency: formData.currency_code,
+                })}
                 value={formData.total_foreign_amount}
                 type="number"
                 step="0.01"
@@ -1811,7 +1867,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormInput
                 name="total_excluding_tax_myr"
-                label="MYR Subtotal"
+                label={t("MYR Subtotal")}
                 value={formData.total_excluding_tax_myr}
                 type="number"
                 step="0.01"
@@ -1824,16 +1880,16 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               />
               <FormListbox
                 name="tax_type"
-                label="Tax Type"
+                label={t("Tax Type")}
                 value={formData.tax_type}
                 onChange={(value: string) => updateFormField("tax_type", value)}
-                options={taxTypeOptions}
+                options={translatedTaxTypeOptions}
                 disabled={!canEdit}
                 className="[&_button]:py-1.5"
               />
               <FormInput
                 name="tax_amount_myr"
-                label="Tax (MYR)"
+                label={t("Tax (MYR)")}
                 value={formData.tax_amount_myr}
                 type="number"
                 step="0.01"
@@ -1844,40 +1900,48 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 disabled={!canEdit}
               />
               <AccountCodeCombobox
-                label="GL Account"
+                label={t("GL Account")}
                 required
                 value={formData.account_code}
                 onChange={(value: string) =>
                   updateFormField("account_code", value)
                 }
                 disabled={!canEdit}
-                placeholder="Expense account"
+                placeholder={t("Expense account")}
               />
             </div>
             <div className="mt-3 space-y-2 border-t border-default-200 pt-3 text-sm dark:border-gray-700">
               <div className="flex justify-between gap-4">
                 <span className="text-default-500 dark:text-gray-400">
-                  {formData.currency_code} subtotal
+                  {t("{{currency}} subtotal", {
+                    currency: formData.currency_code,
+                  })}
                 </span>
                 <span className="font-semibold text-default-900 dark:text-gray-100">
                   {formatAmount(totals.foreign, formData.currency_code)}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-default-500 dark:text-gray-400">MYR subtotal</span>
+                <span className="text-default-500 dark:text-gray-400">
+                  {t("MYR subtotal")}
+                </span>
                 <span className="font-semibold text-default-900 dark:text-gray-100">
                   {formatAmount(totals.myr, "MYR")}
                 </span>
               </div>
               <div className="flex justify-between gap-4">
-                <span className="text-default-500 dark:text-gray-400">Tax</span>
+                <span className="text-default-500 dark:text-gray-400">
+                  {t("Tax")}
+                </span>
                 <span className="font-semibold text-default-900 dark:text-gray-100">
                   {formatAmount(totals.tax, "MYR")}
                 </span>
               </div>
               <div className="border-t border-default-200 pt-2 dark:border-gray-700">
                 <div className="flex justify-between gap-4">
-                  <span className="font-medium text-default-700 dark:text-gray-200">Payable</span>
+                  <span className="font-medium text-default-700 dark:text-gray-200">
+                    {t("Payable")}
+                  </span>
                   <span className="text-lg font-semibold text-default-900 dark:text-gray-100">
                     {formatAmount(totals.myr + totals.tax, "MYR")}
                   </span>
@@ -1903,7 +1967,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                     disabled={saving || !supplierPayment.enabled}
                     onClick={recordExistingSupplierPayment}
                   >
-                    {saving ? "Saving..." : "Record Payment"}
+                    {saving ? t("Saving...") : t("Record Payment")}
                   </Button>
                 ) : null
               }
@@ -1921,7 +1985,7 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
                 className="h-8 rounded-lg"
                 onClick={() => setShowDeleteDialog(true)}
               >
-                Delete Draft
+                {t("Delete Draft")}
               </Button>
             </section>
           )}
@@ -1950,7 +2014,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
           </div>
           <iframe
             src={docViewerUrl}
-            title={existingInvoice?.supporting_document_filename ?? "Document"}
+            title={
+              existingInvoice?.supporting_document_filename ?? t("Document")
+            }
             className="min-h-0 flex-1 w-full border-0 bg-white"
           />
         </div>
@@ -1960,9 +2026,12 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={deleteInvoice}
-        title="Delete General Purchase"
-        message={`Delete "${existingInvoice?.self_billed_no || "this draft"}"?`}
-        confirmButtonText="Delete"
+        title={t("Delete General Purchase")}
+        message={t('Delete "{{reference}}"?', {
+          reference:
+            existingInvoice?.self_billed_no || t("this draft"),
+        })}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
 
@@ -1970,11 +2039,15 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
         isOpen={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
         onConfirm={cancelInvoice}
-        title="Cancel General Purchase"
-        message={`Cancel "${
-          existingInvoice?.self_billed_no || "this draft"
-        }"? This marks the local invoice as Cancelled and will also cancel the MyInvois document when possible.`}
-        confirmButtonText="Cancel Invoice"
+        title={t("Cancel General Purchase")}
+        message={t(
+          'Cancel "{{reference}}"? This marks the local invoice as Cancelled and will also cancel the MyInvois document when possible.',
+          {
+            reference:
+              existingInvoice?.self_billed_no || t("this draft"),
+          }
+        )}
+        confirmButtonText={t("Cancel Invoice")}
         variant="danger"
       />
     </div>

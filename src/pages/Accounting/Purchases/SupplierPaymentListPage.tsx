@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { FormInput, FormListbox } from "../../../components/FormComponents";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import TimeNavigator from "../../../components/TimeNavigator";
@@ -116,6 +117,7 @@ const reviveFilters = (cached: any): SupplierPaymentFilters | null => {
 };
 
 const SupplierPaymentListPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
 
   const [rows, setRows] = useState<SupplierPaymentRow[]>([]);
@@ -145,13 +147,22 @@ const SupplierPaymentListPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error fetching supplier payments:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to fetch payments"
+        error instanceof Error ? error.message : t("Failed to fetch payments")
       );
       setRows([]);
     } finally {
       setLoading(false);
     }
-  }, [filters.end_date, filters.source, filters.start_date, filters.status]);
+  }, [filters.end_date, filters.source, filters.start_date, filters.status, t]);
+
+  const translatedSourceOptions = useMemo(
+    () => sourceOptions.map((option) => ({ ...option, name: t(option.name) })),
+    [t]
+  );
+  const translatedStatusOptions = useMemo(
+    () => statusOptions.map((option) => ({ ...option, name: t(option.name) })),
+    [t]
+  );
 
   useEffect(() => {
     fetchPayments();
@@ -195,10 +206,12 @@ const SupplierPaymentListPage: React.FC = () => {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-          Supplier Payments
+          {t("Supplier Payments")}
         </h1>
         <div className="text-sm text-default-500 dark:text-gray-400">
-          Supplier payments recorded from material and general purchase forms.
+          {t(
+            "Supplier payments recorded from material and general purchase forms."
+          )}
         </div>
       </div>
 
@@ -206,16 +219,16 @@ const SupplierPaymentListPage: React.FC = () => {
         <div className="grid gap-3 md:grid-cols-4">
           <FormListbox
             name="source"
-            label="Source"
+            label={t("Source")}
             value={filters.source}
             onChange={(value: string) =>
               updateFilter("source", value as "" | InvoiceSource)
             }
-            options={sourceOptions}
+            options={translatedSourceOptions}
           />
           <div className="space-y-2">
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-              Date Range
+              {t("Date Range")}
             </label>
             <TimeNavigator
               range={{
@@ -229,26 +242,26 @@ const SupplierPaymentListPage: React.FC = () => {
                   end_date: toYmd(range.end),
                 }));
               }}
-              placeholder="All dates"
+              placeholder={t("All dates")}
             />
           </div>
           <FormListbox
             name="status"
-            label="Status"
+            label={t("Status")}
             value={filters.status}
             onChange={(value: string) =>
               updateFilter("status", value as "active" | "all")
             }
-            options={statusOptions}
+            options={translatedStatusOptions}
           />
           <FormInput
             name="search"
-            label="Search"
+            label={t("Search")}
             value={filters.search}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               updateFilter("search", event.target.value)
             }
-            placeholder="Supplier / PV / Ref"
+            placeholder={t("Supplier / PV / Ref")}
           />
         </div>
       </section>
@@ -260,7 +273,7 @@ const SupplierPaymentListPage: React.FC = () => {
           </div>
         ) : filteredRows.length === 0 ? (
           <div className="p-6 text-center text-sm text-default-500 dark:text-gray-400">
-            No supplier payments found.
+            {t("No supplier payments found.")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -268,28 +281,28 @@ const SupplierPaymentListPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    PV / Internal
+                    {t("PV / Internal")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    Supplier
+                    {t("Supplier")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    Invoice
+                    {t("Invoice")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    Method
+                    {t("Method")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    Journal
+                    {t("Journal")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                    Status
+                    {t("Status")}
                   </th>
                 </tr>
               </thead>
@@ -318,7 +331,7 @@ const SupplierPaymentListPage: React.FC = () => {
                       {formatCurrency(Number(row.amount_paid))}
                     </td>
                     <td className="px-3 py-2 capitalize">
-                      {row.payment_method.replace("_", " ")}
+                      {t(row.payment_method.replace("_", " "))}
                       {row.bank_account && row.bank_account !== "CASH" && (
                         <span className="ml-1 text-xs text-default-500 dark:text-gray-400">
                           ({row.bank_account.replace("BANK_", "")})
@@ -338,7 +351,7 @@ const SupplierPaymentListPage: React.FC = () => {
                             : "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
                         }`}
                       >
-                        {row.status}
+                        {t(row.status)}
                       </span>
                     </td>
                   </tr>
@@ -350,7 +363,7 @@ const SupplierPaymentListPage: React.FC = () => {
                     colSpan={4}
                     className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400"
                   >
-                    Active Total
+                    {t("Active Total")}
                   </td>
                   <td className="px-3 py-2 text-right font-semibold text-default-900 dark:text-gray-100">
                     {formatCurrency(totals.active)}
