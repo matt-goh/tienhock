@@ -5,6 +5,7 @@ import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import { refreshContributionRatesCache } from "../../../utils/payroll/useContributionRatesCache";
 import Button from "../../Button";
+import { useTranslation } from "react-i18next";
 
 interface IncomeTaxRateCreateModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t } = useTranslation("payroll");
   const [formData, setFormData] = useState({
     wage_from: "",
     wage_to: "",
@@ -58,12 +60,12 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
       }, {} as any);
 
       await api.post("/api/contribution-rates/income-tax", payload);
-      toast.success("Income tax rate created successfully");
+      toast.success(t("Income tax rate created successfully"));
       await refreshContributionRatesCache();
       onClose();
     } catch (error) {
       console.error("Error creating income tax rate:", error);
-      toast.error("Failed to create income tax rate");
+      toast.error(t("Failed to create income tax rate"));
     } finally {
       setIsSubmitting(false);
     }
@@ -80,7 +82,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700 px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold dark:text-gray-100">Create Income Tax Rate</h2>
+          <h2 className="text-xl font-semibold dark:text-gray-100">{t("Create Income Tax Rate")}</h2>
           <button
             onClick={onClose}
             className="text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
@@ -94,7 +96,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-                Wage From
+                {t("Wage From")}
               </label>
               <input
                 type="number"
@@ -107,7 +109,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
             </div>
             <div>
               <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-                Wage To
+                {t("Wage To")}
               </label>
               <input
                 type="number"
@@ -123,7 +125,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
           {/* Base Rate */}
           <div>
             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-              Base Rate (Single/Married without children)
+              {t("Base Rate (Single/Married without children)")}
             </label>
             <input
               type="number"
@@ -138,7 +140,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
           {/* Unemployed Spouse Rates */}
           <div>
             <h3 className="text-lg font-medium mb-3 dark:text-gray-100">
-              Spouse Unemployed Rates
+              {t("Spouse Unemployed Rates")}
             </h3>
             <div className="grid grid-cols-6 gap-3">
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
@@ -166,7 +168,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
 
           {/* Employed Spouse Rates */}
           <div>
-            <h3 className="text-lg font-medium mb-3 dark:text-gray-100">Spouse Employed Rates</h3>
+            <h3 className="text-lg font-medium mb-3 dark:text-gray-100">{t("Spouse Employed Rates")}</h3>
             <div className="grid grid-cols-6 gap-3">
               {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                 <div key={`employed-${num}`}>
@@ -199,7 +201,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
               variant="default"
               color="default"
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               type="submit"
@@ -207,7 +209,7 @@ const IncomeTaxRateCreateModal: React.FC<IncomeTaxRateCreateModalProps> = ({
               variant="filled"
               color="sky"
             >
-              {isSubmitting ? "Creating..." : "Create Rate"}
+              {isSubmitting ? t("Creating...") : t("Create Rate")}
             </Button>
           </div>
         </form>

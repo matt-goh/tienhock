@@ -2280,6 +2280,7 @@ export default function (pool, config) {
           i.id, i.salespersonid, i.customerid, i.createddate, i.paymenttype,
           i.total_excluding_tax, i.tax_amount, i.rounding, i.totalamountpayable,
           i.invoice_status, i.einvoice_status, i.balance_due,
+          i.journal_entry_id,
           ${SETTLEABLE_AMOUNT_SQL} as settleable_amount,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
@@ -2330,6 +2331,24 @@ export default function (pool, config) {
 
       const invoice = result.rows[0];
 
+      // The invoice-owned sales journal (S) powers the header Journal link.
+      // Fetch its visible reference and status once; older invoices may not
+      // have a journal at all.
+      let journalReference = null;
+      let journalStatus = null;
+      if (invoice.journal_entry_id) {
+        const journalResult = await pool.query(
+          `SELECT COALESCE(display_reference, reference_no) AS reference, status
+             FROM journal_entries
+            WHERE id = $1`,
+          [invoice.journal_entry_id]
+        );
+        if (journalResult.rows.length > 0) {
+          journalReference = journalResult.rows[0].reference;
+          journalStatus = journalResult.rows[0].status;
+        }
+      }
+
       // Format response (Match ExtendedInvoiceData)
       const response = {
         id: invoice.id,
@@ -2342,6 +2361,9 @@ export default function (pool, config) {
         rounding: parseFloat(invoice.rounding || 0),
         totalamountpayable: parseFloat(invoice.totalamountpayable || 0),
         balance_due: parseFloat(invoice.balance_due || 0),
+        journal_entry_id: invoice.journal_entry_id,
+        journal_reference: journalReference,
+        journal_status: journalStatus,
         settleable_amount: parseFloat(invoice.settleable_amount || 0),
         invoice_status: invoice.invoice_status,
         einvoice_status: invoice.einvoice_status,
@@ -2400,7 +2422,7 @@ export default function (pool, config) {
                 AND group_r.origin = r.origin
                 AND group_r.status IN ('pending', 'posted')) as allocation_count,
             p.notes, p.created_at, p.status, p.cancellation_date,
-            je.reference_no as journal_reference_no
+            COALESCE(je.display_reference, je.reference_no) as journal_reference_no
           FROM payments p
           LEFT JOIN invoices i ON i.id = p.invoice_id
           LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
@@ -2409,6 +2431,7 @@ export default function (pool, config) {
             ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id,
               CASE WHEN p.is_auto_collection THEN i.journal_entry_id END)
           WHERE p.invoice_id = $1
+            AND NOT (p.is_auto_collection = true AND p.status = 'cancelled')
           ORDER BY p.payment_date DESC, p.created_at DESC
           `,
           [id]
@@ -2427,11 +2450,14 @@ export default function (pool, config) {
                  c.name AS customer_name,
                  p.id AS paired_doc_id, COALESCE(p.display_id, p.id) AS paired_display_id,
                  p.type AS paired_type, p.status AS paired_status,
-                 p.einvoice_status AS paired_einvoice_status
+                 p.einvoice_status AS paired_einvoice_status,
+                 je.status AS journal_status,
+                 COALESCE(je.display_reference, je.reference_no) AS journal_reference
             FROM adjustment_documents a
             JOIN invoices i ON a.original_invoice_id = i.id
        LEFT JOIN customers c ON a.customerid = c.id
        LEFT JOIN adjustment_documents p ON a.paired_with_id = p.id
+       LEFT JOIN journal_entries je ON je.id = a.journal_entry_id
            WHERE a.original_invoice_id = $1
            ORDER BY a.created_at DESC
           `,

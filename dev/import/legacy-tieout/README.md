@@ -54,11 +54,31 @@ are applied before comparing (without them you get pages of false positives):
 ## Proof profile (June 2026, after the reclass migrations)
 
 `--month 2026-06 --legacy dev/import/legacy-june-tb/june-2026-legacy-tb.json`
-yields **1 differing account: CR_LD +40.00** — the documented legacy
-source-document anomaly (the legacy print's own credit column foots 40.00 over
-its own grand total). Everything else ties to the cent, and the folded ERP abs
-total (34,205,761.74 = 2 × 17,102,880.87) equals the printed grand total
-exactly.
+yields **5 differing accounts**, all four expected:
+
+```
+MBRMF   ytd   +100.00     MBSAF   ytd   -100.00
+MBC     ytd    -40.00     MBSM_K  ytd    +40.00
+CR_LD   ytd    +40.00
+```
+
+- `CR_LD +40.00` — the documented legacy source-document anomaly: the legacy
+  print's own credit column foots 40.00 over its own grand total. Not a keying
+  difference; see `JUNE_RECLASS_DESIGN.md` §d.3.
+- The other four are the **7 Aug 2026 post-print amendments**. That fixture is a
+  faithful transcription of the June print, and the coworker corrected two of her
+  own legacy keying errors *after* it was printed (KFC LINTAS 40.00 → `MBSM_K`;
+  PAUMIN #2606-2133 → `MBRMF` 565.00 / `MBSAF` 144.00). The ERP matches the
+  amended legacy, not the print. **Do not "fix" the fixture** — it is evidence.
+  Re-running June against a fresh legacy export should show only `CR_LD`.
+  See `JUNE_RECLASS_DESIGN.md` §e.
+
+Everything else ties to the cent.
+
+**This is exactly the failure mode the tie-out exists to surface, and it cuts
+both ways:** a difference means the two systems disagree, not that legacy is
+right. Before editing an ERP line, check the original receipt — three of June's
+31 corrections went the wrong way because a print was trusted over the ERP.
 
 ## Database
 
@@ -93,12 +113,17 @@ STEPS:
    DB_NAME=tienhock_prod DB_USER=postgres on the server
    (ssh tienhock@5.223.55.190).
 2. A clean month prints "differing accounts: 0". Known permanent exception:
-   CR_LD +40.00 (documented legacy print anomaly — ignore it).
+   CR_LD +40.00 (documented legacy print anomaly — ignore it). Re-running the
+   June 2026 print fixture also shows MBC/MBSM_K/MBRMF/MBSAF, the documented
+   7 Aug post-print amendments (see the June proof profile above).
 3. For each differing account: pull the ERP account-ledger lines for the month
    (dev DB: docker exec -i tienhock_dev_db psql -U postgres -d tienhock), ask
    me for the legacy ledger detail of just those accounts, match line by line,
    and identify the miskeyed voucher lines. docs/Account/KEYING_GUIDE.md
-   already covers the recurring vendors.
+   already covers the recurring vendors. A difference means the two systems
+   disagree — it does NOT mean legacy is right. Check the original receipt
+   before editing an ERP line; in June three corrections went the wrong way
+   because the legacy print was trusted over a correct ERP entry.
 4. Fix by editing the miskeyed lines (Journal page, or a guarded idempotent
    SQL migration in the style of dev/migrations/2026-08-06_june_legacy_reclass_e1_e7_mrm_mgt.sql
    if there are many). HARD RULES: only manual, source-less journals past the

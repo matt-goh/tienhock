@@ -351,6 +351,10 @@ export interface ExtendedInvoiceData extends InvoiceData {
     amount: number;
     payment_reference?: string;
   }[];
+  // The invoice-owned sales journal (S), when one exists.
+  journal_entry_id?: number | null;
+  journal_reference?: string | null;
+  journal_status?: string | null;
   consolidated_part_of?: ConsolidatedInfo | null;
   adjustmentDocs?: AdjustmentDocument[];
   // Display-only classification from the invoice list API explaining why a bill
@@ -522,6 +526,8 @@ export interface AdjustmentDocument {
   cancellation_reason: string | null;
   cancellation_date: string | null;
   journal_entry_id: number | null;
+  journal_reference?: string | null;
+  journal_status?: string | null;
 
   created_by: string | null;
   created_at: string;
@@ -723,6 +729,8 @@ export interface InvoiceGT {
   }>;
   cancellation_date?: string | null;
   cancellation_reason?: string;
+  // Optional record-only Delivery Order (DO) reference keyed on the invoice.
+  delivery_order?: string | null;
   adjustmentDocs?: GTAdjDocSummary[];
 }
 
@@ -1219,6 +1227,21 @@ export interface JournalEntry {
   posted_at?: string;
   posted_by?: string;
   lines?: JournalEntryLine[]; // Line items
+  // Journals this entry is related to (GET /:id only): an invoice's sales
+  // journal lists the invoice's adjustment-document journals, and an
+  // adjustment journal lists the invoice's S journal plus sibling adjustments.
+  related_invoice_id?: string | null;
+  related_journals?: Array<{
+    kind: "sales" | "adjustment";
+    doc_id: string | null;
+    doc_type: "credit_note" | "debit_note" | "refund_note" | null;
+    doc_status: "active" | "cancelled" | null;
+    amount: number;
+    journal_entry_id: number;
+    journal_reference: string | null;
+    journal_status: string | null;
+    journal_date: string | null;
+  }>;
 }
 
 // Another Cash/Bank Payment journal already carrying the same cheque number

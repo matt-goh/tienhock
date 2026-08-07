@@ -6,6 +6,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import toast from "react-hot-toast";
@@ -238,6 +239,8 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
   workerOrderApiBase = "/api/production-entries",
   workerOrderRefreshKey = 0,
 }) => {
+  const { t } = useTranslation("stock");
+
   // Use internal state only if no external control is provided
   const [internalSearchQuery] = useState("");
   const searchQuery =
@@ -618,10 +621,10 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
         console.error("Error saving worker order:", error);
         invalidateWorkerOrderCache(workerOrderScope);
         applyWorkerOrderIds(dragState.previousOrderIds);
-        toast.error("Failed to save worker order");
+        toast.error(t("Failed to save worker order"));
       }
     },
-    [applyWorkerOrderIds, clearDragOverlayFrame, workerOrderScope]
+    [applyWorkerOrderIds, clearDragOverlayFrame, workerOrderScope, t]
   );
 
   const handleDragHandlePointerCancel = useCallback(
@@ -676,7 +679,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
           <span className="text-sm text-default-500 dark:text-gray-400">
-            {isLoading ? "Loading workers..." : "Loading worker order..."}
+            {isLoading ? t("Loading workers...") : t("Loading worker order...")}
           </span>
         </div>
       </div>
@@ -687,11 +690,10 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
     return (
       <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-8 text-center">
         <p className="text-default-500 dark:text-gray-400">
-          No workers found for the selected product type.
+          {t("No workers found for the selected product type.")}
         </p>
         <p className="mt-1 text-sm text-default-400 dark:text-gray-500">
-          Please select a product first or ensure workers are assigned to the
-          correct packing job.
+          {t("Please select a product first or ensure workers are assigned to the correct packing job.")}
         </p>
       </div>
     );
@@ -703,7 +705,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
       <div className="p-4 bg-white dark:bg-gray-800">
         {filteredWorkers.length === 0 ? (
           <div className="py-8 text-center text-default-500 dark:text-gray-400">
-            No workers found matching "{searchQuery}"
+            {t('No workers found matching "{{query}}"', { query: searchQuery })}
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-3">
@@ -724,11 +726,11 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <button
                     type="button"
-                    aria-label={`Move ${worker.name}`}
+                    aria-label={t("Move {{name}}", { name: worker.name })}
                     title={
                       isSearchActive
-                        ? "Clear search to reorder workers"
-                        : "Drag to reorder worker"
+                        ? t("Clear search to reorder workers")
+                        : t("Drag to reorder worker")
                     }
                     disabled={!canReorderWorkers}
                     onPointerDown={(event) =>
@@ -862,14 +864,16 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
             </div>
             <div>
               <div className="font-semibold text-default-900 dark:text-gray-100">
-                Total{" "}
-                {unitLabel === "kg"
-                  ? "Weight"
-                  : unitLabel === "sack"
-                  ? "Sacks"
-                  : unitLabel === "bundle"
-                  ? "Bundles"
-                  : "Packed"}
+                {t("Total")}{" "}
+                {t(
+                  unitLabel === "kg"
+                    ? "Weight"
+                    : unitLabel === "sack"
+                    ? "Sacks"
+                    : unitLabel === "bundle"
+                    ? "Bundles"
+                    : "Packed",
+                )}
               </div>
               <div className="text-xs text-default-500 dark:text-gray-400">
                 {new Date().toLocaleDateString("en-MY", {
@@ -894,7 +898,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
               <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
                 {workingWorkersCount}{" "}
                 <span className="text-base font-normal text-default-500 dark:text-gray-400">
-                  perkerja
+                  {t("workers")}
                 </span>
               </p>
             </div>
@@ -909,7 +913,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                   color="default"
                   icon={IconRefresh}
                 >
-                  Reset
+                  {t("Reset")}
                 </Button>
                 <Button
                   onClick={onSave}
@@ -917,7 +921,7 @@ const WorkerEntryGrid: React.FC<WorkerEntryGridProps> = ({
                   color="sky"
                   icon={IconDeviceFloppy}
                 >
-                  {isSaving ? "Saving..." : "Save Production"}
+                  {isSaving ? t("Saving...") : t("Save Production")}
                 </Button>
               </div>
             )}

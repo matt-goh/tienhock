@@ -1,5 +1,6 @@
 // src/pages/Stock/ProductStockAdjustmentEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
@@ -55,6 +56,8 @@ interface ProductStockAdjustmentEntryPageProps {
 const ProductStockAdjustmentEntryPage: React.FC<
   ProductStockAdjustmentEntryPageProps
 > = ({ productTypes }) => {
+  const { t } = useTranslation("stock");
+
   // Adjustment date selection state
   const [selectedAdjustmentDate, setSelectedAdjustmentDate] = useState<Date>(
     () => new Date()
@@ -259,25 +262,21 @@ const ProductStockAdjustmentEntryPage: React.FC<
 
       if (
         hasUnsavedChanges &&
-        !window.confirm(
-          "You have unsaved changes. Do you want to discard them?"
-        )
+        !window.confirm(t("You have unsaved changes. Do you want to discard them?"))
       ) {
         return;
       }
 
       setSelectedAdjustmentDate(range.start);
     },
-    [hasUnsavedChanges, selectedAdjustmentDate]
+    [hasUnsavedChanges, selectedAdjustmentDate, t]
   );
 
   // Handle reference selection
   const handleSelectReference = (reference: StockAdjustmentReference) => {
     if (hasUnsavedChanges) {
       if (
-        !window.confirm(
-          "You have unsaved changes. Do you want to discard them?"
-        )
+        !window.confirm(t("You have unsaved changes. Do you want to discard them?"))
       ) {
         return;
       }
@@ -292,9 +291,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
   const handleCreateNew = () => {
     if (hasUnsavedChanges) {
       if (
-        !window.confirm(
-          "You have unsaved changes. Do you want to discard them?"
-        )
+        !window.confirm(t("You have unsaved changes. Do you want to discard them?"))
       ) {
         return;
       }
@@ -334,7 +331,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
     const reference = isCreatingNew ? newReferenceInput : selectedReference;
 
     if (!reference || reference.trim() === "") {
-      toast.error("Please enter a reference code");
+      toast.error(t("Please enter a reference code"));
       return;
     }
 
@@ -344,7 +341,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
     );
 
     if (entriesWithValues.length === 0) {
-      toast.error("Please enter at least one adjustment");
+      toast.error(t("Please enter at least one adjustment"));
       return;
     }
 
@@ -366,7 +363,10 @@ const ProductStockAdjustmentEntryPage: React.FC<
       });
 
       toast.success(
-        `Adjustments saved: ${response.total_adj_in} ADJ+, ${response.total_adj_out} ADJ-`
+        t("Adjustments saved: {{in}} ADJ+, {{out}} ADJ-", {
+          in: response.total_adj_in,
+          out: response.total_adj_out,
+        })
       );
 
       // Refresh references list
@@ -382,7 +382,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
       setOriginalEntryDate(adjustmentDateText);
     } catch (error) {
       console.error("Error saving adjustments:", error);
-      toast.error("Failed to save adjustments");
+      toast.error(t("Failed to save adjustments"));
     } finally {
       setIsSaving(false);
     }
@@ -405,7 +405,9 @@ const ProductStockAdjustmentEntryPage: React.FC<
 
     if (
       !window.confirm(
-        `Are you sure you want to delete all adjustments for reference "${selectedReference}"?`
+        t('Are you sure you want to delete all adjustments for reference "{{reference}}"?', {
+          reference: selectedReference,
+        })
       )
     ) {
       return;
@@ -417,7 +419,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
         `/api/stock/adjustments/by-reference?month=${monthString}&reference=${encodeURIComponent(selectedReference)}`
       );
 
-      toast.success("Adjustments deleted successfully");
+      toast.success(t("Adjustments deleted successfully"));
 
       // Refresh references list
       await fetchReferences();
@@ -429,7 +431,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
       setOriginalEntryDate(null);
     } catch (error) {
       console.error("Error deleting adjustments:", error);
-      toast.error("Failed to delete adjustments");
+      toast.error(t("Failed to delete adjustments"));
     } finally {
       setIsDeleting(false);
     }
@@ -467,10 +469,10 @@ const ProductStockAdjustmentEntryPage: React.FC<
       {/* Header */}
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">
-          Stock Adjustments
+          {t("Stock Adjustments")}
         </h1>
         <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-          Record monthly ADJ+ (returned usable) and ADJ- (defective) adjustments
+          {t("Record monthly ADJ+ (returned usable) and ADJ- (defective) adjustments")}
         </p>
       </div>
 
@@ -478,18 +480,18 @@ const ProductStockAdjustmentEntryPage: React.FC<
       <div className="mb-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
         <div className="flex items-center gap-4">
           <label className="text-sm font-medium text-default-700 dark:text-gray-200">
-            Adjustment Date:
+            {t("Adjustment Date:")}
           </label>
           <TimeNavigator
             range={adjustmentDateRange}
             onChange={handleAdjustmentDateChange}
             modes={["day"]}
             presets={false}
-            placeholder="Pick adjustment date"
+            placeholder={t("Pick adjustment date")}
           />
           {hasUnsavedChanges && (
             <span className="ml-auto rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-200">
-              Unsaved changes
+              {t("Unsaved changes")}
             </span>
           )}
         </div>
@@ -502,14 +504,14 @@ const ProductStockAdjustmentEntryPage: React.FC<
           <div className="border-b border-default-200 dark:border-gray-700 p-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
-                References
+                {t("References")}
               </h2>
               <button
                 onClick={handleCreateNew}
                 className="flex items-center gap-1 rounded-lg bg-sky-500 px-2.5 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-600"
               >
                 <IconPlus size={14} />
-                Add New
+                {t("Add New")}
               </button>
             </div>
           </div>
@@ -526,10 +528,10 @@ const ProductStockAdjustmentEntryPage: React.FC<
                   size={32}
                 />
                 <p className="mt-2 text-sm text-default-500 dark:text-gray-400">
-                  No adjustments for this month
+                  {t("No adjustments for this month")}
                 </p>
                 <p className="mt-1 text-xs text-default-400">
-                  Click "Add New" to create one
+                  {t('Click "Add New" to create one')}
                 </p>
               </div>
             ) : (
@@ -549,7 +551,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
                       {ref.reference}
                     </div>
                     <div className="mt-1 flex items-center gap-3 text-xs text-default-500 dark:text-gray-400">
-                      <span>{ref.product_count} products</span>
+                      <span>{t("{{count}} products", { count: ref.product_count })}</span>
                       <span className="text-teal-600">
                         +{ref.total_adj_in}
                       </span>
@@ -574,7 +576,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
               <div className="text-center">
                 <IconPackage className="mx-auto text-default-300" size={48} />
                 <p className="mt-4 text-default-500 dark:text-gray-400">
-                  Select a reference to edit or create a new one
+                  {t("Select a reference to edit or create a new one")}
                 </p>
               </div>
             </div>
@@ -585,14 +587,14 @@ const ProductStockAdjustmentEntryPage: React.FC<
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <label className="text-sm font-medium text-default-700 dark:text-gray-200">
-                      Reference:
+                      {t("Reference:")}
                     </label>
                     {isCreatingNew ? (
                       <input
                         type="text"
                         value={newReferenceInput}
                         onChange={(e) => setNewReferenceInput(e.target.value)}
-                        placeholder="Enter reference code..."
+                        placeholder={t("Enter reference code...")}
                         className="w-48 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-1.5 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                         autoFocus
                       />
@@ -611,7 +613,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
                       className="flex items-center gap-1.5 rounded-lg border border-rose-300 bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-100 disabled:opacity-50 dark:border-rose-700 dark:bg-rose-950/50 dark:text-rose-100 dark:hover:bg-rose-900/70"
                     >
                       <IconTrash size={16} />
-                      {isDeleting ? "Deleting..." : "Delete"}
+                      {isDeleting ? t("Deleting...") : t("Delete")}
                     </button>
                   )}
                 </div>
@@ -632,12 +634,13 @@ const ProductStockAdjustmentEntryPage: React.FC<
                           : "border-transparent text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       )}
                     >
-                      {tab === "BH"
-                        ? "Bihun"
-                        : tab === "MEE"
-                        ? "Mee"
-                        : "Other"}{" "}
-                      Products
+                      {t(
+                        tab === "BH"
+                          ? "Bihun Products"
+                          : tab === "MEE"
+                          ? "Mee Products"
+                          : "Other Products",
+                      )}
                       <span className="ml-2 rounded-full bg-default-200 dark:bg-gray-700 px-2 py-0.5 text-xs">
                         {tab === "BH"
                           ? bhProducts.length
@@ -662,16 +665,16 @@ const ProductStockAdjustmentEntryPage: React.FC<
                     <thead className="sticky top-0 bg-default-50 dark:bg-gray-900/50">
                       <tr>
                         <th className="border-b border-default-200 dark:border-gray-700 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300">
-                          Product ID
+                          {t("Product ID")}
                         </th>
                         <th className="border-b border-default-200 dark:border-gray-700 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300">
-                          Description
+                          {t("Description")}
                         </th>
                         <th className="w-32 border-b border-default-200 dark:border-gray-700 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-teal-600">
-                          ADJ+ (Return)
+                          {t("ADJ+ (Return)")}
                         </th>
                         <th className="w-32 border-b border-default-200 dark:border-gray-700 px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-orange-600">
-                          ADJ- (Defect)
+                          {t("ADJ- (Defect)")}
                         </th>
                       </tr>
                     </thead>
@@ -744,7 +747,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
                       color="default"
                       icon={IconRefresh}
                     >
-                      Reset
+                      {t("Reset")}
                     </Button>
                     <Button
                       onClick={handleSave}
@@ -756,7 +759,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
                       color="sky"
                       icon={IconDeviceFloppy}
                     >
-                      {isSaving ? "Saving..." : "Save Adjustments"}
+                      {isSaving ? t("Saving...") : t("Save Adjustments")}
                     </Button>
                   </div>
                 </div>

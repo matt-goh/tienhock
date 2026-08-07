@@ -1,5 +1,6 @@
 // src/components/Stock/ProductPayCodeMappingModal.tsx
 import React, { useState, useEffect, Fragment, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -54,6 +55,8 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   productTypes,
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("stock");
+
   const productPayCodesApiBase =
     company === "jellypolly"
       ? "/jellypolly/api/product-pay-codes"
@@ -296,7 +299,11 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
       await refreshData();
 
       toast.success(
-        `Updated pay codes for "${selectedProduct.id}" (${payCodeIdsToAdd.length} added, ${payCodeIdsToRemove.length} removed)`
+        t('Updated pay codes for "{{product}}" ({{added}} added, {{removed}} removed)', {
+          product: selectedProduct.id,
+          added: payCodeIdsToAdd.length,
+          removed: payCodeIdsToRemove.length,
+        })
       );
 
       // Update original to match current selection
@@ -307,7 +314,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
       }
     } catch (error) {
       console.error("Error updating product pay codes:", error);
-      toast.error("Failed to update pay codes");
+      toast.error(t("Failed to update pay codes"));
     } finally {
       setIsProcessing(false);
     }
@@ -384,7 +391,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Product Pay Code Mappings
+                    {t("Product Pay Code Mappings")}
                   </DialogTitle>
                   <button
                     onClick={handleClose}
@@ -396,8 +403,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                 </div>
 
                 <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
-                  Map products to pay codes for production entry payroll
-                  calculations.
+                  {t("Map products to pay codes for production entry payroll calculations.")}
                 </p>
 
                 {isLoading ? (
@@ -411,7 +417,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                       <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                         <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                           <IconPackage size={16} />
-                          Products
+                          {t("Products")}
                         </div>
                         <div className="relative mt-2">
                           <IconSearch
@@ -420,7 +426,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                           />
                           <input
                             type="text"
-                            placeholder="Search products..."
+                            placeholder={t("Search products...")}
                             className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                             value={productSearch}
                             onChange={(e) => setProductSearch(e.target.value)}
@@ -431,7 +437,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                       <div className="max-h-[400px] overflow-y-auto">
                         {filteredRegular.length === 0 && filteredSpecial.length === 0 ? (
                           <div className="py-4 text-center text-sm text-default-500 dark:text-gray-400">
-                            No products found
+                            {t("No products found")}
                           </div>
                         ) : (
                           <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -487,7 +493,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                               <>
                                 <li className="px-3 py-1.5 bg-purple-50 dark:bg-purple-900/30 text-xs text-purple-700 dark:text-purple-300 font-medium flex items-center gap-1.5 sticky top-0">
                                   <IconSparkles size={12} />
-                                  Special Items ({filteredSpecial.length})
+                                  {t("Special Items ({{count}})", { count: filteredSpecial.length })}
                                 </li>
                                 {filteredSpecial.map((product) => {
                                   const mappingCount = getMappingCount(product.id);
@@ -508,7 +514,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                           <div className="font-medium text-sm text-default-800 dark:text-gray-100 flex items-center gap-1.5">
                                             {product.id}
                                             <span className="text-[10px] bg-purple-200 dark:bg-purple-800 text-purple-700 dark:text-purple-200 px-1 rounded">
-                                              System
+                                              {t("System")}
                                             </span>
                                           </div>
                                           <div className="text-xs text-default-500 dark:text-gray-400 truncate max-w-[200px]">
@@ -550,12 +556,12 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-default-700 dark:text-gray-200">
                             {selectedProduct
-                              ? `Pay Codes for ${selectedProduct.id}`
-                              : "Select a product"}
+                              ? t("Pay Codes for {{product}}", { product: selectedProduct.id })
+                              : t("Select a product")}
                           </div>
                           {selectedProduct && (
                             <span className="text-xs text-default-500 dark:text-gray-400">
-                              {selectedPayCodeIds.size} selected
+                              {t("{{count}} selected", { count: selectedPayCodeIds.size })}
                             </span>
                           )}
                         </div>
@@ -567,7 +573,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                             />
                             <input
                               type="text"
-                              placeholder="Search pay codes..."
+                              placeholder={t("Search pay codes...")}
                               className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                               value={payCodeSearch}
                               onChange={(e) => setPayCodeSearch(e.target.value)}
@@ -583,18 +589,18 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                               size={32}
                               className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                             />
-                            Select a product to manage its pay codes
+                            {t("Select a product to manage its pay codes")}
                           </div>
                         ) : filteredPayCodes.length === 0 ? (
                           <div className="py-4 text-center text-sm text-default-500 dark:text-gray-400">
-                            No pay codes available for this product type
+                            {t("No pay codes available for this product type")}
                           </div>
                         ) : (
                           <ul className="divide-y divide-default-100 dark:divide-gray-600">
                             {/* Header for saved section */}
                             {savedPayCodesCount > 0 && (
                               <li className="px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-xs text-green-700 dark:text-green-300 font-medium">
-                                Mapped Pay Codes ({savedPayCodesCount})
+                                {t("Mapped Pay Codes ({{count}})", { count: savedPayCodesCount })}
                               </li>
                             )}
                             {filteredPayCodes.map((payCode, index) => {
@@ -611,7 +617,9 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                 <React.Fragment key={payCode.id}>
                                   {showSeparator && (
                                     <li className="px-3 py-1.5 bg-default-100 dark:bg-gray-700 text-xs text-default-500 dark:text-gray-400 font-medium border-t border-default-200 dark:border-gray-600">
-                                      Available Pay Codes ({filteredPayCodes.length - savedPayCodesCount})
+                                      {t("Available Pay Codes ({{count}})", {
+                                        count: filteredPayCodes.length - savedPayCodesCount,
+                                      })}
                                     </li>
                                   )}
                                   <li
@@ -645,9 +653,9 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                           status === 'new' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300' :
                                           'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-300'
                                         }`}>
-                                          {status === 'saved' && <><IconCheck size={12} /> Saved</>}
-                                          {status === 'new' && <><IconPlus size={12} /> New</>}
-                                          {status === 'removing' && <><IconMinus size={12} /> Remove</>}
+                                          {status === 'saved' && <><IconCheck size={12} /> {t("Saved")}</>}
+                                          {status === 'new' && <><IconPlus size={12} /> {t("New")}</>}
+                                          {status === 'removing' && <><IconMinus size={12} /> {t("Remove")}</>}
                                         </span>
                                       )}
                                     </div>
@@ -668,25 +676,25 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                     {hasChanges && selectedProduct ? (
                       <div className="flex items-center gap-3">
                         <span className="text-amber-600 dark:text-amber-400 font-medium">
-                          Pending changes for {selectedProduct.id}:
+                          {t("Pending changes for {{product}}:", { product: selectedProduct.id })}
                         </span>
                         {changesSummary.toAdd > 0 && (
                           <span className="flex items-center gap-1 text-sky-600 dark:text-sky-400">
-                            <IconPlus size={14} /> {changesSummary.toAdd} to add
+                            <IconPlus size={14} /> {t("{{count}} to add", { count: changesSummary.toAdd })}
                           </span>
                         )}
                         {changesSummary.toRemove > 0 && (
                           <span className="flex items-center gap-1 text-red-500 dark:text-red-400">
-                            <IconMinus size={14} /> {changesSummary.toRemove} to remove
+                            <IconMinus size={14} /> {t("{{count}} to remove", { count: changesSummary.toRemove })}
                           </span>
                         )}
                       </div>
                     ) : selectedProduct ? (
                       <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                        <IconCheck size={14} /> All changes saved
+                        <IconCheck size={14} /> {t("All changes saved")}
                       </span>
                     ) : (
-                      <span className="text-default-400 dark:text-gray-500">Select a product to manage mappings</span>
+                      <span className="text-default-400 dark:text-gray-500">{t("Select a product to manage mappings")}</span>
                     )}
                   </div>
                   <div className="flex space-x-3">
@@ -696,7 +704,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                       onClick={handleClose}
                       disabled={isProcessing}
                     >
-                      Close
+                      {t("Close")}
                     </Button>
                     {selectedProduct && (
                       <Button
@@ -706,7 +714,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                         onClick={handleSaveProduct}
                         disabled={isProcessing || !hasChanges}
                       >
-                        {isProcessing ? "Saving..." : "Save Changes"}
+                        {isProcessing ? t("Saving...") : t("Save Changes")}
                       </Button>
                     )}
                   </div>

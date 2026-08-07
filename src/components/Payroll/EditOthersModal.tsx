@@ -28,6 +28,7 @@ import { OthersRecord, PayCode, RateUnit } from "../../types/types";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import MonthDayMultiPicker from "./MonthDayMultiPicker";
+import { useTranslation } from "react-i18next";
 
 interface EditOthersModalProps {
   isOpen: boolean;
@@ -76,6 +77,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
   apiBasePath = "/api/others-records",
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("payroll");
   const { payCodes: thPayCodes } = useJobPayCodeMappings();
   const { payCodes: jpPayCodes } = useJPJobPayCodeMappings();
   const payCodes = company === "jellypolly" ? jpPayCodes : thPayCodes;
@@ -166,7 +168,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
         })
         .catch((err) => {
           console.error("Failed to load linked siblings:", err);
-          toast.error("Failed to load linked dates for this entry.");
+          toast.error(t("Failed to load linked dates for this entry."));
         })
         .finally(() => setIsLoadingSiblings(false));
     } else {
@@ -209,17 +211,17 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
   const handleSave = async (): Promise<void> => {
     if (!record) return;
     if (!payCodeId || !rateUnit || !description.trim()) {
-      toast.error("Pay code, description, and rate unit are required.");
+      toast.error(t("Pay code, description, and rate unit are required."));
       return;
     }
     const r = parseFloat(rate);
     const q = parseFloat(quantity);
     if (!isFinite(r) || r <= 0 || !isFinite(q) || q <= 0) {
-      toast.error("Rate and quantity must be positive numbers.");
+      toast.error(t("Rate and quantity must be positive numbers."));
       return;
     }
     if (isLinked && linkedDates.length === 0) {
-      toast.error("Linked entry must keep at least one date.");
+      toast.error(t("Linked entry must keep at least one date."));
       return;
     }
     setIsSaving(true);
@@ -241,17 +243,18 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
       await api.put(`${apiBasePath}/${record.id}`, payload);
       toast.success(
         isLinked
-          ? `Linked ${displayLabel} entry updated (${linkedDates.length} date${
-              linkedDates.length === 1 ? "" : "s"
-            }).`
-          : `${displayLabel} record updated.`
+          ? t(linkedDates.length === 1 ? "Linked {{label}} entry updated ({{count}} date)." : "Linked {{label}} entry updated ({{count}} dates).", {
+              label: displayLabel,
+              count: linkedDates.length,
+            })
+          : t("{{label}} record updated.", { label: displayLabel })
       );
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error("Failed to update Others record:", error);
       toast.error(
-        error.response?.data?.message || `Failed to update ${displayLabel} record.`
+        error.response?.data?.message || t("Failed to update {{label}} record.", { label: displayLabel })
       );
     } finally {
       setIsSaving(false);
@@ -299,7 +302,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     as="h3"
                     className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
-                    Edit {displayLabel}
+                    {t("Edit {{label}}", { label: displayLabel })}
                   </DialogTitle>
                   <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                     <span className="font-medium text-default-700 dark:text-gray-200">
@@ -316,17 +319,15 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-800/60 dark:bg-sky-900/30 dark:text-sky-100">
                       <div className="flex items-center gap-1.5 font-medium">
                         <IconLink size={16} />
-                        Linked entry
+                        {t("Linked entry")}
                         {isLoadingSiblings && (
                           <span className="text-xs text-sky-700 dark:text-sky-300 font-normal">
-                            (loading dates…)
+                            {t("(loading dates…)")}
                           </span>
                         )}
                       </div>
                       <p className="mt-1 text-xs text-sky-800/90 dark:text-sky-200/90">
-                        Pay code, rate, quantity, and description below apply to
-                        every linked date. Check or uncheck days in the date
-                        picker to add or remove them from this group.
+                        {t("Pay code, rate, quantity, and description below apply to every linked date. Check or uncheck days in the date picker to add or remove them from this group.")}
                       </p>
                     </div>
                   )}
@@ -336,8 +337,8 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     <div>
                       <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
                         {isLinked
-                          ? `Linked dates (${linkedDates.length} selected)`
-                          : "Date"}
+                          ? t("Linked dates ({{count}} selected)", { count: linkedDates.length })
+                          : t("Date")}
                       </label>
                       {isLinked ? (
                         <MonthDayMultiPicker
@@ -361,7 +362,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
 
                     <div>
                       <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
-                        Pay code
+                        {t("Pay code")}
                       </label>
                       <Combobox
                         value={payCodeId}
@@ -384,7 +385,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                             onChange={(event) =>
                               handlePayCodeQueryChange(event.target.value)
                             }
-                            placeholder="Search pay code..."
+                            placeholder={t("Search pay code...")}
                           />
                           <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -408,7 +409,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                             >
                               {filteredPayCodes.length === 0 ? (
                                 <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                                  No pay codes found.
+                                  {t("No pay codes found.")}
                                 </div>
                               ) : (
                                 <>
@@ -460,7 +461,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                                             size={14}
                                             className="mr-1.5"
                                           />
-                                          Load more ({remainingPayCodeCount} remaining)
+                                          {t("Load more ({{count}} remaining)", { count: remainingPayCodeCount })}
                                         </span>
                                       </button>
                                     </div>
@@ -473,7 +474,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                       </Combobox>
                       {rateUnit && (
                         <div className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                          Unit: {rateUnit}
+                          {t("Unit: {{unit}}", { unit: rateUnit })}
                         </div>
                       )}
                     </div>
@@ -483,7 +484,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <FormInput
                       name="rate"
-                      label="Rate (RM)"
+                      label={t("Rate (RM)")}
                       type="number"
                       value={rate}
                       onChange={(e) => setRate(e.target.value)}
@@ -493,7 +494,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     />
                     <FormInput
                       name="quantity"
-                      label={`Quantity${rateUnit ? ` (${rateUnit})` : ""}`}
+                      label={rateUnit ? t("Quantity ({{unit}})", { unit: rateUnit }) : t("Quantity")}
                       type="number"
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
@@ -503,14 +504,14 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     />
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                        {isLinked ? "Per-day amount" : "Amount"}
+                        {isLinked ? t("Per-day amount") : t("Amount")}
                       </label>
                       <div className="block w-full px-3 py-2 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm bg-default-50 dark:bg-gray-900/40 text-sm font-medium text-default-800 dark:text-gray-100">
                         {formatCurrency(calculatedAmount)}
                       </div>
                       {isLinked && linkedDates.length > 0 && (
                         <div className="text-xs text-default-500 dark:text-gray-400 text-right -mt-1">
-                          × {linkedDates.length} ={" "}
+                          {t("× {{count}} =", { count: linkedDates.length })}{" "}
                           <span className="font-medium text-default-700 dark:text-gray-200">
                             {formatCurrency(calculatedAmount * linkedDates.length)}
                           </span>
@@ -522,7 +523,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                   {/* Description */}
                   <FormInput
                     name="description"
-                    label="Description"
+                    label={t("Description")}
                     type="text"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
@@ -532,7 +533,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                   {/* Salary report column override */}
                   <div>
                     <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
-                      Salary report column
+                      {t("Salary report column")}
                     </label>
                     <select
                       value={reportColumn}
@@ -542,13 +543,18 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     >
                       {REPORT_COLUMN_OPTIONS.map((opt) => (
                         <option key={opt.value} value={opt.value}>
-                          {opt.label}
+                          {opt.label === "Automatic (by rule)" ? t(opt.label) : opt.label}
                         </option>
                       ))}
                     </select>
                     <p className="mt-1 text-[11px] text-default-400 dark:text-gray-500">
-                      Forces which Salary Report column this amount shows in. Leave on Automatic unless it needs overriding.
-                      {isLinked && " Applies to all linked dates."}
+                      {t("Forces which Salary Report column this amount shows in. Leave on Automatic unless it needs overriding.")}
+                      {isLinked && (
+                        <>
+                          {" "}
+                          {t("Applies to all linked dates.")}
+                        </>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -559,17 +565,17 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                     {isLinked ? (
                       <>
                         <span className="font-medium">
-                          {linkedDates.length} date
-                          {linkedDates.length === 1 ? "" : "s"}
+                          {t(linkedDates.length === 1 ? "{{count}} date" : "{{count}} dates", { count: linkedDates.length })}
                         </span>{" "}
-                        · Total{" "}
+                        {" · "}
+                        {t("Total")}{" "}
                         <span className="font-medium text-default-800 dark:text-gray-100">
                           {formatCurrency(calculatedAmount * linkedDates.length)}
                         </span>
                       </>
                     ) : (
                       <>
-                        Total{" "}
+                        {t("Total")}{" "}
                         <span className="font-medium text-default-800 dark:text-gray-100">
                           {formatCurrency(calculatedAmount)}
                         </span>
@@ -583,7 +589,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                       onClick={onClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       color="sky"
@@ -592,7 +598,7 @@ const EditOthersModal: React.FC<EditOthersModalProps> = ({
                       disabled={isSaving}
                       icon={IconDeviceFloppy}
                     >
-                      {isSaving ? "Saving..." : "Save Changes"}
+                      {isSaving ? t("Saving...") : t("Save Changes")}
                     </Button>
                   </div>
                 </div>

@@ -23,6 +23,7 @@ import {
 } from "@tabler/icons-react";
 import { calculateActivitiesAmounts, calculateActivityAmount } from "../../utils/payroll/calculateActivityAmount";
 import SafeLink from "../SafeLink";
+import { useTranslation } from "react-i18next";
 
 export interface ActivityItem {
   payCodeId: string;
@@ -114,6 +115,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
   isDoubled = false,
   forceOTHours = 0,
 }) => {
+  const { t } = useTranslation("payroll");
   const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [loading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -442,14 +444,14 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                     as="h3"
                     className="text-lg font-semibold text-default-800 dark:text-gray-100"
                   >
-                    Manage Activities for {employee?.name}
+                    {t("Manage Activities for {{name}}", { name: employee?.name })}
                   </DialogTitle>
                   <div className="flex items-center space-x-3">
                     <Button variant="outline" onClick={handleClose} disabled={loading}>
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button color="sky" variant="filled" onClick={handleSave} disabled={loading}>
-                      Apply Activities
+                      {t("Apply Activities")}
                     </Button>
                   </div>
                 </div>
@@ -458,7 +460,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                 <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                   <div className="flex items-center gap-2 lg:gap-4 text-sm min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">Job:</span>
+                      <span className="text-gray-500 dark:text-gray-400 flex-shrink-0">{t("Job:")}</span>
                       <SafeLink
                         to={`/catalogue/job?id=${jobType}`}
                         className="font-medium text-default-900 dark:text-gray-100 hover:underline hover:text-sky-600 dark:hover:text-sky-400 truncate max-w-[120px] lg:max-w-none"
@@ -472,7 +474,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                     <span className="text-gray-300 dark:text-gray-600 flex-shrink-0">•</span>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <span className="text-gray-500 dark:text-gray-400">
-                        {(isSalesman || isSalesmanIkut) ? "Location:" : "Hours:"}
+                        {(isSalesman || isSalesmanIkut) ? t("Location:") : t("Hours:")}
                       </span>
                       <span className="font-medium text-default-900 dark:text-gray-100">
                         {(isSalesman || isSalesmanIkut) ? locationType : `${employeeHours}h`}
@@ -480,7 +482,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                     </div>
                     <span className="text-gray-300 dark:text-gray-600 flex-shrink-0">•</span>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                      <span className="text-gray-500 dark:text-gray-400">Day:</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t("Day:")}</span>
                       <span className="font-medium text-default-900 dark:text-gray-100">{dayType}</span>
                     </div>
                     {forceOTHours > 0 && (
@@ -498,7 +500,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                     <input
                       type="text"
                       className="w-full sm:w-40 lg:w-64 py-1.5 pl-9 pr-8 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-full text-sm"
-                      placeholder="Search..."
+                      placeholder={t("Search...")}
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -531,18 +533,18 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                             selectedActivities.length > 0 ? "cursor-pointer hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors" : ""
                           }`}
                           onClick={handleDeselectAll}
-                          title={selectedActivities.length > 0 ? "Click to deselect all activities" : undefined}
+                          title={selectedActivities.length > 0 ? t("Click to deselect all activities") : undefined}
                         >
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-2">
                               <IconCheck size={16} className="text-sky-600 dark:text-sky-400" />
-                              <span className="text-sm font-medium text-sky-800 dark:text-sky-200">Selected</span>
+                              <span className="text-sm font-medium text-sky-800 dark:text-sky-200">{t("Selected")}</span>
                               <span className="px-2 py-0.5 bg-sky-100 dark:bg-sky-800 text-sky-700 dark:text-sky-300 rounded-full text-xs font-medium">
                                 {selectedActivities.length}
                               </span>
                               {selectedActivities.length > 0 && (
                                 <span className="text-xs text-sky-600 dark:text-sky-400 opacity-60">
-                                  (click to clear all)
+                                  {t("(click to clear all)")}
                                 </span>
                               )}
                             </div>
@@ -555,8 +557,8 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                           {selectedActivities.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500">
                               <IconCheck size={40} className="mb-2 opacity-50" />
-                              <p className="text-sm">No activities selected</p>
-                              <p className="text-xs mt-1">Click items on the right to add</p>
+                              <p className="text-sm">{t("No activities selected")}</p>
+                              <p className="text-xs mt-1">{t("Click items on the right to add")}</p>
                             </div>
                           ) : (
                             selectedActivities.map((activity) => {
@@ -609,19 +611,19 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                     {activity.source === "employee" && (
                                       <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300">
                                         <IconUser size={10} className="mr-0.5" />
-                                        Staff
+                                        {t("Staff")}
                                       </span>
                                     )}
                                     {activity.source === "job" && (
                                       <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
                                         <IconBriefcase size={10} className="mr-0.5" />
-                                        Job
+                                        {t("Job")}
                                       </span>
                                     )}
                                     {isSalesman && salesmanProducts.find((p) => String(p.product_id) === String(activity.payCodeId)) && (
                                       <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
                                         <IconPackage size={10} className="mr-0.5" />
-                                        Product
+                                        {t("Product")}
                                       </span>
                                     )}
                                   </div>
@@ -652,7 +654,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                                         <>
                                           <span className="text-gray-400 dark:text-gray-500">•</span>
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-gray-500 dark:text-gray-400">Units:</span>
+                                            <span className="text-gray-500 dark:text-gray-400">{t("Units:")}</span>
                                             <div className="relative">
                                               <input
                                                 type="number"
@@ -710,17 +712,17 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                             unselectedActivities.length > 0 ? "cursor-pointer hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors" : ""
                           }`}
                           onClick={handleSelectAll}
-                          title={unselectedActivities.length > 0 ? "Click to select all activities" : undefined}
+                          title={unselectedActivities.length > 0 ? t("Click to select all activities") : undefined}
                         >
                           <div className="flex items-center gap-2">
                             <IconPlus size={16} className="text-gray-500 dark:text-gray-400" />
-                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">Available</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{t("Available")}</span>
                             <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-300 rounded-full text-xs font-medium">
                               {unselectedActivities.length}
                             </span>
                             {unselectedActivities.length > 0 && (
                               <span className="text-xs text-gray-500 dark:text-gray-400 opacity-60">
-                                (click to add all)
+                                {t("(click to add all)")}
                               </span>
                             )}
                           </div>
@@ -730,7 +732,7 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
                             <div className="flex flex-col items-center justify-center py-12 text-gray-400 dark:text-gray-500">
                               <IconCheck size={40} className="mb-2 text-green-400" />
                               <p className="text-sm">
-                                {activities.length === 0 ? "No pay codes available" : "All activities selected"}
+                                {activities.length === 0 ? t("No pay codes available") : t("All activities selected")}
                               </p>
                             </div>
                           ) : (

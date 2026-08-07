@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { Trans, useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import {
   JournalEntry,
@@ -30,6 +31,7 @@ import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVo
 import { generateJournalVoucherPDF } from "../../utils/accounting/JournalVoucherPDFMake";
 import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo";
 import GreenTargetLogo from "../../utils/GreenTargetLogo.png";
+import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
 import {
   IconFileText,
   IconPencil,
@@ -41,6 +43,12 @@ import {
 } from "@tabler/icons-react";
 
 const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
+
+const ADJUSTMENT_TYPE_LABEL_KEY: Record<string, string> = {
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
+  refund_note: "Refund Note",
+};
 
 const isLegacyImportEntry = (entry: JournalEntry): boolean =>
   entry.is_legacy_import === true ||
@@ -81,6 +89,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 }) => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation("accounting");
 
   const apiBase: string = isGreenTarget ? "/greentarget/api" : "/api";
   const journalEntriesPath: string = isGreenTarget
@@ -139,12 +148,17 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
       setEntry(response as JournalEntry);
     } catch (err: unknown) {
       console.error("Error fetching journal entry:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError(`Failed to load journal entry: ${errorMessage}`);
+      const errorMessage =
+        err instanceof Error ? err.message : t("Unknown error");
+      setError(
+        t("Failed to load journal entry: {{message}}", {
+          message: errorMessage,
+        })
+      );
     } finally {
       setLoading(false);
     }
-  }, [id, apiBase]);
+  }, [id, apiBase, t]);
 
   useEffect(() => {
     fetchEntry();
@@ -213,13 +227,13 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
     setIsProcessing(true);
     try {
       await api.post(`${apiBase}/journal-entries/${id}/cancel`);
-      toast.success("Journal entry cancelled successfully");
+      toast.success(t("Journal entry cancelled successfully"));
       setShowCancelDialog(false);
       fetchEntry();
     } catch (err: unknown) {
       console.error("Error cancelling entry:", err);
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to cancel entry";
+        err instanceof Error ? err.message : t("Failed to cancel entry");
       toast.error(errorMessage);
     } finally {
       setIsProcessing(false);
@@ -234,7 +248,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
     setIsProcessing(true);
     try {
       await api.post(`${apiBase}/journal-entries/${id}/restore`);
-      toast.success("Journal entry restored successfully");
+      toast.success(t("Journal entry restored successfully"));
       setShowRestoreDialog(false);
       fetchEntry();
     } catch (err: unknown) {
@@ -251,7 +265,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
         setShowActionErrorDialog(true);
       } else {
         const errorMessage =
-          err instanceof Error ? err.message : "Failed to restore entry";
+          err instanceof Error ? err.message : t("Failed to restore entry");
         toast.error(errorMessage);
       }
     } finally {
@@ -265,7 +279,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
     setIsProcessing(true);
     try {
       await api.delete(`/api/journal-entries/${id}`);
-      toast.success("Journal entry deleted successfully");
+      toast.success(t("Journal entry deleted successfully"));
       setShowDeleteDialog(false);
       navigate(journalEntriesPath);
     } catch (err: unknown) {
@@ -280,7 +294,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
       if (errorData) {
         // Store error data and show error dialog
         setActionErrorData({
-          message: errorData.message || "Failed to delete journal entry",
+          message: errorData.message || t("Failed to delete journal entry"),
           detail: errorData.detail,
           payment_id: errorData.payment_id,
           invoice_id: errorData.invoice_id,
@@ -289,8 +303,9 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
         setShowActionErrorDialog(true);
       } else {
         // Fallback to simple toast error
-        const errorMessage = err instanceof Error ? err.message : "Unknown error";
-        toast.error(errorMessage || "Failed to delete entry");
+        const errorMessage =
+          err instanceof Error ? err.message : t("Unknown error");
+        toast.error(errorMessage || t("Failed to delete entry"));
       }
     } finally {
       setIsProcessing(false);
@@ -315,7 +330,8 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
       await printCashReceiptVoucherPDF(response as CashReceiptVoucherData);
     } catch (err: unknown) {
       console.error("Error printing voucher:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to print voucher";
+      const errorMessage =
+        err instanceof Error ? err.message : t("Failed to print voucher");
       toast.error(errorMessage);
     } finally {
       setIsLoadingVoucher(false);
@@ -361,7 +377,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
       });
     } catch (err: unknown) {
       console.error("Error printing journal voucher:", err);
-      toast.error("Failed to generate voucher PDF");
+      toast.error(t("Failed to generate voucher PDF"));
     } finally {
       setIsPrintingJournal(false);
     }
@@ -378,7 +394,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
             : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
         }`}
       >
-        {isCancelled ? "Cancelled" : "Active"}
+        {isCancelled ? t("Cancelled") : t("Active")}
       </span>
     );
   };
@@ -398,7 +414,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
       <div className="space-y-3">
         <BackButton onClick={handleBack} />
         <div className="p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg">
-          {error || "Journal entry not found"}
+          {error || t("Journal entry not found")}
         </div>
       </div>
     );
@@ -459,15 +475,15 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   {getStatusBadge(entry.status)}
                   {isLegacyImport && (
                     <span className="inline-flex rounded bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-default-500 dark:text-gray-400">
-                      Legacy
+                      {t("Legacy")}
                     </span>
                   )}
                   {entry.manual_override && (
                     <span
                       className="inline-flex rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300"
-                      title="Edited by hand — the invoice no longer updates this journal automatically."
+                      title={t("Edited by hand \u2014 the invoice no longer updates this journal automatically.")}
                     >
-                      Manual
+                      {t("Manual")}
                     </span>
                   )}
                 </div>
@@ -476,7 +492,8 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   {formatDate(entry.entry_date)} | {entry.description || "-"}
                   {entry.cheque_no && (
                     <>
-                      {" | Cheque: "}
+                      {" | "}
+                      {t("Cheque:")}{" "}
                       <span
                         className={
                           chequeDuplicates.length > 0
@@ -501,7 +518,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   color="sky"
                   icon={IconExternalLink}
                   iconPosition="left"
-                  title="Open the document that created this journal"
+                  title={t("Open the document that created this journal")}
                 >
                   {entry.source.label}
                 </Button>
@@ -515,7 +532,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   iconPosition="left"
                   disabled={isLoadingVoucher}
                 >
-                  {isLoadingVoucher ? "Loading..." : "Print Voucher"}
+                  {isLoadingVoucher ? t("Loading...") : t("Print Voucher")}
                 </Button>
               )}
               {!canPrintVoucher && (
@@ -527,7 +544,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   iconPosition="left"
                   disabled={isPrintingJournal}
                 >
-                  {isPrintingJournal ? "Preparing..." : "Print Voucher"}
+                  {isPrintingJournal ? t("Preparing...") : t("Print Voucher")}
                 </Button>
               )}
               {canEdit && (
@@ -540,11 +557,11 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   disabled={isProcessing || (isGreenTarget && isSourceOwned)}
                   title={
                     isGreenTarget && isSourceOwned
-                      ? "This journal is owned by its source document - edit that document instead."
+                      ? t("This journal is owned by its source document - edit that document instead.")
                       : undefined
                   }
                 >
-                  Edit
+                  {t("Edit")}
                 </Button>
               )}
               {canCancel && (
@@ -557,11 +574,11 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   disabled={isProcessing || isSourceOwned}
                   title={
                     isSourceOwned
-                      ? "This journal is owned by its source document - cancel that document instead."
+                      ? t("This journal is owned by its source document - cancel that document instead.")
                       : undefined
                   }
                 >
-                  Cancel Entry
+                  {t("Cancel Entry")}
                 </Button>
               )}
               {canRestore && (
@@ -573,7 +590,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   iconPosition="left"
                   disabled={isProcessing}
                 >
-                  Restore Entry
+                  {t("Restore Entry")}
                 </Button>
               )}
               {canDelete && (
@@ -586,11 +603,11 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   disabled={isProcessing || isSourceOwned}
                   title={
                     isSourceOwned
-                      ? "This journal is owned by its source document - remove or cancel that document instead."
+                      ? t("This journal is owned by its source document - remove or cancel that document instead.")
                       : undefined
                   }
                 >
-                  Delete
+                  {t("Delete")}
                 </Button>
               )}
             </div>
@@ -620,31 +637,31 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                     style={{ top: headerHeight }}
                     className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider"
                   >
-                    Account
+                    {t("Account")}
                   </th>
                   <th
                     style={{ top: headerHeight }}
                     className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-48"
                   >
-                    Reference
+                    {t("Reference")}
                   </th>
                   <th
                     style={{ top: headerHeight }}
                     className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider"
                   >
-                    Particulars
+                    {t("Particulars")}
                   </th>
                   <th
                     style={{ top: headerHeight }}
                     className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32"
                   >
-                    Debit ($)
+                    {t("Debit ($)")}
                   </th>
                   <th
                     style={{ top: headerHeight }}
                     className="sticky z-20 bg-default-100 dark:bg-gray-800 px-4 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32 rounded-tr-lg"
                   >
-                    Credit ($)
+                    {t("Credit ($)")}
                   </th>
                 </tr>
               </thead>
@@ -690,7 +707,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                       colSpan={6}
                       className="px-4 py-8 text-center text-sm text-default-500 dark:text-gray-400"
                     >
-                      No line items found
+                      {t("No line items found")}
                     </td>
                   </tr>
                 )}
@@ -701,7 +718,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                     colSpan={4}
                     className="px-4 py-2.5 text-sm text-right text-default-700 dark:text-gray-300 rounded-bl-lg"
                   >
-                    Total
+                    {t("Total")}
                   </td>
                   <td className="px-4 py-2.5 text-sm text-right text-default-900 dark:text-gray-100">
                     {formatAmount(entry.total_debit)}
@@ -717,35 +734,133 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
           {/* Balance Check */}
           {Math.abs(entry.total_debit - entry.total_credit) > 0.01 && (
             <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-300 text-sm">
-              <strong>Warning:</strong> This entry is out of balance. Debits (
-              {formatAmount(entry.total_debit)}) do not equal Credits (
-              {formatAmount(entry.total_credit)}).
+              <Trans
+                ns="accounting"
+                i18nKey="<strong>Warning:</strong> This entry is out of balance. Debits ({{debit}}) do not equal Credits ({{credit}})."
+                values={{
+                  debit: formatAmount(entry.total_debit),
+                  credit: formatAmount(entry.total_credit),
+                }}
+                components={{ strong: <strong /> }}
+              />
             </div>
           )}
         </div>
+
+        {/* Related journals (invoice sale / adjustment cross-links) */}
+        {entry.related_journals && entry.related_journals.length > 0 && (
+            <div className="px-6 pb-4">
+              <div className="rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/30">
+                  <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100">
+                    {t("Related journals for Invoice {{id}}", {
+                      id: entry.related_invoice_id || "",
+                    })}
+                  </h3>
+                </div>
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="bg-default-100 dark:bg-gray-900/50">
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("Type")}
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("ID")}
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("Journal")}
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("amount", { ns: "common" })}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-default-100 dark:divide-gray-800 bg-white dark:bg-gray-800">
+                    {entry.related_journals.map((adj) => (
+                      <tr
+                        key={adj.journal_entry_id}
+                        className="hover:bg-default-50/50 dark:hover:bg-gray-700/30 cursor-pointer"
+                        onClick={() =>
+                          navigate(
+                            `/accounting/journal-entries/${adj.journal_entry_id}`
+                          )
+                        }
+                      >
+                        <td className="px-4 py-2.5 text-sm font-medium text-default-900 dark:text-gray-100">
+                          {adj.kind === "sales"
+                            ? t("Sales")
+                            : t(
+                                (adj.doc_type &&
+                                  ADJUSTMENT_TYPE_LABEL_KEY[adj.doc_type]) ||
+                                  adj.doc_type ||
+                                  ""
+                              )}
+                        </td>
+                        <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
+                          {adj.kind === "sales"
+                            ? "-"
+                            : formatAdjustmentDocId(adj.doc_id)}
+                        </td>
+                        <td className="px-4 py-2.5 text-sm">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(
+                                `/accounting/journal-entries/${adj.journal_entry_id}`
+                              );
+                            }}
+                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                            title={t("View journal entry")}
+                          >
+                            <IconFileText size={14} />
+                            <span className="font-mono">
+                              {adj.journal_reference ||
+                                `#${adj.journal_entry_id}`}
+                            </span>
+                            <span className="opacity-80">
+                              {" "}
+                              ({t(
+                                adj.journal_status === "cancelled"
+                                  ? "Cancelled"
+                                  : "Posted"
+                              )})
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-4 py-2.5 text-sm text-right font-medium text-default-900 dark:text-gray-100">
+                          {formatAmount(adj.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
         {/* Metadata */}
         <div className="px-6 py-4 border-t border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">
           <div className="flex flex-wrap gap-6 text-xs text-default-500 dark:text-gray-400">
             {entry.created_at && (
               <div>
-                <span className="font-medium">Created:</span>{" "}
+                <span className="font-medium">{t("Created:")}</span>{" "}
                 {formatDateTime(entry.created_at)}
-                {entry.created_by && ` by ${entry.created_by}`}
+                {entry.created_by && ` ${t("by")} ${entry.created_by}`}
               </div>
             )}
             {entry.updated_at && entry.updated_at !== entry.created_at && (
               <div>
-                <span className="font-medium">Updated:</span>{" "}
+                <span className="font-medium">{t("Updated:")}</span>{" "}
                 {formatDateTime(entry.updated_at)}
-                {entry.updated_by && ` by ${entry.updated_by}`}
+                {entry.updated_by && ` ${t("by")} ${entry.updated_by}`}
               </div>
             )}
             {entry.posted_at && (
               <div>
-                <span className="font-medium">Posted:</span>{" "}
+                <span className="font-medium">{t("Posted:")}</span>{" "}
                 {formatDateTime(entry.posted_at)}
-                {entry.posted_by && ` by ${entry.posted_by}`}
+                {entry.posted_by && ` ${t("by")} ${entry.posted_by}`}
               </div>
             )}
           </div>
@@ -757,9 +872,12 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Journal Entry"
-        message={`Are you sure you want to delete entry "${visibleReference}"? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Journal Entry")}
+        message={t(
+          'Are you sure you want to delete entry "{{reference}}"? This action cannot be undone.',
+          { reference: visibleReference }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
 
@@ -767,9 +885,12 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
         isOpen={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
         onConfirm={handleConfirmCancel}
-        title="Cancel Journal Entry"
-        message={`Are you sure you want to cancel entry "${visibleReference}"? This will mark the entry as cancelled.`}
-        confirmButtonText="Cancel Entry"
+        title={t("Cancel Journal Entry")}
+        message={t(
+          'Are you sure you want to cancel entry "{{reference}}"? This will mark the entry as cancelled.',
+          { reference: visibleReference }
+        )}
+        confirmButtonText={t("Cancel Entry")}
         variant="danger"
       />
 
@@ -777,9 +898,12 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
         isOpen={showRestoreDialog}
         onClose={() => setShowRestoreDialog(false)}
         onConfirm={handleConfirmRestore}
-        title="Restore Journal Entry"
-        message={`Restore entry "${visibleReference}"? It will go back onto the ledger exactly as it was before it was cancelled.`}
-        confirmButtonText="Restore Entry"
+        title={t("Restore Journal Entry")}
+        message={t(
+          'Restore entry "{{reference}}"? It will go back onto the ledger exactly as it was before it was cancelled.',
+          { reference: visibleReference }
+        )}
+        confirmButtonText={t("Restore Entry")}
         variant="default"
       />
 
@@ -829,7 +953,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   variant="filled"
                   size="md"
                 >
-                  Go to Invoice #{actionErrorData.invoice_id}
+                  {t("Go to Invoice #{{id}}", { id: actionErrorData.invoice_id })}
                 </Button>
               )}
               <Button
@@ -841,7 +965,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                 variant="outline"
                 size="md"
               >
-                Close
+                {t("Close")}
               </Button>
             </div>
           </div>

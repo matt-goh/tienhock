@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { IconExternalLink } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 
 interface BreakdownItem {
   description: string;
@@ -32,6 +33,7 @@ const SalaryAmountTooltip: React.FC<SalaryAmountTooltipProps> = ({
   className = "",
   formatCurrency = (v) => v.toFixed(2),
 }) => {
+  const { t } = useTranslation("payroll");
   const navigate = useNavigate();
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState<TooltipPosition>({
@@ -188,7 +190,7 @@ const SalaryAmountTooltip: React.FC<SalaryAmountTooltipProps> = ({
 
             {/* Total */}
             <div className="mt-2.5 pt-2 border-t border-gray-700 dark:border-gray-600 flex justify-between font-medium">
-              <span className="text-gray-300">Total</span>
+              <span className="text-gray-300">{t("Total")}</span>
               <span className="text-white">{formatCurrency(amount)}</span>
             </div>
 

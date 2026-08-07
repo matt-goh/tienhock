@@ -9,8 +9,10 @@ import IncomeTaxRateCreateModal from "./IncomeTaxRateCreateModal";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import Button from "../../Button";
+import { useTranslation } from "react-i18next";
 
 const IncomeTaxRatesTab: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const { incomeTaxRates, isLoading, error, refreshRates } =
     useContributionRatesCache();
   const [editingRate, setEditingRate] = useState<IncomeTaxRate | null>(null);
@@ -30,18 +32,18 @@ const IncomeTaxRatesTab: React.FC = () => {
 
   const handleDeleteRate = async (id: number) => {
     if (
-      !window.confirm("Are you sure you want to delete this income tax rate?")
+      !window.confirm(t("Are you sure you want to delete this income tax rate?"))
     ) {
       return;
     }
 
     try {
       await api.delete(`/api/contribution-rates/income-tax/${id}`);
-      toast.success("Income tax rate deleted successfully");
+      toast.success(t("Income tax rate deleted successfully"));
       refreshRates();
     } catch (error) {
       console.error("Error deleting income tax rate:", error);
-      toast.error("Failed to delete income tax rate");
+      toast.error(t("Failed to delete income tax rate"));
     }
   };
 
@@ -64,7 +66,7 @@ const IncomeTaxRatesTab: React.FC = () => {
   if (error) {
     return (
       <div className="text-center py-8 text-rose-600 dark:text-rose-400">
-        Error loading Income Tax rates: {error.message}
+        {t("Error loading Income Tax rates: {{message}}", { message: error.message })}
       </div>
     );
   }
@@ -73,7 +75,7 @@ const IncomeTaxRatesTab: React.FC = () => {
     <div className="mt-4">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-medium text-default-800 dark:text-gray-100">
-          Income Tax Rates
+          {t("Income Tax Rates")}
         </h3>
         <Button
           onClick={() => setShowCreateModal(true)}
@@ -83,7 +85,7 @@ const IncomeTaxRatesTab: React.FC = () => {
           size="md"
           iconSize={20}
         >
-          Add New Rate
+          {t("Add New Rate")}
         </Button>
       </div>
 
@@ -93,13 +95,13 @@ const IncomeTaxRatesTab: React.FC = () => {
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Wage Range
+                  {t("Wage Range")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Base Rate
+                  {t("Base Rate")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
+                  {t("Actions")}
                 </th>
               </tr>
             </thead>
@@ -119,14 +121,14 @@ const IncomeTaxRatesTab: React.FC = () => {
                         <button
                           onClick={() => handleEditRate(rate)}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 p-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/50"
-                          title="Edit Rate"
+                          title={t("Edit Rate")}
                         >
                           <IconEdit size={18} />
                         </button>
                         <button
                           onClick={() => handleDeleteRate(rate.id)}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-900/50"
-                          title="Delete Rate"
+                          title={t("Delete Rate")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -140,7 +142,7 @@ const IncomeTaxRatesTab: React.FC = () => {
                         {/* Unemployed Spouse */}
                         <div className="border border-default-200 dark:border-gray-700 rounded-lg pt-2 pb-4 bg-white dark:bg-gray-800">
                           <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3 text-center border-b border-default-200 dark:border-gray-700 pb-2">
-                            Spouse Unemployed
+                            {t("Spouse Unemployed")}
                           </h4>
                           <div className="grid grid-cols-6 gap-2 text-xs">
                             {[
@@ -173,7 +175,7 @@ const IncomeTaxRatesTab: React.FC = () => {
                         {/* Employed Spouse */}
                         <div className="border border-default-200 dark:border-gray-700 rounded-lg pt-2 pb-4 bg-white dark:bg-gray-800">
                           <h4 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3 text-center border-b border-default-200 dark:border-gray-700 pb-2">
-                            Spouse Employed
+                            {t("Spouse Employed")}
                           </h4>
                           <div className="grid grid-cols-6 gap-2 text-xs">
                             {[

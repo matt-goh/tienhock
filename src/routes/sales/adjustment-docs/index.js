@@ -521,6 +521,21 @@ async function fetchDocWithRelations(client, id) {
   if (docResult.rows.length === 0) return null;
   const doc = docResult.rows[0];
 
+  // Journal reference/status are only meaningful on the Tien Hock shared
+  // ledger; Jelly Polly documents never post a journal.
+  if (T.docs === DEFAULT_TABLES.docs && doc.journal_entry_id) {
+    const journalResult = await client.query(
+      `SELECT COALESCE(display_reference, reference_no) AS reference, status
+         FROM journal_entries
+        WHERE id = $1`,
+      [doc.journal_entry_id]
+    );
+    if (journalResult.rows.length > 0) {
+      doc.journal_reference = journalResult.rows[0].reference;
+      doc.journal_status = journalResult.rows[0].status;
+    }
+  }
+
   const linesResult = await client.query(
     `SELECT id, line_number, code, description, quantity, price, tax, total, issubtotal
        FROM ${T.lines}
@@ -729,17 +744,30 @@ async function resolveReferencedDocument(client, doc) {
 
     try {
       const params = [];
+      // Journal reference/status are only meaningful on the Tien Hock shared
+      // ledger; Jelly Polly documents never post a journal.
+      const journalSelect =
+        T.docs === DEFAULT_TABLES.docs
+          ? `,
+               je.status AS journal_status,
+               COALESCE(je.display_reference, je.reference_no) AS journal_reference`
+          : "";
+      const journalJoin =
+        T.docs === DEFAULT_TABLES.docs
+          ? `
+     LEFT JOIN journal_entries je ON je.id = a.journal_entry_id`
+          : "";
       let sql = `
         SELECT a.*, i.customerid AS inv_customerid,
                i.einvoice_status AS original_invoice_einvoice_status,
                c.name AS customer_name,
                p.id AS paired_doc_id, COALESCE(p.display_id, p.id) AS paired_display_id,
                p.type AS paired_type, p.status AS paired_status,
-               p.einvoice_status AS paired_einvoice_status
+               p.einvoice_status AS paired_einvoice_status${journalSelect}
           FROM ${T.docs} a
           JOIN ${T.invoices} i ON a.original_invoice_id = i.id
      LEFT JOIN customers c ON a.customerid = c.id
-     LEFT JOIN ${T.docs} p ON a.paired_with_id = p.id
+     LEFT JOIN ${T.docs} p ON a.paired_with_id = p.id${journalJoin}
          WHERE 1=1
       `;
       let p = 1;

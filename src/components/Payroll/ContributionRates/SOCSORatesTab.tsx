@@ -5,10 +5,12 @@ import { useContributionRatesCache } from "../../../utils/payroll/useContributio
 import { SOCSORRate } from "../../../types/types";
 import LoadingSpinner from "../../LoadingSpinner";
 import SOCSORateEditModal from "./SOCSORateEditModal";
+import { useTranslation } from "react-i18next";
 
 const SOCSO_SKBBK_EFFECTIVE_LABEL: string = "Applies from June 2026 payroll";
 
 const SOCSORatesTab: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const { socsoRates, isLoading, error } = useContributionRatesCache();
   const [editingRate, setEditingRate] = useState<SOCSORRate | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -29,7 +31,7 @@ const SOCSORatesTab: React.FC = () => {
 
   const formatWageRange = (from: number, to: number): string => {
     if (to >= 999999) {
-      return `${formatCurrency(from)} and above`;
+      return t("{{amount}} and above", { amount: formatCurrency(from) });
     }
     return `${formatCurrency(from)} - ${formatCurrency(to)}`;
   };
@@ -45,7 +47,7 @@ const SOCSORatesTab: React.FC = () => {
   if (error) {
     return (
       <div className="text-center py-8 text-rose-600 dark:text-rose-400">
-        Error loading SOCSO rates: {error.message}
+        {t("Error loading SOCSO rates: {{message}}", { message: error.message })}
       </div>
     );
   }
@@ -53,7 +55,7 @@ const SOCSORatesTab: React.FC = () => {
   return (
     <div className="mt-4">
       <div className="mb-3 text-sm text-default-600 dark:text-gray-300">
-        SKBBK: {SOCSO_SKBBK_EFFECTIVE_LABEL}
+        SKBBK: {t(SOCSO_SKBBK_EFFECTIVE_LABEL)}
       </div>
       <div className="border border-default-200 dark:border-gray-700 rounded-lg">
         <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -63,30 +65,30 @@ const SOCSORatesTab: React.FC = () => {
                   rowSpan={2}
                   className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider align-middle border-r border-default-200 dark:border-gray-700"
                 >
-                  Wage Range
+                  {t("Wage Range")}
                 </th>
                 <th
                   colSpan={4}
                   className="px-4 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider border-r border-default-200 dark:border-gray-700"
                 >
-                  Under 60 (Jenis Pertama)
+                  {t("Under 60 (First Type)")}
                 </th>
                 <th
                   colSpan={3}
                   className="px-4 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider border-r border-default-200 dark:border-gray-700"
                 >
-                  60 and Above (Jenis Kedua)
+                  {t("60 and Above (Second Type)")}
                 </th>
                 <th
                   rowSpan={2}
                   className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider align-middle"
                 >
-                  Actions
+                  {t("Actions")}
                 </th>
               </tr>
               <tr>
                 <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Employer
+                  {t("Employer")}
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                   Keilatan
@@ -95,16 +97,16 @@ const SOCSORatesTab: React.FC = () => {
                   SKBBK
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase tracking-wider border-r border-default-200 dark:border-gray-700">
-                  Employee Total
+                  {t("Employee Total")}
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Employer
+                  {t("Employer")}
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
                   SKBBK
                 </th>
                 <th className="px-3 py-2 text-center text-xs font-medium text-sky-700 dark:text-sky-300 uppercase tracking-wider border-r border-default-200 dark:border-gray-700">
-                  Employee Total
+                  {t("Employee Total")}
                 </th>
               </tr>
             </thead>
@@ -144,7 +146,7 @@ const SOCSORatesTab: React.FC = () => {
                       <button
                         onClick={() => handleEditRate(rate)}
                         className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 p-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/50"
-                        title="Edit Rate"
+                        title={t("Edit Rate")}
                       >
                         <IconEdit size={18} />
                       </button>

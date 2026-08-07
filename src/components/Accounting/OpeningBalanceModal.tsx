@@ -29,6 +29,9 @@ interface OpeningBalanceModalProps {
   onClose: () => void;
   accountCode: string;
   accountDescription?: string;
+  // Which company's opening-balance anchor to read/write. TH uses the
+  // un-prefixed route; GT uses its schema-isolated /greentarget route.
+  company?: "tienhock" | "greentarget";
   // Currently applicable anchor (or null). amount is signed (DR-positive).
   current: { as_of_date: string; amount: number; notes?: string | null } | null;
   onSaved: () => void;
@@ -39,6 +42,7 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
   onClose,
   accountCode,
   accountDescription,
+  company = "tienhock",
   current,
   onSaved,
 }) => {
@@ -79,7 +83,11 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
     const signed = drcr === "CR" ? -Math.abs(magnitude) : Math.abs(magnitude);
     setIsSaving(true);
     try {
-      await api.put(`/api/opening-balances/${accountCode}`, {
+      const basePath: string =
+        company === "greentarget"
+          ? "/greentarget/api/opening-balances"
+          : "/api/opening-balances";
+      await api.put(`${basePath}/${accountCode}`, {
         as_of_date: asOfDate,
         amount: signed,
         notes: notes || null,

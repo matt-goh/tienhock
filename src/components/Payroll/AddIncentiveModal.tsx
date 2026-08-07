@@ -18,6 +18,7 @@ import { FormCombobox, FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTranslation } from "react-i18next";
 
 type IncentiveType = "Commission" | "Bonus";
 
@@ -69,6 +70,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
   allowedEmployeeIds,
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("payroll");
   const showAdvanceColumn =
     incentiveType === "Bonus" && forceIsAdvance === undefined;
   const { staffs: thStaffs } = useStaffsCache();
@@ -189,9 +191,10 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
     });
 
     if (validEntries.length === 0) {
-      const locationMsg = incentiveType === "Commission" ? ", and location" : "";
       toast.error(
-        `Please add at least one valid ${displayLabelLower} entry with staff, amount${locationMsg}, and description.`
+        incentiveType === "Commission"
+          ? t("Please add at least one valid {{label}} entry with staff, amount, and location, and description.", { label: displayLabelLower })
+          : t("Please add at least one valid {{label}} entry with staff, amount, and description.", { label: displayLabelLower })
       );
       return;
     }
@@ -219,9 +222,10 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
     try {
       await Promise.all(promises);
       toast.success(
-        `${
-          validEntries.length
-        } ${displayLabelLower} record(s) saved successfully!`
+        t("{{count}} {{label}} record(s) saved successfully!", {
+          count: validEntries.length,
+          label: displayLabelLower,
+        })
       );
       onSuccess();
       onClose();
@@ -229,7 +233,9 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
       console.error(`Failed to save ${incentiveType}s:`, error);
       toast.error(
         error.response?.data?.message ||
-          `Failed to save one or more ${displayLabelLower} records.`
+          t("Failed to save one or more {{label}} records.", {
+            label: displayLabelLower,
+          })
       );
     } finally {
       setIsSaving(false);
@@ -274,7 +280,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                     as="h3"
                     className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
-                    Record Staff {displayLabel}
+                    {t("Record Staff {{label}}", { label: displayLabel })}
                   </DialogTitle>
                 </div>
 
@@ -282,7 +288,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                   <div className="max-w-xs mb-4">
                     <FormInput
                       name="incentiveDate"
-                      label={`${displayLabel} Date`}
+                      label={t("{{label}} Date", { label: displayLabel })}
                       type="date"
                       value={incentiveDate}
                       onChange={(e) => setIncentiveDate(e.target.value)}
@@ -294,22 +300,22 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                     <thead>
                       <tr>
                         <th className={`py-2 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-1/3"}`}>
-                          Staff
+                          {t("Staff")}
                         </th>
                         {incentiveType === "Commission" && (
                           <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/4">
-                            Location
+                            {t("Location")}
                           </th>
                         )}
                         <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/6">
-                          Amount (RM)
+                          {t("Amount (RM)")}
                         </th>
                         <th className={`py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 ${incentiveType === "Commission" ? "w-1/4" : "w-1/3"}`}>
-                          Description
+                          {t("Description")}
                         </th>
                         {showAdvanceColumn && (
                           <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-default-400 w-1/6">
-                            Advance
+                            {t("Advance")}
                           </th>
                         )}
                         <th className="py-2 text-left font-medium text-default-600 dark:text-default-400"></th>
@@ -337,7 +343,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                               setQuery={(query: React.SetStateAction<string>) =>
                                 setStaffQuery(entry.id, query)
                               }
-                              placeholder="Select Staff..."
+                              placeholder={t("Select Staff...")}
                               mode="single"
                             />
                           </td>
@@ -351,7 +357,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                                   handleEntryChange(index, "locationCode", value)
                                 }
                                 options={commissionLocationOptions}
-                                placeholder="Select Location..."
+                                placeholder={t("Select Location...")}
                               />
                             </td>
                           )}
@@ -385,7 +391,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                                   e.target.value
                                 )
                               }
-                              placeholder={`e.g., ${displayLabel}, bonus work`}
+                              placeholder={t("e.g., {{label}}, bonus work", { label: displayLabel })}
                             />
                           </td>
                           {showAdvanceColumn && (
@@ -395,7 +401,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                                 onChange={(checked) =>
                                   handleEntryChange(index, "isAdvance", checked)
                                 }
-                                label="Deduct"
+                                label={t("Deduct")}
                                 size={18}
                                 className="pt-2"
                               />
@@ -406,7 +412,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                               <button
                                 onClick={() => removeEntryRow(entry.id)}
                                 className="p-2 rounded-full text-default-400 opacity-0 transition-all duration-150 hover:bg-rose-100 hover:text-rose-600 group-hover:opacity-100 dark:text-gray-500 dark:hover:bg-rose-900/40 dark:hover:text-rose-300"
-                                title="Remove row"
+                                title={t("Remove row")}
                               >
                                 <IconX size={18} />
                               </button>
@@ -423,7 +429,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                       onClick={addEntryRow}
                       icon={IconPlus}
                     >
-                      Add Row
+                      {t("Add Row")}
                     </Button>
                     <div className="flex space-x-3">
                       <Button
@@ -431,7 +437,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                         onClick={handleClose}
                         disabled={isSaving}
                       >
-                        Cancel
+                        {t("Cancel")}
                       </Button>
                       <Button
                         color="sky"
@@ -439,7 +445,7 @@ const AddIncentiveModal: React.FC<AddIncentiveModalProps> = ({
                         disabled={isSaving}
                         icon={IconDeviceFloppy}
                       >
-                        {isSaving ? "Saving..." : `Save ${saveButtonLabel}`}
+                        {isSaving ? t("Saving...") : t("Save {{label}}", { label: saveButtonLabel })}
                       </Button>
                     </div>
                   </div>
