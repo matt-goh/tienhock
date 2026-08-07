@@ -57,6 +57,7 @@ import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import { CustomerCombobox } from "../../components/Invoice/CustomerCombobox";
 import LineItemsTable from "../../components/Invoice/LineItemsTable";
+import DateTimePicker from "../../components/Invoice/DateTimePicker";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import InvoiceSoloPDFHandler from "../../utils/invoice/PDF/InvoiceSoloPDFHandler";
 import InvoiceSoloPrintOverlay from "../../utils/invoice/PDF/InvoiceSoloPrintOverlay";
@@ -2864,13 +2865,23 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
 
               <div className="mb-4">
-                <FormInput
-                  name="datetime"
-                  label="Date & Time"
-                  type="datetime-local"
-                  value={selectedDateTime}
-                  onChange={(e) => setSelectedDateTime(e.target.value)}
+                <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                  {"Date & Time"}
+                </label>
+                <DateTimePicker
+                  value={selectedDateTime ? new Date(selectedDateTime) : null}
+                  onChange={(date: Date) => {
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, "0");
+                    const day = String(date.getDate()).padStart(2, "0");
+                    const hours = String(date.getHours()).padStart(2, "0");
+                    const minutes = String(date.getMinutes()).padStart(2, "0");
+                    setSelectedDateTime(
+                      `${year}-${month}-${day}T${hours}:${minutes}`
+                    );
+                  }}
                   disabled={isUpdatingDateTime}
+                  allowFuture
                 />
               </div>
 
