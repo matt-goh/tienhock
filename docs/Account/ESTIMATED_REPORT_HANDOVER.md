@@ -2,6 +2,21 @@
 
 Status: **ALL PHASES COMPLETE — production rollout done 2026-07-28 (§9.4 checklist executed during the GT G8 window); the report is live** | Started: 2026-07-23 | Owner: Kimi (planning/Q&A) → Claude (Phase 1) → Claude (Phase 2) → GPT-5.6 Sol (Phase 3) → Kimi (Phase 4) → Kimi (Phase 5)
 
+**2026-08-07 — P&L parity re-opened by the user for June MEE/BIHUN.** The user supplied
+the legacy print targets for both P&L pages (MRET/BRET, usage/gross, expenses, P/L,
+accumulative, final). Root-cause notes are in
+[JUNE_TB_BIHUN_RECON_HANDOVER.md](JUNE_TB_BIHUN_RECON_HANDOVER.md) — the MRET −1.30 /
+BRET +3.20 and Q10 expenses +216.61 / +207.21 deltas are now user-flagged for
+resolution, and a dev-only June sales drift (1-MNL −7.00 / 2-BNL −15.90, matching
+invoice `015377`) needs a prod check. **Later 7 Aug:** the legacy formula print
+(`dev/import/closing-stock-report/FORMULA_estimated_unit_cost.csv/.txt`, unit-cost
+format dated 01 MAR 2010) was received and analysed — account sets match our seeds
+exactly, but it contains no P&L-footer section and cannot reproduce 119,401.41 /
+137,602.88 (gaps 216.61 / 207.21 remain unexplained by any row/account subset). The
+user confirmed the legacy footer is formula-calculated, not keyed. Coworker questions
+(returns detail, invoice `015377`, P&L page formula/config, BIHUN accumulative) were
+sent; **no data or code change has been made yet.**
+
 Phase 3 runs the shipped engine against the complete June fixture with **415 exact
 checks, 57 explicitly derived/documented deltas and 0 failures** (§9). Both approved
 data fixes are applied to dev and production through a guarded, idempotent migration
@@ -160,7 +175,7 @@ BIHUN packing materials, BFIN→kilang.
 7. ~~Accumulative seeds~~ **CONFIRMED:** MEE −166,900.31 / BIHUN 404,935.44 @ 2026-06-01.
 8. ~~SMALL/BIG packing assignment~~ **CONFIRMED:** MEE BIG = {M14,M15,M16,M17,M20,M21,M28,M29,M31} (ids 56,58,59,60,63,66,64,65,57); BIHUN BIG = {B12,B13,B14,B15,B18A,B29,B31} (ids 79,81,82,85,84,83,80). The 0.30 June keyed typo was **corrected by §5 FIX-2 on 2026-07-28, dev and production**.
 9. ~~SAGO family on CS_LS line~~ **CONFIRMED** (report implies it).
-10. ~~P&L EXPENSES vs unit-cost residue (216.61/207.21)~~ **CLOSED AS FAR AS AVAILABLE EVIDENCE ALLOWS IN PHASE 3:** the legacy pages contradict one another and expose no P&L account breakdown; keep the internally auditable engine formula (§7.3/§9.3).
+10. ~~P&L EXPENSES vs unit-cost residue (216.61/207.21)~~ **CLOSED AS FAR AS AVAILABLE EVIDENCE ALLOWS IN PHASE 3:** the legacy pages contradict one another and expose no P&L account breakdown; keep the internally auditable engine formula (§7.3/§9.3). **REOPENED 2026-08-07 by the user** — the legacy formula print was received and analysed (matches our seeds; no P&L-footer section; gaps not reproducible from any row/account subset); user confirmed the footer is formula-calculated. Awaiting the legacy P&L page formula/config from the coworker — see [JUNE_TB_BIHUN_RECON_HANDOVER.md](JUNE_TB_BIHUN_RECON_HANDOVER.md).
 
 ### Round 2 (answered by user 2026-07-24; **co-worker answers received 2026-07-25 — all three CLOSED**)
 
@@ -1146,6 +1161,15 @@ That keeps the two live pages mutually auditable. The verifier gates the old foo
 a known legacy-page discrepancy and pins the historical gaps at 216.61/207.21; it does
 **not** create a hidden adjustment, change mappings, or mutate journals. Only the
 original legacy P&L configuration/account breakdown could close this further.
+
+**2026-08-07 update:** the user supplied the legacy formula print
+(`dev/import/closing-stock-report/FORMULA_estimated_unit_cost.csv/.txt`). It confirms
+the unit-cost side exactly (our seeds match its account sets; the only difference,
+MTRA/BTRA 50% vs our 100%, is contradicted by the June print itself), but it contains
+no P&L-footer definition and no combination of its rows/accounts reproduces the
+216.61/207.21 gaps. The user confirmed the legacy footer is formula-calculated, so the
+remaining evidence needed is the **legacy P&L page's own report definition/config**
+(pages 1–2). See [JUNE_TB_BIHUN_RECON_HANDOVER.md](JUNE_TB_BIHUN_RECON_HANDOVER.md).
 
 ### 9.4 Phase 4 handoff to Kimi
 

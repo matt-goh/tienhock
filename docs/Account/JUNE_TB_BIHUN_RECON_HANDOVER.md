@@ -10,7 +10,104 @@ Production keeps the 7 Aug state — KFC 40.00 in `MBSM_K`, PAUMIN `MBRMF` 565.0
 
 The 4 Aug annotated scans (MBC 479.55 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10) are the pre-amendment snapshot and are superseded — treat any future sighting of them as stale.
 
-**Next work: the P&L**, which has discrepancies in places. Separate scope, not covered by this document.
+**Next work: the P&L** — re-opened 7 Aug 2026 with the user's June MEE/BIHUN discrepancy lists. Root-cause notes are in the new section immediately below; **status: analysis complete, coworker questions sent, awaiting answers. No data or code change has been made yet.**
+
+## June Estimated P&L discrepancies — root-cause notes (7 Aug 2026, investigation only)
+
+**Status: investigated, NOT fixed — awaiting coworker answers (questions sent 7 Aug).** The user re-opened the June Estimated P&L after the unit-cost close and supplied the target figures for both lines. "Current (page)" = the live page values the user quoted (sales match the legacy print); "Current (dev)" = the 7 Aug dev engine output; "Target" = the legacy print / boss-corrected values in `dev/import/closing-stock-report/expected-june-2026.json` **unless overridden by the user's later confirmations (see #5/#6)**. The page derives everything from source data — every difference below is a **source-data or legacy-formula difference, not a page bug**. The engine's P&L math itself is internally consistent (verified: usage = OS+PU+RET−CS, P/L = gross−expenses, accumulative = anchor + P/L trail, final = P/L + add back).
+
+### MEE June
+
+| row | current (page) | current (dev) | target | delta vs page | cause |
+|---|---:|---:|---:|---:|---|
+| Sales | 176,035.10 | 176,028.10 | 176,035.10 | 0.00 (dev −7.00) | dev-only June sales drift, see #1 below |
+| MRET (returns) | 1,517.80 | 1,517.80 | 1,519.10 | **−1.30** | sales-return source difference, see #2 |
+| Opening stock | 216,152.12 | 216,152.12 | 216,152.20 | −0.08 | OS_MPMS May keying noise, see #3 |
+| Purchases | 49,900.00 | 49,900.00 | 50,440.00 | −540.00 | PU_MSD legacy-only, Q11 closed decision, see #4 |
+| Opening+Purchase+Returns | 267,569.92 | 267,569.92 | 268,111.30 | −541.38 | sum of MRET/OS/PU rows |
+| USAGE | 88,430.44 | 88,430.44 | **87,603.28** | +827.16 | **USER-CONFIRMED 7 Aug: boss's manual figure after printout is 87,603.28; do NOT follow the printed/crossed-out 87,063.28. See #5 — this conflicts with the accum/final targets.** |
+| GROSS | 87,604.66 | 87,597.66 | **88,431.82** (derived: sales − usage) | −827.16 (dev −834.16) | derived once usage = 87,603.28; the printed row (87,063.28 / struck 87,603.28) is superseded by the user's confirmation, see #5 |
+| Total expenses | 119,618.02 | 119,618.02 | 119,401.41 | **+216.61** | Q10 legacy page-to-page residue, see #6 |
+| PROFIT/(LOSS) | −32,013.36 | −32,020.36 | −32,338.13 (earlier target) | +324.77 (dev +317.77) | follows from gross + expenses; **superseded if 87,603.28 stands (then −30,969.59), see #5** |
+| FINAL P/L | −22,354.53 | −22,361.53 | −22,679.30 (earlier target) | +324.77 (dev +317.77) | P/L + add back 9,658.83; **superseded if 87,603.28 stands (then −21,310.76), see #5** |
+| ACCUMULATIVE | −198,913.67 | −198,920.67 | −199,238.44 (earlier target) | +324.77 (dev +317.77) | anchor −166,900.31 + P/L; **superseded if 87,603.28 stands (then −197,869.90), see #5** |
+
+### BIHUN June
+
+| row | current (page) | current (dev) | target | delta vs page | cause |
+|---|---:|---:|---:|---:|---|
+| Sales | 541,667.60 | 541,651.70 | 541,667.60 | 0.00 (dev −15.90) | same dev-only drift, #1 |
+| BRET (returns) | 268.30 | 268.30 | 265.10 | **+3.20** | sales-return source difference, #2 |
+| Opening stock | 486,311.65 | 486,311.65 | 486,311.65 | 0.00 | exact |
+| Purchases | 255,491.40 | 255,491.40 | 255,491.40 | 0.00 | exact |
+| Opening+Purchase+Returns | 742,071.35 | 742,071.35 | 742,068.15 | +3.20 | BRET only |
+| USAGE | 327,385.49 | 327,385.49 | 327,382.29 | +3.20 | BRET only |
+| GROSS | 214,282.11 | 214,266.21 | 214,285.31 | −3.20 (dev −19.10) | BRET + dev sales |
+| Total expenses | 137,810.09 | 137,810.09 | 137,602.88 | **+207.21** | Q10, #6 |
+| PROFIT/(LOSS) | 76,472.02 | 76,456.12 | 76,682.43 | −210.41 (dev −226.31) | follows |
+| FINAL P/L | 83,134.68 | 83,118.78 | 83,345.09 | −210.41 (dev −226.31) | P/L + add back 6,662.66 |
+| ACCUMULATIVE | 481,407.46 | 481,391.56 | **481,617.87?** | — | **user quoted 475,457.87 — that is the pre-JAGUNG print; anchor 404,935.44 + target P/L 76,682.43 = 481,617.87. Question sent to coworker; AWAITING, #5** |
+
+### Root causes
+
+1. **Dev-only June sales drift (1-MNL −1 bag/−7.00, 2-BNL −1 bag/−15.90).** Phase 3 (25 Jul) matched the print to the cent, so a June 1-MNL 1×7.00 line and a 2-BNL 1×15.90 line left the June window afterwards. **Invoice `015377` (ROSE, total 22.90, createddate 2026-07-01 11:16:33 KL) contains exactly those two lines.** Its S journal (id 2993) was created 2026-07-08 with `entry_date` 2026-07-01, and its payment (6096, ref `C015377`) was recorded 2026-08-06. The user's page still shows the print sales, so this looks like a re-date that dev picked up and prod may not have (or vice versa). Verify which database is correct and whether `015377` belongs to June (legacy print counted it) or July.
+2. **MRET −1.30 / BRET +3.20.** Returns are derived (`returnproduct × price`, product type MEE/BH, same invoice filters as sales). All 57 MEE and 13 BIHUN return rows are present; there are no cancelled/consolidated/subtotal rows hiding returns. No single row explains ±1.30 / ±3.20, so this is either multiple small price/count differences or a legacy-only return row. Needs the legacy sales-return detail (or confirmation that the print's MRET/BRET are stale).
+3. **OS_MPMS −0.08.** May 2026 MEE small-packing sum = 85,789.29 vs printed 85,789.37. June CS_MPMS is exact (81,885.94). Long-documented "May keying noise" — the exact row still to be identified if we want to clear it.
+4. **PU_MSD −540.00.** Closed decision (Q11, 2026-07-30): no PUR journal will ever be keyed; the boss absorbs the legacy-only 540 in the Add Back. Permanent documented delta unless the user reverses that decision.
+5. **Two target conflicts — status 7 Aug:**
+   - **MEE 87,603.28 — RESOLVED as the target, with a knock-on conflict still open.** The user confirmed on 7 Aug that 87,603.28 is correct (the boss's **manual figure written after printout**; do NOT use the printed/crossed-out 87,063.28). Consequence the user was shown: with sales 176,035.10 and expenses 119,401.41, P/L becomes **−30,969.59**, ACCUMULATIVE **−197,869.90**, FINAL **−21,310.76** — NOT the user's earlier targets (−32,338.13 / −199,238.44 / −22,679.30, which require 87,063.28). **Decision still needed: which set is authoritative** (a BM question was drafted 7 Aug — the user may not have sent it).
+   **Implementation note (MEE 87,603.28):** it cannot be derived from the printed components (O+P+R 268,111.30 − CS 179,139.48 = 88,971.82), so reproducing it on the page requires an explicit override input (like Add Back) or different confirmed components — flag to the user before coding.
+   - **BIHUN ACCUMULATIVE 475,457.87 vs 481,617.87 — AWAITING.** 475,457.87 is the pre-JAGUNG print (`accumulative_struck`); anchor 404,935.44 + the user's own P/L target 76,682.43 = 481,617.87. Question sent to the coworker.
+6. **Expenses +216.61 / +207.21 (Q10).** The legacy unit-cost pages' expense rows sum exactly to the current engine values (MEE 119,618.02 = salary 31,620.54 + salesman 15,518.40 + habuk 4,548.96 + expenses 63,729.82 + machine 4,200.30; BIHUN 137,810.09 = 51,184.66 + 15,518.43 + 4,548.96 + 64,238.82 + 2,319.22 — all verified against dev journals), while the legacy **P&L pages print 119,401.41 / 137,602.88**. The engine intentionally keeps `P&L EXPENSES = unit-cost sum` so the two pages stay mutually auditable. **User confirmed 7 Aug that the legacy footer is formula-driven (NOT keyed manually).** To show the footer value we need the legacy **P&L page's own formula/report definition** (pages 1–2) — this is the remaining ask, sent to the coworker.
+   - **2026-08-07 — formula received and analysed:** the user supplied `dev/import/closing-stock-report/FORMULA_estimated_unit_cost.csv` + `.txt` (legacy "ESTIMATED/UNIT COST (FORMAT)" print, report date 01 MAR 2010). It covers only the unit-cost pages (INGREDIENT / SALARY / EXPENSES / SALESMAN / HABUK / MACHINE REPAIR) — there is no P&L-footer section in it. Account sets match our seeded mappings exactly. Two differences noted: (a) TRANSPORTATION shows MBTRA **50%** + MTRA/BTRA **50%** whereas our seeds use MTRA/BTRA **100%** — the June print proves 100% (BIHUN expenses_line 64,238.82 = shared pool 63,729.82 + BTRA 509.00; at 50% it would be 63,984.32), so the 2010 format print differs from the live config (or the % column is not applied to line-specific rows); (b) MEE machine-repair row 1 shows a blank % while BIHUN's shows 50.00 — Q13 + the printed amounts confirm 50% for both, so this is a scan artifact. Reproducing the formula with June movements gives the unit-cost rows (119,618.02 / 137,810.09), NOT the P&L footer (119,401.41 / 137,602.88); no subset of rows or accounts (tested up to 4) sums to the 216.61 / 207.21 gaps. **Conclusion: the unit-cost formula is already exact; the P&L EXPENSES footer needs the legacy P&L page's own report definition/config (pages 1–2).**
+
+### Coworker questions sent 7 Aug 2026 (answers awaited — these are the next session's inputs)
+
+1. **Legacy June sales-return detail** for MRET 1,519.10 / BRET 265.10 (which invoices/returns; screenshot/print of the return list) — to close MRET −1.30 / BRET +3.20.
+2. **Invoice `015377` (ROSE, 22.90)** — June or July? It holds the exact missing June lines (1-MNL 1×7.00, 2-BNL 1×15.90). Also verify prod vs dev (user's page still shows the print sales).
+3. **P&L page EXPENSES formula/settings** (MEE 119,401.41 / BIHUN 137,602.88) — user confirmed it is formula-calculated, not keyed; ask for the report definition/screenshot for pages 1–2 (not the unit-cost format). Include the 216.61 / 207.21 arithmetic and the BTRA 50%-vs-100% question.
+4. **BIHUN ACCUMULATIVE** 475,457.87 vs 481,617.87 (sent with question 2/3; may need follow-up).
+5. **MEE 87,603.28 vs accum/final** — BM question drafted but possibly not sent (user said they did not ask this one); the user's own direction is 87,603.28 is correct. **The contradiction with −199,238.44 / −22,679.30 is still unresolved — flag to the user next session before changing anything.**
+
+### Resuming in a fresh session (read this first)
+
+State: June estimated P&L re-opened by the user; root causes documented above; **no data/code changes made**; coworker answers pending. The unit-cost reconciliation (top section) is CLOSED and unrelated to the pending P&L work. Read `docs/Account/ESTIMATED_REPORT_HANDOVER.md` §1/§2/§7.3/§9.3 for engine context, and this section for the P&L deltas. Dev DB: `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"`. Evidence: `dev/import/closing-stock-report/expected-june-2026.json`, `verify-estimated-report.mjs`, `FORMULA_estimated_unit_cost.csv/.txt`.
+
+Next session steps (once the answers arrive):
+1. Collect the four/five answers and map each to a root cause (#1 sales, #2 returns, #5 targets, #6 expenses).
+2. Returns: identify the exact legacy return rows/prices, then correct the ERP rows (deferred-fix protocol — key into June, never July) or document the print as stale.
+3. Sales: if `015377` belongs to June, re-date it (verify prod first); if July, update the fixture/verifier targets.
+4. Targets: get a definitive decision on MEE 87,603.28 vs accum/final, and BIHUN accumulative; then the P&L engine follows automatically (no hardcoding).
+5. Expenses: once the P&L page formula/config arrives, decide whether to (a) add a separate P&L-expenses mapping set (unit-cost page unchanged), or (b) implement whatever the legacy config shows; only then touch `estimated-report-engine.js`.
+6. Re-run `node dev/import/closing-stock-report/verify-estimated-report.mjs`, retire stale expected deltas, update `expected-june-2026.json` only with evidence, and update ESTIMATED_REPORT_HANDOVER.md Q10/Q11.
+7. Changelog entry (`src/components/ChangelogModal.tsx`) once visible numbers change.
+
+Copy-paste prompt for the next session:
+
+```text
+You are continuing the June 2026 Estimated P&L reconciliation in C:/tienhock.
+Read docs/Account/JUNE_TB_BIHUN_RECON_HANDOVER.md first — specifically the
+"June Estimated P&L discrepancies — root-cause notes (7 Aug 2026)" section and its
+"Resuming in a fresh session" block, then docs/Account/ESTIMATED_REPORT_HANDOVER.md.
+The coworker's answers to the four/five WhatsApp questions are attached below.
+Apply each answer to its root cause, make the minimal data/mapping/engine changes
+needed for the June MEE and BIHUN P&L to land on the confirmed targets (MRET
+1,519.10 / BRET 265.10, MEE 87,603.28 decision, expenses 119,401.41 / 137,602.88,
+accumulative and final per the user's final decision), without hardcoding anything.
+Re-run dev/import/closing-stock-report/verify-estimated-report.mjs, update
+expected-june-2026.json only where evidence supports it, update both handovers and
+the changelog, and report what was changed and what remains open.
+```
+
+### What would fix it (next steps, not yet done)
+
+- Sales: re-date `015377` into June if it belongs there (deferred-fix protocol: key the fix into the month it belongs to) or confirm July and update the fixture target.
+- Returns: identify the legacy return rows/prices from the legacy sales system, then correct the ERP rows (or document as stale print).
+- OS_MPMS: correct the May stock row(s) once identified.
+- Expenses: replicate the legacy P&L page formula as its own mapping set (unit-cost page unchanged) once the coworker's config arrives — user confirmed it is formula-calculated, not manual.
+- MEE 87,603.28: decide the override mechanism (it is not derivable from components) AND resolve the accumulative/final conflict before touching the engine.
+- Page code: no change expected for items 1–4 (data-driven); only the expenses formula (#6) and the 87,603.28 override (#5) would touch the engine/page.
+- After data fixes: re-run `node dev/import/closing-stock-report/verify-estimated-report.mjs`, retire the stale expected deltas, update `expected-june-2026.json` only where evidence supports it, and update ESTIMATED_REPORT_HANDOVER.md Q10/Q11.
 
 ### How it got here (context, no longer actionable)
 

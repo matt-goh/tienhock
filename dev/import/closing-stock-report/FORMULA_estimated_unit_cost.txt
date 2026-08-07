@@ -1,0 +1,222 @@
+TIEN HOCK FOOD INDUSTRIES SDN BHD (953309-T)
+ESTIMATED/UNIT COST (FORMAT)
+
+======================================================================
+REPORT : MEE (REPORT) ESTIMATED/COST
+REPORT DATE 05:54:03 01 MAR 2010
+======================================================================
+
+INGREDIENT
+----------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   SC             TEPUNG                                        OS MTEP+PU MTEP+CS MTEP1-CS MTEP2-CS MTEP3-                                       
+2   SC             GARAM                                         OS MGRM+PU MGRM+CS MGRM1-                                                         
+3   SC             TH-1                                          OS MTH1+PU MTH1+CS MTH11-                                                         
+4   SC             SODA ASH                                      OS MSOD1+OS MSOD2+PU MSOD+CS MSOD1-CS MSOD2-                                      
+5   SC             SODIUM TRIPOLYPHOSPHATE                       OS MSD+PU MSD+CS MSD-                                                             
+6   ST                                                                                                                                             
+7   B                                                                                                                                              
+8   SC             SELOTAPE                                      OS MTAP1+PM MTAP+CS MTAP-                                                         
+9   SC             PLASTIC (SMALL)                               OS M30+OS M39+OS M21+OS M27+OS M28+OS M29+OS [truncated on scan]                  
+10  SC             PLASTIC (BIG)                                 OS ML1+OS ML2+OS MP1+OS MP2+OS MM1+OS MM2+OS [truncated on scan]                  
+11  ST                                                                                                                                             
+
+SALARY MACHINE/PACKING
+----------------------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   F              SALARY MACHINE                                MS MM+ME MM+MSC MM+ML MM+MBSIP MM+                                                
+2   F              SALARY PACKING                                MS PM+ME PM+MSC PM+ML PM+MBSIP PM+                                                
+
+EXPENSES
+--------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   C      MBADV   ADVERTISEMENT                                                                                                              50.00
+2   C      MBAR    AUDITORS REMUNERATION                                                                                                      50.00
+3   C      MBBC    BANK CHARGES                                                                                                               50.00
+4   C      MBC     CLEANING EXPENSES                                                                                                          50.00
+5   F              DIRECTORS REMUNERATION                        MBDRB+MBDRE+MBDRS+MBDRSC+MBDRSIP+                                            50.00
+6   C      MBDON   DONATIONS                                                                                                                  50.00
+7   C      MBEW    ELECTRICITY AND WATER                                                                                                      50.00
+8   C      MBEN    ENTERTAINMENT                                                                                                              50.00
+9   C      MBINS   INSURANCE                                                                                                                  50.00
+10  C      MBIF    INSPECTION FEE                                                                                                             50.00
+11  C      MBLP    LEGAL AND PROFESSIONAL FEE                                                                                                 50.00
+12  F              LEVY                                          MBL O+MBL PK+MBL TS+MBL M+                                                   50.00
+13  C      MBLC    LICENCE FEE                                                                                                                50.00
+14  C      MBMED   MEDICAL FEE                                                                                                                50.00
+15  C      MBNEW   NEWSPAPER AND PERIODICALS                                                                                                  50.00
+16  C      MBOR    OFFICE REFRESHMENT                                                                                                         50.00
+17  C      MBPEN   PENALTY                                                                                                                    50.00
+18  C      MBTEL   POSTAGE AND TELEPHONE                                                                                                      50.00
+19  C      MBPS    PRINTING AND STATIONERY                                                                                                    50.00
+20  C      MBREN   RENT AND RATES                                                                                                             50.00
+21  C      MBRMF   REPAIR AND MAINTENANCE (FACTORY)                                                                                           50.00
+22  C      MBRMO   REPAIR AND MAINTENANCE (OFFICE)                                                                                            50.00
+23  F      MBRMB   REPAIR AND MAINTENANCE (BOILER)               MBRMB+PU CHEM+MBKH+                                                          50.00
+24  C      MBSAF   SAFETY & HEALTH EXPENSES                                                                                                   50.00
+25  F              SALARY & WAGES                                MBS O+MBS PK+MBS TS+MBS M+                                                   50.00
+26  F              EPF (EMPLOYEES PROVIDENT FUND) CONTRIBUTIONS  MBE O+MBE PK+MBE TS+MBE M+                                                   50.00
+27  F              SOCSO CONTRIBUTIONS                           MBSC O+MBSC PK+MBSC TS+MBSC M+                                               50.00
+28  F              SIP CONTRIBUTIONS                             MBSIP O+MBSIP TS+MBSIP M+                                                    50.00
+29  C      MBSEC   SECRETARIAL AND FILLING FEES                                                                                               50.00
+30  C      MBSUN   SUNDRY EXPENSES                                                                                                            50.00
+31  F              STAFF MESSING                                 MBSM O+MBSM K+                                                               50.00
+32  C      MBST    STAFF TRAINING                                                                                                             50.00
+33  C      MBTRV   TRAVELLING AND ACCOMMODATION                                                                                               50.00
+34  SC             TRANSPORTATION                                MBTRA+                                                                       50.00
+35  SC             TRANSPORTATION                                MTRA+                                                                        50.00
+36  ST             TRANSPORTATION                                                                                                             50.00
+37  C      MBUF    UPKEEP OF FACTORY                                                                                                          50.00
+38  C      MBUMF   UPKEEP OF MACHINERY (FACTORY)                                                                                              50.00
+39  C      MBUMO   UPKEEP OF MACHINERY (OFFICE)                                                                                               50.00
+40  C      MBUMB   UPKEEP OF MACHINERY (BOILER)                                                                                               50.00
+41  F              VRE-DIESEL                                    OIL9922+OIL9698+OIL6323+OIL7369+OIL5163+OILOTH+OILFORK+OILCASE+OILHT18+OILHT15+OILJCB+OIL9753+OIL9897+  50.00
+42  F              VRE-INSURANCE                                 INS9922+INS9698+INS6323+INS7369+INS5163+INSOTH+INSFORK+INSBFORK+INSCASE+INSHT18+INSHT15+INSJCB+INS9753+INS9897+  50.00
+43  F              VRE-SERVICE                                   SV9922+SV9698+SV6323+SV7369+SV5163+SVOTH+SVFORK+SVBFORK+SVCASE+SVHT18+SVHT15+SVJCB+SV9753+SV9897+  50.00
+44  F              VRE-ROAD TAX                                  TAX9922+TAX9698+TAX6323+TAX7369+TAX5163+TAXOTH+TAXFORK+TAXBFORK+TAXCASE+TAXHT18+TAXHT15+TAXJCB+TAX9753+TAX9897+  50.00
+45  F              VRE-TYRE                                      TY9922+TY9698+TY6323+TY7369+TY5163+TYOTH+TYFORK+TYBFORK+TYCASE+TYHT18+TYHT15+TYJCB+TY9753+TY9897+  50.00
+46  F              VRE-BATTERY                                   BT9922+BT9698+BT6323+BT7369+BT5163+BTOTH+BTFORK+BTBFORK+BTCASE+BTHT18+BTHT15+BTJCB+BT9753+BT9897+  50.00
+47  F              VRE-REPAIR                                    R9922+R9698+R6323+R7369+R5163+ROTH+RFORK+RBFORK+RCASE+RHT18+RHT15+RJCB+R9753+R9897+  50.00
+48  C      MBWP    WORKPASS                                                                                                                   50.00
+
+SALESMAN
+--------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   SC             SALARY SALESMAN                               MBS SMO+MBE SM+MBSC SM+MBL SM+MBSIP SM+                                      50.00
+2   SC             SALARY SALESMAN                               MS SM+                                                                            
+3   ST             SALARY SALESMAN                                                                                                                 
+4   SC             SALARY IKUT LORI                              MBS ILO+MBE IL+MBSC IL+MBL IL+MBSIP IL+                                      50.00
+5   SC             SALARY IKUT LORI                              MS IL+                                                                            
+6   ST             SALARY IKUT LORI                                                                                                                
+7   F              STAFF MESSING                                 MBSM SM+                                                                     50.00
+8   F              VRE-DIESEL (LORI SALESMAN SAHAJA)             OIL2962+OIL6893+OIL6389+OIL4688+OIL9901+OIL1016+                             50.00
+9   F              VRE-OTHERS (LORI SALESMAN SAHAJA)             INS2962+INS6893+INS6389+INS4688+SV2962+SV6893+SV6389+SV4688+TAX2962+TAX6893+TAX6389+TAX4688+TY2962+TY6893+TY6389+TY [truncated on scan]  50.00
+10  F              BAD DEBTS WRITTEN OFF                         MBD+                                                                         50.00
+
+HABUK
+-----
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   F              SALARY HABUK                                  MBS LH+MBE LH+MBSC LH+MBL LH+MBSIP LH+                                       50.00
+2   F              SALARY JAGA API                               MBS JB+MBE JB+MBSC JB+MBL JB+MBSIP JB+                                       50.00
+3   F              BURNING MATERIALS (HABUK/KAYU)                MBKH+                                                                        50.00
+4   F              VRE-DIESEL (LORI HABUK SAHAJA)                OIL2035+OIL1325+OIL830+                                                      50.00
+5   F              VRE-OTHERS (LORI HABUK SAHAJA)                INS2035+INS1325+INS830+SV2035+SV1325+SV830+TAX2035+TAX1325+TAX830+TY2035+TY1325+TY830+BT2035+BT1325+BT830+R2035+R13 [truncated on scan]  50.00
+
+MACHINE REPAIR
+--------------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   SC             MEE MACHINE REPAIR                            MBRM+MBUM+                                                                        
+2   SC             MEE MACHINE REPAIR                            MRM+MUM+                                                                          
+3   ST             MEE MACHINE REPAIR                                                                                                              
+
+======================================================================
+REPORT : BIHUN (REPORT) ESTIMATED/COST
+REPORT DATE 05:56:23 01 MAR 2010
+======================================================================
+
+INGREDIENT
+----------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   SC             JAGUNG                                        OS BJAG+PU BJAG+CS BJAG-                                                          
+2   SC             SAGO                                          OS BSAG+PU BSAG+OS KOW+BFT KOW+CS BSAG-CS KO [truncated on scan]                  
+3   SC             BERAS                                         OS BBER+PU BBER+CS BBER-                                                          
+4   SC             SODIUM METALBISULHITE                         OS BSDM+PU BSDM+CS BSDM-                                                          
+5   SC             TH-2                                          OS BTH2+PU BTH2+CS BTH2-                                                          
+6   ST                                                                                                                                             
+7   B                                                                                                                                              
+8   SC             SELOTAPE                                      OS BTAP+PM BTAP+CS BTAP-                                                          
+9   SC             PLASTIC (SMALL)                               OS BPMS+PM BPMS+CS BPMS-                                                          
+10  SC             PLASTIC (BIG)                                 OS BPMB+PM BPMB+CS BPMB-                                                          
+11  ST                                                                                                                                             
+
+SALARY MACHINE/PACKING
+----------------------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   F              SALARY MACHINE                                BS MB+BE MB+BSC MB+BL MB+BSIP MB+                                                 
+2   F              SALARY PACKING                                BS PB+BE PB+BSC PB+BL PB+BSIP PB+                                                 
+
+EXPENSES
+--------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   C      MBADV   ADVERTISEMENT                                                                                                              50.00
+2   C      MBAR    AUDITORS REMUNERATION                                                                                                      50.00
+3   C      MBBC    BANK CHARGES                                                                                                               50.00
+4   C      MBC     CLEANING EXPENSES                                                                                                          50.00
+5   F              DIRECTORS REMUNERATION                        MBDRB+MBDRE+MBDRS+MBDRSC+MBDRSIP+                                            50.00
+6   C      MBDON   DONATIONS                                                                                                                  50.00
+7   C      MBEW    ELECTRICITY AND WATER                                                                                                      50.00
+8   C      MBEN    ENTERTAINMENT                                                                                                              50.00
+9   C      MBINS   INSURANCE                                                                                                                  50.00
+10  C      MBIF    INSPECTION FEE                                                                                                             50.00
+11  C      MBLP    LEGAL AND PROFESSIONAL FEE                                                                                                 50.00
+12  F              LEVY                                          MBL O+MBL PK+MBL TS+MBL M+                                                   50.00
+13  C      MBLC    LICENCE FEE                                                                                                                50.00
+14  C      MBMED   MEDICAL FEE                                                                                                                50.00
+15  C      MBNEW   NEWSPAPER AND PERIODICALS                                                                                                  50.00
+16  C      MBOR    OFFICE REFRESHMENT                                                                                                         50.00
+17  C      MBPEN   PENALTY                                                                                                                    50.00
+18  C      MBTEL   POSTAGE AND TELEPHONE                                                                                                      50.00
+19  C      MBPS    PRINTING AND STATIONERY                                                                                                    50.00
+20  C      MBREN   RENT AND RATES                                                                                                             50.00
+21  C      MBRMF   REPAIR AND MAINTENANCE (FACTORY)                                                                                           50.00
+22  C      MBRMO   REPAIR AND MAINTENANCE (OFFICE)                                                                                            50.00
+23  F      MBRMB   REPAIR AND MAINTENANCE (BOILER)               MBRMB+PU CHEM+MBKH+                                                          50.00
+24  C      MBSAF   SAFETY & HEALTH EXPENSES                                                                                                   50.00
+25  F              SALARY & WAGES                                MBS O+MBS PK+MBS TS+MBS M+                                                   50.00
+26  F              EPF (EMPLOYEES PROVIDENT FUND) CONTRIBUTIONS  MBE O+MBE PK+MBE TS+MBE M+                                                   50.00
+27  F              SOCSO CONTRIBUTIONS                           MBSC O+MBSC PK+MBSC TS+MBSC M+                                               50.00
+28  F              SIP CONTRIBUTIONS                             MBSIP O+MBSIP TS+MBSIP M+                                                    50.00
+29  C      MBSEC   SECRETARIAL AND FILLING FEES                                                                                               50.00
+30  C      MBSUN   SUNDRY EXPENSES                                                                                                            50.00
+31  F              STAFF MESSING                                 MBSM O+MBSM K+                                                               50.00
+32  C      MBST    STAFF TRAINING                                                                                                             50.00
+33  C      MBTRV   TRAVELLING AND ACCOMMODATION                                                                                               50.00
+34  SC             TRANSPORTATION                                MBTRA+                                                                       50.00
+35  SC             TRANSPORTATION                                BTRA+                                                                        50.00
+36  ST             TRANSPORTATION                                                                                                             50.00
+37  C      MBUF    UPKEEP OF FACTORY                                                                                                          50.00
+38  C      MBUMF   UPKEEP OF MACHINERY (FACTORY)                                                                                              50.00
+39  C      MBUMO   UPKEEP OF MACHINERY (OFFICE)                                                                                               50.00
+40  C      MBUMB   UPKEEP OF MACHINERY (BOILER)                                                                                               50.00
+41  F              VRE-DIESEL                                    OIL9922+OIL9698+OIL6323+OIL7369+OIL5163+OILOTH+OILFORK+OILCASE+OILHT18+OILHT15+OILJCB+OIL9753+OIL9897+  50.00
+42  F              VRE-INSURANCE                                 INS9922+INS9698+INS6323+INS7369+INS5163+INSOTH+INSFORK+INSBFORK+INSCASE+INSHT18+INSHT15+INSJCB+INS9753+INS9897+  50.00
+43  F              VRE-SERVICE                                   SV9922+SV9698+SV6323+SV7369+SV5163+SVOTH+SVFORK+SVBFORK+SVCASE+SVHT18+SVHT15+SVJCB+SV9753+SV9897+  50.00
+44  F              VRE-ROAD TAX                                  TAX9922+TAX9698+TAX6323+TAX7369+TAX5163+TAXOTH+TAXFORK+TAXBFORK+TAXCASE+TAXHT18+TAXHT15+TAXJCB+TAX9753+TAX9897+  50.00
+45  F              VRE-TYRE                                      TY9922+TY9698+TY6323+TY7369+TY5163+TYOTH+TYFORK+TYBFORK+TYCASE+TYHT18+TYHT15+TYJCB+TY9753+TY9897+  50.00
+46  F              VRE-BATTERY                                   BT9922+BT9698+BT6323+BT7369+BT5163+BTOTH+BTFORK+BTBFORK+BTCASE+BTHT18+BTHT15+BTJCB+BT9753+BT9897+  50.00
+47  F              VRE-REPAIR                                    R9922+R9698+R6323+R7369+R5163+ROTH+RFORK+RBFORK+RCASE+RHT18+RHT15+RJCB+R9753+R9897+  50.00
+48  C      MBWP    WORKPASS                                                                                                                   50.00
+
+SALESMAN
+--------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   SC             SALARY SALESMAN                               MBS SMO+MBE SM+MBSC SM+MBL SM+MBSIP SM+                                      50.00
+2   SC             SALARY SALESMAN                               BS SM+                                                                            
+3   ST             SALARY SALESMAN                                                                                                                 
+4   SC             SALARY IKUT LORI                              MBS ILO+MBE IL+MBSC IL+MBL IL+MBSIP IL+                                      50.00
+5   SC             SALARY IKUT LORI                              BS IL+                                                                            
+6   ST             SALARY IKUT LORI                                                                                                                
+7   F              STAFF MESSING                                 MBSM SM+                                                                     50.00
+8   F              VRE-DIESEL (LORI SALESMAN SAHAJA)             OIL2962+OIL6893+OIL6389+OIL4688+OIL9901+OIL1016+                             50.00
+9   F              VRE-OTHERS (LORI SALESMAN SAHAJA)             INS2962+INS6893+INS6389+INS4688+SV2962+SV6893+SV6389+SV4688+TAX2962+TAX6893+TAX6389+TAX4688+TY2962+TY6893+TY6389+TY [truncated on scan]  50.00
+10  F              BAD DEBTS WRITTEN OFF                         MBD+                                                                         50.00
+
+HABUK
+-----
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   F              SALARY HABUK                                  MBS LH+MBE LH+MBSC LH+MBL LH+MBSIP LH+                                       50.00
+2   F              SALARY JAGA API                               MBS JB+MBE JB+MBSC JB+MBL JB+MBSIP JB+                                       50.00
+3   F              BURNING MATERIALS (HABUK/KAYU)                MBKH+                                                                        50.00
+4   F              VRE-DIESEL (LORI HABUK SAHAJA)                OIL2035+OIL1325+OIL830+                                                      50.00
+5   F              VRE-OTHERS (LORI HABUK SAHAJA)                INS2035+INS1325+INS830+SV2035+SV1325+SV830+TAX2035+TAX1325+TAX830+TY2035+TY1325+TY830+BT2035+BT1325+BT830+R2035+R13 [truncated on scan]  50.00
+
+MACHINE REPAIR
+--------------
+NO  CODE   PRODUCT DESCRIPTION                                   FORMULA                                                                          %
+1   SC             BIHUN MACHINE REPAIR                          MBRM+MBUM+                                                                   50.00
+2   SC             BIHUN MACHINE REPAIR                          BRM+BUM+                                                                          
+3   ST             BIHUN MACHINE REPAIR                                                                                                            
+
+NOTE: Text was transcribed by visually reading the scanned pages (the PDF's
+embedded OCR layer was unreliable). A few formulas are cut off at the page
+edge in the original scan; these are marked [truncated on scan].
