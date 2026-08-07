@@ -521,6 +521,21 @@ async function fetchDocWithRelations(client, id) {
   if (docResult.rows.length === 0) return null;
   const doc = docResult.rows[0];
 
+  // Journal reference/status are only meaningful on the Tien Hock shared
+  // ledger; Jelly Polly documents never post a journal.
+  if (T.docs === DEFAULT_TABLES.docs && doc.journal_entry_id) {
+    const journalResult = await client.query(
+      `SELECT COALESCE(display_reference, reference_no) AS reference, status
+         FROM journal_entries
+        WHERE id = $1`,
+      [doc.journal_entry_id]
+    );
+    if (journalResult.rows.length > 0) {
+      doc.journal_reference = journalResult.rows[0].reference;
+      doc.journal_status = journalResult.rows[0].status;
+    }
+  }
+
   const linesResult = await client.query(
     `SELECT id, line_number, code, description, quantity, price, tax, total, issubtotal
        FROM ${T.lines}

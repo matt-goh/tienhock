@@ -1225,6 +1225,21 @@ export interface JournalEntry {
   posted_at?: string;
   posted_by?: string;
   lines?: JournalEntryLine[]; // Line items
+  // Journals this entry is related to (GET /:id only): an invoice's sales
+  // journal lists the invoice's adjustment-document journals, and an
+  // adjustment journal lists the invoice's S journal plus sibling adjustments.
+  related_invoice_id?: string | null;
+  related_journals?: Array<{
+    kind: "sales" | "adjustment";
+    doc_id: string | null;
+    doc_type: "credit_note" | "debit_note" | "refund_note" | null;
+    doc_status: "active" | "cancelled" | null;
+    amount: number;
+    journal_entry_id: number;
+    journal_reference: string | null;
+    journal_status: string | null;
+    journal_date: string | null;
+  }>;
 }
 
 // Another Cash/Bank Payment journal already carrying the same cheque number
