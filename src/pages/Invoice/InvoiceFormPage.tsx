@@ -1,5 +1,6 @@
 // src/pages/Invoice/InvoiceFormPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
 // --- Other imports ---
 import {
@@ -57,6 +58,9 @@ import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import { api } from "../../routes/utils/api";
 // --- MODAL IMPORT ---
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal"; // Adjust path if needed
+import TimeNavigator, {
+  type TimeRange,
+} from "../../components/TimeNavigator";
 
 const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
   { value: "cash", label: "Cash" },
@@ -582,6 +586,13 @@ const InvoiceFormPage: React.FC = () => {
   const billTotal: number = roundTenderAmount(
     Number(invoiceData?.totalamountpayable || 0)
   );
+  // Untouched split payments follow the invoice date (same-day default).
+  const defaultPaymentDate: Date = useMemo(() => {
+    const parsed = invoiceData?.createddate
+      ? new Date(Number(invoiceData.createddate))
+      : null;
+    return parsed && !Number.isNaN(parsed.getTime()) ? parsed : new Date();
+  }, [invoiceData?.createddate]);
   const tenderedTotal: number = sumTenders(tenders);
   const tenderRemaining: number = roundTenderAmount(billTotal - tenderedTotal);
   const tendersBalance: boolean = Math.abs(tenderRemaining) <= 0.005;
@@ -684,9 +695,9 @@ const InvoiceFormPage: React.FC = () => {
             for (const tender of tenderPayload) {
               await createPayment({
                 invoice_id: invoiceIdForNavigation,
-                payment_date: new Date(
-                  Number(invoiceData.createddate)
-                ).toISOString(),
+                payment_date:
+                  tender.payment_date ??
+                  format(defaultPaymentDate, "yyyy-MM-dd"),
                 amount_paid: tender.amount,
                 payment_method: tender.payment_method,
                 payment_reference: tender.payment_reference,
@@ -1059,6 +1070,39 @@ const InvoiceFormPage: React.FC = () => {
                         size="md"
                       />
                     </div>
+                    {invoiceData.paymenttype !== "CASH" && (
+                      <div className="w-full sm:w-44">
+                        <div className="space-y-2">
+                          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+                            {t("Payment Date")}
+                          </label>
+                          <TimeNavigator
+                            range={{
+                              start: tender.payment_date
+                                ? new Date(`${tender.payment_date}T00:00:00`)
+                                : defaultPaymentDate,
+                              end: tender.payment_date
+                                ? new Date(`${tender.payment_date}T00:00:00`)
+                                : defaultPaymentDate,
+                            }}
+                            onChange={(range: TimeRange) =>
+                              handleTenderChange(tender.key, {
+                                payment_date: format(
+                                  range.start,
+                                  "yyyy-MM-dd"
+                                ),
+                              })
+                            }
+                            modes={["day"]}
+                            presets={false}
+                            showArrows={false}
+                            allowFuture
+                            size="md"
+                            disabled={isSaving}
+                          />
+                        </div>
+                      </div>
+                    )}
                     {/* The money/reference inputs carry their own width so a
                         tender row lines up with the next one instead of each
                         input sizing itself to its label. */}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { IconX } from "@tabler/icons-react";
 import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
@@ -155,6 +156,7 @@ const toLocalDateInputValue = (value: string | null | undefined): string => {
 };
 
 const SupplierPaymentFormPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -199,6 +201,15 @@ const SupplierPaymentFormPage: React.FC = () => {
     return null;
   }, [existing, queriedInvoiceId]);
 
+  const paymentMethodOptions = useMemo(
+    () =>
+      PAYMENT_METHOD_OPTIONS.map((option) => ({
+        ...option,
+        label: t(option.label),
+      })),
+    [t]
+  );
+
   const loadData = useCallback(async (): Promise<void> => {
     setLoading(true);
     try {
@@ -231,7 +242,9 @@ const SupplierPaymentFormPage: React.FC = () => {
           !VALID_SOURCES.includes(queriedSource) ||
           !queriedInvoiceId
         ) {
-          toast.error("Missing invoice context. Open from the invoice page.");
+          toast.error(
+            t("Missing invoice context. Open from the invoice page.")
+          );
           return;
         }
         const inv = await loadSourceInvoice(
@@ -239,7 +252,7 @@ const SupplierPaymentFormPage: React.FC = () => {
           Number.parseInt(queriedInvoiceId, 10)
         );
         if (!inv) {
-          toast.error("Source invoice not found");
+          toast.error(t("Source invoice not found"));
           return;
         }
         setInvoice(inv);
@@ -251,12 +264,12 @@ const SupplierPaymentFormPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error loading supplier payment context:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to load payment"
+        error instanceof Error ? error.message : t("Failed to load payment")
       );
     } finally {
       setLoading(false);
     }
-  }, [id, isEditMode, queriedSource, queriedInvoiceId, today]);
+  }, [id, isEditMode, queriedSource, queriedInvoiceId, today, t]);
 
   useEffect(() => {
     loadData();
@@ -284,26 +297,28 @@ const SupplierPaymentFormPage: React.FC = () => {
 
   const validateBeforeSave = (): boolean => {
     if (!invoice || !source || !invoiceId) {
-      toast.error("Missing invoice context");
+      toast.error(t("Missing invoice context"));
       return false;
     }
     if (!formData.payment_date) {
-      toast.error("Payment date is required");
+      toast.error(t("Payment date is required"));
       return false;
     }
     const amount = toNumber(formData.amount_paid);
     if (!(amount > 0)) {
-      toast.error("Amount must be greater than zero");
+      toast.error(t("Amount must be greater than zero"));
       return false;
     }
     if (amount - invoice.balance > 0.005) {
       toast.error(
-        `Amount exceeds outstanding balance (${formatCurrency(invoice.balance)})`
+        t("Amount exceeds outstanding balance ({{amount}})", {
+          amount: formatCurrency(invoice.balance),
+        })
       );
       return false;
     }
     if (formData.payment_method !== "cash" && !formData.bank_account) {
-      toast.error("Bank account is required for non-cash payments");
+      toast.error(t("Bank account is required for non-cash payments"));
       return false;
     }
     return true;
@@ -311,7 +326,9 @@ const SupplierPaymentFormPage: React.FC = () => {
 
   const handleSave = async (): Promise<void> => {
     if (isEditMode) {
-      toast.error("Existing payments cannot be edited. Cancel and re-record.");
+      toast.error(
+        t("Existing payments cannot be edited. Cancel and re-record.")
+      );
       return;
     }
     if (!validateBeforeSave()) return;
@@ -330,7 +347,7 @@ const SupplierPaymentFormPage: React.FC = () => {
         notes: formData.notes.trim() || null,
       };
       const response = await api.post("/api/supplier-payments", payload);
-      toast.success("Supplier payment recorded");
+      toast.success(t("Supplier payment recorded"));
       const newId = response.payment?.payment_id;
       if (newId) {
         navigate(`/accounting/supplier-payments/${newId}`, { replace: true });
@@ -340,7 +357,7 @@ const SupplierPaymentFormPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error recording supplier payment:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to record payment"
+        error instanceof Error ? error.message : t("Failed to record payment")
       );
     } finally {
       setSaving(false);
@@ -354,13 +371,13 @@ const SupplierPaymentFormPage: React.FC = () => {
       await api.put(`/api/supplier-payments/${existing.payment_id}/cancel`, {
         cancellation_reason: "Cancelled via system",
       });
-      toast.success("Payment cancelled");
+      toast.success(t("Payment cancelled"));
       setShowCancelDialog(false);
       await loadData();
     } catch (error: unknown) {
       console.error("Error cancelling supplier payment:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to cancel payment"
+        error instanceof Error ? error.message : t("Failed to cancel payment")
       );
     } finally {
       setCancelling(false);
@@ -388,14 +405,16 @@ const SupplierPaymentFormPage: React.FC = () => {
           <span className="text-default-300 dark:text-gray-600">|</span>
           <div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              {isEditMode ? "Supplier Payment" : "Record Supplier Payment"}
+              {isEditMode
+                ? t("Supplier Payment")
+                : t("Record Supplier Payment")}
             </h1>
             {existing && (
               <p className="text-sm text-default-500 dark:text-gray-400">
                 {existing.internal_reference || `Payment #${existing.payment_id}`}
                 {existing.status === "cancelled" && (
                   <span className="ml-2 inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-300">
-                    Cancelled
+                    {t("Cancelled")}
                   </span>
                 )}
               </p>
@@ -412,7 +431,7 @@ const SupplierPaymentFormPage: React.FC = () => {
               size="sm"
               onClick={() => setShowCancelDialog(true)}
             >
-              Cancel Payment
+              {t("Cancel Payment")}
             </Button>
           )}
           {!isEditMode && (
@@ -424,7 +443,7 @@ const SupplierPaymentFormPage: React.FC = () => {
               disabled={saving}
               onClick={handleSave}
             >
-              {saving ? "Saving..." : "Record Payment"}
+              {saving ? t("Saving...") : t("Record Payment")}
             </Button>
           )}
         </div>
@@ -433,17 +452,21 @@ const SupplierPaymentFormPage: React.FC = () => {
       {invoice && (
         <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-            Invoice
+            {t("Invoice")}
           </h2>
           <div className="grid gap-3 md:grid-cols-4 text-sm">
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Supplier</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Supplier")}
+              </p>
               <p className="font-medium text-default-900 dark:text-gray-100">
                 {invoice.supplier_name}
               </p>
             </div>
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Invoice No.</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Invoice No.")}
+              </p>
               {invoiceUrl ? (
                 <button
                   type="button"
@@ -459,14 +482,16 @@ const SupplierPaymentFormPage: React.FC = () => {
               )}
             </div>
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Total</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Total")}
+              </p>
               <p className="text-default-900 dark:text-gray-100">
                 {formatCurrency(invoice.total)}
               </p>
             </div>
             <div>
               <p className="text-xs text-default-500 dark:text-gray-400">
-                {isEditMode ? "Already Paid" : "Outstanding Balance"}
+                {isEditMode ? t("Already Paid") : t("Outstanding Balance")}
               </p>
               <p className="text-default-900 dark:text-gray-100">
                 {isEditMode
@@ -480,12 +505,12 @@ const SupplierPaymentFormPage: React.FC = () => {
 
       <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-          Payment Details
+          {t("Payment Details")}
         </h2>
         <div className="grid gap-3 md:grid-cols-3">
           <FormInput
             name="payment_date"
-            label="Payment Date"
+            label={t("Payment Date")}
             value={formData.payment_date}
             type="date"
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
@@ -496,7 +521,7 @@ const SupplierPaymentFormPage: React.FC = () => {
           />
           <FormInput
             name="amount_paid"
-            label="Amount (MYR)"
+            label={t("Amount (MYR)")}
             value={formData.amount_paid}
             type="number"
             min={0}
@@ -509,56 +534,56 @@ const SupplierPaymentFormPage: React.FC = () => {
           />
           <div className="space-y-2">
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-              Payment Method <span className="text-red-500">*</span>
+              {t("Payment Method")} <span className="text-red-500">*</span>
             </label>
             <PillSelect<string>
               value={formData.payment_method}
               onChange={(value: string) => updateField("payment_method", value)}
-              options={PAYMENT_METHOD_OPTIONS}
+              options={paymentMethodOptions}
               disabled={!canEdit}
-              ariaLabel="Payment method"
+              ariaLabel={t("Payment method")}
               size="md"
             />
           </div>
           {formData.payment_method !== "cash" && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                Bank Account <span className="text-red-500">*</span>
+                {t("Bank Account")} <span className="text-red-500">*</span>
               </label>
               <PillSelect<string>
                 value={formData.bank_account}
                 onChange={(value: string) => updateField("bank_account", value)}
                 options={BANK_ACCOUNT_OPTIONS}
                 disabled={!canEdit}
-                ariaLabel="Bank account"
+              ariaLabel={t("Bank account")}
                 size="md"
               />
             </div>
           )}
           <FormInput
             name="payment_reference"
-            label="Payment Reference"
+            label={t("Payment Reference")}
             value={formData.payment_reference}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               updateField("payment_reference", event.target.value)
             }
             disabled={!canEdit}
-            placeholder="Cheque no. / txn ref"
+            placeholder={t("Cheque no. / txn ref")}
           />
           <FormInput
             name="internal_reference"
-            label="PV / Internal Reference"
+            label={t("PV / Internal Reference")}
             value={formData.internal_reference}
             onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
               updateField("internal_reference", event.target.value)
             }
             disabled={!canEdit}
-            placeholder="Auto-generated if left blank"
+            placeholder={t("Auto-generated if left blank")}
           />
         </div>
         <div className="mt-3 space-y-2">
           <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-            Notes
+            {t("Notes")}
           </label>
           <textarea
             value={formData.notes}
@@ -567,7 +592,7 @@ const SupplierPaymentFormPage: React.FC = () => {
             }
             disabled={!canEdit}
             rows={3}
-            placeholder="Optional notes"
+            placeholder={t("Optional notes")}
             className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700"
           />
         </div>
@@ -576,12 +601,12 @@ const SupplierPaymentFormPage: React.FC = () => {
       {existing && (
         <section className="rounded-lg border border-default-200 bg-white p-3 dark:border-gray-700 dark:bg-gray-800">
           <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-            Journal Posting
+            {t("Journal Posting")}
           </h2>
           <div className="grid gap-3 md:grid-cols-3 text-sm">
             <div>
               <p className="text-xs text-default-500 dark:text-gray-400">
-                Journal Reference
+                {t("Journal Reference")}
               </p>
               {journalUrl && existing.journal_reference_no ? (
                 <button
@@ -598,15 +623,17 @@ const SupplierPaymentFormPage: React.FC = () => {
               )}
             </div>
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Status</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Status")}
+              </p>
               <p className="text-default-900 dark:text-gray-100">
-                {existing.status}
+                {t(existing.status)}
               </p>
             </div>
             {existing.cancellation_date && (
               <div>
                 <p className="text-xs text-default-500 dark:text-gray-400">
-                  Cancelled At
+                  {t("Cancelled At")}
                 </p>
                 <p className="text-default-900 dark:text-gray-100">
                   {new Date(existing.cancellation_date).toLocaleString("en-MY")}
@@ -621,9 +648,13 @@ const SupplierPaymentFormPage: React.FC = () => {
         isOpen={showCancelDialog}
         onClose={() => setShowCancelDialog(false)}
         onConfirm={handleCancel}
-        title="Cancel Supplier Payment"
-        message="Cancel this payment? The journal entry will be reversed and the invoice's outstanding balance restored."
-        confirmButtonText={cancelling ? "Cancelling..." : "Cancel Payment"}
+        title={t("Cancel Supplier Payment")}
+        message={t(
+          "Cancel this payment? The journal entry will be reversed and the invoice's outstanding balance restored."
+        )}
+        confirmButtonText={
+          cancelling ? t("Cancelling...") : t("Cancel Payment")
+        }
         variant="danger"
       />
     </div>

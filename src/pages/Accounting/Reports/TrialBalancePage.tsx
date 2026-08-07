@@ -179,14 +179,6 @@ const LEDGER_TYPE_LABELS: Record<string, string> = {
   TD: "Trade Debtor",
 };
 
-const ledgerTypeOptions: { value: string; label: string }[] = [
-  { value: "", label: "All Ledger Types" },
-  ...Object.entries(LEDGER_TYPE_LABELS).map(([code, label]) => ({
-    value: code,
-    label: `${label} (${code})`,
-  })),
-];
-
 export interface TrialBalancePageProps {
   company?: "tienhock" | "greentarget";
 }
@@ -194,7 +186,7 @@ export interface TrialBalancePageProps {
 const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
   company = "tienhock",
 }: TrialBalancePageProps) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("accounting");
   const isGreenTarget: boolean = company === "greentarget";
   const reportsBasePath: string = isGreenTarget
     ? "/greentarget/api/financial-reports"
@@ -229,6 +221,16 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
     useState<TrialBalanceOrderPreference>(() =>
       loadTrialBalanceOrderPreference(company)
     );
+  const ledgerTypeOptions = useMemo(
+    (): { value: string; label: string }[] => [
+      { value: "", label: t("All Ledger Types") },
+      ...Object.entries(LEDGER_TYPE_LABELS).map(([code, label]) => ({
+        value: code,
+        label: `${t(label)} (${code})`,
+      })),
+    ],
+    [t]
+  );
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [fsNotes, setFsNotes] = useState<FinancialStatementNoteLike[]>([]);
   const { accountCodes, isLoading: accountCodesLoading } =
@@ -375,12 +377,12 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
       );
       setTrialBalance(response);
     } catch (err) {
-      setError("Failed to fetch trial balance. Please try again later.");
+      setError(t("Failed to fetch trial balance. Please try again later."));
       console.error("Error fetching trial balance:", err);
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, buildFilterParams, reportsBasePath]);
+  }, [selectedMonth, buildFilterParams, reportsBasePath, t]);
 
   useEffect(() => {
     fetchTrialBalance();
@@ -451,7 +453,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
       );
     } catch (err) {
       console.error("Error printing PDF:", err);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setExporting(false);
     }
@@ -525,6 +527,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
             selectedMonth={selectedMonth}
             onChange={handleMonthChange}
             size="sm"
+            pickerPlacement="bottom-left-button"
           />
 
           {/* Search */}
@@ -532,7 +535,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
             <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search code or description..."
+              placeholder={t("Search code or description...")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8 pr-3 py-1.5 w-56 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -546,8 +549,8 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
                 <IconFilter className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <span className="block truncate">
                   {selectedLedgerType
-                    ? `${LEDGER_TYPE_LABELS[selectedLedgerType]} (${selectedLedgerType})`
-                    : "All Ledger Types"}
+                    ? `${t(LEDGER_TYPE_LABELS[selectedLedgerType])} (${selectedLedgerType})`
+                    : t("All Ledger Types")}
                 </span>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                   <IconChevronDown
@@ -603,7 +606,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
           <Checkbox
             checked={hideZeroBalance}
             onChange={handleHideZeroChange}
-            label="Hide zero"
+            label={t("Hide zero")}
             size={18}
             className="flex-shrink-0"
           />
@@ -629,7 +632,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
             iconSize={16}
             onClick={fetchTrialBalance}
             disabled={loading}
-            title="Refresh"
+            title={t("Refresh")}
             additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
           />
           <Button
@@ -641,7 +644,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
             onClick={handlePrintPDF}
             disabled={exporting || !trialBalance || totalFiltered === 0}
           >
-            {exporting ? "Preparing..." : "Print"}
+            {exporting ? t("Preparing...") : t("Print")}
           </Button>
         </div>
       </div>
@@ -661,20 +664,25 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
                 <>
                   <IconCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
                   <span className="font-medium text-green-800 dark:text-green-200">
-                    Trial Balance is Balanced
+                    {t("Trial Balance is Balanced")}
                   </span>
                 </>
               ) : (
                 <>
                   <IconX className="h-5 w-5 text-red-600 dark:text-red-400" />
                   <span className="font-medium text-red-800 dark:text-red-200">
-                    Trial Balance is NOT Balanced (Difference: RM {formatCurrency(trialBalance.totals.difference)})
+                    {t("Trial Balance is NOT Balanced (Difference: RM {{amount}})", {
+                      amount: formatCurrency(trialBalance.totals.difference),
+                    })}
                   </span>
                 </>
               )}
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              For period {trialBalance.period.start_date} to {trialBalance.period.end_date}
+              {t("For period {{start}} to {{end}}", {
+                start: trialBalance.period.start_date,
+                end: trialBalance.period.end_date,
+              })}
             </div>
           </div>
         </div>
@@ -702,37 +710,37 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-left w-32 rounded-tl-lg")}
                   >
-                    Account Code
+                    {t("Account Code")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-left")}
                   >
-                    Description
+                    {t("Description")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-center w-20")}
                   >
-                    Type
+                    {t("Type")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-center w-20")}
                   >
-                    Note
+                    {t("Note")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-right w-36")}
                   >
-                    Debit (RM)
+                    {t("Debit (RM)")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-right w-36 rounded-tr-lg")}
                   >
-                    Credit (RM)
+                    {t("Credit (RM)")}
                   </th>
                 </tr>
               </thead>
@@ -740,7 +748,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
                 {accounts.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                      No accounts found matching the criteria
+                      {t("No accounts found matching the criteria")}
                     </td>
                   </tr>
                 ) : (
@@ -782,7 +790,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
                     style={{ bottom: paginationFooterHeight }}
                     className={clsx(footerCellClasses, "text-right")}
                   >
-                    TOTALS:
+                    {t("TOTALS:")}
                   </td>
                   <td
                     style={{ bottom: paginationFooterHeight }}
@@ -884,7 +892,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
               }
             />
             <div className="text-right text-xs text-gray-500 dark:text-gray-400 mt-2">
-              Period: January - {getMonthName(selectedMonth)}
+              {t("Period:")} {t("January")} - {getMonthName(selectedMonth)}
             </div>
           </div>
         </div>

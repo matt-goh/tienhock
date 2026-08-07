@@ -11,6 +11,8 @@ import React, {
 import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { api } from "../../routes/utils/api";
 import {
   AccountCode,
@@ -128,9 +130,16 @@ const emptyLine = (lineNumber: number): JournalLineFormData => ({
 });
 
 const getGTDebtorIdentityLabel = (
-  identity: GreenTargetDebtorSubledgerIdentity
+  identity: GreenTargetDebtorSubledgerIdentity,
+  t?: TFunction
 ): string =>
-  `${identity.code} - ${identity.description} (posts to ${identity.control_account_code})`;
+  t
+    ? t("{{code}} - {{description}} (posts to {{control}})", {
+        code: identity.code,
+        description: identity.description,
+        control: identity.control_account_code,
+      })
+    : `${identity.code} - ${identity.description} (posts to ${identity.control_account_code})`;
 
 const mergeGTDebtorIdentities = (
   rows: ReadonlyArray<GreenTargetDebtorSubledgerIdentity>
@@ -166,6 +175,7 @@ const GTJournalDebtorIdentitySelector: React.FC<
   disabled,
   onChange,
 }) => {
+  const { t } = useTranslation("accounting");
   const [query, setQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<
     GreenTargetDebtorSubledgerIdentity[]
@@ -284,7 +294,7 @@ const GTJournalDebtorIdentitySelector: React.FC<
     const availableOptions: SelectOption[] = identities.map(
       (identity: GreenTargetDebtorSubledgerIdentity): SelectOption => ({
         id: identity.code,
-        name: getGTDebtorIdentityLabel(identity),
+        name: getGTDebtorIdentityLabel(identity, t),
       })
     );
     if (
@@ -295,17 +305,20 @@ const GTJournalDebtorIdentitySelector: React.FC<
     ) {
       availableOptions.unshift({
         id: value,
-        name: `${value} - ${description || "selected identity"} (posts to CD_SD)`,
+        name: t("{{value}} - {{description}} (posts to CD_SD)", {
+          value,
+          description: description || t("selected identity"),
+        }),
       });
     }
     return availableOptions;
-  }, [description, identities, value]);
+  }, [description, identities, t, value]);
 
   return (
     <div className="mt-1.5 space-y-1">
       <FormCombobox
         name={`debtor_subledger_code_${lineNumber}`}
-        label="Trade Debtor Identity"
+        label={t("Trade Debtor Identity")}
         value={value || undefined}
         onChange={(selected: string | string[] | null): void => {
           const selectedCode: string =
@@ -331,23 +344,26 @@ const GTJournalDebtorIdentitySelector: React.FC<
         maxVisibleOptions={GT_DEBTOR_SEARCH_LIMIT}
         placeholder={
           isSearching
-            ? "Searching debtor identities..."
-            : "Search debtor code or customer name..."
+            ? t("Searching debtor identities...")
+            : t("Search debtor code or customer name...")
         }
       />
       <p className="px-1 text-[11px] leading-4 text-default-500 dark:text-gray-400">
-        Required for the Trade Debtors sub-schedule. The general ledger line
-        remains posted to CD_SD.
+        {t(
+          "Required for the Trade Debtors sub-schedule. The general ledger line remains posted to CD_SD."
+        )}
       </p>
       {selectedIdentityUnavailable && (
         <p className="px-1 text-[11px] leading-4 text-rose-700 dark:text-rose-300">
-          {value} is not selectable for this journal date. Choose another
-          identity before saving.
+          {t(
+            "{{value}} is not selectable for this journal date. Choose another identity before saving.",
+            { value }
+          )}
         </p>
       )}
       {searchFailed && (
         <p className="px-1 text-[11px] leading-4 text-rose-700 dark:text-rose-300">
-          Debtor identity search could not be loaded.
+          {t("Debtor identity search could not be loaded.")}
         </p>
       )}
     </div>
@@ -423,6 +439,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
   onClose,
   onCreated,
 }: QuickAddAccountCodeModalProps) => {
+  const { t } = useTranslation("accounting");
   const [formData, setFormData] = useState<QuickAddAccountCodeFormData>(
     getInitialQuickAddAccountData(initialQuery)
   );
@@ -438,7 +455,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
 
   const ledgerTypeOptions: SelectOption[] = useMemo(
     (): SelectOption[] => [
-      { id: "", name: "None" },
+      { id: "", name: t("None") },
       ...ledgerTypes.map(
         (ledgerType: LedgerType): SelectOption => ({
           id: ledgerType.code,
@@ -446,7 +463,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
         })
       ),
     ],
-    [ledgerTypes]
+    [ledgerTypes, t]
   );
 
   const handleInputChange = (
@@ -511,19 +528,21 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
       .toUpperCase();
 
     if (!normalizedCode) {
-      return "Account code is required";
+      return t("Account code is required");
     }
 
     if (!trimmedDescription) {
-      return "Description is required";
+      return t("Description is required");
     }
 
     if (!ACCOUNT_CODE_PATTERN.test(normalizedCode)) {
-      return "Account code can only contain letters, numbers, hyphens, underscores, and periods";
+      return t(
+        "Account code can only contain letters, numbers, hyphens, underscores, and periods"
+      );
     }
 
     if (normalizedParentCode && normalizedParentCode === normalizedCode) {
-      return "An account cannot be its own parent";
+      return t("An account cannot be its own parent");
     }
 
     const duplicateAccount: boolean = existingAccountCodes.some(
@@ -532,7 +551,9 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
     );
 
     if (duplicateAccount) {
-      return `Account code "${normalizedCode}" already exists`;
+      return t('Account code "{{code}}" already exists', {
+        code: normalizedCode,
+      });
     }
 
     return null;
@@ -573,10 +594,12 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
         await refreshAccountCodesCache();
       } catch (cacheError: unknown) {
         console.error("Error refreshing account codes cache:", cacheError);
-        toast.error("Account code created, but the account list could not refresh");
+        toast.error(
+          t("Account code created, but the account list could not refresh")
+        );
       }
 
-      toast.success("Account code created successfully");
+      toast.success(t("Account code created successfully"));
       onCreated(createdAccountCode);
       onClose();
     } catch (err: unknown) {
@@ -585,8 +608,10 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
         err instanceof Error ? (err as ApiErrorLike) : null;
       const errorMessage: string =
         apiError?.status === 409
-          ? `Account code "${normalizedCode}" already exists`
-          : apiError?.message || "Failed to create account code";
+          ? t('Account code "{{code}}" already exists', {
+              code: normalizedCode,
+            })
+          : apiError?.message || t("Failed to create account code");
 
       setError(errorMessage);
       toast.error(errorMessage);
@@ -631,27 +656,27 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                   as="h3"
                   className="text-lg font-semibold text-default-900 dark:text-gray-100"
                 >
-                  Add Account Code
+                  {t("Add Account Code")}
                 </DialogTitle>
 
                 <form onSubmit={handleSubmit} className="mt-5 space-y-5" noValidate>
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <FormInput
                       name="code"
-                      label="Account Code"
+                      label={t("Account Code")}
                       value={formData.code}
                       onChange={handleInputChange}
-                      placeholder="e.g., SALES-001"
+                      placeholder={t("e.g., SALES-001")}
                       required
                       disabled={isSaving}
                     />
 
                     <FormInput
                       name="description"
-                      label="Description"
+                      label={t("Description")}
                       value={formData.description}
                       onChange={handleInputChange}
-                      placeholder="e.g., Sales Account"
+                      placeholder={t("e.g., Sales Account")}
                       required
                       disabled={isSaving}
                     />
@@ -660,26 +685,28 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <FormListbox
                       name="ledger_type"
-                      label="Ledger Type"
+                      label={t("Ledger Type")}
                       value={formData.ledger_type}
                       onChange={handleLedgerTypeChange}
                       options={ledgerTypeOptions}
                       disabled={isSaving || ledgerTypesLoading}
-                      placeholder={ledgerTypesLoading ? "Loading..." : "Select ledger type..."}
+                      placeholder={
+                        ledgerTypesLoading ? t("Loading...") : t("Select ledger type...")
+                      }
                     />
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                        Parent Account
+                        {t("Parent Account")}
                       </label>
                       <AccountCodeCombobox
                         value={formData.parent_code}
                         onChange={handleParentAccountChange}
                         disabled={isSaving}
-                        placeholder="Search parent account..."
+                        placeholder={t("Search parent account...")}
                         hierarchical
                         allowEmpty
-                        emptyLabel="None (Top Level)"
+                        emptyLabel={t("None (Top Level)")}
                         filter={(account: AccountCode): boolean =>
                           account.code.toUpperCase() !==
                           formData.code.trim().toUpperCase()
@@ -691,7 +718,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <FormInput
                       name="sort_order"
-                      label="Sort Order"
+                      label={t("Sort Order")}
                       value={formData.sort_order}
                       onChange={handleInputChange}
                       type="number"
@@ -706,7 +733,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                       htmlFor="quick-add-account-notes"
                       className="block text-sm font-medium text-default-700 dark:text-gray-200"
                     >
-                      Notes
+                      {t("Notes")}
                     </label>
                     <textarea
                       id="quick-add-account-notes"
@@ -715,7 +742,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                       value={formData.notes}
                       onChange={handleNotesChange}
                       disabled={isSaving}
-                      placeholder="Optional notes about this account..."
+                      placeholder={t("Optional notes about this account...")}
                       className="block w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-500 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
                     />
                   </div>
@@ -733,7 +760,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                       onClick={handleClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -741,7 +768,7 @@ const QuickAddAccountCodeModal: React.FC<QuickAddAccountCodeModalProps> = ({
                       variant="filled"
                       disabled={isSaving}
                     >
-                      {isSaving ? "Saving..." : "Create Account"}
+                      {isSaving ? t("Saving...") : t("Create Account")}
                     </Button>
                   </div>
                 </form>
@@ -764,6 +791,7 @@ interface JournalEntryPageProps {
 const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
@@ -818,7 +846,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       } catch (err: unknown) {
         console.error("Error fetching Green Target reference data:", err);
         if (!cancelled) {
-          toast.error("Failed to load Green Target accounts and journal types");
+          toast.error(
+            t("Failed to load Green Target accounts and journal types")
+          );
         }
       } finally {
         if (!cancelled) setGtReferenceLoading(false);
@@ -829,7 +859,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [isGreenTarget, apiBase]);
+  }, [isGreenTarget, apiBase, t]);
 
   const entryTypes: JournalEntryTypeInfo[] = isGreenTarget
     ? gtEntryTypes
@@ -1091,12 +1121,17 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       setEntryManualOverride(entry.manual_override === true);
     } catch (err: unknown) {
       console.error("Error fetching entry data:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      setError(`Failed to load journal entry: ${errorMessage}`);
+      const errorMessage =
+        err instanceof Error ? err.message : t("Unknown error");
+      setError(
+        t("Failed to load journal entry: {{message}}", {
+          message: errorMessage,
+        })
+      );
     } finally {
       setLoading(false);
     }
-  }, [id, apiBase]);
+  }, [id, apiBase, t]);
 
   // Initial data loading
   useEffect(() => {
@@ -1269,7 +1304,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   // Remove line
   const removeLine = (index: number) => {
     if (formData.lines.length <= 2) {
-      toast.error("At least 2 lines are required");
+      toast.error(t("At least 2 lines are required"));
       return;
     }
 
@@ -1300,12 +1335,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   // Validation
   const validateForm = (): boolean => {
     if (!formData.reference_no.trim()) {
-      toast.error("Reference number is required");
+      toast.error(t("Reference number is required"));
       return false;
     }
 
     if (!formData.entry_date) {
-      toast.error("Entry date is required");
+      toast.error(t("Entry date is required"));
       return false;
     }
 
@@ -1318,14 +1353,14 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     );
 
     if (filledLines.length < 2) {
-      toast.error("At least 2 line items are required");
+      toast.error(t("At least 2 line items are required"));
       return false;
     }
 
     // Validate each filled line has account code
     for (const line of filledLines) {
       if (!line.account_code) {
-        toast.error("Each line item must have an account code");
+        toast.error(t("Each line item must have an account code"));
         return false;
       }
       if (
@@ -1334,7 +1369,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         !line.debtor_subledger_code.trim()
       ) {
         toast.error(
-          `Select a Trade Debtor identity for CD_SD line ${line.line_number}`
+          t("Select a Trade Debtor identity for CD_SD line {{line}}", {
+            line: line.line_number,
+          })
         );
         return false;
       }
@@ -1342,7 +1379,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         (parseFloat(line.debit_amount) || 0) === 0 &&
         (parseFloat(line.credit_amount) || 0) === 0
       ) {
-        toast.error("Each line item must have either a debit or credit amount");
+        toast.error(
+          t("Each line item must have either a debit or credit amount")
+        );
         return false;
       }
     }
@@ -1350,9 +1389,10 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     // Validate totals match
     if (!isBalanced) {
       toast.error(
-        `Total debits (${totals.totalDebit.toFixed(
-          2
-        )}) must equal total credits (${totals.totalCredit.toFixed(2)})`
+        t("Total debits ({{debit}}) must equal total credits ({{credit}})", {
+          debit: totals.totalDebit.toFixed(2),
+          credit: totals.totalCredit.toFixed(2),
+        })
       );
       return false;
     }
@@ -1428,14 +1468,14 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
 
       if (isEditMode) {
         await api.put(`${apiBase}/journal-entries/${id}`, payload);
-        toast.success("Journal entry updated successfully");
+        toast.success(t("Journal entry updated successfully"));
       } else {
         const response = (await api.post(
           `${apiBase}/journal-entries`,
           payload
         )) as { entry?: { id: number } };
         entryId = response?.entry?.id;
-        toast.success("Journal entry created successfully");
+        toast.success(t("Journal entry created successfully"));
       }
 
       // After an edit, return to where the user came from (normally the entry's
@@ -1449,10 +1489,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       }
     } catch (err: unknown) {
       console.error("Error saving journal entry:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      const errorMessage =
+        err instanceof Error ? err.message : t("Unknown error");
       toast.error(
         errorMessage ||
-          `Failed to ${isEditMode ? "update" : "create"} journal entry`
+          t(
+            isEditMode
+              ? "Failed to update journal entry"
+              : "Failed to create journal entry"
+          )
       );
     } finally {
       setIsSaving(false);
@@ -1466,13 +1511,14 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     setIsSaving(true);
     try {
       await api.delete(`${apiBase}/journal-entries/${id}`);
-      toast.success("Journal entry deleted successfully");
+      toast.success(t("Journal entry deleted successfully"));
       setShowDeleteDialog(false);
       navigate(journalEntriesPath);
     } catch (err: unknown) {
       console.error("Error deleting journal entry:", err);
-      const errorMessage = err instanceof Error ? err.message : "Unknown error";
-      toast.error(errorMessage || "Failed to delete journal entry");
+      const errorMessage =
+        err instanceof Error ? err.message : t("Unknown error");
+      toast.error(errorMessage || t("Failed to delete journal entry"));
     } finally {
       setIsSaving(false);
     }
@@ -1544,7 +1590,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                   <IconFileText size={24} className="text-sky-600 dark:text-sky-400" />
                 </div>
                 <h1 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                  {isEditMode ? "Edit Journal Entry" : "New Journal Entry"}
+                  {isEditMode ? t("Edit Journal Entry") : t("New Journal Entry")}
                 </h1>
               </div>
               <div className="flex items-center gap-3">
@@ -1560,18 +1606,18 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                   {isBalanced ? (
                     <>
                       <IconCheck size={16} />
-                      <span>Balanced</span>
+                      <span>{t("Balanced")}</span>
                     </>
                   ) : (
                     <>
-                      <span>Out of Balance:</span>
+                      <span>{t("Out of Balance:")}</span>
                       <span className="font-bold">{difference.toFixed(2)}</span>
                     </>
                   )}
                 </div>
                 {isFormChanged && (
                   <span className="px-3 py-1 rounded-full text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                    Unsaved changes
+                    {t("Unsaved changes")}
                   </span>
                 )}
                 {isEditMode && (
@@ -1582,7 +1628,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                         : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
                     }`}
                   >
-                    {entryStatus === "cancelled" ? "Cancelled" : "Active"}
+                    {entryStatus === "cancelled" ? t("Cancelled") : t("Active")}
                   </span>
                 )}
                 {/* Sticky save: reachable from any scroll position */}
@@ -1595,11 +1641,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                   disabled={isSaving || !isFormChanged || !isBalanced}
                   title={
                     !isBalanced
-                      ? "Debits must equal credits before saving"
+                      ? t("Debits must equal credits before saving")
                       : undefined
                   }
                 >
-                  {isEditMode ? "Update" : "Save"}
+                  {isEditMode ? t("Update") : t("Save")}
                 </Button>
               </div>
             </div>
@@ -1612,7 +1658,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                 <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                   <LoadingSpinner hideText />
                   <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                    Saving journal entry...
+                    {t("Saving journal entry...")}
                   </span>
                 </div>
               </div>
@@ -1638,7 +1684,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                     header and the resolved type name is the only place the
                     code's meaning is spelled out. */}
                 <label className="block text-sm font-semibold text-default-700 dark:text-gray-300 uppercase tracking-wide mb-1.5">
-                  Type <span className="text-red-500">*</span>
+                  {t("Type")} <span className="text-red-500">*</span>
                   {selectedEntryTypeName && (
                     <span className="ml-2 normal-case font-medium text-default-500 dark:text-gray-400">
                       {selectedEntryTypeName}
@@ -1650,7 +1696,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                   onChange={handleEntryTypeChange}
                   options={entryTypeOptions}
                   disabled={isSaving}
-                  ariaLabel="Journal entry type"
+                  ariaLabel={t("Journal entry type")}
                   size="md"
                 />
               </div>
@@ -1663,7 +1709,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                 {/* Reference Number */}
                 <div>
                   <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                    Reference No <span className="text-red-500">*</span>
+                    {t("Reference No")} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -1674,7 +1720,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                         reference_no: e.target.value,
                       }))
                     }
-                    placeholder="e.g., PBE001/06"
+                    placeholder={t("e.g., PBE001/06")}
                     disabled={isSaving}
                     className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
                   />
@@ -1683,7 +1729,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                 {/* Entry Date */}
                 <div>
                   <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                    Date <span className="text-red-500">*</span>
+                    {t("Date")} <span className="text-red-500">*</span>
                   </label>
                   <TimeNavigator
                     range={entryDateRange}
@@ -1692,7 +1738,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                     presets={false}
                     showArrows={false}
                     allowFuture
-                    placeholder="Pick a date"
+                    placeholder={t("Pick a date")}
                     disabled={isSaving}
                     className="w-full"
                     triggerClassName={HEADER_TIME_NAVIGATOR_TRIGGER_CLASSNAME}
@@ -1702,7 +1748,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                 {/* Description */}
                 <div>
                   <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                    Description
+                    {t("Description")}
                   </label>
                   <input
                     type="text"
@@ -1713,7 +1759,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                         description: e.target.value,
                       }))
                     }
-                    placeholder="Optional description"
+                    placeholder={t("Optional description")}
                     disabled={isSaving}
                     className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500`}
                   />
@@ -1723,7 +1769,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                 {showChequeNo && (
                   <div>
                     <label className="block text-xs font-medium text-default-600 dark:text-gray-400 uppercase tracking-wide mb-1.5">
-                      Cheque No
+                      {t("Cheque No")}
                     </label>
                     <input
                       type="text"
@@ -1734,7 +1780,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                           cheque_no: e.target.value,
                         }))
                       }
-                      placeholder="e.g., PBB350779"
+                      placeholder={t("e.g., PBB350779")}
                       disabled={isSaving}
                       className={`${HEADER_FIELD_CLASSNAME} placeholder:text-gray-400 dark:placeholder:text-gray-500 ${
                         chequeDuplicates.length > 0
@@ -1770,31 +1816,31 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                         style={{ top: tableHeaderTop }}
                         className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-[30rem]"
                       >
-                        Account
+                        {t("Account")}
                       </th>
                       <th
                         style={{ top: tableHeaderTop }}
                         className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-24"
                       >
-                        {isGreenTarget ? "Chq No" : "Reference"}
+                        {isGreenTarget ? t("Chq No") : t("Reference")}
                       </th>
                       <th
                         style={{ top: tableHeaderTop }}
                         className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider"
                       >
-                        Description
+                        {t("Description")}
                       </th>
                       <th
                         style={{ top: tableHeaderTop }}
                         className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32"
                       >
-                        Debit ($)
+                        {t("Debit ($)")}
                       </th>
                       <th
                         style={{ top: tableHeaderTop }}
                         className="sticky z-10 bg-default-100 dark:bg-gray-800 px-3 py-2.5 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider w-32"
                       >
-                        Credit ($)
+                        {t("Credit ($)")}
                       </th>
                       <th
                         style={{ top: tableHeaderTop }}
@@ -1889,7 +1935,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                             onFocus={() => setFocusedCell({ row: index, col: "reference" })}
                             onBlur={() => setFocusedCell(null)}
                             disabled={isSaving}
-                            placeholder="Chq No"
+                            placeholder={t("Chq No")}
                             className={`w-full px-2 py-1.5 text-sm bg-transparent border-0 rounded placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed ${
                               focusedCell?.row === index && focusedCell?.col === "reference"
                                 ? "ring-1 ring-sky-500 bg-white dark:bg-gray-700"
@@ -1909,7 +1955,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                             onFocus={() => setFocusedCell({ row: index, col: "particulars" })}
                             onBlur={() => setFocusedCell(null)}
                             disabled={isSaving}
-                            placeholder="Description"
+                            placeholder={t("Description")}
                             className={`w-full px-2 py-1.5 text-sm bg-transparent border-0 rounded placeholder:text-gray-400 dark:placeholder:text-gray-500 text-default-900 dark:text-gray-100 disabled:cursor-not-allowed ${
                               focusedCell?.row === index && focusedCell?.col === "particulars"
                                 ? "ring-1 ring-sky-500 bg-white dark:bg-gray-700"
@@ -1976,7 +2022,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                               onClick={() => removeLine(index)}
                               disabled={isSaving}
                               className="opacity-0 group-hover:opacity-100 text-rose-500 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300 transition-opacity p-1 rounded hover:bg-rose-50 dark:hover:bg-rose-900/20"
-                              title="Remove line"
+                              title={t("Remove line")}
                             >
                               <IconTrash size={16} />
                             </button>
@@ -1995,7 +2041,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                           className="flex items-center gap-1.5 text-sm font-medium text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <IconPlus size={16} />
-                          Add Line
+                          {t("Add Line")}
                         </button>
                       </td>
                       <td className="px-3 py-2.5 text-right">
@@ -2030,7 +2076,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
                     icon={IconTrash}
                     iconPosition="left"
                   >
-                    Delete
+                    {t("Delete")}
                   </Button>
                 </div>
               )}
@@ -2057,9 +2103,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Journal Entry"
-        message={`Are you sure you want to delete entry "${formData.reference_no}"? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Journal Entry")}
+        message={t(
+          'Are you sure you want to delete entry "{{reference}}"? This action cannot be undone.',
+          { reference: formData.reference_no }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
 
@@ -2067,9 +2116,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Changes"
-        message="You have unsaved changes. Are you sure you want to go back? All changes will be lost."
-        confirmButtonText="Discard"
+        title={t("Discard Changes")}
+        message={t(
+          "You have unsaved changes. Are you sure you want to go back? All changes will be lost."
+        )}
+        confirmButtonText={t("Discard")}
       />
 
       <ConfirmationDialog
@@ -2079,9 +2130,12 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
           setShowDetachConfirmation(false);
           void performSave();
         }}
-        title="Detach Journal from Its Document?"
-        message={`This journal was created by its source document, which keeps it up to date automatically. Saving entry "${formData.reference_no}" by hand detaches it: the source document will stop updating it, and the per-line receipt and cheque references on its lines will be lost. This cannot be undone.`}
-        confirmButtonText="Save & Detach"
+        title={t("Detach Journal from Its Document?")}
+        message={t(
+          'This journal was created by its source document, which keeps it up to date automatically. Saving entry "{{reference}}" by hand detaches it: the source document will stop updating it, and the per-line receipt and cheque references on its lines will be lost. This cannot be undone.',
+          { reference: formData.reference_no }
+        )}
+        confirmButtonText={t("Save & Detach")}
         variant="danger"
       />
     </div>

@@ -8,6 +8,7 @@ import {
   Location,
 } from "../../utils/catalogue/useLocationMappingsCache";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -458,6 +459,8 @@ const CATEGORY_CONFIG = {
 };
 
 const LocationAccountMappingsPage: React.FC = () => {
+  const { t, i18n } = useTranslation("accounting");
+
   // Use cached location mappings
   const {
     locations,
@@ -506,7 +509,9 @@ const LocationAccountMappingsPage: React.FC = () => {
 
   // Help dialog state
   const [showHelpDialog, setShowHelpDialog] = useState(false);
-  const [helpLanguage, setHelpLanguage] = useState<"ms" | "en">("ms");
+  const [helpLanguage, setHelpLanguage] = useState<"ms" | "en">(() =>
+    i18n.resolvedLanguage === "ms" ? "ms" : "en"
+  );
 
   // Tooltip state
   const [hoveredMapping, setHoveredMapping] =
@@ -634,14 +639,14 @@ const LocationAccountMappingsPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!selectedAccountCode || !selectedLocation || !selectedMappingType) {
-      toast.error("Please select a location and mapping type");
+      toast.error(t("Please select a location and mapping type"));
       return;
     }
 
     // Find location name
     const loc = availableLocations.find((l) => l.id === selectedLocation);
     if (!loc) {
-      toast.error("Invalid location selected");
+      toast.error(t("Invalid location selected"));
       return;
     }
 
@@ -655,13 +660,13 @@ const LocationAccountMappingsPage: React.FC = () => {
         voucher_type: activeTab,
         is_active: true,
       });
-      toast.success("Mapping created successfully");
+      toast.success(t("Mapping created successfully"));
       setShowAddModal(false);
       invalidateAccountMappings();
     } catch (error: unknown) {
       console.error("Error saving mapping:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to save mapping";
+        error instanceof Error ? error.message : t("Failed to save mapping");
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -673,14 +678,14 @@ const LocationAccountMappingsPage: React.FC = () => {
 
     try {
       await api.delete(`/api/journal-vouchers/mappings/${mappingToDelete.id}`);
-      toast.success("Mapping deleted successfully");
+      toast.success(t("Mapping deleted successfully"));
       setShowDeleteDialog(false);
       setMappingToDelete(null);
       invalidateAccountMappings();
     } catch (error: unknown) {
       console.error("Error deleting mapping:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete mapping";
+        error instanceof Error ? error.message : t("Failed to delete mapping");
       toast.error(errorMessage);
     }
   };
@@ -798,10 +803,10 @@ const LocationAccountMappingsPage: React.FC = () => {
       <div className="mb-4 flex flex-col items-start justify-between gap-4 md:flex-row md:items-center">
         <div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Account Code Mappings
+            {t("Account Code Mappings")}
           </h1>
           <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
-            Manage which payroll locations flow into each GL account code
+            {t("Manage which payroll locations flow into each GL account code")}
           </p>
         </div>
       </div>
@@ -817,7 +822,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                 : "border-transparent text-default-500 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
             }`}
           >
-            JVSL - Staff Salary
+            {t("JVSL - Staff Salary")}
           </button>
           <button
             onClick={() => setActiveTab("JVDR")}
@@ -827,7 +832,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                 : "border-transparent text-default-500 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
             }`}
           >
-            JVDR - Director's Remuneration
+            {t("JVDR - Director's Remuneration")}
           </button>
         </div>
       </div>
@@ -842,24 +847,28 @@ const LocationAccountMappingsPage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search account code..."
+              placeholder={t("Search account code...")}
               className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="flex items-center gap-3 text-xs text-default-600 dark:text-gray-400">
-            <span>{expectedAccountCodes.length} account codes</span>
+            <span>
+              {t("{{count}} account codes", {
+                count: expectedAccountCodes.length,
+              })}
+            </span>
             <span className="text-default-300 dark:text-gray-600">|</span>
             {unmappedCount > 0 ? (
               <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
                 <IconAlertTriangle size={14} />
-                {unmappedCount} unmapped
+                {t("{{count}} unmapped", { count: unmappedCount })}
               </span>
             ) : (
               <span className="flex items-center gap-1 text-green-600 dark:text-green-400">
                 <IconCheck size={14} />
-                All mapped
+                {t("All mapped")}
               </span>
             )}
           </div>
@@ -867,10 +876,10 @@ const LocationAccountMappingsPage: React.FC = () => {
         <button
           onClick={() => setShowHelpDialog(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-default-600 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-default-100 dark:hover:bg-gray-700 rounded-lg transition-colors self-start sm:self-auto"
-          title="Help - Learn about account mappings"
+          title={t("Help - Learn about account mappings")}
         >
           <IconHelp size={18} />
-          <span>Help</span>
+          <span>{t("Help")}</span>
         </button>
       </div>
 
@@ -920,7 +929,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                         : "text-amber-700 dark:text-amber-300"
                     }`}
                   >
-                    {config.label}
+                    {t(config.label)}
                   </span>
                   <span className="text-xs text-default-500 dark:text-gray-400">
                     ({codes.length})
@@ -984,7 +993,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                                     {mapping.location_id}
                                   </span>
                                   <span className="text-green-600 dark:text-green-400 text-[9px] sm:text-[10px]">
-                                    {getMappingTypeLabel(mapping.mapping_type)}
+                                    {t(getMappingTypeLabel(mapping.mapping_type))}
                                   </span>
                                   <button
                                     onClick={(e) => {
@@ -992,7 +1001,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                                       handleDeleteClick(mapping);
                                     }}
                                     className="ml-0.5 p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-800 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title="Remove mapping"
+                                    title={t("Remove mapping")}
                                   >
                                     <IconX
                                       size={10}
@@ -1014,12 +1023,12 @@ const LocationAccountMappingsPage: React.FC = () => {
                             }`}
                             title={
                               isMapped
-                                ? "Add another location"
-                                : "Add location mapping"
+                                ? t("Add another location")
+                                : t("Add location mapping")
                             }
                           >
                             <IconPlus size={12} className="sm:w-3.5 sm:h-3.5" />
-                            {!isMapped && <span>Add</span>}
+                            {!isMapped && <span>{t("Add")}</span>}
                           </button>
 
                           {/* Desktop status indicator */}
@@ -1045,7 +1054,9 @@ const LocationAccountMappingsPage: React.FC = () => {
 
         {filteredAccountCodes.length === 0 && (
           <div className="text-center py-10 text-default-500 dark:text-gray-400">
-            No account codes found matching "{searchTerm}"
+            {t('No account codes found matching "{{search}}"', {
+              search: searchTerm,
+            })}
           </div>
         )}
       </div>
@@ -1060,14 +1071,14 @@ const LocationAccountMappingsPage: React.FC = () => {
             />
             <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
               <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100 mb-4">
-                Add Location Mapping
+                {t("Add Location Mapping")}
               </h2>
 
               <div className="space-y-4">
                 {/* Account Code Info */}
                 <div className="p-3 rounded-lg bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800">
                   <div className="text-xs text-sky-600 dark:text-sky-400 mb-1">
-                    Account Code
+                    {t("Account Code")}
                   </div>
                   <div className="font-medium text-sky-800 dark:text-sky-200">
                     <code>
@@ -1082,7 +1093,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                 {/* Mapping Type Selection */}
                 <div>
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                    Mapping Type
+                    {t("Mapping Type")}
                   </label>
                   <Listbox
                     value={selectedMappingType}
@@ -1091,7 +1102,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 px-3 py-2 pr-10 text-left text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
                         <span className="block truncate">
-                          {getMappingTypeLabel(selectedMappingType)}
+                          {t(getMappingTypeLabel(selectedMappingType))}
                         </span>
                         <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                           <IconChevronDown
@@ -1120,7 +1131,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                                     selected ? "font-medium" : ""
                                   }`}
                                 >
-                                  {getMappingTypeLabel(type)}
+                                  {t(getMappingTypeLabel(type))}
                                 </span>
                                 {selected && (
                                   <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
@@ -1139,7 +1150,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                 {/* Location Selection */}
                 <div>
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                    Location
+                    {t("Location")}
                   </label>
                   <Combobox
                     value={selectedLocation}
@@ -1155,10 +1166,12 @@ const LocationAccountMappingsPage: React.FC = () => {
                           const loc = availableLocations.find(
                             (l) => l.id === id
                           );
-                          return loc ? `${loc.id} - ${loc.name}` : id;
+                          return loc
+                            ? `${loc.id} - ${t(loc.name)}`
+                            : id;
                         }}
                         onChange={(e) => setLocationSearch(e.target.value)}
-                        placeholder="Search location..."
+                        placeholder={t("Search location...")}
                       />
                       <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                         <IconChevronDown
@@ -1169,7 +1182,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                       <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-lg bg-white dark:bg-gray-800 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                         {availableLocations.length === 0 ? (
                           <div className="px-4 py-2 text-default-500 dark:text-gray-400">
-                            No locations found
+                            {t("No locations found")}
                           </div>
                         ) : (
                           availableLocations.map((loc) => (
@@ -1194,7 +1207,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                                     <span className="text-sky-600 dark:text-sky-400">
                                       {loc.id}
                                     </span>
-                                    <span className="ml-2">{loc.name}</span>
+                                    <span className="ml-2">{t(loc.name)}</span>
                                   </span>
                                   {selected && (
                                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
@@ -1221,7 +1234,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                   onClick={() => setShowAddModal(false)}
                   disabled={isSaving}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   type="button"
@@ -1232,7 +1245,7 @@ const LocationAccountMappingsPage: React.FC = () => {
                     isSaving || !selectedLocation || !selectedMappingType
                   }
                 >
-                  {isSaving ? "Saving..." : "Add Mapping"}
+                  {isSaving ? t("Saving...") : t("Add Mapping")}
                 </Button>
               </div>
             </div>
@@ -1245,8 +1258,15 @@ const LocationAccountMappingsPage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Mapping"
-        message={`Are you sure you want to delete the mapping from Location ${mappingToDelete?.location_id} (${mappingToDelete?.location_name}) to account ${mappingToDelete?.account_code}? This action cannot be undone.`}
+        title={t("Delete Mapping")}
+        message={t(
+          "Are you sure you want to delete the mapping from Location {{locationId}} ({{locationName}}) to account {{accountCode}}? This action cannot be undone.",
+          {
+            locationId: mappingToDelete?.location_id,
+            locationName: mappingToDelete?.location_name,
+            accountCode: mappingToDelete?.account_code,
+          }
+        )}
         variant="danger"
       />
 
@@ -1643,7 +1663,7 @@ const LocationAccountMappingsPage: React.FC = () => {
               />
             </div>
             <div className="text-[10px] text-sky-500 dark:text-sky-400 mt-0.5 group-hover:underline">
-              View in Location Page
+              {t("View in Location Page")}
             </div>
           </button>
 
@@ -1654,7 +1674,11 @@ const LocationAccountMappingsPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-medium text-default-600 dark:text-gray-400 mb-1">
                     <IconBriefcase size={12} />
-                    <span>Jobs ({locationDetails.jobs.length})</span>
+                    <span>
+                      {t("Jobs ({{count}})", {
+                        count: locationDetails.jobs.length,
+                      })}
+                    </span>
                   </div>
                   {locationDetails.jobs.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
@@ -1668,12 +1692,16 @@ const LocationAccountMappingsPage: React.FC = () => {
                       ))}
                       {locationDetails.jobs.length > 6 && (
                         <span className="px-1.5 py-0.5 text-[10px] text-default-500">
-                          +{locationDetails.jobs.length - 6} more
+                          {t("+{{count}} more", {
+                            count: locationDetails.jobs.length - 6,
+                          })}
                         </span>
                       )}
                     </div>
                   ) : (
-                    <span className="text-[10px] text-default-400 italic">No jobs mapped</span>
+                    <span className="text-[10px] text-default-400 italic">
+                      {t("No jobs mapped")}
+                    </span>
                   )}
                 </div>
 
@@ -1681,7 +1709,11 @@ const LocationAccountMappingsPage: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-1.5 text-xs font-medium text-default-600 dark:text-gray-400 mb-1">
                     <IconUsers size={12} />
-                    <span>Employees ({locationDetails.staffs.length})</span>
+                    <span>
+                      {t("Employees ({{count}})", {
+                        count: locationDetails.staffs.length,
+                      })}
+                    </span>
                   </div>
                   {locationDetails.staffs.length > 0 ? (
                     <div className="flex flex-wrap gap-1">
@@ -1695,12 +1727,16 @@ const LocationAccountMappingsPage: React.FC = () => {
                       ))}
                       {locationDetails.staffs.length > 6 && (
                         <span className="px-1.5 py-0.5 text-[10px] text-default-500">
-                          +{locationDetails.staffs.length - 6} more
+                          {t("+{{count}} more", {
+                            count: locationDetails.staffs.length - 6,
+                          })}
                         </span>
                       )}
                     </div>
                   ) : (
-                    <span className="text-[10px] text-default-400 italic">No employees assigned</span>
+                    <span className="text-[10px] text-default-400 italic">
+                      {t("No employees assigned")}
+                    </span>
                   )}
                 </div>
               </>

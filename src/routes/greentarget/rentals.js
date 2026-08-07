@@ -666,61 +666,6 @@ export default function (pool) {
     }
   });
 
-  // Generate delivery order PDF
-  router.get("/:rental_id/delivery-order", async (req, res) => {
-    const { rental_id } = req.params;
-
-    try {
-      // Get rental details with joined data
-      const query = `
-        SELECT r.*, 
-               c.name as customer_name,
-               l.address as location_address,
-               l.site as location_site,
-               d.status as dumpster_status
-        FROM greentarget.rentals r
-        JOIN greentarget.customers c ON r.customer_id = c.customer_id
-        LEFT JOIN greentarget.locations l ON r.location_id = l.location_id
-        LEFT JOIN greentarget.dumpsters d ON r.tong_no = d.tong_no
-        WHERE r.rental_id = $1
-      `;
-
-      const result = await pool.query(query, [rental_id]);
-
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Rental not found" });
-      }
-
-      const rentalData = result.rows[0];
-
-      // Return the data - in a real implementation, you would generate a PDF here
-      // For now, we're just returning the data that would be used in the PDF
-      res.json({
-        message: "Delivery order data retrieved",
-        deliveryOrderData: {
-          rental_id: rentalData.rental_id,
-          do_number: `DO-${rentalData.rental_id}`,
-          date: rentalData.date_placed,
-          customer: rentalData.customer_name,
-          location:
-            [rentalData.location_site, rentalData.location_address]
-              .map((part) => (part || "").trim())
-              .filter(Boolean)
-              .join(" — ") || "N/A",
-          dumpster: rentalData.tong_no,
-          driver: rentalData.driver,
-          remarks: rentalData.remarks || "",
-        },
-      });
-    } catch (error) {
-      console.error("Error generating delivery order:", error);
-      res.status(500).json({
-        message: "Error generating delivery order",
-        error: error.message,
-      });
-    }
-  });
-
   // Get aggregated rental details: rental row + ALL linked invoices (each with
   // its payments), for the Rental Details page. Non-cancelled invoices first.
   router.get("/:rental_id/details", async (req, res) => {

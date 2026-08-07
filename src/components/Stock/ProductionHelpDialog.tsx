@@ -1,5 +1,6 @@
 // src/components/Stock/ProductionHelpDialog.tsx
-import React, { Fragment, useState } from "react";
+import React, { Fragment, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -27,7 +28,23 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [language, setLanguage] = useState<Language>("bm");
+  const { i18n } = useTranslation("stock");
+  // The dialog keeps its own BM/EN toggle (bilingual content, like the
+  // ChangelogModal); the default now follows the app language so e.g. zh-Hans
+  // users land on the English tab instead of Malay. Manual choice wins.
+  const [language, setLanguage] = useState<Language>("en");
+  const languageTouchedRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen && !languageTouchedRef.current) {
+      setLanguage(i18n.resolvedLanguage === "ms" ? "bm" : "en");
+    }
+  }, [isOpen, i18n.resolvedLanguage]);
+
+  const handleLanguageChange = (nextLanguage: Language): void => {
+    languageTouchedRef.current = true;
+    setLanguage(nextLanguage);
+  };
 
   const content = {
     en: {
@@ -247,7 +264,7 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
                     {/* Language Toggle */}
                     <div className="flex rounded-lg border border-default-200 dark:border-gray-600 overflow-hidden">
                       <button
-                        onClick={() => setLanguage("bm")}
+                        onClick={() => handleLanguageChange("bm")}
                         className={clsx(
                           "px-3 py-1 text-sm font-medium transition-colors",
                           language === "bm"
@@ -258,7 +275,7 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
                         BM
                       </button>
                       <button
-                        onClick={() => setLanguage("en")}
+                        onClick={() => handleLanguageChange("en")}
                         className={clsx(
                           "px-3 py-1 text-sm font-medium transition-colors",
                           language === "en"

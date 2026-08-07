@@ -44,6 +44,7 @@ import {
   type PayrollProcessEmployeeSelection,
 } from "../../utils/payroll/payrollUtils";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import AddManualItemModal from "../../components/Payroll/AddManualItemModal";
 import CrossCompanyTakeHomeCard from "../../components/Payroll/CrossCompanyTakeHomeCard";
 import {
@@ -129,6 +130,7 @@ interface MonthlyLeaveRecord {
 }
 
 const EmployeePayrollDetailsPage: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -258,7 +260,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       setPinjamRecords(response.pinjam_records || []);
     } catch (error) {
       console.error("Error fetching comprehensive employee payroll:", error);
-      toast.error("Failed to load employee payroll details");
+      toast.error(t("Failed to load employee payroll details"));
     } finally {
       setIsLoading(false);
     }
@@ -270,11 +272,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     setIsDeleting(true);
     try {
       await deletePayrollItem(itemToDelete.id);
-      toast.success("Item deleted successfully");
+      toast.success(t("Item deleted successfully"));
       await fetchEmployeePayrollComprehensive();
     } catch (error) {
       console.error("Error deleting payroll item:", error);
-      toast.error("Failed to delete payroll item");
+      toast.error(t("Failed to delete payroll item"));
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -348,7 +350,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     const selectedCombinations: PayrollProcessEmployeeSelection[] =
       buildIndividualProcessCombinations();
     if (selectedCombinations.length === 0) {
-      toast.error("No employee jobs found for processing");
+      toast.error(t("No employee jobs found for processing"));
       return;
     }
 
@@ -363,19 +365,23 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       );
 
       if (response.errors?.length > 0) {
-        toast.error(`Processed with ${response.errors.length} errors`);
+        toast.error(
+          t("Processed with {{count}} errors", {
+            count: response.errors.length,
+          }),
+        );
       } else {
-        toast.success("Payroll reprocessed successfully");
+        toast.success(t("Payroll reprocessed successfully"));
       }
 
       if (response.missing_income_tax_employees?.length > 0) {
-        toast.error("Some employees are missing income tax rates");
+        toast.error(t("Some employees are missing income tax rates"));
       }
 
       await fetchEmployeePayrollComprehensive();
     } catch (error) {
       console.error("Error reprocessing employee payroll:", error);
-      toast.error("Failed to reprocess payroll");
+      toast.error(t("Failed to reprocess payroll"));
     } finally {
       setIsReprocessingPayroll(false);
     }
@@ -628,12 +634,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   if (!payroll) {
     return (
       <div className="text-center py-12">
-        <p className="text-default-500 dark:text-gray-400">
-          Employee payroll not found
-        </p>
-        <Button onClick={handleBack} className="mt-4" variant="outline">
-          Back
-        </Button>
+        <p className="text-default-500 dark:text-gray-400">{t("Employee payroll not found")}</p>
+        <Button onClick={handleBack} className="mt-4" variant="outline">{t("Back")}</Button>
       </div>
     );
   }
@@ -1153,7 +1155,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         row.rate_unit === rateUnit && isMoneyEqual(Number(row.rate) || 0, rate),
     );
 
-    if (!hasConsistentRate) return { rate: "Mixed rates", quantity: "-" };
+    if (!hasConsistentRate) return { rate: t("Mixed rates"), quantity: "-" };
 
     if (rateUnit === "Fixed") {
       const allDirectAmountFixed: boolean = rows.every((row: OthersRecord) => {
@@ -1164,8 +1166,11 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
       if (allDirectAmountFixed) {
         return {
-          rate: "Ikut amaun",
-          quantity: rows.length === 1 ? "-" : `${rows.length} entries`,
+          rate: t("By amount"),
+          quantity:
+            rows.length === 1
+              ? "-"
+              : t("{{count}} entries", { count: rows.length }),
         };
       }
 
@@ -1326,19 +1331,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             </span>
             {item.item_count > 1 && (
               <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 dark:bg-gray-700 text-default-500 dark:text-gray-400">
-                {item.item_count} entries
+                {t("{{count}} entries", { count: item.item_count })}
               </span>
             )}
             {item.is_manual && (
               <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
-                Manual
+                {t("Manual")}
               </span>
             )}
           </span>
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {fixedDirectAmountSummary
-            ? "Ikut amaun"
+            ? t("By amount")
             : item.rate_unit === "Percent"
               ? `${item.rate}%`
               : item.rate_unit === "Fixed" && item.item_count > 1
@@ -1347,7 +1352,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         </td>
         <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
           {fixedDirectAmountSummary ? (
-            `${fixedDirectAmountSummary.paidEntries} paid / ${fixedDirectAmountSummary.totalEntries} entries`
+            t("{{paid}} paid / {{total}} entries", {
+              paid: fixedDirectAmountSummary.paidEntries,
+              total: fixedDirectAmountSummary.totalEntries,
+            })
           ) : item.rate_unit === "Fixed" && item.item_count > 1 ? (
             item.item_count
           ) : (
@@ -1436,14 +1444,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </span>
               {item.is_manual && (
                 <span className="ml-1.5 px-1 py-0.5 text-xs rounded bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
-                  Manual
+                  {t("Manual")}
                 </span>
               )}
             </span>
           </td>
           <td className="px-3 py-2 whitespace-nowrap text-center text-sm">
             {isDirectAmountFixedItem(item)
-              ? "Ikut amaun"
+              ? t("By amount")
               : item.rate_unit === "Percent"
                 ? `${item.rate}%`
                 : item.rate_unit === "Fixed" && item.quantity > 1
@@ -1503,9 +1511,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     totalLabel: string,
   ): React.ReactElement => {
     const summary: BaseRateSummary = calculateBaseRateSummary(baseItems, unit);
-    const unitLabel: string = unit === "Hour" ? "Jam" : unit;
+    const unitLabel: string = unit === "Hour" ? t("Jam") : unit;
     const summaryLabel: string = shouldShowBaseFinalTotal(baseItems)
-      ? `${unitLabel} Summary`
+      ? t("{{unit}} Summary", { unit: unitLabel })
       : totalLabel;
 
     return (
@@ -1518,10 +1526,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           {summaryLabel}
         </td>
         <td className="px-3 py-2 text-center text-sm font-semibold text-default-800 dark:text-gray-100">
-          Rate/{unitLabel}: {formatCurrency(summary.averageRate)}
+          {t("Rate/{{unit}}: {{rate}}", {
+            unit: unitLabel,
+            rate: formatCurrency(summary.averageRate),
+          })}
         </td>
         <td className="px-3 py-2 text-center text-sm font-medium text-default-600 dark:text-gray-300">
-          Jumlah {unitLabel}: {formatUnitQuantity(summary.totalUnits)}
+          {t("Total {{unit}}: {{quantity}}", {
+            unit: unitLabel,
+            quantity: formatUnitQuantity(summary.totalUnits),
+          })}
         </td>
         <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
           {formatCurrency(summary.totalAmount)}
@@ -1566,7 +1580,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           colSpan={3}
           className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
         >
-          Jumlah lain-lain
+          {t("Total Others")}
         </td>
         <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
           {formatCurrency(otherTotalAmount)}
@@ -1678,12 +1692,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           <div className="min-w-0">
             <h1
               className="max-w-48 truncate text-xl font-semibold text-default-800 dark:text-gray-100 sm:max-w-72"
-              title={payroll.employee_name || "Unknown employee"}
+              title={payroll.employee_name || t("Unknown employee")}
             >
-              {payroll.employee_name || "Unknown employee"}
+              {payroll.employee_name || t("Unknown employee")}
             </h1>
             <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
-              {getMonthName(payroll.month)} {payroll.year}
+              {t(getMonthName(payroll.month))} {payroll.year}
             </p>
           </div>
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
@@ -1696,10 +1710,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   ? "bg-sky-500 text-white"
                   : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
-              title="Summary View - Shows totals grouped by item"
+              title={t("Summary View - Shows totals grouped by item")}
             >
               <IconList size={16} />
-              Summary
+              {t("Summary")}
             </button>
             <button
               onClick={() => handleViewModeChange("detailed")}
@@ -1708,10 +1722,10 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   ? "bg-sky-500 text-white"
                   : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
               }`}
-              title="Detailed View - Shows per-day breakdown"
+              title={t("Detailed View - Shows per-day breakdown")}
             >
               <IconListDetails size={16} />
-              Detailed
+              {t("Detailed")}
             </button>
           </div>
         </div>
@@ -1725,7 +1739,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               disabled={isReprocessingPayroll}
               className="flex-1 md:flex-none"
             >
-              {isReprocessingPayroll ? "Processing..." : "Re-process"}
+              {isReprocessingPayroll
+                ? t("Processing...")
+                : t("Re-process")}
             </Button>
           )}
           <PrintPayslipButton
@@ -1733,8 +1749,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             midMonthPayroll={midMonthPayroll}
             buttonText={
               payroll.job_type?.includes(", ")
-                ? "Per Job"
-                : "Pay Slip"
+                ? t("Per Job")
+                : t("Pay Slip")
             }
             variant="filled"
             color="sky"
@@ -1745,7 +1761,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               payroll={payroll}
               midMonthPayroll={midMonthPayroll}
               mode="combined"
-              buttonText="Combined"
+              buttonText={t("Combined")}
               variant="outline"
               color="sky"
               className="flex-1 md:flex-none"
@@ -1756,8 +1772,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             midMonthPayroll={midMonthPayroll}
             buttonText={
               payroll.job_type?.includes(", ")
-                ? "Full PDF"
-                : "PDF"
+                ? t("Full PDF")
+                : t("PDF")
             }
             variant="default"
             color="sky"
@@ -1771,7 +1787,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               color="default"
               className="flex-1 md:flex-none"
             >
-              Manual Item
+              {t("Manual Item")}
             </Button>
           )}
         </div>
@@ -1783,7 +1799,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
         <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 transition-shadow hover:shadow-md">
           <div className="px-4 py-3 bg-default-50 dark:bg-gray-900/50 border-b border-default-100 dark:border-gray-700">
             <h3 className="text-md font-semibold text-default-700 dark:text-gray-200">
-              Employee Information
+              {t("Employee Information")}
             </h3>
           </div>
           <div className="p-4 flex flex-col h-full">
@@ -1791,13 +1807,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               {/* Employee Name */}
               <div>
                 <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-400 mb-1">
-                  Employee
+                  {t("Employee")}
                 </p>
                 {isCombinedPayroll &&
                 Object.keys(derivedEmployeeJobMapping).length > 0 ? (
                   <>
                     <p className="font-semibold text-default-800 dark:text-gray-100">
-                      {payroll.employee_name || "Unknown"}
+                      {payroll.employee_name || t("Unknown")}
                     </p>
                     <div className="mt-2 space-y-1">
                       {Object.entries(derivedEmployeeJobMapping).map(
@@ -1830,7 +1846,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         to={`/catalogue/staff/${payroll.employee_id}`}
                         className="text-sky-600 dark:text-sky-400 hover:underline"
                       >
-                        {payroll.employee_name || "Unknown"}
+                        {payroll.employee_name || t("Unknown")}
                       </Link>
                     </p>
                     <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
@@ -1843,7 +1859,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               {/* Job Type */}
               <div>
                 <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-400 mb-1">
-                  Job Type
+                  {t("Job Type")}
                 </p>
                 <p className="font-semibold text-default-800 dark:text-gray-100">
                   {payroll.job_type}
@@ -1864,14 +1880,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-emerald-600 dark:text-emerald-400"
               />
-              Earnings
+              {t("Earnings")}
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
             <div className="space-y-2 flex-grow">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Base Pay
+                  {t("Base Pay")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(baseTotal)}
@@ -1879,7 +1895,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Tambahan
+                  {t("Tambahan")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(tambahanTotal)}
@@ -1887,7 +1903,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Overtime
+                  {t("Overtime")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(overtimeTotal)}
@@ -1895,7 +1911,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Cuti Pay
+                  {t("Leave Pay")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(
@@ -1946,7 +1962,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             <div className="border-t border-default-200 dark:border-gray-600 mt-auto pt-3">
               <div className="flex justify-between font-semibold">
                 <span className="text-default-800 dark:text-gray-100">
-                  Gross Pay
+                  {t("Gross Pay")}
                 </span>
                 <span className="text-emerald-700 dark:text-emerald-400 text-lg">
                   {formatCurrency(payroll.gross_pay)}
@@ -1964,14 +1980,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-sky-600 dark:text-sky-400"
               />
-              Deductions & Final Pay
+              {t("Deductions & Final Pay")}
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
             <div className="space-y-2 flex-grow">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Gross Pay
+                  {t("Gross Pay")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(payroll.gross_pay)}
@@ -2012,7 +2028,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       className="group relative flex justify-between text-sm"
                     >
                       <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                        {deductionName}
+                        {t(deductionName)}
                         <IconInfoCircle
                           size={14}
                           className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
@@ -2029,12 +2045,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
                           <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
                           <div className="font-semibold mb-2 text-default-100">
-                            {deductionName} Breakdown
+                            {t("{{name}} Breakdown", {
+                              name: t(deductionName),
+                            })}
                           </div>
                           <div className="space-y-1">
                             <div className="flex justify-between">
                               <span className="text-default-300">
-                                Employee:
+                                {t("Employee:")}
                               </span>
                               <span>
                                 {formatCurrency(deduction.employee_amount)}
@@ -2042,7 +2060,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </div>
                             <div className="flex justify-between">
                               <span className="text-default-300">
-                                Employer:
+                                {t("Employer:")}
                               </span>
                               <span>
                                 {formatCurrency(deduction.employer_amount)}
@@ -2050,16 +2068,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             </div>
                             <div className="border-t border-default-600 mt-2 pt-2">
                               <div className="flex justify-between text-default-400">
-                                <span>Employee Rate:</span>
+                                <span>{t("Employee Rate:")}</span>
                                 <span>{deduction.rate_info.employee_rate}</span>
                               </div>
                               <div className="flex justify-between text-default-400">
-                                <span>Employer Rate:</span>
+                                <span>{t("Employer Rate:")}</span>
                                 <span>{deduction.rate_info.employer_rate}</span>
                               </div>
                               {deduction.rate_info.age_group && (
                                 <div className="flex justify-between text-default-400">
-                                  <span>Age Group:</span>
+                                  <span>{t("Age Group:")}</span>
                                   <span className="capitalize">
                                     {deduction.rate_info.age_group.replace(
                                       /_/g,
@@ -2083,7 +2101,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     {mergedAdvanceCommissionRecords
                       .map((record) => record.description)
                       .join(" + ")}{" "}
-                    Advance
+                    {t("Advance")}
                     <IconInfoCircle
                       size={14}
                       className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
@@ -2103,12 +2121,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
                       <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
                       <div className="font-semibold mb-2 text-default-100">
-                        Commission Advance
+                        {t("Commission Advance")}
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between">
                           <span className="text-default-300">
-                            Total Amount:
+                            {t("Total Amount:")}
                           </span>
                           <span>
                             {formatCurrency(
@@ -2120,12 +2138,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-default-300">Records:</span>
+                          <span className="text-default-300">
+                            {t("Records:")}
+                          </span>
                           <span>{advanceCommissionRecords.length}</span>
                         </div>
                       </div>
                       <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
-                        Payments made in advance, deducted from final pay.
+                        {t("Payments made in advance, deducted from final pay.")}
                       </div>
                     </div>
                   </div>
@@ -2142,7 +2162,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     className="flex flex-1 items-center justify-between rounded text-default-600 hover:text-sky-600 dark:text-gray-300 dark:hover:text-sky-400"
                   >
                     <span className="flex items-center gap-1 cursor-help">
-                      Mid-month Advance
+                      {t("Mid-month Advance")}
                       <IconInfoCircle
                         size={14}
                         className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
@@ -2157,15 +2177,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
                       <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800"></div>
                       <div className="font-semibold mb-2 text-default-100">
-                        Mid-month Advance
+                        {t("Mid-month Advance")}
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between">
-                          <span className="text-default-300">Amount:</span>
+                          <span className="text-default-300">
+                            {t("Amount:")}
+                          </span>
                           <span>{formatCurrency(midMonthPayroll.amount)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-default-300">Date:</span>
+                          <span className="text-default-300">
+                            {t("Date:")}
+                          </span>
                           <span>
                             {format(
                               new Date(midMonthPayroll.created_at),
@@ -2175,7 +2199,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         </div>
                       </div>
                       <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
-                        Advance payment made mid-month, deducted from final pay.
+                        {t(
+                          "Advance payment made mid-month, deducted from final pay.",
+                        )}
                       </div>
                     </div>
                   </div>
@@ -2186,7 +2212,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               <div className="border-t border-default-200 dark:border-gray-600 mt-2 pt-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300 font-medium">
-                    Total Deductions
+                    {t("Total Deductions")}
                   </span>
                   <span className="font-semibold text-rose-600 dark:text-rose-400">
                     -{" "}
@@ -2221,7 +2247,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               return digenapkan > 0.001 ? (
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-default-600 dark:text-gray-300">
-                    Digenapkan
+                    {t("Rounding")}
                   </span>
                   <span className="font-medium text-emerald-600 dark:text-emerald-400">
                     + {formatCurrency(digenapkan)}
@@ -2234,7 +2260,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             <div className="bg-sky-100 dark:bg-sky-900/30 -mx-4 -mb-4 mt-4 px-4 py-4 border-t border-sky-200 dark:border-sky-800/50 rounded-b-lg">
               <div className="flex justify-between items-center">
                 <span className="text-sky-800 dark:text-sky-300 font-bold text-base">
-                  Jumlah Digenapkan
+                  {t("Rounded Total")}
                 </span>
                 <span className="text-sky-900 dark:text-sky-200 text-2xl font-bold">
                   {formatCurrency(jumlahDigenapkan)}
@@ -2270,10 +2296,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
               <div key={jobType} className="mb-3">
                 <div className="flex items-center justify-between mb-3 pb-2 border-b-2 border-default-300 dark:border-gray-600">
                   <h3 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-                    {formatJobType(jobType as string)} Section
+                    {t("{{name}} Section", {
+                      name: formatJobType(jobType as string),
+                    })}
                   </h3>
                   <span className="text-sm font-medium text-default-600 dark:text-gray-300">
-                    Subtotal: {formatCurrency(jobTotal)}
+                    {t("Subtotal: {{total}}", {
+                      total: formatCurrency(jobTotal),
+                    })}
                   </span>
                 </div>
 
@@ -2288,9 +2318,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <IconCoins
                           size={18}
                           className="text-amber-600 dark:text-amber-400"
-                        />
-                        Base Pay
-                      </h4>
+                         /> {t("Base Pay")}</h4>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -2300,55 +2328,47 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               <th
                                 scope="col"
                                 className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                              >
-                                Date
-                              </th>
+                              >{t("Date")}</th>
                             )}
                             <th
                               scope="col"
                               className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Description
-                            </th>
+                            >{t("Description")}</th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Rate
-                            </th>
+                            >{t("Rate")}</th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                             >
                               {viewMode === "consolidated"
-                                ? "Total Qty"
-                                : "Qty"}
+                                ? t("Total Qty")
+                                : t("Qty")}
                             </th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Amount
-                            </th>
+                            >{t("Amount")}</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                           {viewMode === "consolidated"
                             ? renderBaseConsolidatedRows(
                                 jobConsolidatedItems?.["Base"] || [],
-                                "Total Base",
+                                t("Total Base"),
                               )
                             : renderBaseDetailedRows(
                                 jobGroupedItems["Base"],
                                 jobConsolidatedItems?.["Base"] || [],
-                                "Total Base",
+                                t("Total Base"),
                               )}
                         </tbody>
                         {shouldShowBaseFinalTotal(
                           jobConsolidatedItems?.["Base"] || [],
                         ) && (
                           <tfoot className="bg-default-50 dark:bg-gray-800">
-                            {renderBaseTotalRow(jobBaseTotal, "Total Base")}
+                            {renderBaseTotalRow(jobBaseTotal, t("Total Base"))}
                           </tfoot>
                         )}
                       </table>
@@ -2367,9 +2387,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <IconCirclePlus
                           size={18}
                           className="text-violet-600 dark:text-violet-400"
-                        />
-                        Tambahan Pay
-                      </h4>
+                         /> {t("Tambahan Pay")}</h4>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -2379,36 +2397,28 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               <th
                                 scope="col"
                                 className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                              >
-                                Date
-                              </th>
+                              >{t("Date")}</th>
                             )}
                             <th
                               scope="col"
                               className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Description
-                            </th>
+                            >{t("Description")}</th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Rate
-                            </th>
+                            >{t("Rate")}</th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                             >
                               {viewMode === "consolidated"
-                                ? "Total Qty"
-                                : "Qty"}
+                                ? t("Total Qty")
+                                : t("Qty")}
                             </th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Amount
-                            </th>
+                            >{t("Amount")}</th>
                             {isEditable &&
                               (viewMode === "detailed" ||
                                 (viewMode === "consolidated" &&
@@ -2440,9 +2450,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             <td
                               colSpan={viewMode === "detailed" ? 4 : 3}
                               className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                            >
-                              Total Tambahan
-                            </td>
+                            >{t("Total Tambahan")}</td>
                             <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                               {formatCurrency(jobTambahanTotal)}
                             </td>
@@ -2471,9 +2479,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <IconClock
                           size={18}
                           className="text-orange-600 dark:text-orange-400"
-                        />
-                        Overtime Pay
-                      </h4>
+                         /> {t("Overtime Pay")}</h4>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -2483,36 +2489,28 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               <th
                                 scope="col"
                                 className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                              >
-                                Date
-                              </th>
+                              >{t("Date")}</th>
                             )}
                             <th
                               scope="col"
                               className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Description
-                            </th>
+                            >{t("Description")}</th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Rate
-                            </th>
+                            >{t("Rate")}</th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                             >
                               {viewMode === "consolidated"
-                                ? "Total Qty"
-                                : "Qty"}
+                                ? t("Total Qty")
+                                : t("Qty")}
                             </th>
                             <th
                               scope="col"
                               className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                            >
-                              Amount
-                            </th>
+                            >{t("Amount")}</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -2532,9 +2530,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             <td
                               colSpan={viewMode === "detailed" ? 4 : 3}
                               className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                            >
-                              Total Overtime
-                            </td>
+                            >{t("Total Overtime")}</td>
                             <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                               {formatCurrency(jobOvertimeTotal)}
                             </td>
@@ -2560,9 +2556,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <IconCoins
                       size={18}
                       className="text-amber-600 dark:text-amber-400"
-                    />
-                    Base Pay
-                  </h3>
+                     /> {t("Base Pay")}</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -2572,53 +2566,45 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           <th
                             scope="col"
                             className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                          >
-                            Date
-                          </th>
+                          >{t("Date")}</th>
                         )}
                         <th
                           scope="col"
                           className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          Description
-                        </th>
+                        >{t("Description")}</th>
+                        <th
+                          scope="col"
+                          className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                        >{t("Rate")}</th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                         >
-                          Rate
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          {viewMode === "consolidated" ? "Total Qty" : "Qty"}
+                          {viewMode === "consolidated" ? t("Total Qty") : t("Qty")}
                         </th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          Amount
-                        </th>
+                        >{t("Amount")}</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                       {viewMode === "consolidated"
                         ? renderBaseConsolidatedRows(
                             groupedConsolidatedItems["Base"],
-                            "Total Base Pay",
+                            t("Total Base Pay"),
                           )
                         : renderBaseDetailedRows(
                             groupedItems["Base"],
                             groupedConsolidatedItems["Base"],
-                            "Total Base Pay",
+                            t("Total Base Pay"),
                           )}
                     </tbody>
                     {shouldShowBaseFinalTotal(
                       groupedConsolidatedItems["Base"],
                     ) && (
                       <tfoot className="bg-default-50 dark:bg-gray-800">
-                        {renderBaseTotalRow(baseTotal, "Total Base Pay")}
+                        {renderBaseTotalRow(baseTotal, t("Total Base Pay"))}
                       </tfoot>
                     )}
                   </table>
@@ -2637,9 +2623,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <IconCirclePlus
                       size={18}
                       className="text-violet-600 dark:text-violet-400"
-                    />
-                    Tambahan Pay
-                  </h3>
+                     /> {t("Tambahan Pay")}</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -2649,34 +2633,26 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           <th
                             scope="col"
                             className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                          >
-                            Date
-                          </th>
+                          >{t("Date")}</th>
                         )}
                         <th
                           scope="col"
                           className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          Description
-                        </th>
+                        >{t("Description")}</th>
+                        <th
+                          scope="col"
+                          className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                        >{t("Rate")}</th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                         >
-                          Rate
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          {viewMode === "consolidated" ? "Total Qty" : "Qty"}
+                          {viewMode === "consolidated" ? t("Total Qty") : t("Qty")}
                         </th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          Amount
-                        </th>
+                        >{t("Amount")}</th>
                         {isEditable &&
                           (viewMode === "detailed" ||
                             (viewMode === "consolidated" &&
@@ -2707,9 +2683,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <td
                           colSpan={viewMode === "detailed" ? 4 : 3}
                           className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                        >
-                          Total Tambahan Pay
-                        </td>
+                        >{t("Total Tambahan Pay")}</td>
                         <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                           {formatCurrency(tambahanTotal)}
                         </td>
@@ -2738,9 +2712,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <IconClock
                       size={18}
                       className="text-orange-600 dark:text-orange-400"
-                    />
-                    Overtime Pay
-                  </h3>
+                     /> {t("Overtime Pay")}</h3>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -2750,34 +2722,26 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                           <th
                             scope="col"
                             className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                          >
-                            Date
-                          </th>
+                          >{t("Date")}</th>
                         )}
                         <th
                           scope="col"
                           className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          Description
-                        </th>
+                        >{t("Description")}</th>
+                        <th
+                          scope="col"
+                          className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
+                        >{t("Rate")}</th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                         >
-                          Rate
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          {viewMode === "consolidated" ? "Total Qty" : "Qty"}
+                          {viewMode === "consolidated" ? t("Total Qty") : t("Qty")}
                         </th>
                         <th
                           scope="col"
                           className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                        >
-                          Amount
-                        </th>
+                        >{t("Amount")}</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -2796,9 +2760,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                         <td
                           colSpan={viewMode === "detailed" ? 4 : 3}
                           className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                        >
-                          Total Overtime Pay
-                        </td>
+                        >{t("Total Overtime Pay")}</td>
                         <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                           {formatCurrency(overtimeTotal)}
                         </td>
@@ -2823,10 +2785,8 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <Link
                   to={`/payroll/bonus?year=${payroll.year}&month=${payroll.month}`}
                   className="hover:underline"
-                  title="Open Bonus input page"
-                >
-                  Bonus / Insentif
-                </Link>
+                  title={t("Open Bonus input page")}
+                >{t("Bonus / Insentif")}</Link>
               </h3>
             </div>
             <div className="overflow-x-auto">
@@ -2836,21 +2796,15 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <th
                       scope="col"
                       className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                    >
-                      Date
-                    </th>
+                    >{t("Date")}</th>
                     <th
                       scope="col"
                       className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                    >
-                      Description
-                    </th>
+                    >{t("Description")}</th>
                     <th
                       scope="col"
                       className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                    >
-                      Amount
-                    </th>
+                    >{t("Amount")}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -2864,7 +2818,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             <Link
                               to={row.link}
                               className="hover:underline text-teal-700 dark:text-teal-400"
-                              title="Open entry page"
+                              title={t("Open entry page")}
                             >
                               {format(new Date(row.date), "dd MMM yyyy")}
                             </Link>
@@ -2891,7 +2845,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                                   new Date(record.commission_date),
                                   "dd MMM yyyy",
                                 )
-                              : `${record.merged_count} entries`}
+                              : t("{{count}} entries", { count: record.merged_count })}
                           </td>
                           <td
                             className="px-3 py-2 text-sm text-default-800 dark:text-gray-100"
@@ -2915,9 +2869,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <td
                       colSpan={2}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                    >
-                      Total Bonus / Insentif
-                    </td>
+                    >{t("Total Bonus / Insentif")}</td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(mergedCommissionTotal)}
                     </td>
@@ -2936,29 +2888,17 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <IconClockHour4
                   size={18}
                   className="text-indigo-600 dark:text-indigo-400"
-                />
-                Others (Kerja Luar OT)
-              </h3>
+                />{t("Others (Kerja Luar OT)")}</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                 <thead className="bg-default-50 dark:bg-gray-800">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                      Date
-                    </th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                      Description
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                      Rate
-                    </th>
-                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                      Total Qty
-                    </th>
-                    <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                      Amount
-                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">{t("Date")}</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">{t("Description")}</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">{t("Rate")}</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">{t("Total Qty")}</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">{t("Amount")}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -2984,14 +2924,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                             <Link
                               to={incentiveEntryLink("/payroll/others")}
                               className="hover:underline text-indigo-700 dark:text-indigo-400"
-                              title="Open entry page"
+                              title={t("Open entry page")}
                             >
                               {format(new Date(record.record_date), "dd MMM yyyy")}
                             </Link>
                           ) : record.merged_count === 1 ? (
                             format(new Date(record.record_date), "dd MMM yyyy")
                           ) : (
-                            `${record.merged_count} entries`
+                            t("{{count}} entries", { count: record.merged_count })
                           )}
                         </td>
                         <td
@@ -3033,9 +2973,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <td
                       colSpan={4}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
-                    >
-                      Total Others (Kerja Luar OT)
-                    </td>
+                    >{t("Total Others (Kerja Luar OT)")}</td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(
                         mergedOthersRecords.reduce(
@@ -3059,9 +2997,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                 <IconCalendarEvent
                   size={18}
                   className="text-rose-600 dark:text-rose-400"
-                />
-                Cuti Records
-              </h3>
+                />{t("Leave Records")}</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
@@ -3070,27 +3006,19 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     <th
                       scope="col"
                       className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                    >
-                      Date
-                    </th>
+                    >{t("Date")}</th>
                     <th
                       scope="col"
                       className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                    >
-                      Leave Type
-                    </th>
+                    >{t("Leave Type")}</th>
                     <th
                       scope="col"
                       className="px-3 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                    >
-                      Days
-                    </th>
+                    >{t("Days")}</th>
                     <th
                       scope="col"
                       className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
-                    >
-                      Amount
-                    </th>
+                    >{t("Amount")}</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
@@ -3098,32 +3026,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     const getLeaveTypeDisplay = (leaveType: string) => {
                       switch (leaveType) {
                         case "cuti_umum":
-                          return "Cuti Umum";
+                          return "Public Holiday";
                         case "cuti_sakit":
-                          return "Cuti Sakit";
+                          return "Sick Leave";
                         case "cuti_tahunan":
-                          return "Cuti Tahunan";
+                          return "Annual Leave";
                         case "cuti_rawatan":
-                          return "Cuti Rawatan";
+                          return "Medical Leave";
                         default:
                           return leaveType;
                       }
-                    };
-                    const getLeaveRecordDisplay = (
-                      leaveRecord: MonthlyLeaveRecord,
-                    ) => {
-                      const baseLabel = getLeaveTypeDisplay(
-                        leaveRecord.leave_type,
-                      );
-
-                      if (
-                        leaveRecord.leave_type === "cuti_umum" &&
-                        leaveRecord.holiday_description
-                      ) {
-                        return `${baseLabel} - ${leaveRecord.holiday_description}`;
-                      }
-
-                      return baseLabel;
                     };
                     const getLeaveTypeColor = (leaveType: string) => {
                       switch (leaveType) {
@@ -3170,7 +3082,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                               record.leave_type,
                             )}`}
                           >
-                            {getLeaveRecordDisplay(record)}
+                            {record.leave_type === "cuti_umum" &&
+                            record.holiday_description
+                              ? t("{{label}} - {{description}}", {
+                                  label: t(getLeaveTypeDisplay(record.leave_type)),
+                                  description: record.holiday_description,
+                                })
+                              : t(getLeaveTypeDisplay(record.leave_type))}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-center text-sm text-default-800 dark:text-gray-100">
@@ -3189,12 +3107,12 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                       colSpan={3}
                       className="px-3 py-2 text-right text-sm font-medium text-default-600 dark:text-gray-300"
                     >
-                      Jumlah cuti (
-                      {monthlyLeaveDisplayRecords.reduce(
-                        (sum, r) => sum + (Number(r.days_taken) || 0),
-                        0,
-                      )}{" "}
-                      hari)
+                      {t("Total leave ({{days}} days)", {
+                        days: monthlyLeaveDisplayRecords.reduce(
+                          (sum, r) => sum + (Number(r.days_taken) || 0),
+                          0,
+                        ),
+                      })}
                     </td>
                     <td className="px-3 py-2 text-right text-sm font-semibold text-default-800 dark:text-gray-100">
                       {formatCurrency(
@@ -3213,18 +3131,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
         {payroll.items.length === 0 && (
           <div className="mb-4 text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
-            <p className="text-default-500 dark:text-gray-400">
-              No payroll items found.
-            </p>
+            <p className="text-default-500 dark:text-gray-400">{t("No payroll items found.")}</p>
             {isEditable && (
               <Button
                 onClick={() => setShowAddItemModal(true)}
                 color="sky"
                 variant="outline"
                 className="mt-4"
-              >
-                Manual Item
-              </Button>
+              >{t("Manual Item")}</Button>
             )}
           </div>
         )}
@@ -3240,18 +3154,16 @@ const EmployeePayrollDetailsPage: React.FC = () => {
             <Link
               to={`/payroll/pinjam?year=${payroll.year}&month=${payroll.month}&search=${encodeURIComponent(payroll.employee_name || payroll.employee_id)}`}
               className="group flex items-center justify-between gap-3 border-b border-red-100 bg-red-50 px-4 py-2 transition-colors hover:bg-red-100/70 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-400 dark:border-red-800/50 dark:bg-red-900/20 dark:hover:bg-red-900/35"
-              title={`Open Pinjam for ${payroll.employee_name || payroll.employee_id}`}
+              title={t("Open Pinjam for {{name}}", { name: payroll.employee_name || payroll.employee_id })}
             >
               <h3 className="text-md font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
                 <IconWallet
                   size={18}
                   className="text-red-600 dark:text-red-400"
                 />
-                <span>Pinjam</span>
+                <span>{t("Pinjam")}</span>
               </h3>
-              <span className="flex items-center gap-1 text-xs font-semibold text-red-700 group-hover:underline dark:text-red-300">
-                Open Pinjam
-                <IconChevronRight size={16} aria-hidden="true" />
+              <span className="flex items-center gap-1 text-xs font-semibold text-red-700 group-hover:underline dark:text-red-300">{t("Open Pinjam")}<IconChevronRight size={16} aria-hidden="true" />
               </span>
             </Link>
             <div className="p-4">
@@ -3270,9 +3182,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     }`}
                   >
                     <div className="mb-3">
-                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
-                        Mid-Month Pay (Before Pinjam)
-                      </p>
+                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">{t("Mid-Month Pay (Before Pinjam)")}</p>
                       <p
                         className={`text-xl font-bold ${pinjamAmountColor(
                           midMonthPayBeforePinjam,
@@ -3284,9 +3194,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </div>
 
                     <div className="mb-3">
-                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                        Pinjam Items:
-                      </p>
+                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">{t("Pinjam Items:")}</p>
                       <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                         {midMonthPinjamRecords.map((record) => (
                           <div key={record.id} className="flex items-start">
@@ -3306,17 +3214,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
                     <div className="mt-auto text-sm">
                       <div className="flex justify-between mb-2">
-                        <span className="text-default-600 dark:text-gray-300">
-                          Jumlah Pinjam:
-                        </span>
+                        <span className="text-default-600 dark:text-gray-300">{t("Total Pinjam:")}</span>
                         <span className="font-semibold text-red-600 dark:text-red-400">
                           - {formatCurrency(midMonthPinjamTotal)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
-                        <span className="text-default-800 dark:text-gray-100">
-                          Final Mid-Month Pay
-                        </span>
+                        <span className="text-default-800 dark:text-gray-100">{t("Final Mid-Month Pay")}</span>
                         <span
                           className={`text-lg font-bold ${pinjamAmountColor(
                             midMonthFinalPay,
@@ -3338,9 +3242,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     }`}
                   >
                     <div className="mb-3">
-                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
-                        Gaji Genap (Before Pinjam)
-                      </p>
+                      <p className="text-sm text-default-500 dark:text-gray-400 mb-1">{t("Gaji Genap (Before Pinjam)")}</p>
                       <p
                         className={`text-xl font-bold ${pinjamAmountColor(
                           jumlahDigenapkan,
@@ -3352,9 +3254,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                     </div>
 
                     <div className="mb-3">
-                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                        Pinjam Items:
-                      </p>
+                      <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">{t("Pinjam Items:")}</p>
                       <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                         {monthlyPinjamRecords.map((record) => (
                           <div key={record.id} className="flex items-start">
@@ -3374,18 +3274,14 @@ const EmployeePayrollDetailsPage: React.FC = () => {
 
                     <div className="mt-auto text-sm">
                       <div className="flex justify-between mb-2">
-                        <span className="text-default-600 dark:text-gray-300">
-                          Jumlah Pinjam:
-                        </span>
+                        <span className="text-default-600 dark:text-gray-300">{t("Total Pinjam:")}</span>
                         <span className="font-semibold text-red-600 dark:text-red-400">
                           - {formatCurrency(monthlyPinjamTotal)}
                         </span>
                       </div>
                       <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
                         <span className="text-default-800 dark:text-gray-100 flex items-center gap-1.5">
-                          <IconBuildingBank className="w-4 h-4 flex-shrink-0" />
-                          Jumlah Masuk Bank
-                        </span>
+                          <IconBuildingBank className="w-4 h-4 flex-shrink-0" />{t("Total Banked In")}</span>
                         <span
                           className={`text-lg font-bold ${pinjamAmountColor(
                             monthlyFinalPay,
@@ -3431,9 +3327,9 @@ const EmployeePayrollDetailsPage: React.FC = () => {
           setItemToDelete(null);
         }}
         onConfirm={handleDeleteItem}
-        title="Delete Payroll Item"
-        message={`Are you sure you want to delete this item: ${itemToDelete?.description}?`}
-        confirmButtonText={isDeleting ? "Deleting..." : "Delete"}
+        title={t("Delete Payroll Item")}
+        message={t("Are you sure you want to delete this item: {{description}}?", { description: itemToDelete?.description })}
+        confirmButtonText={isDeleting ? t("Deleting...") : t("Delete")}
         variant="danger"
       />
     </div>

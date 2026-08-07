@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { ActivityItem } from "./ManageActivitiesModal";
 import SafeLink from "../SafeLink";
+import { useTranslation } from "react-i18next";
 
 interface ActivitiesTooltipProps {
   activities: ActivityItem[];
@@ -33,6 +34,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
   showBelow = false,
   isDoubled = false,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -122,7 +124,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
             {activities.length}
           </span>
         )}
-        Manage Activities
+        {t("Manage Activities")}
       </button>
 
       {isVisible &&
@@ -144,14 +146,14 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
             {/* --- Sticky Header --- */}
             <div className="flex-shrink-0">
               <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1 flex justify-between items-center">
-                <span className="text-base">Applied Activities</span>
+                <span className="text-base">{t("Applied Activities")}</span>
                 <span className="text-xs text-default-500 dark:text-gray-400">
-                  ({activities.length} total)
+                  {t("({{total}} total)", { total: activities.length })}
                 </span>
               </div>
               {employeeName && (
                 <div className="text-sm text-default-600 dark:text-gray-300 mb-2">
-                  Employee: <span className="font-medium">{employeeName}</span>
+                  {t("Employee: {{name}}", { name: employeeName })}
                 </div>
               )}
               {/* Separator line */}
@@ -194,7 +196,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
                       {activity.isContextLinked && (
                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
                           <IconLink size={10} className="mr-0.5" />
-                          Linked
+                          {t("Linked")}
                         </span>
                       )}
                     </div>
@@ -288,7 +290,7 @@ const ActivitiesTooltip: React.FC<ActivitiesTooltipProps> = ({
             {/* --- Sticky Footer --- */}
             <div className="flex-shrink-0">
               <div className="border-t border-default-200 dark:border-gray-700 pt-3 flex justify-between items-center">
-                <span className="font-medium text-default-800 dark:text-gray-100">Total</span>
+                <span className="font-medium text-default-800 dark:text-gray-100">{t("Total")}</span>
                 <span className="font-semibold text-default-900 dark:text-gray-100 text-base">
                   RM{totalAmount.toFixed(2)}
                 </span>

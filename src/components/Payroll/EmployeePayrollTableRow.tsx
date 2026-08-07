@@ -9,6 +9,7 @@ import { printPayslip } from "../../utils/payroll/PayslipManager";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import LoadingOverlay from "./LoadingOverlay";
+import { useTranslation } from "react-i18next";
 
 interface EmployeePayrollTableRowProps {
   employeePayroll: EmployeePayroll;
@@ -35,6 +36,7 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
   midMonthPayroll,
   formatCurrency,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isPrinting, setIsPrinting] = useState(false);
   const [showPrintOverlay, setShowPrintOverlay] = useState(false);
   const { staffs } = useStaffsCache();
@@ -114,7 +116,7 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
                 )
               }
               size={18}
-              ariaLabel={`Select ${employeePayroll.employee_name || "employee"}`}
+              ariaLabel={t("Select {{name}}", { name: employeePayroll.employee_name || t("employee") })}
             />
           </div>
         </td>
@@ -123,9 +125,9 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
         <td className="px-3 py-2">
           <div
             className="truncate font-medium text-default-700 dark:text-gray-200"
-            title={employeePayroll.employee_name || "Unknown"}
+            title={employeePayroll.employee_name || t("Unknown")}
           >
-            {employeePayroll.employee_name || "Unknown"}
+            {employeePayroll.employee_name || t("Unknown")}
           </div>
         </td>
 
@@ -180,7 +182,7 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
                   ? "text-default-400 dark:text-gray-500 cursor-wait"
                   : "hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-600 dark:text-sky-400"
               )}
-              title="Process this employee"
+              title={t("Process this employee")}
             >
               <IconRefresh
                 size={16}
@@ -197,7 +199,7 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
                   ? "text-default-400 dark:text-gray-500 cursor-wait"
                   : "hover:bg-sky-100 dark:hover:bg-sky-900/50 text-sky-600 dark:text-sky-400"
               )}
-              title="Print Payslip"
+              title={t("Print Payslip")}
             >
               {isPrinting ? (
                 <IconLoader2 size={16} className="animate-spin" />
@@ -212,8 +214,8 @@ const EmployeePayrollTableRow: React.FC<EmployeePayrollTableRowProps> = ({
       {/* Print Overlay */}
       {showPrintOverlay && (
         <LoadingOverlay
-          message="Preparing payslip for printing..."
-          processingMessage="Opening print dialog..."
+          message={t("Preparing payslip for printing...")}
+          processingMessage={t("Opening print dialog...")}
           onClose={() => setShowPrintOverlay(false)}
         />
       )}

@@ -8,12 +8,12 @@ import React, {
 } from "react";
 import { format } from "date-fns";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconChevronDown,
   IconFileInvoice,
   IconMapPin,
   IconPencil,
-  IconReceipt,
   IconSquare,
   IconSquareCheckFilled,
   IconTrash,
@@ -202,6 +202,7 @@ const RentalDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation("nav");
 
   const [rental, setRental] = useState<RentalDetails | null>(null);
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
@@ -243,6 +244,7 @@ const RentalDetailsPage: React.FC = () => {
     isDuplicate: false,
     message: "",
   });
+  const [invoiceDeliveryOrder, setInvoiceDeliveryOrder] = useState<string>("");
   const [invoiceAmount, setInvoiceAmount] = useState<string>("200.00");
   const [invoiceRevenueSplits, setInvoiceRevenueSplits] = useState<
     GreenTargetRevenueSplit[]
@@ -361,6 +363,7 @@ const RentalDetailsPage: React.FC = () => {
       isDuplicate: false,
       message: "",
     });
+    setInvoiceDeliveryOrder("");
     setInvoiceAmount("200.00");
     setInvoiceRevenueSplits([
       {
@@ -614,6 +617,7 @@ const RentalDetailsPage: React.FC = () => {
       const response = await greenTargetApi.createInvoice({
         type: "regular",
         invoice_number: invoiceNumber.trim() || undefined,
+        delivery_order: invoiceDeliveryOrder.trim() || undefined,
         customer_id: rental.customer_id,
         rental_ids: selectedRentalIds,
         amount_before_tax: amount,
@@ -804,15 +808,6 @@ const RentalDetailsPage: React.FC = () => {
             color="sky"
           >
             Edit
-          </Button>
-          <Button
-            onClick={() =>
-              navigate(`/greentarget/rentals/${rental.rental_id}/delivery-order`)
-            }
-            icon={IconReceipt}
-            variant="outline"
-          >
-            Delivery Order
           </Button>
           <Button
             onClick={() => setIsDeleteDialogOpen(true)}
@@ -1343,53 +1338,77 @@ const RentalDetailsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Invoice Number */}
+                  {/* Invoice Number + Delivery Order */}
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                      Invoice Number
-                      <span className="ml-1 text-xs font-normal text-default-500 dark:text-gray-400">
-                        (optional - auto-generated if empty)
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={invoiceNumber}
-                        onChange={(e) => setInvoiceNumber(e.target.value)}
-                        disabled={isCreatingInvoice}
-                        placeholder="Enter custom invoice number or leave blank"
-                        className={`w-full px-3 py-2 border rounded-lg text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400 ${
-                          invoiceNumberValidation.isDuplicate
-                            ? "border-rose-500 bg-rose-50 dark:bg-rose-900/30"
-                            : invoiceNumberValidation.isValid
-                            ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50"
-                            : "border-amber-500 bg-amber-50 dark:bg-amber-900/30"
-                        }`}
-                      />
-                      {invoiceNumberValidation.isValidating && (
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
-                        </div>
-                      )}
-                    </div>
-                    {invoiceNumberValidation.message && (
-                      <p
-                        className={`mt-1 text-xs ${
-                          invoiceNumberValidation.isDuplicate
-                            ? "text-rose-600"
-                            : "text-amber-600"
-                        }`}
+                    <div className="flex items-end justify-between gap-3">
+                      <label className="block text-sm font-medium text-default-700 dark:text-gray-300">
+                        Invoice Number
+                        <span className="ml-1 text-xs font-normal text-default-500 dark:text-gray-400">
+                          (optional - auto-generated if empty)
+                        </span>
+                      </label>
+                      <label
+                        htmlFor="invoice_delivery_order"
+                        className="shrink-0 text-xs font-medium text-default-500 dark:text-gray-400 pb-px"
                       >
-                        {invoiceNumberValidation.message}
-                      </p>
-                    )}
-                    {invoiceNumber.trim() &&
-                      invoiceNumberValidation.isValid &&
-                      !invoiceNumberValidation.isValidating && (
-                        <p className="mt-1 text-xs text-green-600">
-                          Invoice number is available
-                        </p>
-                      )}
+                        {t("Delivery Order")}
+                      </label>
+                    </div>
+                    <div className="mt-2 flex items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="relative">
+                          <input
+                            type="text"
+                            value={invoiceNumber}
+                            onChange={(e) => setInvoiceNumber(e.target.value)}
+                            disabled={isCreatingInvoice}
+                            placeholder="Enter custom invoice number or leave blank"
+                            className={`w-full px-3 py-2 border rounded-lg text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400 ${
+                              invoiceNumberValidation.isDuplicate
+                                ? "border-rose-500 bg-rose-50 dark:bg-rose-900/30"
+                                : invoiceNumberValidation.isValid
+                                ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50"
+                                : "border-amber-500 bg-amber-50 dark:bg-amber-900/30"
+                            }`}
+                          />
+                          {invoiceNumberValidation.isValidating && (
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
+                            </div>
+                          )}
+                        </div>
+                        {invoiceNumberValidation.message && (
+                          <p
+                            className={`mt-1 text-xs ${
+                              invoiceNumberValidation.isDuplicate
+                                ? "text-rose-600"
+                                : "text-amber-600"
+                            }`}
+                          >
+                            {invoiceNumberValidation.message}
+                          </p>
+                        )}
+                        {invoiceNumber.trim() &&
+                          invoiceNumberValidation.isValid &&
+                          !invoiceNumberValidation.isValidating && (
+                            <p className="mt-1 text-xs text-green-600">
+                              Invoice number is available
+                            </p>
+                          )}
+                      </div>
+                      <div className="w-40 shrink-0">
+                        <input
+                          type="text"
+                          id="invoice_delivery_order"
+                          value={invoiceDeliveryOrder}
+                          onChange={(e) => setInvoiceDeliveryOrder(e.target.value)}
+                          disabled={isCreatingInvoice}
+                          maxLength={100}
+                          placeholder="DO-00123"
+                          className="w-full px-2.5 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   {/* Amount + Date */}

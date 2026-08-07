@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { JournalEntry, JournalEntryTypeInfo } from "../../types/types";
 import { useJournalEntryTypesCache } from "../../utils/accounting/useAccountingCache";
@@ -187,6 +188,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
   entryTypes,
   isGreenTarget,
 }) => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -322,11 +324,11 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
       setTotal(data.total);
     } catch (error) {
       console.error("Error fetching entries:", error);
-      toast.error("Failed to load journal entries");
+      toast.error(t("Failed to load journal entries"));
     } finally {
       setLoading(false);
     }
-  }, [page, limit, searchTerm, selectedTypes, selectedStatuses, dateRange, apiBase, isGreenTarget]);
+  }, [page, limit, searchTerm, selectedTypes, selectedStatuses, dateRange, apiBase, isGreenTarget, t]);
 
   useEffect(() => {
     fetchEntries();
@@ -394,14 +396,14 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
     setIsCancelling(true);
     try {
       await api.post(`${apiBase}/journal-entries/${entryToCancel.id}/cancel`);
-      toast.success("Journal entry cancelled successfully");
+      toast.success(t("Journal entry cancelled successfully"));
       setShowCancelDialog(false);
       setEntryToCancel(null);
       fetchEntries();
     } catch (error: unknown) {
       console.error("Error cancelling entry:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to cancel entry";
+        error instanceof Error ? error.message : t("Failed to cancel entry");
       toast.error(errorMessage);
     } finally {
       setIsCancelling(false);
@@ -413,7 +415,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
 
     try {
       await api.delete(`/api/journal-entries/${entryToDelete.id}`);
-      toast.success("Journal entry deleted successfully");
+      toast.success(t("Journal entry deleted successfully"));
       setShowDeleteDialog(false);
       setEntryToDelete(null);
       fetchEntries();
@@ -429,7 +431,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
       if (errorData) {
         // Store error data and show error dialog
         setDeleteErrorData({
-          message: errorData.message || "Failed to delete journal entry",
+          message: errorData.message || t("Failed to delete journal entry"),
           detail: errorData.detail,
           payment_id: errorData.payment_id,
           invoice_id: errorData.invoice_id,
@@ -439,7 +441,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
       } else {
         // Fallback to simple toast error
         const errorMessage =
-          error instanceof Error ? error.message : "Failed to delete entry";
+          error instanceof Error ? error.message : t("Failed to delete entry");
         toast.error(errorMessage);
       }
     }
@@ -529,7 +531,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             : "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300"
         }`}
       >
-        {isCancelled ? "Cancelled" : "Active"}
+        {isCancelled ? t("Cancelled") : t("Active")}
       </span>
     );
   };
@@ -547,18 +549,14 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
         {/* Title */}
         <div className="order-1 flex items-center gap-2 flex-shrink-0">
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Journal Entries
+            {t("Journal Entries")}
           </h1>
           <span className="text-default-400 dark:text-gray-500">|</span>
           <span className="text-sm text-default-600 dark:text-gray-300 whitespace-nowrap">
-            Showing{" "}
-            <span className="font-medium text-default-900 dark:text-gray-100">
-              {entries.length}
-            </span>{" "}
-            of{" "}
-            <span className="font-medium text-default-900 dark:text-gray-100">
-              {total}
-            </span>
+            {t("Showing {{shown}} of {{total}}", {
+              shown: entries.length,
+              total,
+            })}
           </span>
         </div>
 
@@ -569,10 +567,10 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             <button
               onClick={clearFilters}
               className="flex items-center gap-1 text-sm text-default-600 dark:text-gray-300 hover:text-default-900 dark:hover:text-gray-100 flex-shrink-0"
-              title="Clear filters"
+              title={t("Clear filters")}
             >
               <IconRefresh size={16} />
-              Clear
+              {t("Clear")}
             </button>
           )}
 
@@ -583,7 +581,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             />
             <input
               type="text"
-              placeholder="Search reference or description..."
+              placeholder={t("Search reference or description...")}
               className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -602,7 +600,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                   setPage(1);
                 }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
-                title="Clear search"
+                title={t("Clear search")}
               >
                 <IconX size={16} />
               </button>
@@ -665,7 +663,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                     : "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
                 }`}
               >
-                {status.label}
+                {t(status.label)}
               </button>
             );
           })}
@@ -687,7 +685,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             iconPosition="left"
             size="md"
           >
-            New
+            {t("New")}
           </Button>
         </div>
       </div>
@@ -703,28 +701,28 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             <thead className="bg-default-100 dark:bg-gray-900/50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Reference
+                  {t("Reference")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Type
+                  {t("Type")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Date
+                  {t("Date")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Description
+                  {t("Description")}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Debit
+                  {t("Debit")}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Credit
+                  {t("Credit")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                  Status
+                  {t("Status")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-28">
-                  Actions
+                  {t("Actions")}
                 </th>
               </tr>
             </thead>
@@ -740,20 +738,25 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                       <span>{getVisibleReference(entry)}</span>
                       {isLegacyImportEntry(entry) && (
                         <span className="ml-2 inline-flex rounded bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 text-[10px] font-medium text-default-500 dark:text-gray-400 align-middle">
-                          Legacy
+                          {t("Legacy")}
                         </span>
                       )}
                       {getChequeDuplicateCount(entry) > 0 && (
                         <span
                           className="ml-2 inline-flex items-center gap-0.5 rounded bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 align-middle"
-                          title={`Cheque ${entry.cheque_no} is also used on ${
+                          title={
                             getChequeDuplicateCount(entry) === 1
-                              ? "1 other entry"
-                              : `${getChequeDuplicateCount(entry)} other entries`
-                          }`}
+                              ? t("Cheque {{chequeNo}} is also used on 1 other entry", {
+                                  chequeNo: entry.cheque_no,
+                                })
+                              : t("Cheque {{chequeNo}} is also used on {{count}} other entries", {
+                                  chequeNo: entry.cheque_no,
+                                  count: getChequeDuplicateCount(entry),
+                                })
+                          }
                         >
                           <IconAlertTriangle size={11} stroke={2} />
-                          Cheque re-used
+                          {t("Cheque re-used")}
                         </span>
                       )}
                     </td>
@@ -792,7 +795,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                                 handleEdit(entry);
                               }}
                               className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                              title="Edit"
+                              title={t("Edit")}
                             >
                               <IconPencil size={18} />
                             </button>
@@ -806,8 +809,8 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                                 className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-600 dark:disabled:hover:text-rose-400"
                                 title={
                                   entry.source_type
-                                    ? "This journal is owned by its source document - cancel that document instead."
-                                    : "Cancel Entry"
+                                    ? t("This journal is owned by its source document - cancel that document instead.")
+                                    : t("Cancel Entry")
                                 }
                               >
                                 <IconX size={18} />
@@ -822,8 +825,8 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                                 className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-rose-600 dark:disabled:hover:text-rose-400"
                                 title={
                                   entry.source_type
-                                    ? "This journal is owned by its source document - remove or cancel that document instead."
-                                    : "Delete"
+                                    ? t("This journal is owned by its source document - remove or cancel that document instead.")
+                                    : t("Delete")
                                 }
                               >
                                 <IconTrash size={18} />
@@ -841,15 +844,13 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                     colSpan={8}
                     className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
-                    No journal entries found.{" "}
-                    {hasActiveFilters && (
-                      <span>Try adjusting your filters or </span>
-                    )}
+                    {t("No journal entries found.")}{" "}
+                    {hasActiveFilters && <span>{t("Try adjusting your filters or")} </span>}
                     <button
                       onClick={handleCreateNew}
                       className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 font-medium"
                     >
-                      create a new entry
+                      {t("create a new entry")}
                     </button>
                     .
                   </td>
@@ -868,7 +869,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             disabled={page === 1}
             className="px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-default-300 dark:border-gray-700 rounded-lg hover:bg-default-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Previous
+            {t("Previous")}
           </button>
           <div className="flex items-center gap-2">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -902,7 +903,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             disabled={page === totalPages}
             className="px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-default-300 dark:border-gray-700 rounded-lg hover:bg-default-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Next
+            {t("Next")}
           </button>
         </div>
       )}
@@ -917,11 +918,16 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
           }
         }}
         onConfirm={handleConfirmCancel}
-        title="Cancel Journal Entry"
-        message={`Are you sure you want to cancel entry "${
-          entryToCancel ? getVisibleReference(entryToCancel) : ""
-        }"? This will mark the entry as cancelled.`}
-        confirmButtonText="Cancel Entry"
+        title={t("Cancel Journal Entry")}
+        message={t(
+          'Are you sure you want to cancel entry "{{reference}}"? This will mark the entry as cancelled.',
+          {
+            reference: entryToCancel
+              ? getVisibleReference(entryToCancel)
+              : "",
+          }
+        )}
+        confirmButtonText={t("Cancel Entry")}
         variant="danger"
         isConfirming={isCancelling}
       />
@@ -931,10 +937,15 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Journal Entry"
-        message={`Are you sure you want to delete entry "${
-          entryToDelete ? getVisibleReference(entryToDelete) : ""
-        }"? This action cannot be undone.`}
+        title={t("Delete Journal Entry")}
+        message={t(
+          'Are you sure you want to delete entry "{{reference}}"? This action cannot be undone.',
+          {
+            reference: entryToDelete
+              ? getVisibleReference(entryToDelete)
+              : "",
+          }
+        )}
         variant="danger"
       />
 
@@ -984,7 +995,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                   variant="filled"
                   size="md"
                 >
-                  Go to Invoice #{deleteErrorData.invoice_id}
+                  {t("Go to Invoice #{{id}}", { id: deleteErrorData.invoice_id })}
                 </Button>
               )}
               <Button
@@ -996,7 +1007,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                 variant="outline"
                 size="md"
               >
-                Close
+                {t("Close")}
               </Button>
             </div>
           </div>
@@ -1017,6 +1028,7 @@ const TienHockJournalEntryList: React.FC = () => {
 // Green Target has no types cache, so it fetches its entry types from the GT
 // route on mount; the pills work exactly like Tien Hock's once loaded.
 const GreenTargetJournalEntryList: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
 
   useEffect(() => {
@@ -1029,7 +1041,7 @@ const GreenTargetJournalEntryList: React.FC = () => {
         if (!cancelled) setEntryTypes(response as JournalEntryTypeInfo[]);
       } catch (err: unknown) {
         console.error("Error fetching Green Target journal entry types:", err);
-        toast.error("Failed to load Green Target journal types");
+        toast.error(t("Failed to load Green Target journal types"));
       }
     };
 

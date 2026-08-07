@@ -5,6 +5,14 @@ the one the legacy program uses, proven line-by-line against the legacy ledger
 prints. Key to these accounts from the start and the monthly tie-out
 (`dev/import/legacy-tieout/`) stays at zero differences — no corrections needed.
 
+> **Updated 7 Aug 2026.** This guide was derived from the June 2026 legacy
+> ledger **print**. Two of its rows turned out to be keying errors in the legacy
+> program itself, not in the ERP — the coworker corrected both in legacy (and in
+> the ERP) on 7 Aug 2026, and this guide is corrected to match: **KFC → `MBSM_K`**
+> (not `MBC`) and **the PAUMIN receipt splits `MBRMF` 565.00 / `MBSAF` 144.00**
+> (not 465.00 / 244.00). General rule: when the legacy print and the ERP disagree,
+> check the original receipt before assuming the print is right.
+
 ## The five rules
 
 1. **Vehicle diesel → the vehicle's OWN `OIL*` account.** Every diesel receipt
@@ -30,9 +38,9 @@ prints. Key to these accounts from the start and the monthly tie-out
 4. **Staff meals → `MBSM_K` (KILANG / factory staff) or `MBSM_O` (OFFICE
    staff)** — pick by WHO the meal was for, not where it was bought.
 5. **Split receipts by item, and the legs must sum to the receipt total.**
-   One PAUMIN receipt = cutting disc `MBRMF` 465.00 + gloves/spectacles
-   `MBSAF` 244.00 = 709.00. Never split by round numbers (565/144 was keyed;
-   it scrambles two accounts even though the voucher still balances).
+   One PAUMIN receipt (#2606-2133) = cutting/grinding discs, drill bits and
+   insulating tape `MBRMF` 565.00 + gloves/spectacles `MBSAF` 144.00 = 709.00.
+   Add each leg up from the receipt's own line items — never estimate the split.
 
 ## Vendor → account table (proven against the June 2026 legacy ledgers)
 
@@ -53,8 +61,8 @@ prints. Key to these accounts from the start and the monthly tie-out
 | TAOBAO-BOZHEN (bearing grease, shared machines) | `MBRM` | — |
 | TAOBAO-GU DE LI QI HANG (compressor air gun) | `MBRM` | — |
 | TAOBAO-HANG ZHOU JIN XIN (gearbox RV63) | `MBRM` | — |
-| PAUMIN HARDWARE — cutting discs | `MBRMF` | — |
-| PAUMIN HARDWARE — gloves/spectacles | `MBSAF` | — |
+| PAUMIN HARDWARE — cutting discs (565.00 on #2606-2133) | `MBRMF` | — |
+| PAUMIN HARDWARE — gloves/spectacles (144.00 on #2606-2133) | `MBSAF` | — |
 | TAOBAO-WEI ER DUN (safety boots) | `MBSAF` | — |
 | SESB (Menggatal meter) | `MGT` | — |
 | 168 HARDWARE (Menggatal) | `MGT` | — |
@@ -74,7 +82,7 @@ prints. Key to these accounts from the start and the monthly tie-out
 | SHELL BUNDUSAN — Ativa QCV920 fuel | `OIL920` | `OILOTH` |
 | SHELL SYT. EXCEL — SD9922H fuel | `OIL9922` | `OIL9882` |
 | EMART (cleaning supplies) | `MBC` | `MBOR` |
-| KFC LINTAS JAYA BOULEVARD | `MBC` | `MBSM_K` |
+| KFC / fast-food restaurants (factory staff meals) | `MBSM_K` | — |
 | LIDO MARKET (office groceries) | `MBOR` | `MBSM_K` |
 | MIX STORE (office groceries) | `MBOR` | `MBSM_K` |
 | HO KEE HAINANESE CHICKEN RICE (factory staff meal) | `MBSM_K` | `MBSM_O` |

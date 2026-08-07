@@ -207,9 +207,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     }
   };
 
-  // Tien Hock: only a cheque's date is pure payment history — every other
-  // method posts its journal on the date it was received, so correcting it
-  // means cancelling and re-keying. Jelly Polly posts no journals at all.
+  // Tien Hock: a receipt-backed payment's date can be corrected. For a cheque
+  // only the received date moves (the journal stays on its clearance date);
+  // for cash, bank transfer and online the received date is also the
+  // accounting date, so the backend moves the receipt, journal and payment
+  // rows together. Jelly Polly posts no journals at all.
   const canEditPaymentDate = (payment: Payment): boolean => {
     if (payment.status === "cancelled") return false;
     if (payment.is_auto_collection) return false;
@@ -220,7 +222,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
       return false;
     }
     if (!usesTienHockReceiptAccounting) return true;
-    return payment.payment_method === "cheque" && Boolean(payment.receipt_id);
+    return (
+      ["cheque", "cash", "bank_transfer", "online"].includes(
+        payment.payment_method
+      ) && Boolean(payment.receipt_id)
+    );
   };
 
   const handleEditDateClick = (payment: Payment, groupSize: number): void => {
@@ -1142,7 +1148,9 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
               <p className="text-xs text-default-500 dark:text-gray-400">
                 {t(
                   usesTienHockReceiptAccounting
-                    ? "Amounts, invoice balances and the posted journal entry are not changed – a cheque is always posted on its clearance date."
+                    ? dateEditPayment.payment_method === "cheque"
+                      ? "Amounts, invoice balances and the posted journal entry are not changed – a cheque is always posted on its clearance date."
+                      : "The receipt, its payment records and the posted journal entry all move to the new date. Amounts and invoice balances are unchanged."
                     : "Amounts and invoice balances are not changed."
                 )}
               </p>

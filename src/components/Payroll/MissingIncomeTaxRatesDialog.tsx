@@ -10,6 +10,7 @@ import {
 import { IconAlertTriangle, IconExternalLink } from "@tabler/icons-react";
 import Button from "../Button";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export interface MissingIncomeTaxEmployee {
   employeeId: string;
@@ -28,6 +29,7 @@ const MissingIncomeTaxRatesDialog: React.FC<MissingIncomeTaxRatesDialogProps> = 
   onClose,
   employees,
 }) => {
+  const { t } = useTranslation("payroll");
   const navigate = useNavigate();
 
   const handleNavigateToRates = () => {
@@ -81,13 +83,10 @@ const MissingIncomeTaxRatesDialog: React.FC<MissingIncomeTaxRatesDialogProps> = 
                       as="h3"
                       className="text-lg font-semibold leading-6 text-default-900 dark:text-gray-100"
                     >
-                      Missing Income Tax Rates
+                      {t("Missing Income Tax Rates")}
                     </DialogTitle>
                     <p className="mt-2 text-sm text-default-600 dark:text-gray-300">
-                      The following employees have gross pay above RM 3,000 but no
-                      income tax rate is recorded for their salary range. Please
-                      add the appropriate income tax rates to ensure accurate
-                      deductions.
+                      {t("The following employees have gross pay above RM 3,000 but no income tax rate is recorded for their salary range. Please add the appropriate income tax rates to ensure accurate deductions.")}
                     </p>
                   </div>
                 </div>
@@ -97,10 +96,10 @@ const MissingIncomeTaxRatesDialog: React.FC<MissingIncomeTaxRatesDialogProps> = 
                     <thead className="bg-default-50 dark:bg-gray-900/50 sticky top-0">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                          Employee
+                          {t("Employee")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                          Gross Pay
+                          {t("Gross Pay")}
                         </th>
                       </tr>
                     </thead>
@@ -121,7 +120,7 @@ const MissingIncomeTaxRatesDialog: React.FC<MissingIncomeTaxRatesDialogProps> = 
 
                 <div className="mt-6 flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={onClose}>
-                    Close
+                    {t("Close")}
                   </Button>
                   <Button
                     type="button"
@@ -130,7 +129,7 @@ const MissingIncomeTaxRatesDialog: React.FC<MissingIncomeTaxRatesDialogProps> = 
                     icon={IconExternalLink}
                     onClick={handleNavigateToRates}
                   >
-                    Add Income Tax Rates
+                    {t("Add Income Tax Rates")}
                   </Button>
                 </div>
               </DialogPanel>

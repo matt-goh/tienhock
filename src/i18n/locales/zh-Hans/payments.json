@@ -3,6 +3,7 @@
   "Contra and overpayment credits cannot be reused as payment groups.": "对冲和多付信用不能重新用作付款组。",
   "This payment group does not have a reference to reuse.": "此付款组没有可重复使用的参考。",
   "Search payments by invoice, reference, or amount": "按发票、参考或金额搜索付款",
+  "Clear search": "清除搜索",
   "All Methods": "所有方式",
   "Cash": "现金",
   "Cheque": "支票",

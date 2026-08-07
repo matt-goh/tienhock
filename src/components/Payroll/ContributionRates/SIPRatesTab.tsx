@@ -5,8 +5,10 @@ import { useContributionRatesCache } from "../../../utils/payroll/useContributio
 import { SIPRate } from "../../../types/types";
 import LoadingSpinner from "../../LoadingSpinner";
 import SIPRateEditModal from "./SIPRateEditModal";
+import { useTranslation } from "react-i18next";
 
 const SIPRatesTab: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const { sipRates, isLoading, error } = useContributionRatesCache();
   const [editingRate, setEditingRate] = useState<SIPRate | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -27,7 +29,7 @@ const SIPRatesTab: React.FC = () => {
 
   const formatWageRange = (from: number, to: number) => {
     if (to >= 999999) {
-      return `${formatCurrency(from)} and above`;
+      return t("{{amount}} and above", { amount: formatCurrency(from) });
     }
     return `${formatCurrency(from)} - ${formatCurrency(to)}`;
   };
@@ -43,7 +45,7 @@ const SIPRatesTab: React.FC = () => {
   if (error) {
     return (
       <div className="text-center py-8 text-rose-600 dark:text-rose-400">
-        Error loading SIP rates: {error.message}
+        {t("Error loading SIP rates: {{message}}", { message: error.message })}
       </div>
     );
   }
@@ -56,16 +58,16 @@ const SIPRatesTab: React.FC = () => {
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Wage Range
+                  {t("Wage Range")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Employee Rate
+                  {t("Employee Rate")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Employer Rate
+                  {t("Employer Rate")}
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                  Actions
+                  {t("Actions")}
                 </th>
               </tr>
             </thead>
@@ -85,7 +87,7 @@ const SIPRatesTab: React.FC = () => {
                     <button
                       onClick={() => handleEditRate(rate)}
                       className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 p-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/50"
-                      title="Edit Rate"
+                      title={t("Edit Rate")}
                     >
                       <IconEdit size={18} />
                     </button>

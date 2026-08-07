@@ -13,6 +13,7 @@ import { SIPRate } from "../../../types/types";
 import { api } from "../../../routes/utils/api";
 import { refreshContributionRatesCache } from "../../../utils/payroll/useContributionRatesCache";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 interface SIPRateEditModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
   onClose,
   rate,
 }) => {
+  const { t } = useTranslation("payroll");
   const [formData, setFormData] = useState({
     wage_from: "",
     wage_to: "",
@@ -65,12 +67,12 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
       // Refresh cache
       await refreshContributionRatesCache();
 
-      toast.success("SIP rate updated successfully");
+      toast.success(t("SIP rate updated successfully"));
       onClose();
     } catch (error) {
       console.error("Error updating SIP rate:", error);
-      setError("Failed to update SIP rate. Please try again.");
-      toast.error("Failed to update SIP rate");
+      setError(t("Failed to update SIP rate. Please try again."));
+      toast.error(t("Failed to update SIP rate"));
     } finally {
       setIsSubmitting(false);
     }
@@ -111,14 +113,14 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Edit SIP Rate
+                  {t("Edit SIP Rate")}
                 </DialogTitle>
 
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <FormInput
                       name="wage_from"
-                      label="Wage From (RM)"
+                      label={t("Wage From (RM)")}
                       type="number"
                       value={formData.wage_from}
                       onChange={(e) =>
@@ -131,7 +133,7 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
 
                     <FormInput
                       name="wage_to"
-                      label="Wage To (RM)"
+                      label={t("Wage To (RM)")}
                       type="number"
                       value={formData.wage_to}
                       onChange={(e) => handleChange("wage_to", e.target.value)}
@@ -143,7 +145,7 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
 
                   <FormInput
                     name="employee_rate"
-                    label="Employee Rate (RM)"
+                    label={t("Employee Rate (RM)")}
                     type="number"
                     value={formData.employee_rate}
                     onChange={(e) =>
@@ -156,7 +158,7 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
 
                   <FormInput
                     name="employer_rate"
-                    label="Employer Rate (RM)"
+                    label={t("Employer Rate (RM)")}
                     type="number"
                     value={formData.employer_rate}
                     onChange={(e) =>
@@ -180,7 +182,7 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
                       onClick={onClose}
                       disabled={isSubmitting}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -188,7 +190,7 @@ const SIPRateEditModal: React.FC<SIPRateEditModalProps> = ({
                       variant="filled"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? "Updating..." : "Update Rate"}
+                      {isSubmitting ? t("Updating...") : t("Update Rate")}
                     </Button>
                   </div>
                 </form>

@@ -1,5 +1,6 @@
 // src/pages/Stock/ProductStockMovementPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
@@ -65,6 +66,8 @@ interface ProductStockMovementPageProps {
 const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
   productTypes,
 }) => {
+  const { t } = useTranslation("stock");
+
   // Tien Hock and Jelly Polly both render this page, so cache keys are scoped
   // by product type — they must never share a product or month.
   const storageScope: string = (productTypes ?? DEFAULT_PRODUCT_TYPES).join("+");
@@ -272,14 +275,14 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       setProductDescription(response.product_description || "");
     } catch (error) {
       console.error("Error fetching stock movements:", error);
-      toast.error("Failed to load stock movements");
+      toast.error(t("Failed to load stock movements"));
       setMovements([]);
       setMonthlyTotals(null);
       setProductDescription("");
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProductId, dateRange.start, dateRange.end, viewType]);
+  }, [selectedProductId, dateRange.start, dateRange.end, viewType, t]);
 
   // Fetch movements when dependencies change
   useEffect(() => {
@@ -314,12 +317,12 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
 
     const newBalance = parseInt(editBalanceValue, 10);
     if (isNaN(newBalance) || newBalance < 0) {
-      toast.error("Sila masukkan nombor yang sah (0 atau lebih)");
+      toast.error(t("Please enter a valid number (0 or more)"));
       return;
     }
 
     if (!editBalanceDate) {
-      toast.error("Sila pilih tarikh berkuat kuasa baki permulaan");
+      toast.error(t("Please select an effective date for the opening balance"));
       return;
     }
 
@@ -331,7 +334,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
         effective_date: editBalanceDate,
       });
 
-      toast.success("Baki permulaan dikemas kini");
+      toast.success(t("Opening balance updated"));
       setInitialBalance(newBalance);
       setInitialBalanceDate(editBalanceDate);
       setIsEditingBalance(false);
@@ -339,7 +342,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       fetchMovements();
     } catch (error) {
       console.error("Error saving opening balance:", error);
-      toast.error("Gagal menyimpan baki permulaan");
+      toast.error(t("Failed to save opening balance"));
     } finally {
       setIsSavingBalance(false);
     }
@@ -376,7 +379,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       });
     } catch (error) {
       console.error("Error printing stock card:", error);
-      toast.error("Gagal menjana PDF kad stok");
+      toast.error(t("Failed to generate stock card PDF"));
     } finally {
       setIsPrinting(false);
     }
@@ -387,9 +390,9 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">Stock Movement</h1>
+          <h1 className="text-2xl font-bold text-default-900 dark:text-gray-100">{t("Stock Movement")}</h1>
           <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-            View daily stock movements and balances
+            {t("View daily stock movements and balances")}
           </p>
         </div>
         <Button
@@ -398,7 +401,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
           icon={IconPrinter}
           variant="outline"
         >
-          {isPrinting ? "Preparing..." : "Print Stock Card"}
+          {isPrinting ? t("Preparing...") : t("Print Stock Card")}
         </Button>
       </div>
 
@@ -408,7 +411,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
           {/* Product Selector */}
           <div>
             <ProductSelector
-              label="Product"
+              label={t("Product")}
               value={selectedProductId}
               onChange={setSelectedProductId}
               productTypes={productTypes || DEFAULT_PRODUCT_TYPES}
@@ -430,7 +433,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                 className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
               >
                 <IconArrowsSort size={14} />
-                Reorder products
+                {t("Reorder products")}
               </button>
             </div>
             {/* Quick access favorite pills */}
@@ -459,14 +462,14 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
               <div className="flex items-center gap-2">
                 <IconCalendar size={16} />
-                View Type
+                {t("View Type")}
               </div>
             </label>
             <div className="flex gap-2">
               {[
-                { value: "month", label: "Month" },
-                { value: "rolling", label: "Last 31 Days" },
-                { value: "custom", label: "Custom" },
+                { value: "month", label: t("Month") },
+                { value: "rolling", label: t("Last 31 Days") },
+                { value: "custom", label: t("Custom") },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -487,7 +490,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
           {/* Date Navigator / Range */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-              Date Range
+              {t("Date Range")}
             </label>
             {viewType === "month" ? (
               <MonthNavigator
@@ -499,7 +502,10 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               />
             ) : viewType === "rolling" ? (
               <div className="rounded-lg border border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 px-4 py-2 text-center text-sm text-default-600 dark:text-gray-300">
-                Last 31 days ({dateRange.start} to {dateRange.end})
+                {t("Last 31 days ({{start}} to {{end}})", {
+                  start: dateRange.start,
+                  end: dateRange.end,
+                })}
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -511,7 +517,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                   max={customEndDate || formatDateLocal(new Date())}
                   className="flex-1 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 px-3 py-2 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                 />
-                <span className="text-default-400 dark:text-gray-500">to</span>
+                <span className="text-default-400 dark:text-gray-500">{t("to")}</span>
                 <input
                   type="date"
                   value={customEndDate}
@@ -539,12 +545,13 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                 </div>
                 <div>
                   <p className="text-sm text-default-500 dark:text-gray-400">
-                    Brought Forward from{" "}
-                    {new Date(
-                      selectedMonth.getFullYear(),
-                      selectedMonth.getMonth() - 1,
-                      1
-                    ).toLocaleDateString("en-MY", { month: "short" })}
+                    {t("Brought Forward from {{month}}", {
+                      month: new Date(
+                        selectedMonth.getFullYear(),
+                        selectedMonth.getMonth() - 1,
+                        1,
+                      ).toLocaleDateString("en-MY", { month: "short" }),
+                    })}{" "}
                   </p>
                   <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
                     {openingBalance.toLocaleString()}{" "}
@@ -561,14 +568,14 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               <div className="flex items-center gap-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/30 px-3 py-1.5">
                 <div className="flex items-center gap-3">
                   <div>
-                    <p className="text-xs text-green-500 dark:text-green-400">Production</p>
+                    <p className="text-xs text-green-500 dark:text-green-400">{t("Production")}</p>
                     <p className="text-lg font-bold tabular-nums text-green-700 dark:text-green-300">
                       {monthlyTotals.production.toLocaleString()}
                     </p>
                   </div>
                   <div className="h-6 w-px bg-green-200 dark:bg-green-700" />
                   <div>
-                    <p className="text-xs text-green-500 dark:text-green-400">Returns</p>
+                    <p className="text-xs text-green-500 dark:text-green-400">{t("Returns")}</p>
                     <p className="text-lg font-bold tabular-nums text-green-700 dark:text-green-300">
                       {monthlyTotals.returns.toLocaleString()}
                     </p>
@@ -589,7 +596,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               <div className="flex items-center gap-3 rounded-lg border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-900/30 px-3 py-1.5">
                 <div className="flex items-center gap-3">
                   <div>
-                    <p className="text-xs text-rose-500 dark:text-rose-400">Sold</p>
+                    <p className="text-xs text-rose-500 dark:text-rose-400">{t("Sold")}</p>
                     <p className="text-lg font-bold tabular-nums text-rose-700 dark:text-rose-300">
                       {monthlyTotals.sold_out.toLocaleString()}
                     </p>
@@ -687,12 +694,13 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                 </div>
                 <div>
                   <p className="text-sm text-default-500 dark:text-gray-400">
-                    Carry Forward to{" "}
-                    {new Date(
-                      selectedMonth.getFullYear(),
-                      selectedMonth.getMonth() + 1,
-                      1
-                    ).toLocaleDateString("en-MY", { month: "short" })}
+                    {t("Carry Forward to {{month}}", {
+                      month: new Date(
+                        selectedMonth.getFullYear(),
+                        selectedMonth.getMonth() + 1,
+                        1,
+                      ).toLocaleDateString("en-MY", { month: "short" }),
+                    })}{" "}
                   </p>
                   <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
                     {movements[movements.length - 1]?.cf.toLocaleString()}{" "}
@@ -712,7 +720,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               <div className="flex items-start gap-3">
                 <div>
                   <p className="text-right text-xs font-medium text-default-500 dark:text-gray-400">
-                    Baki Permulaan
+                    {t("Opening Balance")}
                   </p>
                   {isEditingBalance ? (
                     <div className="mt-1 space-y-1.5">
@@ -750,9 +758,9 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                         </button>
                       </div>
                       <p className="max-w-xs text-right text-[11px] leading-snug text-default-400 dark:text-gray-500">
-                        Jumlah stok sedia ada pada permulaan tarikh yang dipilih.
-                        Baki dikira bermula dari tarikh ini; sebarang rekod
-                        sebelum tarikh ini diabaikan.
+                        {t(
+                          "Total stock available at the start of the selected date. Balance is calculated from this date; any records before this date are ignored.",
+                        )}
                       </p>
                     </div>
                   ) : (
@@ -766,8 +774,8 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                         </p>
                         <p className="text-[11px] text-default-400 dark:text-gray-500">
                           {initialBalanceDate
-                            ? `pada ${formatDisplayDate(initialBalanceDate)}`
-                            : "Belum ditetapkan"}
+                            ? t("on {{date}}", { date: formatDisplayDate(initialBalanceDate) })
+                            : t("Not set")}
                         </p>
                       </div>
                       <button
@@ -798,7 +806,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
           <div className="mb-4 flex items-center gap-2">
             <IconPackage className="h-5 w-5 text-default-400 dark:text-gray-500" />
             <p className="text-sm text-default-500 dark:text-gray-400">
-              Select a product to view its stock movements
+              {t("Select a product to view its stock movements")}
             </p>
           </div>
           {selectableProductGroups.length > 0 ? (
@@ -806,7 +814,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               {selectableProductGroups.map((group) => (
                 <div key={group.label}>
                   <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    {group.label}
+                    {t(group.label)}
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {group.products.map((product) => (
@@ -825,7 +833,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
             </div>
           ) : (
             <p className="text-sm text-default-400 dark:text-gray-500">
-              No products available.
+              {t("No products available.")}
             </p>
           )}
         </div>
@@ -833,7 +841,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
         <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">
           <IconCalendar className="mx-auto h-12 w-12 text-default-300 dark:text-gray-600" />
           <p className="mt-4 text-default-500 dark:text-gray-400">
-            Please select a date range to view stock movements
+            {t("Please select a date range to view stock movements")}
           </p>
         </div>
       ) : (

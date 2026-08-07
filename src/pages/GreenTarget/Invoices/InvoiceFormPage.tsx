@@ -9,6 +9,7 @@ import React, {
 } from "react";
 import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
@@ -114,6 +115,7 @@ interface Invoice {
   total_amount?: number; // Calculated
   date_issued: string; // YYYY-MM-DD
   debtor_account_code: string;
+  delivery_order?: string;
   revenue_splits: GreenTargetRevenueSplit[];
   edit_dependencies?: {
     has_receipts: boolean;
@@ -149,6 +151,7 @@ const paymentMethodOptions: SelectOption[] = [
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation("nav");
   const isEditMode = !!id;
   const goBack = useSmartBack(
     isEditMode && id ? `/greentarget/invoices/${id}` : "/greentarget/invoices"
@@ -165,6 +168,7 @@ const InvoiceFormPage: React.FC = () => {
     date_issued: format(new Date(), "yyyy-MM-dd"),
     rental_ids: [], // Changed to array
     debtor_account_code: "",
+    delivery_order: "",
     revenue_splits: [
       {
         line_number: 1,
@@ -253,6 +257,7 @@ const InvoiceFormPage: React.FC = () => {
         date_issued: format(new Date(), "yyyy-MM-dd"),
         rental_ids: [], // Changed to array
         debtor_account_code: "",
+        delivery_order: "",
         revenue_splits: [
           {
             line_number: 1,
@@ -562,6 +567,7 @@ const InvoiceFormPage: React.FC = () => {
         tax_amount: parseFloat(inv.tax_amount.toString()),
         date_issued: toLocalDateInputValue(inv.date_issued),
         debtor_account_code: inv.debtor_account_code || "",
+        delivery_order: inv.delivery_order || "",
         revenue_splits:
           Array.isArray(inv.revenue_splits) && inv.revenue_splits.length > 0
             ? inv.revenue_splits.map(
@@ -992,6 +998,7 @@ const InvoiceFormPage: React.FC = () => {
         date_issued: formData.date_issued,
         invoice_number: formData.invoice_number?.trim() || undefined,
         debtor_account_code: debtorAccountCode,
+        delivery_order: formData.delivery_order?.trim() || undefined,
         revenue_splits: formData.revenue_splits,
       };
       if (isEditMode && formData.invoice_id)
@@ -1250,41 +1257,64 @@ const InvoiceFormPage: React.FC = () => {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Invoice Number */}
             <div className="space-y-2">
-              <label
-                htmlFor="invoice_number"
-                className="block text-sm font-medium text-default-700 dark:text-gray-200"
-              >
-                Invoice Number
-                {!isEditMode && (
-                  <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
-                    (optional - auto-generated if empty)
-                  </span>
-                )}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="invoice_number"
-                  name="invoice_number"
-                  value={formData.invoice_number || ""}
-                  onChange={handleInputChange}
-                  disabled={isSaving || documentIdentityLocked}
-                  className={clsx(
-                    "block w-full px-3 py-2 border rounded-lg shadow-sm",
-                    "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                    invoiceNumberValidation.isDuplicate
-                      ? "border-red-500 bg-red-50 dark:bg-red-900/30"
-                      : invoiceNumberValidation.isValid
-                      ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
-                      : "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30"
+              <div className="flex items-end justify-between gap-3">
+                <label
+                  htmlFor="invoice_number"
+                  className="block text-sm font-medium text-default-700 dark:text-gray-200"
+                >
+                  Invoice Number
+                  {!isEditMode && (
+                    <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
+                      (optional - auto-generated if empty)
+                    </span>
                   )}
-                  placeholder="Enter custom invoice number or leave blank"
-                />
-                {invoiceNumberValidation.isValidating && (
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
-                  </div>
-                )}
+                </label>
+                <label
+                  htmlFor="delivery_order"
+                  className="shrink-0 text-xs font-medium text-default-500 dark:text-gray-400 pb-px"
+                >
+                  {t("Delivery Order")}
+                </label>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="relative flex-1 min-w-0">
+                  <input
+                    type="text"
+                    id="invoice_number"
+                    name="invoice_number"
+                    value={formData.invoice_number || ""}
+                    onChange={handleInputChange}
+                    disabled={isSaving || documentIdentityLocked}
+                    className={clsx(
+                      "block w-full px-3 py-2 border rounded-lg shadow-sm",
+                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
+                      invoiceNumberValidation.isDuplicate
+                        ? "border-red-500 bg-red-50 dark:bg-red-900/30"
+                        : invoiceNumberValidation.isValid
+                        ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
+                        : "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30"
+                    )}
+                    placeholder="Enter custom invoice number or leave blank"
+                  />
+                  {invoiceNumberValidation.isValidating && (
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-sky-500"></div>
+                    </div>
+                  )}
+                </div>
+                <div className="w-40 shrink-0">
+                  <input
+                    type="text"
+                    id="delivery_order"
+                    name="delivery_order"
+                    value={formData.delivery_order || ""}
+                    onChange={handleInputChange}
+                    disabled={isSaving}
+                    maxLength={100}
+                    placeholder="DO-00123"
+                    className="block w-full px-2.5 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm bg-white dark:bg-gray-700 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
+                  />
+                </div>
               </div>
               {invoiceNumberValidation.message && (
                 <p

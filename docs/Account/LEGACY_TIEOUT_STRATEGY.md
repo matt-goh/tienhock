@@ -28,11 +28,21 @@ into two systems independently, a handful of differences per month is
 `dev/import/legacy-tieout/tie-out.mjs` (procedure in its README): drop in the
 coworker's month-end legacy TB as CSV, run one command, get the list of
 differing accounts. A clean month prints `differing accounts: 0`. June 2026
-post-reclass prints exactly one row — the documented CR_LD +40.00 legacy print
-anomaly. Run it within the first days of each month; fixes are then 10-minute
-Journal-page edits while receipts are fresh, and no migration scripts, PDF
-forensics or handover docs are ever needed again. This converts reconciliation
-from a project into a routine, but it is **detection**, not prevention.
+post-reclass prints the documented CR_LD +40.00 legacy print anomaly, plus the
+four accounts the coworker amended in legacy *after* that print was taken
+(MBC/MBSM_K/MBRMF/MBSAF — see `JUNE_RECLASS_DESIGN.md` §e). Run it within the
+first days of each month; fixes are then 10-minute Journal-page edits while
+receipts are fresh, and no migration scripts, PDF forensics or handover docs are
+ever needed again. This converts reconciliation from a project into a routine,
+but it is **detection**, not prevention.
+
+**Ask for a CSV export, not a print, and run it while the month is fresh.** A
+print is a snapshot of what was keyed at one moment; the coworker may amend
+legacy afterwards, and then the fixture and the live legacy program disagree.
+Equally important: a differing account means the two systems disagree, not that
+legacy is right. Three of June's 31 corrections moved a *correct* ERP line to a
+wrong account because the print was treated as authoritative — always resolve a
+difference against the original receipt.
 
 ## Layer 1.5 — the keying guide (LIVE since 6 Aug 2026)
 

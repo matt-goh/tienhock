@@ -1,5 +1,6 @@
 // src/pages/Stock/Materials/MaterialFormPage.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../../routes/utils/api";
@@ -56,30 +57,40 @@ interface HardDeleteResponse {
   deleted_stock_entries?: number;
 }
 
-// Category options
-const categoryOptions: ReadonlyArray<PillSelectOption<string>> = [
-  { value: "ingredient", label: "Ingredient" },
-  { value: "raw_material", label: "Raw Material" },
-  { value: "packing_material", label: "Packing Material" },
-];
-
-// Applies to options
-const appliesToOptions: ReadonlyArray<PillSelectOption<string>> = [
-  { value: "both", label: "Both (MEE & BIHUN)" },
-  { value: "mee", label: "MEE Only" },
-  { value: "bihun", label: "BIHUN Only" },
-];
-
-const statusOptions: ReadonlyArray<PillSelectOption<string>> = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-];
-
 const MaterialFormPage: React.FC = () => {
+  const { t } = useTranslation("stock");
   const navigate = useNavigate();
   const goBack = useSmartBack("/materials");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id && id !== "new";
+
+  // Category options
+  const categoryOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    () => [
+      { value: "ingredient", label: t("Ingredient") },
+      { value: "raw_material", label: t("Raw Material") },
+      { value: "packing_material", label: t("Packing Material") },
+    ],
+    [t],
+  );
+
+  // Applies to options
+  const appliesToOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    () => [
+      { value: "both", label: t("Both (MEE & BIHUN)") },
+      { value: "mee", label: t("MEE Only") },
+      { value: "bihun", label: t("BIHUN Only") },
+    ],
+    [t],
+  );
+
+  const statusOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    () => [
+      { value: "active", label: t("Active") },
+      { value: "inactive", label: t("Inactive") },
+    ],
+    [t],
+  );
 
   // Form state
   const [formData, setFormData] = useState<MaterialFormData>(defaultFormData);
@@ -127,11 +138,15 @@ const MaterialFormPage: React.FC = () => {
       initialFormDataRef.current = { ...fetchedFormData };
     } catch (err: any) {
       console.error("Error fetching material data:", err);
-      setError(`Failed to load material: ${err?.message || "Unknown error"}`);
+      setError(
+        t("Failed to load material: {{message}}", {
+          message: err?.message || t("Unknown error"),
+        }),
+      );
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   // Fetch variants for the material
   const fetchVariants = useCallback(async () => {
@@ -174,7 +189,7 @@ const MaterialFormPage: React.FC = () => {
     if (!editingVariant || !id) return;
 
     if (!editingVariant.variant_name.trim()) {
-      toast.error("Variant name is required");
+      toast.error(t("Variant name is required"));
       return;
     }
 
@@ -189,7 +204,7 @@ const MaterialFormPage: React.FC = () => {
           sort_order: editingVariant.sort_order,
           is_active: editingVariant.is_active,
         });
-        toast.success("Variant updated");
+        toast.success(t("Variant updated"));
       } else {
         // Create new variant
         await api.post(`/api/materials/${id}/variants`, {
@@ -198,14 +213,14 @@ const MaterialFormPage: React.FC = () => {
           sort_order: editingVariant.sort_order,
           is_active: editingVariant.is_active,
         });
-        toast.success("Variant created");
+        toast.success(t("Variant created"));
       }
 
       setEditingVariant(null);
       fetchVariants();
     } catch (err: any) {
       console.error("Error saving variant:", err);
-      toast.error(err.message || "Failed to save variant");
+      toast.error(err.message || t("Failed to save variant"));
     } finally {
       setIsSavingVariant(false);
     }
@@ -231,17 +246,19 @@ const MaterialFormPage: React.FC = () => {
         const deletedStockEntries: number = response.deleted_stock_entries || 0;
         toast.success(
           deletedStockEntries > 0
-            ? `Variant deleted permanently (${deletedStockEntries} stock records removed)`
-            : "Variant deleted permanently"
+            ? t("Variant deleted permanently ({{count}} stock records removed)", {
+                count: deletedStockEntries,
+              })
+            : t("Variant deleted permanently")
         );
       } else {
         await api.delete(`/api/materials/variants/${variantToDelete.id}`);
-        toast.success("Variant deactivated");
+        toast.success(t("Variant deactivated"));
       }
       fetchVariants();
     } catch (err: any) {
       console.error("Error deleting variant:", err);
-      toast.error(err.message || "Failed to delete variant");
+      toast.error(err.message || t("Failed to delete variant"));
     } finally {
       setShowDeleteVariantDialog(false);
       setVariantToDelete(null);
@@ -315,11 +332,11 @@ const MaterialFormPage: React.FC = () => {
   const handleSave = async () => {
     // Validation
     if (!formData.code.trim()) {
-      toast.error("Code is required");
+      toast.error(t("Code is required"));
       return;
     }
     if (!formData.name.trim()) {
-      toast.error("Name is required");
+      toast.error(t("Name is required"));
       return;
     }
 
@@ -328,14 +345,14 @@ const MaterialFormPage: React.FC = () => {
     try {
       if (isEditMode) {
         await api.put(`/api/materials/${id}`, formData);
-        toast.success("Material updated successfully");
+        toast.success(t("Material updated successfully"));
         goBack();
       } else {
         const response: { material?: { id: number } } = await api.post(
           "/api/materials",
           formData
         );
-        toast.success("Material created successfully");
+        toast.success(t("Material created successfully"));
         const newId: number | undefined = response?.material?.id;
         // Show the material just created. `replace` drops this form from
         // history, so Back returns to wherever the user started.
@@ -347,7 +364,7 @@ const MaterialFormPage: React.FC = () => {
       }
     } catch (err: any) {
       console.error("Error saving material:", err);
-      toast.error(err.message || "Failed to save material");
+      toast.error(err.message || t("Failed to save material"));
     } finally {
       setIsSaving(false);
     }
@@ -370,17 +387,19 @@ const MaterialFormPage: React.FC = () => {
         const deletedStockEntries: number = response.deleted_stock_entries || 0;
         toast.success(
           deletedStockEntries > 0
-            ? `Material deleted permanently (${deletedStockEntries} stock records removed)`
-            : "Material deleted permanently"
+            ? t("Material deleted permanently ({{count}} stock records removed)", {
+                count: deletedStockEntries,
+              })
+            : t("Material deleted permanently")
         );
       } else {
         await api.delete(`/api/materials/${id}`);
-        toast.success("Material deactivated successfully");
+        toast.success(t("Material deactivated successfully"));
       }
       navigate("/materials");
     } catch (err: any) {
       console.error("Error deleting material:", err);
-      toast.error(err.message || "Failed to delete material");
+      toast.error(err.message || t("Failed to delete material"));
     } finally {
       setShowDeleteDialog(false);
       setMaterialDeleteMode("deactivate");
@@ -403,7 +422,7 @@ const MaterialFormPage: React.FC = () => {
             <BackButton fallbackPath="/materials" />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              Material
+              {t("Material")}
             </h1>
           </div>
         </div>
@@ -417,21 +436,35 @@ const MaterialFormPage: React.FC = () => {
   const isMaterialPersistedInactive: boolean =
     isEditMode && initialFormDataRef.current?.is_active === false && !formData.is_active;
   const materialDeleteDialogTitle: string =
-    materialDeleteMode === "permanent" ? "Delete Material Permanently" : "Deactivate Material";
+    materialDeleteMode === "permanent"
+      ? t("Delete Material Permanently")
+      : t("Deactivate Material");
   const materialDeleteDialogMessage: string =
     materialDeleteMode === "permanent"
-      ? `Permanently delete "${formData.name}"? This only works after the material is inactive and not used in purchase invoices. Any stock records for it and its variants will be removed. This action cannot be undone.`
-      : `Are you sure you want to deactivate "${formData.name}"? This material will be hidden but not permanently deleted.`;
+      ? t(
+          'Permanently delete "{{name}}"? This only works after the material is inactive and not used in purchase invoices. Any stock records for it and its variants will be removed. This action cannot be undone.',
+          { name: formData.name },
+        )
+      : t('Are you sure you want to deactivate "{{name}}"? This material will be hidden but not permanently deleted.', {
+          name: formData.name,
+        });
   const materialDeleteConfirmText: string =
-    materialDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";
+    materialDeleteMode === "permanent" ? t("Delete Permanently") : t("Deactivate");
   const variantDeleteDialogTitle: string =
-    variantDeleteMode === "permanent" ? "Delete Variant Permanently" : "Deactivate Variant";
+    variantDeleteMode === "permanent"
+      ? t("Delete Variant Permanently")
+      : t("Deactivate Variant");
   const variantDeleteDialogMessage: string =
     variantDeleteMode === "permanent"
-      ? `Permanently delete variant "${variantToDelete?.variant_name}"? This only works after the variant is inactive and not used in purchase invoices. Any stock records for this variant will be removed. This action cannot be undone.`
-      : `Are you sure you want to deactivate variant "${variantToDelete?.variant_name}"? This variant will be hidden but not permanently deleted.`;
+      ? t(
+          'Permanently delete variant "{{name}}"? This only works after the variant is inactive and not used in purchase invoices. Any stock records for this variant will be removed. This action cannot be undone.',
+          { name: variantToDelete?.variant_name },
+        )
+      : t('Are you sure you want to deactivate variant "{{name}}"? This variant will be hidden but not permanently deleted.', {
+          name: variantToDelete?.variant_name,
+        });
   const variantDeleteConfirmText: string =
-    variantDeleteMode === "permanent" ? "Delete Permanently" : "Deactivate";
+    variantDeleteMode === "permanent" ? t("Delete Permanently") : t("Deactivate");
 
   return (
     <div className="space-y-4">
@@ -442,7 +475,7 @@ const MaterialFormPage: React.FC = () => {
             <BackButton onClick={handleBack} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              {isEditMode ? "Edit Material" : "New Material"}
+              {isEditMode ? t("Edit Material") : t("New Material")}
             </h1>
           </div>
           <div className="flex space-x-2">
@@ -453,7 +486,7 @@ const MaterialFormPage: React.FC = () => {
                 size="sm"
                 onClick={() => handleDeleteClick("deactivate")}
               >
-                Deactivate
+                {t("Deactivate")}
               </Button>
             )}
             {isMaterialPersistedInactive && (
@@ -463,7 +496,7 @@ const MaterialFormPage: React.FC = () => {
                 size="sm"
                 onClick={() => handleDeleteClick("permanent")}
               >
-                Delete Permanently
+                {t("Delete Permanently")}
               </Button>
             )}
             <Button
@@ -472,7 +505,7 @@ const MaterialFormPage: React.FC = () => {
               onClick={handleBack}
               disabled={isSaving}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               color="sky"
@@ -480,7 +513,7 @@ const MaterialFormPage: React.FC = () => {
               onClick={handleSave}
               disabled={isSaving || (!isFormChanged && isEditMode)}
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? t("Saving...") : t("Save")}
             </Button>
           </div>
         </div>
@@ -489,35 +522,35 @@ const MaterialFormPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Code */}
           <FormInput
-            label="Code"
+            label={t("Code")}
             name="code"
             value={formData.code}
             onChange={handleInputChange}
             required
             disabled={isEditMode}
-            placeholder="e.g., GARAM, TEPUNG"
+            placeholder={t("e.g., GARAM, TEPUNG")}
           />
 
           {/* Name */}
           <FormInput
-            label="Name"
+            label={t("Name")}
             name="name"
             value={formData.name}
             onChange={handleInputChange}
             required
-            placeholder="e.g., Garam (Salt)"
+            placeholder={t("e.g., Garam (Salt)")}
           />
 
           {/* Category */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-              Category <span className="text-red-500">*</span>
+              {t("Category")} <span className="text-red-500">*</span>
             </label>
             <PillSelect<string>
               value={formData.category}
               options={categoryOptions}
               onChange={(value: string) => handleSelectChange("category", value)}
-              ariaLabel="Category"
+              ariaLabel={t("Category")}
               size="md"
             />
           </div>
@@ -525,7 +558,7 @@ const MaterialFormPage: React.FC = () => {
           {/* Applies To */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-              Applies To <span className="text-red-500">*</span>
+              {t("Applies To")} <span className="text-red-500">*</span>
             </label>
             <PillSelect<string>
               value={formData.applies_to}
@@ -533,14 +566,14 @@ const MaterialFormPage: React.FC = () => {
               onChange={(value: string) =>
                 handleSelectChange("applies_to", value)
               }
-              ariaLabel="Applies to"
+              ariaLabel={t("Applies to")}
               size="md"
             />
           </div>
 
           {/* Default Unit Cost */}
           <FormInput
-            label="Default Unit Cost (RM)"
+            label={t("Default Unit Cost (RM)")}
             name="default_unit_cost"
             type="number"
             value={formData.default_unit_cost.toString()}
@@ -550,7 +583,7 @@ const MaterialFormPage: React.FC = () => {
 
           {/* Sort Order */}
           <FormInput
-            label="Sort Order"
+            label={t("Sort Order")}
             name="sort_order"
             type="number"
             value={formData.sort_order.toString()}
@@ -561,7 +594,7 @@ const MaterialFormPage: React.FC = () => {
           {isEditMode && (
             <div className="space-y-2">
               <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                Status
+                {t("Status")}
               </label>
               <PillSelect<string>
                 value={formData.is_active ? "active" : "inactive"}
@@ -569,7 +602,7 @@ const MaterialFormPage: React.FC = () => {
                 onChange={(value: string) =>
                   handleSelectChange("is_active", value === "active")
                 }
-                ariaLabel="Status"
+                ariaLabel={t("Status")}
                 size="md"
               />
             </div>
@@ -582,7 +615,7 @@ const MaterialFormPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm px-6 py-4">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-base font-semibold text-default-800 dark:text-gray-100">
-              Variants
+              {t("Variants")}
             </h2>
             <Button
               size="sm"
@@ -591,18 +624,19 @@ const MaterialFormPage: React.FC = () => {
               onClick={handleAddVariant}
               disabled={editingVariant !== null}
             >
-              Add Variant
+              {t("Add Variant")}
             </Button>
           </div>
 
           <p className="text-xs text-default-500 dark:text-gray-400 mb-3">
-            Define multiple variants (e.g., different suppliers, package sizes) for this material.
-            Each variant can have its own default cost and will appear as separate rows in stock entry.
+            {t(
+              "Define multiple variants (e.g., different suppliers, package sizes) for this material. Each variant can have its own default cost and will appear as separate rows in stock entry.",
+            )}
           </p>
 
           {variants.length === 0 && !editingVariant ? (
             <div className="text-center py-6 text-default-400 dark:text-gray-500 text-sm">
-              No variants defined. This material will appear as a single row in stock entry.
+              {t("No variants defined. This material will appear as a single row in stock entry.")}
             </div>
           ) : (
             <div className="overflow-hidden border border-default-200 dark:border-gray-700 rounded-lg">
@@ -610,19 +644,19 @@ const MaterialFormPage: React.FC = () => {
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
                     <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      Variant Name
+                      {t("Variant Name")}
                     </th>
                     <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-32">
-                      Default Cost
+                      {t("Default Cost")}
                     </th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
-                      Order
+                      {t("Order")}
                     </th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-24">
-                      Status
+                      {t("Status")}
                     </th>
                     <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
-                      Actions
+                      {t("Actions")}
                     </th>
                   </tr>
                 </thead>
@@ -636,7 +670,7 @@ const MaterialFormPage: React.FC = () => {
                           value={editingVariant.variant_name}
                           onChange={(e) => handleVariantInputChange("variant_name", e.target.value)}
                           className="w-full px-2 py-1 text-sm border border-default-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                          placeholder="e.g., Vietnam (Coklat)"
+                          placeholder={t("e.g., Vietnam (Coklat)")}
                           autoFocus
                         />
                       </td>
@@ -669,7 +703,7 @@ const MaterialFormPage: React.FC = () => {
                               value === "active"
                             )
                           }
-                          ariaLabel="Variant status"
+                          ariaLabel={t("Variant status")}
                         />
                       </td>
                       <td className="px-3 py-2">
@@ -678,14 +712,14 @@ const MaterialFormPage: React.FC = () => {
                             onClick={handleSaveVariant}
                             disabled={isSavingVariant}
                             className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
-                            title="Save"
+                            title={t("Save")}
                           >
                             <IconCheck className="w-4 h-4" />
                           </button>
                           <button
                             onClick={handleCancelEditVariant}
                             className="p-1 text-red-600 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                            title="Cancel"
+                            title={t("Cancel")}
                           >
                             <IconX className="w-4 h-4" />
                           </button>
@@ -709,11 +743,11 @@ const MaterialFormPage: React.FC = () => {
                       <td className="px-3 py-2 text-center">
                         {variant.is_active ? (
                           <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full dark:bg-green-900/30 dark:text-green-300">
-                            Active
+                            {t("Active")}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-400">
-                            Inactive
+                            {t("Inactive")}
                           </span>
                         )}
                       </td>
@@ -723,7 +757,7 @@ const MaterialFormPage: React.FC = () => {
                             onClick={() => handleEditVariant(variant)}
                             disabled={editingVariant !== null}
                             className="p-1 text-gray-500 hover:text-sky-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
-                            title="Edit"
+                            title={t("Edit")}
                           >
                             <IconPencil className="w-4 h-4" />
                           </button>
@@ -732,7 +766,7 @@ const MaterialFormPage: React.FC = () => {
                               onClick={() => handleDeleteVariantClick(variant, "deactivate")}
                               disabled={editingVariant !== null}
                               className="p-1 text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
-                              title="Deactivate"
+                              title={t("Deactivate")}
                             >
                               <IconTrash className="w-4 h-4" />
                             </button>
@@ -742,7 +776,7 @@ const MaterialFormPage: React.FC = () => {
                               onClick={() => handleDeleteVariantClick(variant, "permanent")}
                               disabled={editingVariant !== null}
                               className="p-1 text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors disabled:opacity-50"
-                              title="Delete permanently"
+                              title={t("Delete permanently")}
                             >
                               <IconTrash className="w-4 h-4" />
                             </button>
@@ -763,9 +797,9 @@ const MaterialFormPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={() => navigate("/materials")}
-        title="Unsaved Changes"
-        message="You have unsaved changes. Are you sure you want to leave? Your changes will be lost."
-        confirmButtonText="Leave"
+        title={t("Unsaved Changes")}
+        message={t("You have unsaved changes. Are you sure you want to leave? Your changes will be lost.")}
+        confirmButtonText={t("Leave")}
         variant="danger"
       />
 

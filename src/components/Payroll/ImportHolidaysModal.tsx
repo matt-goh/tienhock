@@ -13,6 +13,7 @@ import toast from "react-hot-toast";
 import { format, parse } from "date-fns";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import Checkbox from "../Checkbox";
+import { useTranslation, Trans } from "react-i18next";
 
 interface ImportHolidaysModalProps {
   isOpen: boolean;
@@ -37,6 +38,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
   existingHolidays,
   selectedYear,
 }) => {
+  const { t } = useTranslation("payroll");
   const [inputText, setInputText] = useState("");
   const [parsedHolidays, setParsedHolidays] = useState<ParsedHoliday[]>([]);
   const [showPreview, setShowPreview] = useState(false);
@@ -150,7 +152,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
       setShowPreview(true);
     } catch (error) {
       console.error("Error parsing holiday text:", error);
-      toast.error("Failed to parse holiday data. Please check the format.");
+      toast.error(t("Failed to parse holiday data. Please check the format."));
     }
   };
 
@@ -176,14 +178,12 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
         overwrite: overwriteDuplicates,
       });
 
-      toast.success(
-        `Successfully imported ${holidaysToImport.length} holidays`
-      );
+      toast.success(t("Successfully imported {{count}} holidays", { count: holidaysToImport.length }));
       onImportComplete();
       onClose();
     } catch (error: any) {
       console.error("Error importing holidays:", error);
-      toast.error(error.response?.data?.message || "Failed to import holidays");
+      toast.error(error.response?.data?.message || t("Failed to import holidays"));
     } finally {
       setIsImporting(false);
     }
@@ -230,26 +230,26 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Import Holidays for {selectedYear}
+                  {t("Import Holidays for {{year}}", { year: selectedYear })}
                 </DialogTitle>
 
                 {!showPreview ? (
                   <div className="mt-4">
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
-                      Paste the list of holidays below. The format is tailored
-                      for copying directly from sites like{" "}
-                      <a
-                        href="https://publicholidays.com.my/sabah/2026-dates/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sky-600 dark:text-sky-400 hover:underline"
-                      >
-                        publicholidays.com.my
-                      </a>
-                      .<br />
-                      You can also manually type entries.
-                      <br />
-                      Each holiday should be on a new line. For example:
+                      <Trans
+                        i18nKey="Paste the list of holidays below. The format is tailored for copying directly from sites like <link>publicholidays.com.my</link>.<br/>You can also manually type entries.<br/>Each holiday should be on a new line. For example:"
+                        components={{
+                          link: (
+                            <a
+                              href="https://publicholidays.com.my/sabah/2026-dates/"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sky-600 dark:text-sky-400 hover:underline"
+                            />
+                          ),
+                          br: <br />,
+                        }}
+                      />
                     </p>
                     <pre className="text-xs bg-gray-50 dark:bg-gray-700 p-2 rounded border border-gray-200 dark:border-gray-600 mb-2">
                       <code className="dark:text-gray-200">
@@ -268,7 +268,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                     />
                     <div className="mt-4 flex justify-end space-x-3">
                       <Button variant="outline" onClick={handleClose}>
-                        Cancel
+                        {t("Cancel")}
                       </Button>
                       <Button
                         color="sky"
@@ -276,7 +276,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                         onClick={parseHolidayText}
                         disabled={!inputText.trim()}
                       >
-                        Preview Import
+                        {t("Preview Import")}
                       </Button>
                     </div>
                   </div>
@@ -287,14 +287,13 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                         <IconAlertTriangle className="h-5 w-5 text-amber-500 dark:text-amber-400 mt-0.5 mr-2" />
                         <div>
                           <p className="text-sm text-amber-800 dark:text-amber-300">
-                            {duplicateCount} duplicate
-                            {duplicateCount > 1 ? "s" : ""} found
+                            {t(duplicateCount === 1 ? "{{count}} duplicate found" : "{{count}} duplicates found", { count: duplicateCount })}
                           </p>
                           <div className="mt-2">
                             <Checkbox
                               checked={overwriteDuplicates}
                               onChange={setOverwriteDuplicates}
-                              label="Overwrite existing holidays"
+                              label={t("Overwrite existing holidays")}
                               size={18}
                               checkedColor="text-sky-600"
                               uncheckedColor="text-gray-400"
@@ -310,16 +309,16 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                         <thead className="bg-gray-50 dark:bg-gray-700">
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                              Date
+                              {t("Date")}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                              Day
+                              {t("Day")}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                              Description
+                              {t("Description")}
                             </th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">
-                              Status
+                              {t("Status")}
                             </th>
                           </tr>
                         </thead>
@@ -343,19 +342,18 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                               <td className="px-4 py-3 text-sm">
                                 {holiday.isDuplicate ? (
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
-                                    Duplicate
+                                    {t("Duplicate")}
                                     {holiday.existingDescription &&
                                       holiday.existingDescription !==
                                         holiday.description && (
                                         <span className="ml-1 text-amber-600 dark:text-amber-400">
-                                          (Current:{" "}
-                                          {holiday.existingDescription})
+                                          {t("(Current: {{description}})", { description: holiday.existingDescription })}
                                         </span>
                                       )}
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300">
-                                    New
+                                    {t("New")}
                                   </span>
                                 )}
                               </td>
@@ -367,17 +365,17 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
 
                     <div className="mt-4 flex justify-between items-center">
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {parsedHolidays.length} total, {duplicateCount}{" "}
-                        duplicates
+                        {t("{{total}} total, {{duplicates}} duplicates", { total: parsedHolidays.length, duplicates: duplicateCount })}
                         {overwriteDuplicates || duplicateCount === 0
-                          ? ` • ${
-                              parsedHolidays.length -
-                              duplicateCount +
-                              (overwriteDuplicates ? duplicateCount : 0)
-                            } will be imported`
-                          : ` • ${
-                              parsedHolidays.length - duplicateCount
-                            } will be imported (duplicates will be skipped)`}
+                          ? t(" • {{count}} will be imported", {
+                              count:
+                                parsedHolidays.length -
+                                duplicateCount +
+                                (overwriteDuplicates ? duplicateCount : 0),
+                            })
+                          : t(" • {{count}} will be imported (duplicates will be skipped)", {
+                              count: parsedHolidays.length - duplicateCount,
+                            })}
                       </div>
                       <div className="flex space-x-3">
                         <Button
@@ -385,7 +383,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                           onClick={() => setShowPreview(false)}
                           disabled={isImporting}
                         >
-                          Back
+                          {t("Back")}
                         </Button>
                         <Button
                           color="sky"
@@ -393,7 +391,7 @@ const ImportHolidaysModal: React.FC<ImportHolidaysModalProps> = ({
                           onClick={handleImport}
                           disabled={isImporting || parsedHolidays.length === 0}
                         >
-                          {isImporting ? "Importing..." : "Import"}
+                          {isImporting ? t("Importing...") : t("Import")}
                         </Button>
                       </div>
                     </div>

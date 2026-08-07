@@ -1,5 +1,6 @@
 // src/components/Stock/ProductStockMovementTable.tsx
 import React from "react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 import { StockMovement } from "../../types/types";
 
@@ -21,6 +22,8 @@ const ProductStockMovementTable: React.FC<ProductStockMovementTableProps> = ({
   monthlyTotals,
   isLoading = false,
 }) => {
+  const { t } = useTranslation("stock");
+
   // Column headers configuration
   const columns = [
     { key: "day", label: "Day", align: "center" as const, width: "w-20" },
@@ -54,7 +57,7 @@ const ProductStockMovementTable: React.FC<ProductStockMovementTableProps> = ({
       <div className="flex items-center justify-center py-16">
         <div className="flex flex-col items-center gap-3">
           <div className="h-10 w-10 animate-spin rounded-full border-3 border-sky-500 border-t-transparent"></div>
-          <span className="text-sm text-default-500 dark:text-gray-400">Loading stock data...</span>
+          <span className="text-sm text-default-500 dark:text-gray-400">{t("Loading stock data...")}</span>
         </div>
       </div>
     );
@@ -63,9 +66,9 @@ const ProductStockMovementTable: React.FC<ProductStockMovementTableProps> = ({
   if (movements.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-12 text-center">
-        <p className="text-default-500 dark:text-gray-400">No stock movement data available.</p>
+        <p className="text-default-500 dark:text-gray-400">{t("No stock movement data available.")}</p>
         <p className="mt-1 text-sm text-default-400 dark:text-gray-500">
-          Select a product and date range to view stock movements.
+          {t("Select a product and date range to view stock movements.")}
         </p>
       </div>
     );
@@ -86,7 +89,7 @@ const ProductStockMovementTable: React.FC<ProductStockMovementTableProps> = ({
                   col.align === "right" ? "text-right" : "text-center"
                 )}
               >
-                {col.label}
+                {t(col.label)}
               </th>
             ))}
           </tr>
@@ -173,7 +176,7 @@ const ProductStockMovementTable: React.FC<ProductStockMovementTableProps> = ({
           <tfoot>
             <tr className="bg-default-50 dark:bg-gray-900/50">
               <td className="w-20 border-t-2 border-default-300 dark:border-gray-600 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400">
-                Totals
+                {t("Totals")}
               </td>
               <td className="w-20 border-t-2 border-default-300 dark:border-gray-600 px-3 py-2 text-right text-default-300 dark:text-gray-500">
                 —

@@ -38,6 +38,7 @@ import { api } from "../../routes/utils/api";
 import { useAuth } from "../../contexts/AuthContext";
 import MonthDayMultiPicker from "./MonthDayMultiPicker";
 import Checkbox from "../Checkbox";
+import { useTranslation, Trans } from "react-i18next";
 
 interface OthersEntry {
   id: number;
@@ -122,6 +123,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
   allowedEmployeeIds,
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("payroll");
   const { staffs: thStaffs } = useStaffsCache();
   const { staffs: jpStaffs } = useJPStaffsCache();
   const { payCodes: thPayCodes } = useJobPayCodeMappings();
@@ -352,9 +354,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
     });
 
     if (valid.length === 0) {
-      toast.error(
-        `Please add at least one valid entry with staff, pay code, dates, rate, quantity, and description.`
-      );
+      toast.error(t("Please add at least one valid entry with staff, pay code, dates, rate, quantity, and description."));
       return;
     }
 
@@ -383,7 +383,10 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
         totalInserted += e.dates.length;
       }
       toast.success(
-        `${totalInserted} ${displayLabel} record(s) saved successfully!`
+        t("{{count}} {{label}} record(s) saved successfully!", {
+          count: totalInserted,
+          label: displayLabel,
+        })
       );
       onSuccess();
       onClose();
@@ -391,7 +394,9 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
       console.error("Failed to save Others records:", error);
       toast.error(
         error.response?.data?.message ||
-          `Failed to save one or more ${displayLabel} records.`
+          t("Failed to save one or more {{label}} records.", {
+            label: displayLabel,
+          })
       );
     } finally {
       setIsSaving(false);
@@ -449,10 +454,14 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                     as="h3"
                     className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
-                    Record Staff {displayLabel}
+                    {t("Record Staff {{label}}", { label: displayLabel })}
                   </DialogTitle>
                   <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                    Adding to <span className="font-medium">{monthLabel}</span>. Pick one or more dates per entry — entries with 2+ dates are saved as a linked record that stays in sync.
+                    <Trans
+                      i18nKey="Adding to <strong>{{month}}</strong>. Pick one or more dates per entry — entries with 2+ dates are saved as a linked record that stays in sync."
+                      values={{ month: monthLabel }}
+                      components={{ strong: <span className="font-medium" /> }}
+                    />
                   </p>
                 </div>
 
@@ -510,11 +519,11 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                           {/* Card header */}
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
-                              Entry {index + 1}
+                              {t("Entry {{index}}", { index: index + 1 })}
                               {isLinked && (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
                                   <IconLink size={11} />
-                                  Linked across {entry.dates.length} dates
+                                  {t("Linked across {{count}} dates", { count: entry.dates.length })}
                                 </span>
                               )}
                             </div>
@@ -524,7 +533,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                 onClick={() => removeEntryRow(entry.id)}
                                 disabled={isSaving}
                                 className="p-1.5 rounded-full text-default-400 hover:bg-rose-100 hover:text-rose-600 dark:text-gray-500 dark:hover:bg-rose-900/40 dark:hover:text-rose-300 transition-colors"
-                                title="Remove entry"
+                                title={t("Remove entry")}
                               >
                                 <IconX size={16} />
                               </button>
@@ -535,7 +544,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
                             <div>
                               <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
-                                Staff
+                                {t("Staff")}
                               </label>
                               <Combobox
                                 value={entry.employeeId || ""}
@@ -563,7 +572,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                         [entry.id]: event.target.value,
                                       }))
                                     }
-                                    placeholder="Select staff..."
+                                    placeholder={t("Select staff...")}
                                   />
                                   <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                                     <IconChevronDown
@@ -590,7 +599,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                     >
                                       {filteredStaff.length === 0 ? (
                                         <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                                          No staff found.
+                                          {t("No staff found.")}
                                         </div>
                                       ) : (
                                         filteredStaff.slice(0, 50).map((s) => (
@@ -642,7 +651,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                       }}
                                     >
                                       <IconUsersPlus size={14} />
-                                      Add multiple staff
+                                      {t("Add multiple staff")}
                                     </PopoverButton>
                                     <Transition
                                       as={Fragment}
@@ -658,7 +667,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                         className="z-50 w-80 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 shadow-lg ring-1 ring-black/5 dark:ring-gray-700"
                                       >
                                         <div className="mb-2 text-xs font-medium text-default-700 dark:text-gray-200">
-                                          Pick staff — each will get this entry's paycode, dates, rate, qty and description copied. You can tweak per row after.
+                                          {t("Pick staff — each will get this entry's paycode, dates, rate, qty and description copied. You can tweak per row after.")}
                                         </div>
                                         <input
                                           type="text"
@@ -666,13 +675,13 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                           onChange={(e) =>
                                             setBulkStaffQuery(e.target.value)
                                           }
-                                          placeholder="Search staff..."
+                                          placeholder={t("Search staff...")}
                                           className="w-full rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-1.5 px-2 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                                         />
                                         <div className="mt-2 max-h-60 overflow-auto space-y-0.5">
                                           {filteredBulkStaffOptions.length === 0 ? (
                                             <div className="py-2 px-1 text-sm text-default-500 dark:text-gray-400">
-                                              No staff found.
+                                              {t("No staff found.")}
                                             </div>
                                           ) : (
                                             filteredBulkStaffOptions.map((s) => (
@@ -707,7 +716,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                         </div>
                                         <div className="mt-3 flex items-center justify-between border-t border-default-200 dark:border-gray-700 pt-2 text-xs">
                                           <span className="text-default-500 dark:text-gray-400">
-                                            {bulkStaffSelected.length} selected
+                                            {t("{{count}} selected", { count: bulkStaffSelected.length })}
                                           </span>
                                           <div className="flex items-center gap-2">
                                             <button
@@ -719,7 +728,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                               }}
                                               className="rounded-md px-3 py-1 text-default-600 hover:bg-default-100 dark:text-gray-300 dark:hover:bg-gray-700"
                                             >
-                                              Cancel
+                                              {t("Cancel")}
                                             </button>
                                             <button
                                               type="button"
@@ -731,8 +740,9 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                               }
                                               className="rounded-md bg-sky-500 px-3 py-1 font-medium text-white hover:bg-sky-600 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-sky-600 dark:hover:bg-sky-500"
                                             >
-                                              Add {bulkStaffSelected.length || ""} row
-                                              {bulkStaffSelected.length === 1 ? "" : "s"}
+                                              {bulkStaffSelected.length === 1
+                                                ? t("Add {{count}} row", { count: bulkStaffSelected.length })
+                                                : t("Add {{count}} rows", { count: bulkStaffSelected.length })}
                                             </button>
                                           </div>
                                         </div>
@@ -745,7 +755,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
 
                             <div>
                               <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
-                                Pay code
+                                {t("Pay code")}
                               </label>
                               <Combobox
                                 value={entry.payCodeId}
@@ -771,7 +781,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                         event.target.value,
                                       )
                                     }
-                                    placeholder="Search pay code..."
+                                    placeholder={t("Search pay code...")}
                                   />
                                   <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                                     <IconChevronDown
@@ -802,7 +812,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                     >
                                       {filteredPayCodes.length === 0 ? (
                                         <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                                          No pay codes found.
+                                          {t("No pay codes found.")}
                                         </div>
                                       ) : (
                                         <>
@@ -859,7 +869,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                                     size={14}
                                                     className="mr-1.5"
                                                   />
-                                                  Load more ({remainingPayCodeCount} remaining)
+                                                  {t("Load more ({{count}} remaining)", { count: remainingPayCodeCount })}
                                                 </span>
                                               </button>
                                             </div>
@@ -872,7 +882,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                               </Combobox>
                               {entry.rateUnit && (
                                 <div className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                                  Unit: {entry.rateUnit}
+                                  {t("Unit: {{unit}}", { unit: entry.rateUnit })}
                                 </div>
                               )}
                             </div>
@@ -881,7 +891,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                           {/* Row 2: Date(s) */}
                           <div className="mb-3">
                             <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
-                              Date(s)
+                              {t("Date(s)")}
                             </label>
                             <MonthDayMultiPicker
                               year={currentYear}
@@ -898,7 +908,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                             <FormInput
                               name={`rate-${entry.id}`}
-                              label="Rate (RM)"
+                              label={t("Rate (RM)")}
                               type="number"
                               value={entry.rate}
                               onChange={(e) =>
@@ -910,7 +920,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                             />
                             <FormInput
                               name={`quantity-${entry.id}`}
-                              label={`Quantity${entry.rateUnit ? ` (${entry.rateUnit})` : ""}`}
+                              label={entry.rateUnit ? t("Quantity ({{unit}})", { unit: entry.rateUnit }) : t("Quantity")}
                               type="number"
                               value={entry.quantity}
                               onChange={(e) =>
@@ -922,14 +932,14 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                             />
                             <div className="space-y-2">
                               <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                                {isLinked ? "Per-day amount" : "Amount"}
+                                {isLinked ? t("Per-day amount") : t("Amount")}
                               </label>
                               <div className="block w-full px-3 py-2 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm bg-default-50 dark:bg-gray-900/40 text-sm font-medium text-default-800 dark:text-gray-100">
                                 {formatCurrency(amount)}
                               </div>
                               {isLinked && (
                                 <div className="text-xs text-default-500 dark:text-gray-400 text-right -mt-1">
-                                  × {entry.dates.length} ={" "}
+                                  {t("× {{count}} =", { count: entry.dates.length })}{" "}
                                   <span className="font-medium text-default-700 dark:text-gray-200">
                                     {formatCurrency(totalForEntry)}
                                   </span>
@@ -941,7 +951,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                           {/* Row 3.5: Salary report column override */}
                           <div className="mb-3">
                             <label className="block text-xs font-medium text-default-600 dark:text-gray-300 mb-1">
-                              Salary report column
+                              {t("Salary report column")}
                             </label>
                             <select
                               value={entry.reportColumn}
@@ -957,19 +967,19 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                             >
                               {REPORT_COLUMN_OPTIONS.map((opt) => (
                                 <option key={opt.value} value={opt.value}>
-                                  {opt.label}
+                                  {opt.label === "Automatic (by rule)" ? t(opt.label) : opt.label}
                                 </option>
                               ))}
                             </select>
                             <p className="mt-1 text-[11px] text-default-400 dark:text-gray-500">
-                              Forces which Salary Report column this amount shows in. Leave on Automatic unless it needs overriding.
+                              {t("Forces which Salary Report column this amount shows in. Leave on Automatic unless it needs overriding.")}
                             </p>
                           </div>
 
                           {/* Row 4: Description */}
                           <FormInput
                             name={`description-${entry.id}`}
-                            label="Description"
+                            label={t("Description")}
                             type="text"
                             value={entry.description}
                             onChange={(e) =>
@@ -979,7 +989,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                                 e.target.value,
                               )
                             }
-                            placeholder="Description"
+                            placeholder={t("Description")}
                           />
                         </div>
                       );
@@ -992,7 +1002,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                       className="w-full inline-flex items-center justify-center gap-2 rounded-xl border border-dashed border-default-300 dark:border-gray-600 px-4 py-3 text-sm font-medium text-default-600 hover:border-sky-400 hover:bg-sky-50/40 hover:text-sky-700 dark:text-gray-300 dark:hover:border-sky-700 dark:hover:bg-sky-900/20 dark:hover:text-sky-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <IconPlus size={16} />
-                      Add another entry
+                      {t("Add another entry")}
                     </button>
                   </div>
                 </div>
@@ -1001,12 +1011,10 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                 <div className="flex justify-between items-center px-6 py-4 border-t border-default-200 bg-white dark:border-gray-700 dark:bg-gray-800 rounded-b-2xl">
                   <div className="text-sm text-default-600 dark:text-gray-300">
                     <span className="font-medium">
-                      {totalRecordsToCreate} record
-                      {totalRecordsToCreate === 1 ? "" : "s"}
-                    </span>{" "}
-                    · Total{" "}
-                    <span className="font-medium text-default-800 dark:text-gray-100">
-                      {formatCurrency(totalAmountAcrossAll)}
+                      {t(totalRecordsToCreate === 1 ? "{{count}} record · Total {{amount}}" : "{{count}} records · Total {{amount}}", {
+                        count: totalRecordsToCreate,
+                        amount: formatCurrency(totalAmountAcrossAll),
+                      })}
                     </span>
                   </div>
                   <div className="flex space-x-3">
@@ -1015,7 +1023,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                       onClick={handleClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       color="sky"
@@ -1023,7 +1031,7 @@ const AddOthersModal: React.FC<AddOthersModalProps> = ({
                       disabled={isSaving}
                       icon={IconDeviceFloppy}
                     >
-                      {isSaving ? "Saving..." : `Save ${displayLabel}`}
+                      {isSaving ? t("Saving...") : t("Save {{label}}", { label: displayLabel })}
                     </Button>
                   </div>
                 </div>

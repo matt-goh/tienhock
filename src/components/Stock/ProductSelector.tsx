@@ -1,5 +1,6 @@
 // src/components/Stock/ProductSelector.tsx
 import React, { useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Combobox,
   ComboboxInput,
@@ -47,13 +48,15 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
   value,
   onChange,
   productTypes = ["BH", "MEE"],
-  placeholder = "Select a product...",
+  placeholder,
   showCategories = true,
   disabled = false,
   label,
   required = false,
   productFilter,
 }) => {
+  const { t } = useTranslation("stock");
+
   const [query, setQuery] = useState("");
   const { products, isLoading } = useProductsCache("all");
 
@@ -230,7 +233,9 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                   : ""
               }
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={isLoading ? "Loading products..." : placeholder}
+              placeholder={
+                isLoading ? t("Loading products...") : placeholder ?? t("Select a product...")
+              }
             />
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <IconSearch className="h-4 w-4 text-default-400 dark:text-gray-400" />
@@ -256,7 +261,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                 onChange(null);
               }}
               className="absolute inset-y-0 right-0 flex items-center pr-2 text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200 z-20"
-              aria-label="Clear selection"
+              aria-label={t("Clear selection")}
             >
               <IconX className="h-5 w-5" aria-hidden="true" />
             </button>
@@ -271,7 +276,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
           >
             {!hasResults && query !== "" ? (
               <div className="relative cursor-default select-none px-4 py-2 text-default-500 dark:text-gray-400">
-                No products found.
+                {t("No products found.")}
               </div>
             ) : (
               <>
@@ -287,7 +292,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                     }
                   >
                     <span className="block truncate italic">
-                      Clear selection
+                      {t("Clear selection")}
                     </span>
                   </ComboboxOption>
                 )}
@@ -296,7 +301,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                 {showCategories && filteredFavorites.length > 0 && (
                   <div>
                     <div className="sticky top-0 z-10 px-4 py-2 text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-gray-900">
-                      Favorites ({filteredFavorites.length})
+                      {t("Favorites ({{count}})", { count: filteredFavorites.length })}
                     </div>
                     {filteredFavorites.map((product) => (
                       <ComboboxOption
@@ -371,7 +376,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
                               categoryColors[type] || "text-default-500 dark:text-gray-400 bg-default-50 dark:bg-gray-900"
                             )}
                           >
-                            {categoryLabels[type]} ({prods.length})
+                            {t(categoryLabels[type])} ({prods.length})
                           </div>
 
                           {/* Products in category */}

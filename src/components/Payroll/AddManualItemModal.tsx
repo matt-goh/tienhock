@@ -29,6 +29,7 @@ import {
   IconChevronDown,
   IconCheck,
 } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 
 interface AddManualItemModalProps {
   isOpen: boolean;
@@ -59,6 +60,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
   apiBasePath,
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("payroll");
   const {
     payCodes: thPayCodes,
     detailedMappings: thDetailedMappings,
@@ -208,7 +210,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
         setCalculatedAmount(calculatedAmount);
         setError(null);
       } catch (err) {
-        setError("Invalid calculation. Please check your values.");
+        setError(t("Invalid calculation. Please check your values."));
       }
     }
   }, [rate, quantity, selectedPayCodeDetails]);
@@ -217,29 +219,29 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
     e.preventDefault();
 
     if (!selectedPayCodeDetails) {
-      setError("Please select a pay code");
+      setError(t("Please select a pay code"));
       return;
     }
 
     if (!customDescription.trim()) {
-      setError("Description is required");
+      setError(t("Description is required"));
       return;
     }
 
     if (parseFloat(quantity) <= 0 || isNaN(parseFloat(quantity)) || !isFinite(parseFloat(quantity))) {
-      setError("Quantity must be a valid number greater than 0");
+      setError(t("Quantity must be a valid number greater than 0"));
       return;
     }
 
     if (parseFloat(rate) <= 0 || isNaN(parseFloat(rate)) || !isFinite(parseFloat(rate))) {
-      setError("Rate must be a valid number greater than 0");
+      setError(t("Rate must be a valid number greater than 0"));
       return;
     }
 
     // Validate calculated amount
     const calculatedAmount = parseFloat(rate) * parseFloat(quantity);
     if (isNaN(calculatedAmount) || !isFinite(calculatedAmount)) {
-      setError("Calculated amount is invalid. Please check your inputs.");
+      setError(t("Calculated amount is invalid. Please check your inputs."));
       return;
     }
 
@@ -260,13 +262,13 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
         apiBasePath
       );
 
-      toast.success("Manual item added successfully");
+      toast.success(t("Manual item added successfully"));
       onItemAdded();
       onClose();
     } catch (error) {
       console.error("Error adding manual item:", error);
-      setError("Failed to add manual item. Please try again.");
-      toast.error("Failed to add manual item");
+      setError(t("Failed to add manual item. Please try again."));
+      toast.error(t("Failed to add manual item"));
     } finally {
       setIsSaving(false);
     }
@@ -312,7 +314,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Add Manual Payroll Item
+                  {t("Add Manual Payroll Item")}
                 </DialogTitle>
 
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
@@ -323,9 +325,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                       </div>
                       <div className="text-sm text-sky-700 dark:text-sky-300">
                         <p>
-                          Add a manual "Tambahan" item to this employee's
-                          payroll. This is for additional pay not captured
-                          through regular work logs.
+                          {t("Add a manual \"Tambahan\" item to this employee's payroll. This is for additional pay not captured through regular work logs.")}
                         </p>
                       </div>
                     </div>
@@ -334,7 +334,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   {/* Pay Code Selection - Now using Combobox instead of FormListbox */}
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      Pay Code
+                      {t("Pay Code")}
                     </label>
                     <div className="relative">
                       <Combobox
@@ -356,7 +356,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                                 : "";
                             }}
                             onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search pay code..."
+                            placeholder={t("Search pay code...")}
                           />
                           <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -376,7 +376,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                           <ComboboxOptions className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-800 py-1 text-base shadow-lg ring-1 ring-black/5 dark:ring-gray-700 focus:outline-none sm:text-sm">
                             {sortedPayCodes.length === 0 ? (
                               <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-300">
-                                Nothing found.
+                                {t("Nothing found.", { ns: "common" })}
                               </div>
                             ) : (
                               sortedPayCodes.map((code) => (
@@ -429,9 +429,9 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                                     className="mr-1.5"
                                   />
                                   <span>
-                                    Load More Pay Codes (
-                                    {availablePayCodes.length - loadedItemCount}{" "}
-                                    remaining)
+                                    {t("Load More Pay Codes ({{remaining}} remaining)", {
+                                      remaining: availablePayCodes.length - loadedItemCount,
+                                    })}
                                   </span>
                                 </button>
                               </div>
@@ -445,25 +445,25 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   {/* Custom Description */}
                   <FormInput
                     name="description"
-                    label="Description"
+                    label={t("Description")}
                     type="text"
                     value={customDescription}
                     onChange={(e) => setCustomDescription(e.target.value)}
                     required
-                    placeholder="Enter description"
+                    placeholder={t("Enter description")}
                   />
 
                   {selectedPayCodeDetails && (
                     <div className="mt-2 bg-default-50 dark:bg-gray-900/50 border border-default-200 dark:border-gray-700 rounded-lg p-3">
                       <div className="text-sm text-default-700 dark:text-gray-200">
-                        <p className="font-medium">Pay Code Details:</p>
+                        <p className="font-medium">{t("Pay Code Details:")}</p>
                         <p className="mt-1">
-                          <span className="text-default-500 dark:text-gray-400">Rate Unit:</span>{" "}
+                          <span className="text-default-500 dark:text-gray-400">{t("Rate Unit:")}</span>{" "}
                           {selectedPayCodeDetails.rate_unit}
                         </p>
                         <p>
                           <span className="text-default-500 dark:text-gray-400">
-                            Default Rate:
+                            {t("Default Rate:")}
                           </span>{" "}
                           {formatCurrency(selectedPayCodeDetails.rate_biasa)}
                         </p>
@@ -474,7 +474,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   {/* Rate */}
                   <FormInput
                     name="rate"
-                    label="Rate (RM)"
+                    label={t("Rate (RM)")}
                     type="number"
                     value={rate}
                     onChange={(e) => setRate(e.target.value)}
@@ -486,11 +486,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   {/* Quantity */}
                   <FormInput
                     name="quantity"
-                    label={`Quantity ${
-                      selectedPayCodeDetails
-                        ? `(${selectedPayCodeDetails.rate_unit})`
-                        : ""
-                    }`}
+                    label={selectedPayCodeDetails ? t("Quantity ({{unit}})", { unit: selectedPayCodeDetails.rate_unit }) : t("Quantity")}
                     type="number"
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
@@ -505,7 +501,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                   <div className="bg-default-50 dark:bg-gray-900/50 border border-default-200 dark:border-gray-700 rounded-lg p-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                        Calculated Amount:
+                        {t("Calculated Amount:")}
                       </span>
                       <span className="text-lg font-semibold text-default-800 dark:text-gray-100 flex items-center">
                         <IconCurrencyDollar
@@ -516,7 +512,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                       </span>
                     </div>
                     <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
-                      Formula: Rate × Quantity = Amount
+                      {t("Formula: Rate × Quantity = Amount")}
                     </p>
                   </div>
 
@@ -533,7 +529,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                       onClick={onClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -547,7 +543,7 @@ const AddManualItemModal: React.FC<AddManualItemModalProps> = ({
                         parseFloat(rate) <= 0
                       }
                     >
-                      {isSaving ? "Adding..." : "Add Item"}
+                      {isSaving ? t("Adding...") : t("Add Item")}
                     </Button>
                   </div>
                 </form>

@@ -10,6 +10,7 @@ import {
   PinjamReportData,
 } from "../../utils/payroll/PinjamReportPDF";
 import { BankReportData } from "../../utils/payroll/BankReportPDF";
+import { useTranslation } from "react-i18next";
 
 export type CutiLeaveType =
   | "cuti_sakit"
@@ -34,10 +35,10 @@ export interface CutiBatchEmployee {
 }
 
 const CUTI_TYPES: { key: CutiLeaveType; label: string }[] = [
-  { key: "cuti_sakit", label: "Cuti Sakit" },
-  { key: "cuti_tahunan", label: "Cuti Tahunan" },
-  { key: "cuti_umum", label: "Cuti Umum" },
-  { key: "cuti_rawatan", label: "Cuti Rawatan" },
+  { key: "cuti_sakit", label: "Sick Leave" },
+  { key: "cuti_tahunan", label: "Annual Leave" },
+  { key: "cuti_umum", label: "Public Holiday" },
+  { key: "cuti_rawatan", label: "Medical Leave" },
 ];
 
 const formatCurrency = (amount: number): string =>
@@ -56,19 +57,21 @@ const rowClass = (index: number): string =>
 // Bank tab: who gets paid what this month, with the account to pay it into.
 export const BankReportTable: React.FC<{ data: BankReportData[] }> = ({
   data,
-}) => (
-  <div className="overflow-x-auto">
-    <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
-        <tr>
-          <th className={headClass}>NO.</th>
-          <th className={headClass}>STAFF NAME</th>
-          <th className={headClass}>IC NO.</th>
-          <th className={headClass}>BANK ACCOUNT NUMBER</th>
-          <th className={`${headClass} text-right`}>TOTAL</th>
-          <th className={`${headClass} text-center`}>PAYMENT</th>
-        </tr>
-      </thead>
+}) => {
+  const { t } = useTranslation("payroll");
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
+          <tr>
+            <th className={headClass}>{t("NO.")}</th>
+            <th className={headClass}>{t("STAFF NAME")}</th>
+            <th className={headClass}>{t("IC NO.")}</th>
+            <th className={headClass}>{t("BANK ACCOUNT NUMBER")}</th>
+            <th className={`${headClass} text-right`}>{t("TOTAL")}</th>
+            <th className={`${headClass} text-center`}>{t("PAYMENT")}</th>
+          </tr>
+        </thead>
       <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
         {data.map((item, index) => (
           <tr key={`${item.no}-${item.staff_name}`} className={rowClass(index)}>
@@ -99,7 +102,7 @@ export const BankReportTable: React.FC<{ data: BankReportData[] }> = ({
             colSpan={4}
             className="px-2 py-2 text-sm font-bold text-default-700 dark:text-gray-200 text-right bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
           >
-            TOTAL
+            {t("TOTAL")}
           </td>
           <td className="px-2 py-2 text-sm font-bold text-default-900 dark:text-gray-100 text-right bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600">
             {formatCurrency(
@@ -109,9 +112,10 @@ export const BankReportTable: React.FC<{ data: BankReportData[] }> = ({
           <td className="bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600" />
         </tr>
       </tfoot>
-    </table>
-  </div>
-);
+      </table>
+    </div>
+  );
+};
 
 const PaymentBadge: React.FC<{ preference: string | null | undefined }> = ({
   preference,
@@ -132,21 +136,23 @@ const PaymentBadge: React.FC<{ preference: string | null | undefined }> = ({
 export const PinjamReportTable: React.FC<{
   data: PinjamReportData[];
   gajiLabel?: string;
-}> = ({ data, gajiLabel = "Gaji/Genap" }) => (
-  <div className="overflow-x-auto">
-    <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
-      <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
-        <tr>
-          <th className={headClass}>NO.</th>
-          <th className={headClass}>STAFF/ID</th>
-          <th className={`${headClass} text-right`}>
-            {gajiLabel.toUpperCase()}
-          </th>
-          <th className={`${headClass} text-right`}>TOTAL PINJAM</th>
-          <th className={`${headClass} text-right`}>TOTAL</th>
-          <th className={`${headClass} text-center`}>PAYMENT</th>
-        </tr>
-      </thead>
+}> = ({ data, gajiLabel = "Gaji/Genap" }) => {
+  const { t } = useTranslation("payroll");
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <thead className="bg-default-50 dark:bg-gray-900/50 border-b border-default-200 dark:border-gray-700 sticky top-0 z-10">
+          <tr>
+            <th className={headClass}>{t("NO.")}</th>
+            <th className={headClass}>{t("STAFF/ID")}</th>
+            <th className={`${headClass} text-right`}>
+              {gajiLabel.toUpperCase()}
+            </th>
+            <th className={`${headClass} text-right`}>{t("TOTAL PINJAM")}</th>
+            <th className={`${headClass} text-right`}>{t("TOTAL")}</th>
+            <th className={`${headClass} text-center`}>{t("PAYMENT")}</th>
+          </tr>
+        </thead>
       <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
         {data.map((item, index) => (
           <tr key={item.staff_id} className={rowClass(index)}>
@@ -188,15 +194,17 @@ export const PinjamReportTable: React.FC<{
           </tr>
         ))}
       </tbody>
-    </table>
-  </div>
-);
+      </table>
+    </div>
+  );
+};
 
 // Grand total per pinjam type, each expandable to reveal the staff who
 // contributed to it.
 export const PinjamBreakdownCard: React.FC<{ data: PinjamReportData[] }> = ({
   data,
 }) => {
+  const { t } = useTranslation("payroll");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const byType = useMemo(
     () => aggregatePinjamContributorsByType(data ?? []),
@@ -220,14 +228,14 @@ export const PinjamBreakdownCard: React.FC<{ data: PinjamReportData[] }> = ({
     <div className="mb-2 mt-1 rounded-lg border border-teal-200 bg-teal-50/50 p-4 dark:border-teal-700/50 dark:bg-teal-900/20">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-default-700 dark:text-gray-100">
-          Pinjam Breakdown
+          {t("Pinjam Breakdown")}
         </h3>
         <button
           type="button"
           onClick={() => setExpanded(allExpanded ? new Set() : new Set(allKeys))}
           className="text-xs font-medium text-teal-600 hover:text-teal-700 dark:text-teal-300 dark:hover:text-teal-200"
         >
-          {allExpanded ? "Collapse all" : "Expand all"}
+          {allExpanded ? t("Collapse all") : t("Expand all")}
         </button>
       </div>
       <div className="divide-y divide-teal-200/70 dark:divide-teal-700/30">
@@ -293,6 +301,7 @@ export const PinjamBreakdownButton: React.FC<{
   disabled: boolean;
   onGenerate: (action: "download" | "print") => void;
 }> = ({ disabled, onGenerate }) => {
+  const { t } = useTranslation("payroll");
   const [isOpen, setIsOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -324,7 +333,7 @@ export const PinjamBreakdownButton: React.FC<{
         disabled={disabled}
         size="sm"
       >
-        Breakdown
+        {t("Breakdown")}
       </Button>
       {isOpen && (
         <div className="absolute right-0 top-full mt-1 z-50">
@@ -337,7 +346,7 @@ export const PinjamBreakdownButton: React.FC<{
               disabled={disabled}
               className={itemClass}
             >
-              Print
+              {t("Print")}
             </button>
             <button
               onClick={() => {
@@ -347,7 +356,7 @@ export const PinjamBreakdownButton: React.FC<{
               disabled={disabled}
               className={itemClass}
             >
-              Download PDF
+              {t("Download PDF")}
             </button>
           </div>
         </div>
@@ -362,6 +371,7 @@ export const CutiReportTable: React.FC<{
   employees: CutiBatchEmployee[];
   month: number | null;
 }> = ({ employees, month }) => {
+  const { t } = useTranslation("payroll");
   const rows = useMemo(() => {
     const months =
       month === null ? Array.from({ length: 12 }, (_, i) => i + 1) : [month];
@@ -420,25 +430,25 @@ export const CutiReportTable: React.FC<{
             <th
               rowSpan={2}
               className="px-2 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 align-middle"
-              title="Bilangan"
+              title={t("Number")}
             >
               BIL
             </th>
             <th
               rowSpan={2}
               className="px-2 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700 align-middle"
-              title="Nama Pekerja"
+              title={t("Staff Name")}
             >
-              NAMA PEKERJA
+              {t("NAMA PEKERJA")}
             </th>
             {CUTI_TYPES.map(({ key, label }) => (
               <th
                 key={key}
                 colSpan={2}
                 className="px-1 py-2 text-center text-xs font-semibold text-default-600 dark:text-gray-300 uppercase tracking-wider border-l border-b border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900"
-                title={label}
+                title={t(label)}
               >
-                {label}
+                {t(label)}
               </th>
             ))}
           </tr>
@@ -446,10 +456,10 @@ export const CutiReportTable: React.FC<{
             {CUTI_TYPES.map(({ key }) => (
               <React.Fragment key={key}>
                 <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-l border-b border-default-300 dark:border-gray-600">
-                  HARI
+                  {t("DAYS")}
                 </th>
                 <th className="px-1 py-2 text-center text-xs font-semibold text-default-400 uppercase bg-default-50 dark:bg-gray-900 border-b border-default-200 dark:border-gray-700">
-                  AMAUN
+                  {t("AMOUNT")}
                 </th>
               </React.Fragment>
             ))}
@@ -489,10 +499,11 @@ export const CutiReportTable: React.FC<{
               colSpan={2}
               className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
             >
-              GRAND TOTAL:{" "}
-              {formatCurrency(
-                CUTI_TYPES.reduce((sum, { key }) => sum + grandTotals[key], 0)
-              )}
+              {t("GRAND TOTAL: {{amount}}", {
+                amount: formatCurrency(
+                  CUTI_TYPES.reduce((sum, { key }) => sum + grandTotals[key], 0)
+                ),
+              })}
             </td>
             {CUTI_TYPES.map(({ key }) => (
               <React.Fragment key={key}>

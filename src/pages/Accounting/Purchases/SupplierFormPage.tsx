@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../../routes/utils/api";
 import { SupplierWithSummary, SupplierInput } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
@@ -22,6 +23,7 @@ interface SupplierFormData {
 }
 
 const SupplierFormPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const goBack = useSmartBack("/accounting/suppliers");
   const { id } = useParams<{ id: string }>();
@@ -80,12 +82,16 @@ const SupplierFormPage: React.FC = () => {
     } catch (err: unknown) {
       console.error("Error fetching supplier data:", err);
       const errorMessage =
-        err instanceof Error ? err.message : "Unknown error";
-      setError(`Failed to load supplier: ${errorMessage}`);
+        err instanceof Error ? err.message : t("Unknown error");
+      setError(
+        t("Failed to load supplier: {{message}}", {
+          message: errorMessage,
+        })
+      );
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   // Initial data loading
   useEffect(() => {
@@ -138,11 +144,11 @@ const SupplierFormPage: React.FC = () => {
 
     // Validation
     if (!formData.code.trim()) {
-      toast.error("Supplier code is required");
+      toast.error(t("Supplier code is required"));
       return;
     }
     if (!formData.name.trim()) {
-      toast.error("Supplier name is required");
+      toast.error(t("Supplier name is required"));
       return;
     }
 
@@ -160,14 +166,14 @@ const SupplierFormPage: React.FC = () => {
 
       if (isEditMode) {
         await api.put(`/api/suppliers/${id}`, payload);
-        toast.success("Supplier updated successfully");
+        toast.success(t("Supplier updated successfully"));
         goBack();
       } else {
         const response: { supplier?: { id: number } } = await api.post(
           "/api/suppliers",
           payload
         );
-        toast.success("Supplier created successfully");
+        toast.success(t("Supplier created successfully"));
         const newId: number | undefined = response?.supplier?.id;
         // Show the supplier just created. `replace` drops this form from
         // history, so Back returns to wherever the user started.
@@ -180,7 +186,7 @@ const SupplierFormPage: React.FC = () => {
     } catch (err: unknown) {
       console.error("Error saving supplier:", err);
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to save supplier";
+        err instanceof Error ? err.message : t("Failed to save supplier");
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -190,12 +196,12 @@ const SupplierFormPage: React.FC = () => {
   const handleDelete = async () => {
     try {
       await api.delete(`/api/suppliers/${id}`);
-      toast.success("Supplier deactivated successfully");
+      toast.success(t("Supplier deactivated successfully"));
       navigate("/accounting/suppliers");
     } catch (err: unknown) {
       console.error("Error deactivating supplier:", err);
       const errorMessage =
-        err instanceof Error ? err.message : "Failed to deactivate supplier";
+        err instanceof Error ? err.message : t("Failed to deactivate supplier");
       toast.error(errorMessage);
     }
     setShowDeleteDialog(false);
@@ -237,7 +243,7 @@ const SupplierFormPage: React.FC = () => {
           <span className="text-default-300 dark:text-gray-600">|</span>
           <div>
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-              {isEditMode ? "Edit Supplier" : "New Supplier"}
+              {isEditMode ? t("Edit Supplier") : t("New Supplier")}
             </h1>
             {isEditMode && (
               <p className="text-sm text-default-500 dark:text-gray-400">
@@ -253,7 +259,7 @@ const SupplierFormPage: React.FC = () => {
             variant="outline"
             size="sm"
           >
-            Deactivate
+            {t("Deactivate")}
           </Button>
         )}
       </div>
@@ -263,7 +269,7 @@ const SupplierFormPage: React.FC = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4">
             <p className="text-sm text-default-500 dark:text-gray-400">
-              Total Invoices
+              {t("Total Invoices")}
             </p>
             <p className="text-xl font-semibold text-default-900 dark:text-gray-100">
               {summary.total_invoices}
@@ -271,7 +277,7 @@ const SupplierFormPage: React.FC = () => {
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4">
             <p className="text-sm text-default-500 dark:text-gray-400">
-              Total Purchased
+              {t("Total Purchased")}
             </p>
             <p className="text-xl font-semibold text-default-900 dark:text-gray-100">
               {formatCurrency(parseFloat(String(summary.total_purchased)))}
@@ -279,7 +285,7 @@ const SupplierFormPage: React.FC = () => {
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4">
             <p className="text-sm text-default-500 dark:text-gray-400">
-              Total Paid
+              {t("Total Paid")}
             </p>
             <p className="text-xl font-semibold text-green-600 dark:text-green-400">
               {formatCurrency(parseFloat(String(summary.total_paid)))}
@@ -287,7 +293,7 @@ const SupplierFormPage: React.FC = () => {
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4">
             <p className="text-sm text-default-500 dark:text-gray-400">
-              Outstanding
+              {t("Outstanding")}
             </p>
             <p className="text-xl font-semibold text-rose-600 dark:text-rose-400">
               {formatCurrency(parseFloat(String(summary.outstanding_balance)))}
@@ -302,51 +308,51 @@ const SupplierFormPage: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Code */}
             <FormInput
-              label="Supplier Code"
+              label={t("Supplier Code")}
               name="code"
               value={formData.code}
               onChange={handleInputChange}
-              placeholder="e.g., LAHAD_DATU"
+              placeholder={t("e.g., LAHAD_DATU")}
               required
               disabled={isEditMode}
             />
 
             {/* Name */}
             <FormInput
-              label="Supplier Name"
+              label={t("Supplier Name")}
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              placeholder="e.g., LAHAD DATU FLOUR MILL SDN BHD"
+              placeholder={t("e.g., LAHAD DATU FLOUR MILL SDN BHD")}
               required
             />
 
             {/* Contact Person */}
             <FormInput
-              label="Contact Person"
+              label={t("Contact Person")}
               name="contact_person"
               value={formData.contact_person}
               onChange={handleInputChange}
-              placeholder="Primary contact name"
+              placeholder={t("Primary contact name")}
             />
 
             {/* Phone */}
             <FormInput
-              label="Phone"
+              label={t("Phone")}
               name="phone"
               value={formData.phone}
               onChange={handleInputChange}
-              placeholder="e.g., 088-123456"
+              placeholder={t("e.g., 088-123456")}
             />
 
             {/* Email */}
             <FormInput
-              label="Email"
+              label={t("Email")}
               name="email"
               type="email"
               value={formData.email}
               onChange={handleInputChange}
-              placeholder="e.g., supplier@example.com"
+              placeholder={t("e.g., supplier@example.com")}
             />
 
             {/* Is Active (Edit Mode) */}
@@ -357,7 +363,7 @@ const SupplierFormPage: React.FC = () => {
                   onChange={(checked) =>
                     setFormData((prev) => ({ ...prev, is_active: checked }))
                   }
-                  label="Active"
+                  label={t("Active")}
                   checkedColor="text-sky-600 dark:text-sky-400"
                 />
               </div>
@@ -373,7 +379,7 @@ const SupplierFormPage: React.FC = () => {
             color="default"
             variant="outline"
           >
-            Cancel
+            {t("Cancel")}
           </Button>
           <Button
             type="submit"
@@ -381,7 +387,11 @@ const SupplierFormPage: React.FC = () => {
             variant="filled"
             disabled={!isFormChanged || isSaving}
           >
-            {isSaving ? "Saving..." : isEditMode ? "Update Supplier" : "Create Supplier"}
+            {isSaving
+              ? t("Saving...")
+              : isEditMode
+                ? t("Update Supplier")
+                : t("Create Supplier")}
           </Button>
         </div>
       </form>
@@ -391,8 +401,10 @@ const SupplierFormPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Unsaved Changes"
-        message="You have unsaved changes. Are you sure you want to leave this page?"
+        title={t("Unsaved Changes")}
+        message={t(
+          "You have unsaved changes. Are you sure you want to leave this page?"
+        )}
         variant="danger"
       />
 
@@ -401,8 +413,11 @@ const SupplierFormPage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDelete}
-        title="Deactivate Supplier"
-        message={`Are you sure you want to deactivate supplier "${formData.name}"? The supplier can be reactivated later.`}
+        title={t("Deactivate Supplier")}
+        message={t(
+          'Are you sure you want to deactivate supplier "{{name}}"? The supplier can be reactivated later.',
+          { name: formData.name }
+        )}
         variant="danger"
       />
     </div>

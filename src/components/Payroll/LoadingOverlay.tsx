@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import LoadingSpinner from "../LoadingSpinner";
+import { useTranslation } from "react-i18next";
 
 interface LoadingOverlayProps {
   message: string;
@@ -18,6 +19,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
   onClose,
   timeout = 20000,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isGenerating, setIsGenerating] = useState(true);
 
   // Auto-transition to processing state after a delay
@@ -47,7 +49,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
           <p className="text-base font-medium text-default-900 dark:text-gray-100">
             {isGenerating ? message : processingMessage || message}
           </p>
-          <p className="text-sm text-default-500 dark:text-gray-400">Please wait a moment</p>
+          <p className="text-sm text-default-500 dark:text-gray-400">{t("Please wait a moment")}</p>
           {error && (
             <p className="text-sm text-rose-600 dark:text-rose-400 mt-2 text-center">{error}</p>
           )}
@@ -55,7 +57,7 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
             onClick={onClose}
             className="mt-2 text-sm text-center text-sky-600 dark:text-sky-400 hover:underline"
           >
-            Close
+            {t("Close")}
           </button>
         </div>
       </div>

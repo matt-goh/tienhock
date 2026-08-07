@@ -1,6 +1,7 @@
 // src/pages/Payroll/MonthlyLogEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
@@ -83,13 +84,6 @@ type EmployeeHourField =
 
 type LeaveType = "cuti_sakit" | "cuti_tahunan" | "cuti_umum" | "cuti_rawatan";
 
-const LEAVE_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
-  { value: "cuti_sakit", label: "Sick Leave" },
-  { value: "cuti_tahunan", label: "Annual Leave" },
-  { value: "cuti_umum", label: "Public Holiday" },
-  { value: "cuti_rawatan", label: "Hospital Leave" },
-];
-
 const DEFAULT_LEAVE_AMOUNT: number = 65;
 const DEFAULT_LEAVE_AMOUNT_INPUT: string = String(DEFAULT_LEAVE_AMOUNT);
 const DUAL_COMPANY_PAYROLL_EMPLOYEE_IDS: ReadonlySet<string> = new Set<string>([
@@ -155,6 +149,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
   onCancel,
   jobType = "MAINTENANCE",
 }) => {
+  const { t } = useTranslation("payroll");
+  const LEAVE_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
+    { value: "cuti_sakit", label: t("Sick Leave") },
+    { value: "cuti_tahunan", label: t("Annual Leave") },
+    { value: "cuti_umum", label: t("Public Holiday") },
+    { value: "cuti_rawatan", label: t("Hospital Leave") },
+  ];
   const navigate = useNavigate();
   const goBack = useSmartBack(
     `/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`
@@ -964,7 +965,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
   const handleAddLeave = () => {
     if (!leaveFormData.leaveDate) {
-      toast.error("Please select a date");
+      toast.error(t("Please select a date"));
       return;
     }
 
@@ -976,7 +977,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       .map(([id]) => id);
 
     if (targetEmployeeIds.length === 0) {
-      toast.error("Please select at least one employee");
+      toast.error(t("Please select at least one employee"));
       return;
     }
 
@@ -987,7 +988,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       trimmedAmount === "" ? DEFAULT_LEAVE_AMOUNT : Number(trimmedAmount);
 
     if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
-      toast.error("Please enter a valid non-negative leave amount.");
+      toast.error(t("Please enter a valid non-negative leave amount."));
       return;
     }
 
@@ -1010,8 +1011,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     setNewLeaveEntries((prev) => [...prev, ...additions]);
     toast.success(
       additions.length === 1
-        ? "Leave entry added"
-        : `Added leave for ${additions.length} employees`,
+        ? t("Leave entry added")
+        : t("Added leave for {{count}} employees", {
+            count: additions.length,
+          }),
     );
     closeAddLeaveModal();
   };
@@ -1112,7 +1115,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     );
 
     if (selectedEmployees.length === 0) {
-      toast.error("Please select at least one employee");
+      toast.error(t("Please select at least one employee"));
       return;
     }
 
@@ -1141,7 +1144,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       );
 
       if (hourValues.some((hours) => hours < 0)) {
-        toast.error(`Hours cannot be negative for ${emp.employeeName}`);
+        toast.error(
+          t("Hours cannot be negative for {{employee}}", {
+            employee: emp.employeeName,
+          }),
+        );
         return;
       }
 
@@ -1150,7 +1157,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         !hasActivityAmount
       ) {
         toast.error(
-          `Please enter valid hours or a paid activity for ${emp.employeeName}`,
+          t("Please enter valid hours or a paid activity for {{employee}}", {
+            employee: emp.employeeName,
+          }),
         );
         return;
       }
@@ -1204,14 +1213,14 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/api/monthly-work-logs/${existingWorkLog.id}`, payload);
-        toast.success("Monthly work log updated successfully");
+        toast.success(t("Monthly work log updated successfully"));
         goBack();
       } else {
         const response: { workLogId?: number } = await api.post(
           "/api/monthly-work-logs",
           payload
         );
-        toast.success("Monthly work log created successfully");
+        toast.success(t("Monthly work log created successfully"));
         const newLogId: number | undefined = response?.workLogId;
         // Show the log just created. `replace` drops this form from history,
         // so Back returns to wherever the user started.
@@ -1224,12 +1233,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
     } catch (error: any) {
       console.error("Error saving monthly work log:", error);
       console.error("Error details:", error?.data);
-      // Handle specific error messages from API
-      const errorMessage =
-        error?.data?.message ||
-        error?.message ||
-        "Failed to save monthly work log";
-      toast.error(errorMessage);
+      // Handle specific error messages from API (server messages stay raw)
+      toast.error(
+        error?.data?.message || error?.message || t("Failed to save monthly work log"),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -1251,9 +1258,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         refreshStaffs(),
         refreshPayCodeMappings(),
       ]);
-      toast.success("Data refreshed");
+      toast.success(t("Data refreshed"));
     } catch (err) {
-      toast.error("Failed to refresh data");
+      toast.error(t("Failed to refresh data"));
     } finally {
       setIsRefreshingCache(false);
     }
@@ -1355,7 +1362,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         }
         onClick={(e) => e.stopPropagation()}
         disabled={!entry.selected || isSaving}
-        title={hasInvalidHours ? "Hours cannot be negative" : ariaLabel}
+        title={
+          hasInvalidHours ? t("Hours cannot be negative") : ariaLabel
+        }
         aria-label={ariaLabel}
         className={`w-full min-w-[4.25rem] pl-3 py-1 text-center text-sm border rounded focus:ring-1 disabled:bg-default-100 dark:disabled:bg-gray-700 bg-white dark:bg-gray-800 dark:text-gray-100 disabled:text-default-400 dark:disabled:text-gray-500 ${
           hasInvalidHours
@@ -1384,15 +1393,23 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
       <div className="grid grid-cols-2 gap-1.5">
         <div>
           <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
-            Hrs
+            {t("Hrs")}
           </div>
-          {renderHourInput(entry, hoursField, `${label} hours`)}
+          {renderHourInput(
+            entry,
+            hoursField,
+            t("{{label}} hours", { label: t(label) }),
+          )}
         </div>
         <div>
           <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
-            OT
+            {t("OT")}
           </div>
-          {renderHourInput(entry, overtimeField, `${label} overtime hours`)}
+          {renderHourInput(
+            entry,
+            overtimeField,
+            t("{{label}} overtime hours", { label: t(label) }),
+          )}
         </div>
       </div>
     </div>
@@ -1417,7 +1434,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             <BackButton onClick={handleCancel} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              {mode === "edit" ? "Edit" : "New"} {jobConfig?.name} Monthly Entry
+              {mode === "edit"
+                ? t("Edit {{name}} Monthly Entry", { name: jobConfig?.name })
+                : t("New {{name}} Monthly Entry", { name: jobConfig?.name })}
             </h1>
             <div className="w-px h-6 bg-default-300 dark:bg-gray-600" />
             {mode === "edit" ? (
@@ -1441,13 +1460,13 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               onClick={handleRefreshCache}
               disabled={isRefreshingCache}
               className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-              title="Refresh staff, jobs, and pay codes"
+              title={t("Refresh staff, jobs, and pay codes")}
             >
               <IconRefresh
                 size={16}
                 className={isRefreshingCache ? "animate-spin" : ""}
               />
-              Refresh
+              {t("Refresh")}
             </button>
             <Button
               variant="outline"
@@ -1455,7 +1474,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               onClick={handleCancel}
               disabled={isSaving}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               color="sky"
@@ -1464,11 +1483,15 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               disabled={isSaving || hasHoursValidationError}
               title={
                 hasHoursValidationError
-                  ? "Some employees have negative hours"
+                  ? t("Some employees have negative hours")
                   : ""
               }
             >
-              {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
+              {isSaving
+                ? t("Saving...")
+                : mode === "edit"
+                  ? t("Update")
+                  : t("Save")}
             </Button>
           </div>
         </div>
@@ -1491,29 +1514,29 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   />
                 </th>
                 <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                  ID
+                  {t("ID")}
                 </th>
                 <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                  Name
+                  {t("Name")}
                 </th>
                 <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                  Job
+                  {t("Job")}
                 </th>
                 <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
-                  Biasa
+                  {t("Biasa")}
                 </th>
                 {supportsDayTypeHours && (
                   <>
                     <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
-                      Ahad
+                      {t("Ahad")}
                     </th>
                     <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
-                      Umum
+                      {t("Umum")}
                     </th>
                   </>
                 )}
                 <th className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                  Activities
+                  {t("Activities")}
                 </th>
               </tr>
             </thead>
@@ -1572,7 +1595,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       entry,
                       "totalHours",
                       "overtimeHours",
-                      "Biasa",
+                      t("Biasa"),
                       false,
                     )}
                   </td>
@@ -1583,7 +1606,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                           entry,
                           "ahadHours",
                           "ahadOvertimeHours",
-                          "Ahad",
+                          t("Ahad"),
                         )}
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap">
@@ -1591,7 +1614,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                           entry,
                           "umumHours",
                           "umumOvertimeHours",
-                          "Umum",
+                          t("Umum"),
                         )}
                       </td>
                     </>
@@ -1620,7 +1643,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
         {Object.values(employeeEntries).length === 0 && (
           <div className="p-8 text-center text-default-500 dark:text-gray-400">
-            No employees found for this job type.
+            {t("No employees found for this job type.")}
           </div>
         )}
       </div>
@@ -1630,12 +1653,16 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
         <div className="p-4 border-b border-default-200 dark:border-gray-700 flex justify-between items-center">
           <div>
             <h2 className="text-sm font-medium text-default-700 dark:text-gray-200">
-              Leave Records for{" "}
-              {monthOptions.find((m) => m.id === formData.logMonth)?.name}{" "}
-              {formData.logYear}
+              {t("Leave Records for {{month}} {{year}}", {
+                month: t(
+                  monthOptions.find((m) => m.id === formData.logMonth)?.name ||
+                    "",
+                ),
+                year: formData.logYear,
+              })}
             </h2>
             <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
-              View existing leave and add new leave entries for this month
+              {t("View existing leave and add new leave entries for this month")}
             </p>
           </div>
           <Button
@@ -1645,7 +1672,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             size="sm"
             disabled={isSaving}
           >
-            Add Leave
+            {t("Add Leave")}
           </Button>
         </div>
 
@@ -1655,22 +1682,22 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Employee
+                    {t("Employee")}
                   </th>
                   <th className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Status
+                    {t("Status")}
                   </th>
                   <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-20">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -1705,7 +1732,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                             leave.leaveType,
                           )}`}
                         >
-                          {getLeaveTypeLabel(leave.leaveType)}
+                          {t(getLeaveTypeLabel(leave.leaveType))}
                         </span>
                       </td>
                       <td className="px-4 py-2 text-right text-sm text-default-700 dark:text-gray-200">
@@ -1736,11 +1763,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       <td className="px-4 py-2 text-center">
                         {leave.isNew ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
-                            New
+                            {t("New")}
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300">
-                            Existing
+                            {t("Existing")}
                           </span>
                         )}
                       </td>
@@ -1754,7 +1781,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                             }
                           }}
                           className="text-rose-600 hover:text-rose-800 dark:text-rose-400 dark:hover:text-rose-300"
-                          title="Remove"
+                          title={t("Remove")}
                           disabled={isSaving}
                         >
                           <IconTrash size={16} />
@@ -1772,9 +1799,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
               size={32}
               className="mx-auto mb-2 text-default-300 dark:text-gray-600"
             />
-            <p>No leave records for this month.</p>
+            <p>{t("No leave records for this month.")}</p>
             <p className="text-xs mt-1">
-              Click "Add Leave" to record leave entries.
+              {t('Click "Add Leave" to record leave entries.')}
             </p>
           </div>
         )}
@@ -1828,10 +1855,12 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     size={20}
                     className="text-sky-600 dark:text-sky-400"
                   />
-                  Add Leave
+                  {t("Add Leave")}
                 </DialogTitle>
                 <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
-                  Pick a date and leave type, then select one or more employees.
+                  {t(
+                    "Pick a date and leave type, then select one or more employees.",
+                  )}
                 </p>
 
                 {/* Date + Amount row (Leave Type gets its own row below — a
@@ -1839,7 +1868,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      Date
+                      {t("Date")}
                     </label>
                     <div className="relative h-10">
                       <IconCalendar
@@ -1858,7 +1887,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      Amount
+                      {t("Amount")}
                     </label>
                     <div className="relative h-10">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-default-400 dark:text-gray-400 pointer-events-none">
@@ -1884,7 +1913,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
 
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                    Leave Type
+                    {t("Leave Type")}
                   </label>
                   <PillSelect<LeaveType>
                     value={leaveFormData.leaveType}
@@ -1895,8 +1924,8 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       })
                     }
                     options={LEAVE_TYPE_OPTIONS}
-                    ariaLabel="Leave type"
-                  size="md"
+                    ariaLabel={t("Leave type")}
+                    size="md"
                   />
                 </div>
 
@@ -1905,10 +1934,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     <div className="flex items-center gap-1 mt-2 text-xs text-sky-600 dark:text-sky-400">
                       <IconAlertCircle size={14} />
                       <span>
-                        Public holiday:{" "}
-                        {getHolidayDescription(
-                          new Date(leaveFormData.leaveDate),
-                        )}
+                        {t("Public holiday: {{description}}", {
+                          description: getHolidayDescription(
+                            new Date(leaveFormData.leaveDate),
+                          ),
+                        })}
                       </span>
                     </div>
                   )}
@@ -1917,9 +1947,11 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                 <div className="mt-5">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-default-700 dark:text-gray-200">
-                      Employees
+                      {t("Employees")}
                       <span className="ml-2 text-xs font-normal text-default-500 dark:text-gray-400">
-                        {leaveSelectedCount} selected
+                        {t("{{count}} selected", {
+                          count: leaveSelectedCount,
+                        })}
                       </span>
                     </label>
                     <button
@@ -1969,7 +2001,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                           visibleSelectable.every(
                             (emp: Employee) => leaveEmployeeSelections[emp.id],
                           );
-                        return allOn ? "Deselect All" : "Select All";
+                        return allOn ? t("Deselect All") : t("Select All");
                       })()}
                     </button>
                   </div>
@@ -1984,7 +2016,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       type="text"
                       value={leaveEmployeeSearch}
                       onChange={(e) => setLeaveEmployeeSearch(e.target.value)}
-                      placeholder="Search by name or ID..."
+                      placeholder={t("Search by name or ID...")}
                       className="w-full pl-9 pr-3 py-2 text-sm border border-default-300 dark:border-gray-600 rounded-lg focus:ring-1 focus:ring-sky-500 focus:border-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100"
                     />
                   </div>
@@ -2011,7 +2043,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                       if (filtered.length === 0) {
                         return (
                           <div className="p-6 text-center text-sm text-default-500 dark:text-gray-400">
-                            No employees match your search.
+                            {t("No employees match your search.")}
                           </div>
                         );
                       }
@@ -2060,7 +2092,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                                   <div
                                     className={`text-xs mt-0.5 break-words ${isDisabled ? "text-default-300 dark:text-gray-600" : "text-sky-600 dark:text-sky-400"}`}
                                   >
-                                    Collapsed IDs: {groupedIdsText}
+                                    {t("Collapsed IDs: {{ids}}", {
+                                      ids: groupedIdsText,
+                                    })}
                                   </div>
                                 )}
                               </div>
@@ -2069,7 +2103,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                                   className={`inline-flex flex-shrink-0 items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${getLeaveTypeColor(existingType)}`}
                                 >
                                   <IconCheck size={12} />
-                                  {getLeaveTypeLabel(existingType)}
+                                  {t(getLeaveTypeLabel(existingType))}
                                 </span>
                               )}
                             </div>
@@ -2086,7 +2120,7 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     className="inline-flex justify-center px-4 py-2 text-sm font-medium text-default-700 dark:text-gray-200 bg-default-100 dark:bg-gray-800 border border-transparent rounded-full hover:bg-default-200 active:bg-default-300 focus:outline-none"
                     onClick={closeAddLeaveModal}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </button>
                   <button
                     type="button"
@@ -2095,8 +2129,10 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
                     onClick={handleAddLeave}
                   >
                     {leaveSelectedCount > 1
-                      ? `Add Leave for ${leaveSelectedCount} Employees`
-                      : "Add Leave"}
+                      ? t("Add Leave for {{count}} Employees", {
+                          count: leaveSelectedCount,
+                        })
+                      : t("Add Leave")}
                   </button>
                 </div>
               </DialogPanel>

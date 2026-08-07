@@ -47,6 +47,11 @@ const createClearanceRange = (receivedDate?: string | null): TimeRange => {
   return { start: date, end: date };
 };
 
+const toDayRange = (value: string): TimeRange => {
+  const day: Date = new Date(value);
+  return { start: day, end: day };
+};
+
 interface ReceiptAllocation {
   id: number;
   line_number: number;
@@ -107,6 +112,7 @@ interface ReceiptDetailsDialogProps {
   onConfirmed: () => void | Promise<void>;
   onCancelled: () => void | Promise<void>;
   onReferenceUpdated: () => void | Promise<void>;
+  onDateUpdated: () => void | Promise<void>;
 }
 
 const formatCurrency = (amount: number | string): string => {
@@ -208,6 +214,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   onConfirmed,
   onCancelled,
   onReferenceUpdated,
+  onDateUpdated,
 }) => {
   const { t } = useTranslation("invoice");
   const [paymentGroup, setPaymentGroup] =
@@ -229,6 +236,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   const [isSavingReference, setIsSavingReference] =
     useState<boolean>(false);
   const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [isDateDialogOpen, setIsDateDialogOpen] = useState<boolean>(false);
+  const [dateRange, setDateRange] = useState<TimeRange>(() =>
+    createClearanceRange()
+  );
+  const [isSavingDate, setIsSavingDate] = useState<boolean>(false);
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const invoiceAllocations: ReceiptAllocation[] = useMemo(
     (): ReceiptAllocation[] =>
@@ -257,6 +270,14 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     paymentGroup &&
       paymentGroup.origin === "erp" &&
       (paymentGroup.status === "pending" || paymentGroup.status === "mixed")
+  );
+  const canEditDate: boolean = Boolean(
+    paymentGroup &&
+      paymentGroup.status !== "cancelled" &&
+      paymentGroup.origin === "erp" &&
+      ["cash", "cheque", "bank_transfer", "online"].includes(
+        paymentGroup.payment_method
+      )
   );
 
   const loadPaymentGroup = useCallback(async (): Promise<void> => {
@@ -340,6 +361,10 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       setReferenceValue("");
       setIsSavingReference(false);
       setReferenceError(null);
+      setIsDateDialogOpen(false);
+      setDateRange(createClearanceRange());
+      setIsSavingDate(false);
+      setDateError(null);
     }
   }, [isOpen]);
 
@@ -348,14 +373,98 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     setReferenceValue("");
     setReferenceError(null);
     setClearanceDateRange(createClearanceRange());
+    setIsDateDialogOpen(false);
+    setDateRange(createClearanceRange());
+    setIsSavingDate(false);
+    setDateError(null);
   }, [receiptId]);
 
   const handleClose = (): void => {
-    if (!isCancelling && !isConfirming && !isSavingReference) {
+    if (
+      !isCancelling &&
+      !isConfirming &&
+      !isSavingReference &&
+      !isSavingDate
+    ) {
       setIsCancelConfirmationOpen(false);
       setIsConfirmConfirmationOpen(false);
       setClearanceDateRange(createClearanceRange());
+      setIsDateDialogOpen(false);
+      setDateRange(createClearanceRange());
+      setIsSavingDate(false);
+      setDateError(null);
       onClose();
+    }
+  };
+
+  const handleStartDateEdit = (): void => {
+    if (!paymentGroup || isConfirming || isSavingReference || isSavingDate) {
+      return;
+    }
+    setDateRange(toDayRange(paymentGroup.received_date));
+    setDateError(null);
+    setIsDateDialogOpen(true);
+  };
+
+  const handleCloseDateDialog = (): void => {
+    if (isSavingDate) return;
+    setIsDateDialogOpen(false);
+    setDateError(null);
+  };
+
+  const handleSaveDate = async (): Promise<void> => {
+    if (
+      !paymentGroup ||
+      receiptId === null ||
+      isSavingDate ||
+      isConfirming ||
+      isSavingReference
+    ) {
+      return;
+    }
+    const currentDate: string = format(
+      new Date(paymentGroup.received_date),
+      "yyyy-MM-dd"
+    );
+    const nextDate: string = format(dateRange.start, "yyyy-MM-dd");
+    if (nextDate === currentDate) {
+      handleCloseDateDialog();
+      return;
+    }
+
+    setIsSavingDate(true);
+    setDateError(null);
+    try {
+      await api.patch(`/api/receipts/${receiptId}/date`, {
+        expected_received_date: currentDate,
+        received_date: nextDate,
+      });
+      setPaymentGroup(
+        (currentGroup: PaymentGroupDetails | null): PaymentGroupDetails | null =>
+          currentGroup
+            ? { ...currentGroup, received_date: nextDate }
+            : currentGroup
+      );
+      setIsDateDialogOpen(false);
+      toast.success(t("Payment date updated."));
+    } catch (error: unknown) {
+      console.error("Error updating receipt date:", error);
+      setDateError(
+        getErrorMessage(
+          error,
+          t("We couldn't update this payment date. Nothing was changed.")
+        )
+      );
+      setIsSavingDate(false);
+      return;
+    }
+
+    try {
+      await onDateUpdated();
+    } catch (error: unknown) {
+      console.error("Error refreshing payments after date update:", error);
+    } finally {
+      setIsSavingDate(false);
     }
   };
 
@@ -704,7 +813,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                     <button
                       type="button"
                       onClick={handleClose}
-                      disabled={isCancelling || isConfirming || isSavingReference}
+                      disabled={
+                        isCancelling ||
+                        isConfirming ||
+                        isSavingReference ||
+                        isSavingDate
+                      }
                       className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                       aria-label={t("Close payment group details")}
                     >
@@ -812,9 +926,27 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">{t("Received date")}</p>
-                            <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
-                              {formatReceiptDate(paymentGroup.received_date, t)}
-                            </p>
+                            <div className="mt-1 inline-flex items-center gap-1.5">
+                              <p className="text-sm font-medium text-default-800 dark:text-gray-100">
+                                {formatReceiptDate(paymentGroup.received_date, t)}
+                              </p>
+                              {canEditDate && (
+                                <button
+                                  type="button"
+                                  onClick={handleStartDateEdit}
+                                  disabled={
+                                    isConfirming ||
+                                    isSavingReference ||
+                                    isSavingDate
+                                  }
+                                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-sky-600 hover:bg-sky-50 hover:text-sky-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
+                                  title={t("Correct payment date")}
+                                  aria-label={t("Correct payment date")}
+                                >
+                                  <IconPencil size={13} />
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">{t("Method")}</p>
@@ -1040,7 +1172,12 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         variant="outline"
                         size="sm"
                         onClick={handleClose}
-                        disabled={isCancelling || isConfirming || isSavingReference}
+                        disabled={
+                          isCancelling ||
+                          isConfirming ||
+                          isSavingReference ||
+                          isSavingDate
+                        }
                         className="flex-1 sm:flex-none"
                       >
                         {t("close", { ns: "common" })}
@@ -1063,7 +1200,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             isLoading ||
                             isCancelling ||
                             isConfirming ||
-                            isSavingReference
+                            isSavingReference ||
+                            isSavingDate
                           }
                         >
                           {isConfirming
@@ -1085,7 +1223,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           isLoading ||
                           isCancelling ||
                           isConfirming ||
-                          isSavingReference
+                          isSavingReference ||
+                          isSavingDate
                         }
                       >
                         {isCancelling
@@ -1115,6 +1254,74 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         confirmButtonText={t("Confirm All Pending Payments")}
         variant="success"
         allowContentOverflow
+      />
+
+      <ConfirmationDialog
+        isOpen={isDateDialogOpen}
+        onClose={handleCloseDateDialog}
+        onConfirm={() => void handleSaveDate()}
+        title={t("Correct payment date")}
+        message={
+          <div className="space-y-3">
+            <p>
+              {t(
+                "Change the date recorded for this {{method}} payment of {{amount}}.",
+                {
+                  method: t(
+                    formatPaymentMethod(paymentGroup?.payment_method || "")
+                  ),
+                  amount: formatCurrency(paymentGroup?.total_amount ?? 0),
+                }
+              )}
+            </p>
+
+            {paymentGroup && paymentGroup.allocations.length > 1 && (
+              <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-200">
+                {t(
+                  "Reference {{reference}} covers more than one invoice. Every payment under it moves to the new date together, so the group stays on one row.",
+                  { reference: paymentGroup.display_reference || "" }
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                {t("Payment Date")}
+              </label>
+              <TimeNavigator
+                range={dateRange}
+                onChange={(range: TimeRange): void => setDateRange(range)}
+                modes={["day"]}
+                presets={false}
+                showArrows={false}
+                size="sm"
+                disabled={isSavingDate}
+                className="w-full"
+                triggerClassName="w-full justify-between"
+              />
+            </div>
+
+            {dateError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
+                {dateError}
+              </div>
+            )}
+
+            <p className="text-xs text-default-500 dark:text-gray-400">
+              {t(
+                paymentGroup?.payment_method === "cheque"
+                  ? "Amounts, invoice balances and the posted journal entry are not changed – a cheque is always posted on its clearance date."
+                  : "The receipt, its payment records and the posted journal entry all move to the new date. Amounts and invoice balances are unchanged."
+              )}
+            </p>
+          </div>
+        }
+        confirmButtonText={
+          isSavingDate ? t("Saving...") : t("Save Date")
+        }
+        variant="success"
+        allowContentOverflow
+        isConfirming={isSavingDate}
       />
 
       <ConfirmationDialog

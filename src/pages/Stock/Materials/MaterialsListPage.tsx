@@ -1,5 +1,6 @@
 // src/pages/Stock/Materials/MaterialsListPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconPencil,
@@ -56,6 +57,7 @@ interface HardDeleteResponse {
 }
 
 const MaterialsListPage: React.FC = () => {
+  const { t } = useTranslation("stock");
   const navigate = useNavigate();
 
   // State
@@ -131,7 +133,7 @@ const MaterialsListPage: React.FC = () => {
       setMaterials(materialsWithVariants);
     } catch (error) {
       console.error("Error fetching materials:", error);
-      toast.error("Failed to load materials");
+      toast.error(t("Failed to load materials"));
     } finally {
       setLoading(false);
     }
@@ -210,17 +212,22 @@ const MaterialsListPage: React.FC = () => {
         const deletedStockEntries: number = response.deleted_stock_entries || 0;
         toast.success(
           deletedStockEntries > 0
-            ? `Material "${materialToDelete.name}" deleted permanently (${deletedStockEntries} stock records removed)`
-            : `Material "${materialToDelete.name}" deleted permanently`
+            ? t('Material "{{name}}" deleted permanently ({{count}} stock records removed)', {
+                name: materialToDelete.name,
+                count: deletedStockEntries,
+              })
+            : t('Material "{{name}}" deleted permanently', {
+                name: materialToDelete.name,
+              })
         );
       } else {
         await api.delete(`/api/materials/${materialToDelete.id}`);
-        toast.success(`Material "${materialToDelete.name}" deactivated`);
+        toast.success(t('Material "{{name}}" deactivated', { name: materialToDelete.name }));
       }
       fetchMaterials();
     } catch (error: any) {
       console.error("Error deleting material:", error);
-      toast.error(error.message || "Failed to delete material");
+      toast.error(error.message || t("Failed to delete material"));
     } finally {
       setShowDeleteDialog(false);
       setMaterialToDelete(null);
@@ -242,11 +249,11 @@ const MaterialsListPage: React.FC = () => {
         ...materialToReactivate,
         is_active: true,
       });
-      toast.success(`Material "${materialToReactivate.name}" reactivated`);
+      toast.success(t('Material "{{name}}" reactivated', { name: materialToReactivate.name }));
       fetchMaterials();
     } catch (error: any) {
       console.error("Error reactivating material:", error);
-      toast.error(error.message || "Failed to reactivate material");
+      toast.error(error.message || t("Failed to reactivate material"));
     } finally {
       setShowReactivateDialog(false);
       setMaterialToReactivate(null);
@@ -286,7 +293,7 @@ const MaterialsListPage: React.FC = () => {
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               }`}
             >
-              {pill.label}
+              {t(pill.label)}
             </button>
           ))}
         </div>
@@ -299,7 +306,7 @@ const MaterialsListPage: React.FC = () => {
           <span className="font-medium text-default-700 dark:text-gray-200">
             {filteredMaterials.length}
           </span>
-          <span className="text-default-400 dark:text-gray-400">materials</span>
+          <span className="text-default-400 dark:text-gray-400">{t("materials")}</span>
           {materialsWithVariantsCount > 0 && (
             <>
               <span className="text-default-300 dark:text-gray-600">•</span>
@@ -307,7 +314,7 @@ const MaterialsListPage: React.FC = () => {
               <span className="text-purple-600 dark:text-purple-400 font-medium">
                 {materialsWithVariantsCount}
               </span>
-              <span className="text-default-400 dark:text-gray-400">with variants</span>
+              <span className="text-default-400 dark:text-gray-400">{t("with variants")}</span>
             </>
           )}
         </div>
@@ -322,14 +329,14 @@ const MaterialsListPage: React.FC = () => {
               ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
               : "text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-300"
           }`}
-          title={showInactive ? "Showing all (including inactive)" : "Showing active only"}
+          title={showInactive ? t("Showing all (including inactive)") : t("Showing active only")}
         >
           {showInactive ? (
             <IconEye size={14} />
           ) : (
             <IconEyeOff size={14} />
           )}
-          <span>{showInactive ? "All" : "Active"}</span>
+          <span>{showInactive ? t("All") : t("Active")}</span>
         </button>
 
         {/* Right side: Search + Add Button */}
@@ -338,7 +345,7 @@ const MaterialsListPage: React.FC = () => {
           <div className="relative">
             <input
               type="text"
-              placeholder="Search..."
+              placeholder={t("Search...")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="px-3 py-1 pr-7 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-default-500 dark:focus:ring-default-400 focus:border-default-500 dark:focus:border-default-400 w-[140px] placeholder-gray-400 dark:placeholder-gray-500"
@@ -347,7 +354,7 @@ const MaterialsListPage: React.FC = () => {
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
                 onClick={() => setSearchTerm("")}
-                title="Clear search"
+                title={t("Clear search")}
               >
                 <IconX size={14} />
               </button>
@@ -360,7 +367,7 @@ const MaterialsListPage: React.FC = () => {
             size="sm"
             icon={IconPlus}
           >
-            New
+            {t("New")}
           </Button>
         </div>
       </div>
@@ -371,22 +378,22 @@ const MaterialsListPage: React.FC = () => {
           <thead className="bg-gray-50 dark:bg-gray-900">
             <tr>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Material
+                {t("Material")}
               </th>
               <th className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Category
+                {t("Category")}
               </th>
               <th className="px-4 py-2.5 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Default Cost
+                {t("Default Cost")}
               </th>
               <th className="px-4 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Applies To
+                {t("Applies To")}
               </th>
               <th className="px-4 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                Status
+                {t("Status")}
               </th>
               <th className="px-4 py-2.5 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-24">
-                Actions
+                {t("Actions")}
               </th>
             </tr>
           </thead>
@@ -400,7 +407,7 @@ const MaterialsListPage: React.FC = () => {
                     {/* Category Header */}
                     <tr className="bg-gray-100 dark:bg-gray-700/50">
                       <td colSpan={6} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        {categoryLabels[category as MaterialCategory]} ({items.length})
+                        {t(categoryLabels[category as MaterialCategory])} ({items.length})
                       </td>
                     </tr>
                     {/* Category Items */}
@@ -438,7 +445,7 @@ const MaterialsListPage: React.FC = () => {
             {filteredMaterials.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
-                  No materials found
+                  {t("No materials found")}
                 </td>
               </tr>
             )}
@@ -469,9 +476,11 @@ const MaterialsListPage: React.FC = () => {
           setMaterialToReactivate(null);
         }}
         onConfirm={handleConfirmReactivate}
-        title="Reactivate Material"
-        message={`Are you sure you want to reactivate "${materialToReactivate?.name}"? This material will be visible and available for use again.`}
-        confirmButtonText="Reactivate"
+        title={t("Reactivate Material")}
+        message={t('Are you sure you want to reactivate "{{name}}"? This material will be visible and available for use again.', {
+          name: materialToReactivate?.name,
+        })}
+        confirmButtonText={t("Reactivate")}
         variant="success"
       />
     </div>
@@ -498,6 +507,7 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
   onPermanentDelete,
   onReactivate,
 }) => {
+  const { t } = useTranslation("stock");
   const formatCost = (cost: number | string) => Number(cost).toFixed(2);
   const hasVariants = (material.variantCount || 0) > 0;
 
@@ -537,7 +547,9 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
                 </span>
                 {hasVariants && (
                   <span className="text-xs text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full">
-                    {material.variantCount} variant{material.variantCount !== 1 ? "s" : ""}
+                    {t(material.variantCount !== 1 ? "{{count}} variants" : "{{count}} variant", {
+                      count: material.variantCount,
+                    })}
                   </span>
                 )}
               </div>
@@ -546,7 +558,7 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
         </td>
         <td className="px-4 py-2.5 whitespace-nowrap">
           <span className="text-sm text-gray-600 dark:text-gray-300">
-            {categoryLabels[material.category]}
+            {t(categoryLabels[material.category])}
           </span>
         </td>
         <td className="px-4 py-2.5 whitespace-nowrap text-right">
@@ -562,19 +574,19 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
               ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
               : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300"
           }`}>
-            {appliesTo}
+            {t(appliesTo)}
           </span>
         </td>
         <td className="px-4 py-2.5 whitespace-nowrap text-center">
           {material.is_active ? (
             <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full dark:bg-green-900/30 dark:text-green-300">
               <IconCheck className="w-3 h-3 mr-0.5" />
-              Active
+              {t("Active")}
             </span>
           ) : (
             <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 rounded-full dark:bg-gray-700 dark:text-gray-400">
               <IconX className="w-3 h-3 mr-0.5" />
-              Inactive
+              {t("Inactive")}
             </span>
           )}
         </td>
@@ -583,7 +595,7 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
             <button
               onClick={onEdit}
               className="p-1.5 text-gray-500 hover:text-sky-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-              title="Edit"
+              title={t("Edit")}
             >
               <IconPencil className="w-4 h-4" />
             </button>
@@ -591,7 +603,7 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
               <button
                 onClick={onDelete}
                 className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                title="Deactivate"
+                title={t("Deactivate")}
               >
                 <IconTrash className="w-4 h-4" />
               </button>
@@ -600,14 +612,14 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
                 <button
                   onClick={onReactivate}
                   className="p-1.5 text-gray-500 hover:text-green-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Reactivate"
+                  title={t("Reactivate")}
                 >
                   <IconRefresh className="w-4 h-4" />
                 </button>
                 <button
                   onClick={onPermanentDelete}
                   className="p-1.5 text-gray-500 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                  title="Delete permanently"
+                  title={t("Delete permanently")}
                 >
                   <IconTrash className="w-4 h-4" />
                 </button>
@@ -643,9 +655,9 @@ const MaterialRow: React.FC<MaterialRowProps> = ({
           <td className="px-4 py-1.5"></td>
           <td className="px-4 py-1.5 text-center">
             {variant.is_active ? (
-              <span className="text-xs text-green-600 dark:text-green-400">Active</span>
+              <span className="text-xs text-green-600 dark:text-green-400">{t("Active")}</span>
             ) : (
-              <span className="text-xs text-gray-400 dark:text-gray-500">Inactive</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500">{t("Inactive")}</span>
             )}
           </td>
           <td className="px-4 py-1.5"></td>

@@ -16,7 +16,7 @@ import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import SubmissionResultsModal from "../../components/Invoice/SubmissionResultsModal";
-import { FormInput, FormListbox } from "../../components/FormComponents";
+import { FormInput } from "../../components/FormComponents";
 import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import {
@@ -68,6 +68,7 @@ import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import LinkedPaymentsTooltip from "../../components/Invoice/LinkedPaymentsTooltip";
 import PaymentCancellationErrorDialog from "../../components/Invoice/PaymentCancellationErrorDialog";
 import ReceiptDetailsDialog from "../../components/Invoice/ReceiptDetailsDialog";
+import DateTimePicker from "../../components/Invoice/DateTimePicker";
 import InvoiceAdjustmentDocsSection from "../../components/AdjustmentDocs/InvoiceAdjustmentDocsSection";
 import { generateAdjustmentDocPDFBlob } from "../../utils/adjustments/PDF/AdjustmentDocPDFHandler";
 import { generateAdjustmentDocPDFFilename } from "../../utils/adjustments/PDF/generateAdjustmentDocPDFFilename";
@@ -1935,6 +1936,34 @@ const InvoiceDetailsPage: React.FC = () => {
               >
                 {t(getInvoiceDisplayStatusLabel(invoiceDisplayStatus))}
               </span>
+              {/* Invoice-owned sales journal link */}
+              {invoiceData.journal_entry_id && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `/accounting/journal-entries/${invoiceData.journal_entry_id}`
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:underline"
+                  title={t("View journal entry")}
+                >
+                  <IconFileInvoice size={14} />
+                  {t("View Journal {{reference}}", {
+                    reference: invoiceData.journal_reference || invoiceData.id,
+                  })}
+                  {invoiceData.journal_status && (
+                    <span className="opacity-80">
+                      {" "}
+                      ({t(
+                        invoiceData.journal_status === "cancelled"
+                          ? "Cancelled"
+                          : "Posted"
+                      )})
+                    </span>
+                  )}
+                </button>
+              )}
               {/* E-Invoice Status Badge */}
               {eInvoiceStatusInfo && EInvoiceIcon && (
                 <a
@@ -2928,7 +2957,20 @@ const InvoiceDetailsPage: React.FC = () => {
                             title={t("View journal entry")}
                           >
                             <IconReceipt size={14} />
-                            <span className="font-mono">#{doc.journal_entry_id}</span>
+                            <span className="font-mono">
+                              {doc.journal_reference ||
+                                `#${doc.journal_entry_id}`}
+                            </span>
+                            {doc.journal_status && (
+                              <span className="opacity-80">
+                                {" "}
+                                ({t(
+                                  doc.journal_status === "cancelled"
+                                    ? "Cancelled"
+                                    : "Posted"
+                                )})
+                              </span>
+                            )}
                           </button>
                         ) : (
                           <span className="text-xs text-gray-400 dark:text-gray-500">-</span>
@@ -3240,6 +3282,9 @@ const InvoiceDetailsPage: React.FC = () => {
         onReferenceUpdated={async (): Promise<void> => {
           await fetchDetails();
         }}
+        onDateUpdated={async (): Promise<void> => {
+          await fetchDetails();
+        }}
       />
       <ConfirmationDialog
         isOpen={showClearEInvoiceConfirm}
@@ -3506,17 +3551,19 @@ const InvoiceDetailsPage: React.FC = () => {
             </div>
 
             <div className="mb-4">
-              <FormListbox
-                name="salesman"
-                label={t("Select New Salesman")}
+              <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                {t("Select New Salesman")}
+              </label>
+              <PillSelect<string>
                 value={selectedSalesman}
-                onChange={(value) => setSelectedSalesman(value as string)}
-                options={salesmen.map((s) => ({
-                  id: s.id,
-                  name: s.name || s.id,
+                onChange={(value: string) => setSelectedSalesman(value)}
+                options={salesmen.map((salesman) => ({
+                  value: salesman.id,
+                  label: salesman.name || salesman.id,
                 }))}
-                placeholder={t("Select a salesman...")}
                 disabled={isUpdatingSalesman || isLoadingSalesmen}
+                ariaLabel={t("Select New Salesman")}
+                size="md"
               />
             </div>
 
@@ -3664,13 +3711,23 @@ const InvoiceDetailsPage: React.FC = () => {
             </div>
 
             <div className="mb-4">
-              <FormInput
-                name="datetime"
-                label={t("Date & Time")}
-                type="datetime-local"
-                value={selectedDateTime}
-                onChange={(e) => setSelectedDateTime(e.target.value)}
+              <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
+                {t("Date & Time")}
+              </label>
+              <DateTimePicker
+                value={selectedDateTime ? new Date(selectedDateTime) : null}
+                onChange={(date: Date) => {
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, "0");
+                  const day = String(date.getDate()).padStart(2, "0");
+                  const hours = String(date.getHours()).padStart(2, "0");
+                  const minutes = String(date.getMinutes()).padStart(2, "0");
+                  setSelectedDateTime(
+                    `${year}-${month}-${day}T${hours}:${minutes}`
+                  );
+                }}
                 disabled={isUpdatingDateTime}
+                allowFuture
               />
             </div>
 

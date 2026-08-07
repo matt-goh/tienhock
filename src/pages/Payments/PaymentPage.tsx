@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TimeNavigator from "../../components/TimeNavigator";
+import Pagination from "../../components/Invoice/Pagination";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -35,6 +36,7 @@ interface PaymentFilters {
 }
 
 const FILTERS_STORAGE_KEY = "paymentList";
+const PAYMENTS_PAGE_SIZE = 200;
 
 const getDefaultFilters = (): PaymentFilters => {
   const start = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -79,6 +81,9 @@ const PaymentPage: React.FC = () => {
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
     null
   );
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [totalPages, setTotalPages] = useState<number>(1);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Deep link (e.g. from a journal's "View Source" button): /sales/payments?receipt=<id>
@@ -118,6 +123,15 @@ const PaymentPage: React.FC = () => {
     getDefaultFilters,
     reviveFilters
   );
+  const [searchDraft, setSearchDraft] = useState<string>(
+    () => filters.searchTerm
+  );
+
+  // Keep the draft in sync when the committed search changes from outside
+  // this input (e.g. persisted filters restored on navigation).
+  useEffect((): void => {
+    setSearchDraft(filters.searchTerm);
+  }, [filters.searchTerm]);
 
   // Fetch payments
   const fetchPayments = useCallback(async () => {
@@ -145,14 +159,26 @@ const PaymentPage: React.FC = () => {
       if (filters.searchTerm) {
         params.append("search", filters.searchTerm);
       }
+      params.append("page", String(currentPage));
+      params.append("limit", String(PAYMENTS_PAGE_SIZE));
 
       params.append("include_cancelled", "true"); // Include cancelled payments
 
-      const response = await api.get(`/api/payments/all?${params.toString()}`);
-      setPayments(response);
+      const response = await api.get<{
+        data: Payment[];
+        pagination: {
+          page: number;
+          limit: number;
+          total: number;
+          totalPages: number;
+        };
+      }>(`/api/payments/all?${params.toString()}`);
+      setPayments(response.data);
+      setTotalItems(response.pagination.total);
+      setTotalPages(response.pagination.totalPages);
 
       // Sort payments with pending status at the top, then by date
-      const sorted = [...response].sort((a, b) => {
+      const sorted = [...response.data].sort((a, b) => {
         // First priority: pending status
         if (a.status === "pending" && b.status !== "pending") return -1;
         if (a.status !== "pending" && b.status === "pending") return 1;
@@ -169,11 +195,19 @@ const PaymentPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, currentPage]);
 
   useEffect(() => {
     fetchPayments();
   }, [fetchPayments]);
+
+  // If the last rows disappear (e.g. a payment on the final page is
+  // cancelled), fall back to the last valid page instead of showing empty.
+  useEffect((): void => {
+    if (totalPages > 0 && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // Restore the previous scroll position when returning (e.g. from a journal entry).
   useScrollRestoration("payment-list", !loading);
@@ -182,6 +216,7 @@ const PaymentPage: React.FC = () => {
   // selections from the single TimeNavigator control.
   const handleTimeNavigatorChange = useCallback(
     (range: { start: Date; end: Date }) => {
+      setCurrentPage(1);
       setFilters((prev) => ({
         ...prev,
         dateRange: { start: range.start, end: range.end },
@@ -189,6 +224,10 @@ const PaymentPage: React.FC = () => {
     },
     []
   );
+
+  const handlePageChange = (page: number): void => {
+    setCurrentPage(Math.min(Math.max(1, page), totalPages));
+  };
 
   const handleNewPayment = (): void => {
     setSelectedPayment(null);
@@ -203,6 +242,7 @@ const PaymentPage: React.FC = () => {
     setShowPaymentForm(false);
     setPaymentFormInitialValues(null);
     if (shouldShowFullReferenceGroup) {
+      setCurrentPage(1);
       setFilters((previousFilters: PaymentFilters): PaymentFilters => ({
         ...previousFilters,
         status: null,
@@ -266,15 +306,40 @@ const PaymentPage: React.FC = () => {
                 title={t(
                   "Search payments by invoice, reference, or amount"
                 )}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
-                value={filters.searchTerm}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    searchTerm: e.target.value,
-                  }))
-                }
+                className="w-full pl-10 pr-9 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
+                value={searchDraft}
+                onChange={(e) => setSearchDraft(e.target.value)}
+                onBlur={() => {
+                  if (filters.searchTerm !== searchDraft) {
+                    setFilters((prev) => ({
+                      ...prev,
+                      searchTerm: searchDraft,
+                    }));
+                    setCurrentPage(1);
+                  }
+                }}
               />
+              {searchDraft && (
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    setSearchDraft("");
+                    if (filters.searchTerm) {
+                      setFilters((prev) => ({
+                        ...prev,
+                        searchTerm: "",
+                      }));
+                      setCurrentPage(1);
+                    }
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-gray-200"
+                  title={t("Clear search")}
+                  aria-label={t("Clear search")}
+                >
+                  <IconX size={14} />
+                </button>
+              )}
             </div>
 
             {/* Time Navigator */}
@@ -290,12 +355,13 @@ const PaymentPage: React.FC = () => {
             <div className="w-[calc(50%-0.375rem)] min-w-[130px] sm:w-40">
               <StyledListbox
                 value={filters.paymentMethod || ""}
-                onChange={(value) =>
+                onChange={(value) => {
+                  setCurrentPage(1);
                   setFilters((prev) => ({
                     ...prev,
                     paymentMethod: value === "" ? null : String(value),
-                  }))
-                }
+                  }));
+                }}
                 options={[
                   { id: "", name: t("All Methods") },
                   { id: "cash", name: t("Cash") },
@@ -313,12 +379,13 @@ const PaymentPage: React.FC = () => {
             <div className="w-[calc(50%-0.375rem)] min-w-[130px] sm:w-40">
               <StyledListbox
                 value={filters.status || ""}
-                onChange={(value) =>
+                onChange={(value) => {
+                  setCurrentPage(1);
                   setFilters((prev) => ({
                     ...prev,
                     status: value === "" ? null : String(value),
-                  }))
-                }
+                  }));
+                }}
                 options={[
                   { id: "", name: t("All Status") },
                   { id: "active", name: t("Active") },
@@ -349,15 +416,27 @@ const PaymentPage: React.FC = () => {
           <LoadingSpinner />
         </div>
       ) : (
-        <PaymentTable
-          payments={sortedPayments}
-          onViewPayment={handleViewPayment}
-          onRefresh={fetchPayments}
-          onCancellationError={setPaymentCancellationError}
-          onAddPaymentToGroup={handleAddPaymentToGroup}
-          onViewPaymentGroup={handleViewPaymentGroup}
-          requiresClearanceDate
-        />
+        <>
+          <PaymentTable
+            payments={sortedPayments}
+            onViewPayment={handleViewPayment}
+            onRefresh={fetchPayments}
+            onCancellationError={setPaymentCancellationError}
+            onAddPaymentToGroup={handleAddPaymentToGroup}
+            onViewPaymentGroup={handleViewPaymentGroup}
+            requiresClearanceDate
+          />
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+              itemsCount={sortedPayments.length}
+              totalItems={totalItems}
+              pageSize={PAYMENTS_PAGE_SIZE}
+            />
+          )}
+        </>
       )}
 
       <PaymentCancellationErrorDialog
@@ -384,6 +463,9 @@ const PaymentPage: React.FC = () => {
           await fetchPayments();
         }}
         onReferenceUpdated={async (): Promise<void> => {
+          await fetchPayments();
+        }}
+        onDateUpdated={async (): Promise<void> => {
           await fetchPayments();
         }}
       />

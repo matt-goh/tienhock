@@ -6,6 +6,14 @@ cetakan lejar legasi. Key kepada akaun ini sejak awal dan penyesuaian bulanan
 (`dev/import/legacy-tieout/`) kekal pada perbezaan sifar — tiada pembetulan
 diperlukan.
 
+> **Dikemas kini 7 Ogos 2026.** Panduan ini diterbitkan daripada **cetakan** lejar
+> Jun 2026. Dua baris dalam cetakan itu sebenarnya kesilapan keying dalam program
+> legasi, bukan dalam ERP — rakan sekerja telah membetulkan kedua-duanya dalam
+> program legasi (dan ERP) pada 7 Ogos 2026, dan panduan ini telah dibetulkan:
+> **KFC → `MBSM_K`** (bukan `MBC`) dan **resit PAUMIN = `MBRMF` 565.00 + `MBSAF`
+> 144.00** (bukan 465.00 / 244.00). Peraturan am: apabila cetakan legasi dan ERP
+> tidak sepadan, sahkan dengan resit asal dahulu — cetakan bukan bukti muktamad.
+
 ## Lima peraturan
 
 1. **Diesel kenderaan → akaun `OIL*` KENDIRI kenderaan itu.** Setiap resit
@@ -34,10 +42,9 @@ diperlukan.
    (kakitangan PEJABAT)** — pilih mengikut SIAPA makanan itu, bukan tempat ia
    dibeli.
 5. **Pecahkan resit mengikut item, dan jumlah pecahan mesti sama dengan jumlah
-   resit.** Satu resit PAUMIN = cakera pemotong `MBRMF` 465.00 + sarung
-   tangan/cermin mata `MBSAF` 244.00 = 709.00. Jangan sesekali pecahkan kepada
-   nombor bulat (565/144 telah dikunci; ia mengelirukan dua akaun walaupun
-   baucar masih seimbang).
+   resit.** Satu resit PAUMIN (#2606-2133) = cakera pemotong/mata gerudi/pita
+   penebat `MBRMF` 565.00 + sarung tangan/cermin mata `MBSAF` 144.00 = 709.00.
+   Kira setiap pecahan daripada item pada resit — jangan anggarkan.
 
 ## Jadual pembekal → akaun (terbukti melalui lejar legasi Jun 2026)
 
@@ -58,8 +65,8 @@ diperlukan.
 | TAOBAO-BOZHEN (gris galas, mesin kongsi) | `MBRM` | — |
 | TAOBAO-GU DE LI QI HANG (pistol angin pemampat) | `MBRM` | — |
 | TAOBAO-HANG ZHOU JIN XIN (kotak gear RV63) | `MBRM` | — |
-| PAUMIN HARDWARE — cakera pemotong | `MBRMF` | — |
-| PAUMIN HARDWARE — sarung tangan/cermin mata | `MBSAF` | — |
+| PAUMIN HARDWARE — cakera pemotong (565.00 pada #2606-2133) | `MBRMF` | — |
+| PAUMIN HARDWARE — sarung tangan/cermin mata (144.00 pada #2606-2133) | `MBSAF` | — |
 | TAOBAO-WEI ER DUN (but keselamatan) | `MBSAF` | — |
 | SESB (meter Menggatal) | `MGT` | — |
 | 168 HARDWARE (Menggatal) | `MGT` | — |
@@ -79,7 +86,7 @@ diperlukan.
 | SHELL BUNDUSAN — bahan api Ativa QCV920 | `OIL920` | `OILOTH` |
 | SHELL SYT. EXCEL — bahan api SD9922H | `OIL9922` | `OIL9882` |
 | EMART (bekalan pembersihan) | `MBC` | `MBOR` |
-| KFC LINTAS JAYA BOULEVARD | `MBC` | `MBSM_K` |
+| KFC / restoran makanan segera (makanan kakitangan kilang) | `MBSM_K` | — |
 | LIDO MARKET (barangan runcit pejabat) | `MBOR` | `MBSM_K` |
 | MIX STORE (barangan runcit pejabat) | `MBOR` | `MBSM_K` |
 | HO KEE HAINANESE CHICKEN RICE (makanan kakitangan kilang) | `MBSM_K` | `MBSM_O` |

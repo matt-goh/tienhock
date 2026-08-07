@@ -10,13 +10,20 @@ const pool = new pg.Pool({
   database: "tienhock",
 });
 
-// Boss's corrected (legacy) targets from CORRECTED_BIHUN_JUNE_ESTIMATED_UNIT_COST.pdf
+// Boss's corrected (legacy) targets from CORRECTED_BIHUN_JUNE_ESTIMATED_UNIT_COST.pdf.
+// Four rows were re-pinned on 7 Aug 2026 after the coworker amended the legacy program
+// for two classifications the June print had keyed wrongly (see JUNE_RECLASS_DESIGN.md
+// §e): KFC LINTAS 40.00 belongs in MBSM_K, not MBC, and the PAUMIN receipt splits
+// MBRMF 565.00 / MBSAF 144.00, not 465.00 / 244.00. Half of each shift lands on BIHUN:
+//   MBC 479.55 -> 459.55 (-20)   STAFF MESSING 2,669.10 -> 2,689.10 (+20)
+//   MBSAF 714.78 -> 664.78 (-50) MBRMF 2,517.80 -> 2,567.80 (+50)
+// The four deltas net to zero, so EXPENSES SUBTOTAL and FINAL are unchanged.
 const targets = {
-  MBC: 479.55,
+  MBC: 459.55,
   MBOR: 799.4,
-  MBRMF: 2517.8,
-  MBSAF: 714.78,
-  "STAFF MESSING": 2669.1,
+  MBRMF: 2567.8,
+  MBSAF: 664.78,
+  "STAFF MESSING": 2689.1,
   "VRE-DIESEL": 1555.67,
   "VRE-REPAIR": 1753.5,
   "EXPENSES SUBTOTAL": 64238.82,

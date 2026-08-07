@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import ProductSelector from "../../components/Stock/ProductSelector";
@@ -86,6 +87,8 @@ type SpecialSelection =
   | null;
 
 const ProductionEntryPage: React.FC = () => {
+  const { t } = useTranslation("stock");
+
   // Get initial values from URL params or defaults
   const getInitialDate = (): string => {
     const params = new URLSearchParams(window.location.search);
@@ -485,10 +488,10 @@ const ProductionEntryPage: React.FC = () => {
         machine_broken: newValue,
       });
       setIsMachineBroken(newValue);
-      toast.success(newValue ? "Mesin rosak ditanda" : "Mesin rosak dibuang");
+      toast.success(newValue ? t("Machine broken marked") : t("Machine broken removed"));
     } catch (error) {
       console.error("Error updating machine status:", error);
-      toast.error("Gagal kemaskini status mesin");
+      toast.error(t("Failed to update machine status"));
     }
   };
 
@@ -524,7 +527,7 @@ const ProductionEntryPage: React.FC = () => {
   // Handle save
   const handleSave = async (): Promise<void> => {
     if (!selectedDate || !selectedProductId) {
-      toast.error("Please select a date and product first");
+      toast.error(t("Please select a date and product first"));
       return;
     }
 
@@ -565,13 +568,16 @@ const ProductionEntryPage: React.FC = () => {
 
       toast.success(
         isStockOnlyProduct
-          ? `Stock record saved: ${response.total_bags} total`
-          : `Production saved: ${response.total_bags} total bags from ${response.entry_count} workers`
+          ? t("Stock record saved: {{total}} total", { total: response.total_bags })
+          : t("Production saved: {{total}} total bags from {{count}} workers", {
+              total: response.total_bags,
+              count: response.entry_count,
+            })
       );
       setOriginalEntries({ ...entries });
     } catch (error) {
       console.error("Error saving production entries:", error);
-      toast.error("Failed to save production entries");
+      toast.error(t("Failed to save production entries"));
     } finally {
       setIsSaving(false);
     }
@@ -600,9 +606,7 @@ const ProductionEntryPage: React.FC = () => {
 
     if (hasCurrentUnsavedChanges) {
       if (
-        !window.confirm(
-          "You have unsaved changes. Do you want to discard them?"
-        )
+        !window.confirm(t("You have unsaved changes. Do you want to discard them?"))
       ) {
         return;
       }
@@ -627,9 +631,7 @@ const ProductionEntryPage: React.FC = () => {
 
     if (hasCurrentUnsavedChanges) {
       if (
-        !window.confirm(
-          "You have unsaved changes. Do you want to discard them?"
-        )
+        !window.confirm(t("You have unsaved changes. Do you want to discard them?"))
       ) {
         return;
       }
@@ -683,7 +685,7 @@ const ProductionEntryPage: React.FC = () => {
           {/* Left: Title | Date */}
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-bold text-default-900 dark:text-gray-100">
-              Production Entry
+              {t("Production Entry")}
             </h1>
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <div className="flex items-center gap-2">
@@ -718,7 +720,7 @@ const ProductionEntryPage: React.FC = () => {
                         : "text-default-500 dark:text-gray-400"
                     }`}
                   >
-                    Mesin Rosak
+                    {t("Machine Broken")}
                   </span>
                   <Switch
                     checked={isMachineBroken}
@@ -745,7 +747,7 @@ const ProductionEntryPage: React.FC = () => {
           <div className="flex items-center gap-2">
             {hasUnsavedChanges && isViewingProduct && (
               <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                Unsaved
+                {t("Unsaved")}
               </span>
             )}
             <Button
@@ -754,7 +756,7 @@ const ProductionEntryPage: React.FC = () => {
               icon={IconHelpCircle}
               onClick={() => setShowHelpDialog(true)}
             >
-              Help
+              {t("Help")}
             </Button>
             <Button
               variant="outline"
@@ -764,7 +766,7 @@ const ProductionEntryPage: React.FC = () => {
                 setWorkerOrderRefreshKey((previousKey) => previousKey + 1)
               }
             >
-              Refresh Order
+              {t("Refresh Order")}
             </Button>
             <Button
               variant="outline"
@@ -772,7 +774,7 @@ const ProductionEntryPage: React.FC = () => {
               icon={IconArrowsSort}
               onClick={() => setShowProductOrderModal(true)}
             >
-              Reorder
+              {t("Reorder")}
             </Button>
             <Button
               variant="outline"
@@ -780,7 +782,7 @@ const ProductionEntryPage: React.FC = () => {
               icon={IconSettings}
               onClick={() => setShowMappingModal(true)}
             >
-              Mappings
+              {t("Mappings")}
             </Button>
           </div>
         </div>
@@ -794,11 +796,11 @@ const ProductionEntryPage: React.FC = () => {
               (isLoadingDeepLinkProductions || deepLinkProductions.length > 0) && (
                 <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 dark:border-sky-900/60 dark:bg-sky-950/30">
                   <div className="mb-2 text-sm font-medium text-sky-800 dark:text-sky-200">
-                    Select this worker&apos;s production
+                    {t("Select this worker's production")}
                   </div>
                   {isLoadingDeepLinkProductions ? (
                     <div className="text-sm text-sky-700 dark:text-sky-300">
-                      Loading productions...
+                      {t("Loading productions...")}
                     </div>
                   ) : (
                     <div className="flex flex-wrap gap-1.5">
@@ -831,7 +833,7 @@ const ProductionEntryPage: React.FC = () => {
             {/* Product Selector Dropdown (for search/starring) */}
             <div className="pb-4 border-b border-default-200 dark:border-gray-700">
               <ProductSelector
-                label="Search for a product (click star to favorite)"
+                label={t("Search for a product (click star to favorite)")}
                 value={selectedProductId}
                 onChange={handleProductSelect}
                 productTypes={["MEE", "BH", "BUNDLE", "OTH"]}
@@ -845,7 +847,7 @@ const ProductionEntryPage: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <IconStarFilled size={14} className="text-amber-500" />
                   <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                    Starred Products
+                    {t("Starred Products")}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -883,7 +885,7 @@ const ProductionEntryPage: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-green-500" />
                 <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                  Mee Products
+                  {t("Mee Products")}
                 </span>
               </div>
               {nonFavoriteProducts.MEE.length > 0 ? (
@@ -912,7 +914,7 @@ const ProductionEntryPage: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  No Mee products available
+                  {t("No Mee products available")}
                 </p>
               )}
             </div>
@@ -922,7 +924,7 @@ const ProductionEntryPage: React.FC = () => {
               <div className="flex items-center gap-1.5">
                 <div className="h-2.5 w-2.5 rounded-full bg-blue-500" />
                 <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                  Bihun Products
+                  {t("Bihun Products")}
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -950,7 +952,7 @@ const ProductionEntryPage: React.FC = () => {
               </div>
               {nonFavoriteProducts.BH.length === 0 && (
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  No Bihun products available
+                  {t("No Bihun products available")}
                 </p>
               )}
             </div>
@@ -961,7 +963,7 @@ const ProductionEntryPage: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <IconPackages size={14} className="text-amber-500" />
                   <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                    Bundle Products
+                    {t("Bundle Products")}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -994,7 +996,7 @@ const ProductionEntryPage: React.FC = () => {
                 <div className="flex items-center gap-1.5">
                   <IconBox size={14} className="text-purple-500" />
                   <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                    Other Products
+                    {t("Other Products")}
                   </span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
@@ -1042,10 +1044,10 @@ const ProductionEntryPage: React.FC = () => {
                   }`}
                 >
                   {selectedProduct?.type === "MEE"
-                    ? "Mee"
+                    ? t("Mee")
                     : selectedProduct?.type === "OTH"
-                    ? "Other"
-                    : "Bihun"}
+                    ? t("Other")
+                    : t("Bihun")}
                 </span>
                 <div className="flex-shrink-0">
                   <span className="font-semibold text-default-900 dark:text-gray-100">
@@ -1062,7 +1064,7 @@ const ProductionEntryPage: React.FC = () => {
                 {isMachineBroken && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/30 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-400 flex-shrink-0">
                     <IconAlertTriangle size={12} />
-                    Mesin Rosak
+                    {t("Machine Broken")}
                   </span>
                 )}
 
@@ -1112,7 +1114,7 @@ const ProductionEntryPage: React.FC = () => {
                       />
                       <input
                         type="text"
-                        placeholder="Search worker..."
+                        placeholder={t("Search worker...")}
                         value={workerSearchQuery}
                         onChange={(e) => setWorkerSearchQuery(e.target.value)}
                         className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -1134,7 +1136,7 @@ const ProductionEntryPage: React.FC = () => {
                   onClick={() => handleProductSelect(null)}
                   className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 whitespace-nowrap"
                 >
-                  Change product
+                  {t("Change product")}
                 </button>
               </div>
             </div>
@@ -1148,7 +1150,7 @@ const ProductionEntryPage: React.FC = () => {
                     htmlFor="stock-only-quantity"
                     className="block text-sm font-medium text-default-700 dark:text-gray-300"
                   >
-                    Quantity
+                    {t("Quantity")}
                   </label>
                   <input
                     id="stock-only-quantity"
@@ -1175,7 +1177,7 @@ const ProductionEntryPage: React.FC = () => {
                   </div>
                   <div>
                     <div className="font-semibold text-default-900 dark:text-gray-100">
-                      Stock Total
+                      {t("Stock Total")}
                     </div>
                     <div className="text-xs text-default-500 dark:text-gray-400">
                       {parseLocalDate(selectedDate).toLocaleDateString("en-MY", {
@@ -1203,7 +1205,7 @@ const ProductionEntryPage: React.FC = () => {
                     color="default"
                     icon={IconRefresh}
                   >
-                    Reset
+                    {t("Reset")}
                   </Button>
                   <Button
                     onClick={handleSave}
@@ -1211,7 +1213,7 @@ const ProductionEntryPage: React.FC = () => {
                     color="sky"
                     icon={IconDeviceFloppy}
                   >
-                    {isSaving ? "Saving..." : "Save Production"}
+                    {isSaving ? t("Saving...") : t("Save Production")}
                   </Button>
                 </div>
               </div>
@@ -1246,7 +1248,7 @@ const ProductionEntryPage: React.FC = () => {
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <IconBox size={16} className="text-purple-500" />
                   <span className="font-medium text-sm text-default-900 dark:text-gray-100">
-                    Bihun Hancur
+                    {t("Bihun Hancur")}
                   </span>
                 </div>
 
@@ -1294,7 +1296,7 @@ const ProductionEntryPage: React.FC = () => {
                   />
                   <input
                     type="text"
-                    placeholder="Search worker..."
+                    placeholder={t("Search worker...")}
                     value={workerSearchQuery}
                     onChange={(e) => setWorkerSearchQuery(e.target.value)}
                     className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -1314,7 +1316,7 @@ const ProductionEntryPage: React.FC = () => {
                   onClick={() => handleSpecialSelect(null)}
                   className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 flex-shrink-0"
                 >
-                  Back to selection
+                  {t("Back to selection")}
                 </button>
               </div>
             </div>
@@ -1345,7 +1347,7 @@ const ProductionEntryPage: React.FC = () => {
                         : "text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
                     }`}
                   >
-                    Best Partner
+                    {t("Best Partner")}
                   </button>
                   <button
                     onClick={() => setSpecialSelection("BUNDLE_BH")}
@@ -1355,7 +1357,7 @@ const ProductionEntryPage: React.FC = () => {
                         : "text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
                     }`}
                   >
-                    Bihun
+                    {t("Bihun")}
                   </button>
                   <button
                     onClick={() => setSpecialSelection("BUNDLE_MEE")}
@@ -1365,7 +1367,7 @@ const ProductionEntryPage: React.FC = () => {
                         : "text-default-500 dark:text-gray-400 hover:bg-default-100 dark:hover:bg-gray-700"
                     }`}
                   >
-                    Mee
+                    {t("Mee")}
                   </button>
                 </div>
 
@@ -1413,7 +1415,7 @@ const ProductionEntryPage: React.FC = () => {
                   />
                   <input
                     type="text"
-                    placeholder="Search worker..."
+                    placeholder={t("Search worker...")}
                     value={workerSearchQuery}
                     onChange={(e) => setWorkerSearchQuery(e.target.value)}
                     className="w-32 sm:w-40 rounded-md border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-1 pl-7 pr-7 text-xs focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
@@ -1433,7 +1435,7 @@ const ProductionEntryPage: React.FC = () => {
                   onClick={() => handleSpecialSelect(null)}
                   className="text-sm text-sky-600 dark:text-sky-400 hover:text-sky-700 dark:hover:text-sky-300 flex-shrink-0"
                 >
-                  Back to selection
+                  {t("Back to selection")}
                 </button>
               </div>
             </div>

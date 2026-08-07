@@ -1,6 +1,8 @@
 // src/pages/Stock/Materials/StockAdjustmentEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import {
@@ -315,8 +317,12 @@ const getMaterialDisplayName = (material: MaterialWithStock): string => {
   return material.custom_name || material.name;
 };
 
-const getVariantDisplayName = (variant: StockEntryRow): string => {
-  return variant.variant_name || variant.custom_description || "Unnamed variant";
+const getVariantDisplayName = (variant: StockEntryRow, t?: TFunction): string => {
+  return (
+    variant.variant_name ||
+    variant.custom_description ||
+    (t ? t("Unnamed variant") : "Unnamed variant")
+  );
 };
 
 const generalStockRowMatchesSearch = (row: GeneralStockRow, query: string): boolean => {
@@ -749,6 +755,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   mode,
   generalHeaderActions,
 }) => {
+  const { t } = useTranslation("stock");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedMonth, setSelectedMonth] = useState<Date>(
@@ -764,7 +771,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     () => getStockEntryTab(searchParams, availableTabs, defaultTab),
     [availableTabs, defaultTab, searchParams]
   );
-  const pageTitle = mode === "general" ? "General Stock" : "Material Stock";
+  const pageTitle = mode === "general" ? t("General Stock") : t("Material Stock");
   const [materials, setMaterials] = useState<MaterialWithStock[]>([]);
   const [originalMaterials, setOriginalMaterials] = useState<MaterialWithStock[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -950,7 +957,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         setOriginalMaterials([]);
       } catch (error: unknown) {
         console.error("Error fetching general stock:", error);
-        toast.error("Failed to load general stock");
+        toast.error(t("Failed to load general stock"));
         setGeneralStockRows([]);
         setGeneralStockCategories([]);
       } finally {
@@ -977,13 +984,13 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       setNewVariantRows(new Map());
     } catch (error: unknown) {
       console.error("Error fetching materials:", error);
-      toast.error("Failed to load materials data");
+      toast.error(t("Failed to load materials data"));
       setMaterials([]);
       setOriginalMaterials([]);
     } finally {
       setIsLoading(false);
     }
-  }, [year, month, activeTab]);
+  }, [year, month, activeTab, t]);
 
   useEffect(() => {
     fetchData();
@@ -1101,7 +1108,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       } catch (error: unknown) {
         if (cancelled) return;
         console.error("Error fetching closing stock values:", error);
-        toast.error("Failed to load closing stock values");
+        toast.error(t("Failed to load closing stock values"));
         setClosingStockInputs(emptyClosingStockInputs());
       }
     };
@@ -1127,7 +1134,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     return (): void => {
       cancelled = true;
     };
-  }, [mode, year, month]);
+  }, [mode, year, month, t]);
 
   const handleSaveClosingStock = async (): Promise<void> => {
     setIsSavingClosingStock(true);
@@ -1139,11 +1146,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       };
 
       await api.put(`/api/financial-reports/closing-stock/${year}/${month}`, { values });
-      toast.success("Closing stock values saved");
+      toast.success(t("Closing stock values saved"));
     } catch (error: unknown) {
       console.error("Error saving closing stock values:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to save closing stock values"
+        error instanceof Error ? error.message : t("Failed to save closing stock values")
       );
     } finally {
       setIsSavingClosingStock(false);
@@ -1439,7 +1446,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     event.stopPropagation();
 
     if (!variant.variant_id) {
-      toast.error("Only registered variants can be deactivated from this page");
+      toast.error(t("Only registered variants can be deactivated from this page"));
       return;
     }
 
@@ -1458,17 +1465,25 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     try {
       if (deleteTarget.type === "variant") {
         await api.delete(`/api/materials/variants/${deleteTarget.variant.variant_id}`);
-        toast.success(`Variant "${getVariantDisplayName(deleteTarget.variant)}" deactivated`);
+        toast.success(
+          t('Variant "{{name}}" deactivated', {
+            name: getVariantDisplayName(deleteTarget.variant, t),
+          })
+        );
       } else {
         await api.delete(`/api/materials/${deleteTarget.material.id}`);
-        toast.success(`Material "${getMaterialDisplayName(deleteTarget.material)}" deactivated`);
+        toast.success(
+          t('Material "{{name}}" deactivated', {
+            name: getMaterialDisplayName(deleteTarget.material),
+          })
+        );
       }
 
       setDeleteTarget(null);
       await fetchData();
     } catch (error: unknown) {
       console.error("Error deactivating material stock item:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to deactivate item");
+      toast.error(error instanceof Error ? error.message : t("Failed to deactivate item"));
     } finally {
       setIsDeleting(false);
     }
@@ -1612,15 +1627,15 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
   const handleBeforeMonthChange = useCallback(() => {
     if (hasUnsavedChanges) {
-      return window.confirm("You have unsaved changes. Do you want to discard them?");
+      return window.confirm(t("You have unsaved changes. Do you want to discard them?"));
     }
     return true;
-  }, [hasUnsavedChanges]);
+  }, [hasUnsavedChanges, t]);
 
   const handleTabChange = (tab: StockEntryTab): void => {
     if (!availableTabs.includes(tab)) return;
     if (tab === activeTab) return;
-    if (hasUnsavedChanges && !window.confirm("You have unsaved changes. Do you want to discard them?")) {
+    if (hasUnsavedChanges && !window.confirm(t("You have unsaved changes. Do you want to discard them?"))) {
       return;
     }
 
@@ -1641,10 +1656,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       });
       setNewGeneralCategoryName("");
       await fetchData();
-      toast.success("General stock category added");
+      toast.success(t("General stock category added"));
     } catch (error: unknown) {
       console.error("Error adding general stock category:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to add category");
+      toast.error(error instanceof Error ? error.message : t("Failed to add category"));
     }
   };
 
@@ -1709,11 +1724,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       await api.post("/api/general-purchases/general-stock/adjustments", {
         adjustments,
       });
-      toast.success("General stock adjustments saved");
+      toast.success(t("General stock adjustments saved"));
       await fetchData();
     } catch (error: unknown) {
       console.error("Error saving general stock adjustments:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save general stock adjustments");
+      toast.error(error instanceof Error ? error.message : t("Failed to save general stock adjustments"));
     } finally {
       setIsSaving(false);
     }
@@ -1724,18 +1739,24 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     event?: React.MouseEvent<HTMLButtonElement>
   ): Promise<void> => {
     event?.stopPropagation();
-    if (!window.confirm(`Revert used quantity ${formatQty(Math.abs(makeNumber(adjustment.adjustment_quantity)))}?`)) {
+    if (
+      !window.confirm(
+        t("Revert used quantity {{quantity}}?", {
+          quantity: formatQty(Math.abs(makeNumber(adjustment.adjustment_quantity))),
+        })
+      )
+    ) {
       return;
     }
 
     setRevertingAdjustmentId(adjustment.id);
     try {
       await api.delete(`/api/general-purchases/general-stock/adjustments/${adjustment.id}`);
-      toast.success("Used adjustment reverted");
+      toast.success(t("Used adjustment reverted"));
       await fetchData();
     } catch (error: unknown) {
       console.error("Error reverting used adjustment:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to revert used adjustment");
+      toast.error(error instanceof Error ? error.message : t("Failed to revert used adjustment"));
     } finally {
       setRevertingAdjustmentId(null);
     }
@@ -1807,7 +1828,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     if (closingQuantity >= 0) return true;
 
     return window.confirm(
-      `Warning: ${label} has negative calculated closing stock. Do you want to save anyway?`
+      t("Warning: {{label}} has negative calculated closing stock. Do you want to save anyway?", {
+        label,
+      })
     );
   };
 
@@ -1824,10 +1847,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     try {
       await saveMaterialStockEntries([makeMaterialStockEntry(material)]);
       updateOriginalMaterial(material);
-      toast.success(`${material.name} saved`);
+      toast.success(t("{{name}} saved", { name: material.name }));
     } catch (error: unknown) {
       console.error("Error saving material row:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save material");
+      toast.error(error instanceof Error ? error.message : t("Failed to save material"));
     } finally {
       setRowSaving(rowKey, false);
     }
@@ -1842,7 +1865,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     if (activeTab === "general" || !isVariantRowDirty(material.id, variant)) return;
     if (
       !confirmNegativeSave(
-        `${material.name} ${getVariantDisplayName(variant)}`,
+        `${material.name} ${getVariantDisplayName(variant, t)}`,
         variant.closing_quantity
       )
     ) {
@@ -1886,10 +1909,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         makeVariantStockEntries(material.id, nextVariant, originalVariant)
       );
       updateVariantInMaterialStates(material.id, variant, nextVariant);
-      toast.success(`${getVariantDisplayName(nextVariant)} saved`);
+      toast.success(t("{{name}} saved", { name: getVariantDisplayName(nextVariant, t) }));
     } catch (error: unknown) {
       console.error("Error saving variant row:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save variant");
+      toast.error(error instanceof Error ? error.message : t("Failed to save variant"));
     } finally {
       setRowSaving(rowKey, false);
     }
@@ -1905,7 +1928,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
     const variantName: string = newVariant.variant_name?.trim() || "";
     if (!variantName) {
-      toast.error(`Please enter a name for the new variant in ${material.name}`);
+      toast.error(t("Please enter a name for the new variant in {{name}}", { name: material.name }));
       return;
     }
 
@@ -1915,7 +1938,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           variant.variant_name?.trim().toLowerCase() === variantName.toLowerCase()
       )
     ) {
-      toast.error(`Variant "${variantName}" already exists for ${material.name}`);
+      toast.error(
+        t('Variant "{{variant}}" already exists for {{name}}', {
+          variant: variantName,
+          name: material.name,
+        })
+      );
       return;
     }
 
@@ -1959,10 +1987,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         return next;
       });
       setExpandedMaterials((previous: Set<number>) => new Set(previous).add(material.id));
-      toast.success(`Variant "${registeredVariant.variant_name}" saved`);
+      toast.success(t('Variant "{{name}}" saved', { name: registeredVariant.variant_name }));
     } catch (error: unknown) {
       console.error("Error saving new variant row:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save new variant");
+      toast.error(error instanceof Error ? error.message : t("Failed to save new variant"));
     } finally {
       setRowSaving(rowKey, false);
     }
@@ -2028,11 +2056,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             )
           : [...previous, { ...item }]
       );
-      toast.success(`${item.name} saved`);
+      toast.success(t("{{name}} saved", { name: item.name }));
     } catch (error: unknown) {
       console.error("Error saving Stock Kilang row:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to save Stock Kilang row"
+        error instanceof Error ? error.message : t("Failed to save Stock Kilang row")
       );
       await refreshProductsAfterMismatch(error);
     } finally {
@@ -2059,7 +2087,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
     if (negativeCount > 0) {
       const confirmed = window.confirm(
-        `Warning: ${negativeCount} item(s) have negative calculated closing stock. Do you want to save anyway?`
+        t(
+          negativeCount === 1
+            ? "Warning: {{count}} item has negative calculated closing stock. Do you want to save anyway?"
+            : "Warning: {{count}} items have negative calculated closing stock. Do you want to save anyway?",
+          { count: negativeCount }
+        )
       );
       if (!confirmed) return;
     }
@@ -2071,12 +2104,18 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         !row.variant_name?.trim()
       ) {
         const material = materials.find((item) => item.id === materialId);
-        incompleteNewVariants.push(material?.name || `Material ${materialId}`);
+        incompleteNewVariants.push(
+          material?.name || t("Material {{id}}", { id: materialId })
+        );
       }
     });
 
     if (incompleteNewVariants.length > 0) {
-      toast.error(`Please enter a name for new variants in: ${incompleteNewVariants.join(", ")}`);
+      toast.error(
+        t("Please enter a name for new variants in: {{names}}", {
+          names: incompleteNewVariants.join(", "),
+        })
+      );
       return;
     }
 
@@ -2190,25 +2229,44 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
       const messages: string[] = [];
       if (variantNameUpdates.length > 0) {
-        messages.push(`${variantNameUpdates.length} variant name(s) updated`);
+        messages.push(
+          t(
+            variantNameUpdates.length === 1
+              ? "{{count}} variant name updated"
+              : "{{count}} variant names updated",
+            { count: variantNameUpdates.length }
+          )
+        );
       }
       if (response.registered_variants && response.registered_variants.length > 0) {
-        messages.push(`${response.registered_variants.length} new variant(s) registered`);
+        messages.push(
+          t(
+            response.registered_variants.length === 1
+              ? "{{count}} new variant registered"
+              : "{{count}} new variants registered",
+            { count: response.registered_variants.length }
+          )
+        );
       }
       if (stockKilangSaved) {
-        messages.push("Stock Kilang updated");
+        messages.push(t("Stock Kilang updated"));
       }
 
-      toast.success(messages.length > 0 ? `Saved. ${messages.join(", ")}.` : "Stock adjustments saved");
+      toast.success(
+        messages.length > 0
+          ? t("Saved. {{details}}.", { details: messages.join(", ") })
+          : t("Stock adjustments saved")
+      );
       await fetchData();
       await fetchStockKilang();
     } catch (error: unknown) {
       console.error("Error saving stock entries:", error);
-      const message = error instanceof Error ? error.message : "Failed to save stock adjustments";
+      const message =
+        error instanceof Error ? error.message : t("Failed to save stock adjustments");
       toast.error(
         materialWritesDone
-          ? `${message} The material rows above WERE saved.`
-          : `${message} Nothing was saved.`
+          ? t("{{message}} The material rows above WERE saved.", { message })
+          : t("{{message}} Nothing was saved.", { message })
       );
       await refreshProductsAfterMismatch(error);
     } finally {
@@ -2446,7 +2504,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     };
     setDraggedRowKey(`variant:${material.id}:${variant.variant_id}`);
     setDragOverlay({
-      label: getVariantDisplayName(variant),
+      label: getVariantDisplayName(variant, t),
       sublabel: material.name,
       index,
       left: rowRect.left,
@@ -2508,7 +2566,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
       } catch (error: unknown) {
         console.error("Error saving material order:", error);
         applyMaterialOrder(dragState.category, dragState.previousOrderIds);
-        toast.error("Failed to save material order");
+        toast.error(t("Failed to save material order"));
       }
       return;
     }
@@ -2521,7 +2579,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     } catch (error: unknown) {
       console.error("Error saving variant order:", error);
       applyVariantOrder(dragState.materialId, dragState.previousOrderIds);
-      toast.error("Failed to save variant order");
+      toast.error(t("Failed to save variant order"));
     }
   };
 
@@ -2787,7 +2845,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             : "text-default-300 dark:text-gray-600",
           disabled && "cursor-not-allowed opacity-50"
         )}
-        title={isSavingRow ? "Saving..." : label}
+        title={isSavingRow ? t("Saving...") : label}
         aria-label={label}
       >
         <IconDeviceFloppy size={14} />
@@ -2848,18 +2906,30 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
   const deleteTargetName: string =
     deleteTarget?.type === "variant"
-      ? getVariantDisplayName(deleteTarget.variant)
+      ? getVariantDisplayName(deleteTarget.variant, t)
       : deleteTarget
         ? getMaterialDisplayName(deleteTarget.material)
         : "";
 
   const deleteDialogTitle: string =
-    deleteTarget?.type === "variant" ? "Deactivate Variant" : "Deactivate Material";
+    deleteTarget?.type === "variant" ? t("Deactivate Variant") : t("Deactivate Material");
 
   const deleteDialogMessage: string = deleteTarget
     ? deleteTarget.type === "variant"
-      ? `Deactivate variant "${deleteTargetName}" from ${deleteTarget.material.name}? It will be hidden from stock entry and purchases, but existing stock history stays unchanged.${hasUnsavedChanges ? " Unsaved edits on this page will be discarded when it reloads." : ""}`
-      : `Deactivate material "${deleteTargetName}"? It will be hidden from stock entry and purchases, but existing stock history stays unchanged.${hasUnsavedChanges ? " Unsaved edits on this page will be discarded when it reloads." : ""}`
+      ? t(
+          'Deactivate variant "{{name}}" from {{material}}? It will be hidden from stock entry and purchases, but existing stock history stays unchanged.',
+          { name: deleteTargetName, material: deleteTarget.material.name },
+        ) +
+        (hasUnsavedChanges
+          ? " " + t("Unsaved edits on this page will be discarded when it reloads.")
+          : "")
+      : t(
+          'Deactivate material "{{name}}"? It will be hidden from stock entry and purchases, but existing stock history stays unchanged.',
+          { name: deleteTargetName },
+        ) +
+        (hasUnsavedChanges
+          ? " " + t("Unsaved edits on this page will be discarded when it reloads.")
+          : "")
     : "";
 
   return (
@@ -2880,14 +2950,14 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
                 {activeTab === "general"
-                  ? `${filteredGeneralStockRows.length} general items`
-                  : `${materials.length} materials`}
+                  ? t("{{count}} general items", { count: filteredGeneralStockRows.length })
+                  : t("{{count}} materials", { count: materials.length })}
               </span>
               {activeTab === "general" ? (
                 <>
                   <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                   <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
-                    Stock: <span className="font-medium text-indigo-600 dark:text-indigo-400">{formatQty(generalStockTotal)}</span>
+                    {t("Stock:")} <span className="font-medium text-indigo-600 dark:text-indigo-400">{formatQty(generalStockTotal)}</span>
                   </span>
                 </>
               ) : (
@@ -2896,22 +2966,22 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     <>
                       <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                       <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
-                        Purchases: <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
+                        {t("Purchases:")} <span className="font-medium text-blue-600 dark:text-blue-400">RM {formatNumber(grandTotal.purchases)}</span>
                       </span>
                     </>
                   )}
                   <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                   <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
-                    Stock count: <span className="font-medium text-sky-600 dark:text-sky-400">RM {formatNumber(grandTotal.adjustments)}</span>
+                    {t("Stock count:")} <span className="font-medium text-sky-600 dark:text-sky-400">RM {formatNumber(grandTotal.adjustments)}</span>
                   </span>
                   {showRunningBalance && (
                     <>
                       <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                       <span
                         className="whitespace-nowrap text-default-500 dark:text-gray-400"
-                        title="Running balance — includes earlier months, not this month's count"
+                        title={t("Running balance — includes earlier months, not this month's count")}
                       >
-                        Closing: <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
+                        {t("Closing:")} <span className="font-medium text-green-600 dark:text-green-400">RM {formatNumber(grandTotal.closing)}</span>
                       </span>
                     </>
                   )}
@@ -2921,7 +2991,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 <>
                   <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                   <span className="whitespace-nowrap text-default-500 dark:text-gray-400">
-                    FG: <span className="font-medium text-emerald-600 dark:text-emerald-400">RM {formatNumber(stockKilangTotal)}</span>
+                    {t("FG:")} <span className="font-medium text-emerald-600 dark:text-emerald-400">RM {formatNumber(stockKilangTotal)}</span>
                   </span>
                 </>
               )}
@@ -2930,9 +3000,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                   <span
                     className="whitespace-nowrap text-default-500 dark:text-gray-400"
-                    title="Grand Total = this month's stock count value + Stock Kilang"
+                    title={t("Grand Total = this month's stock count value + Stock Kilang")}
                   >
-                    Total: <span className="font-semibold text-default-800 dark:text-gray-100">RM {formatNumber(grandTotal.adjustments + stockKilangTotal)}</span>
+                    {t("Total:")} <span className="font-semibold text-default-800 dark:text-gray-100">RM {formatNumber(grandTotal.adjustments + stockKilangTotal)}</span>
                   </span>
                 </>
               )}
@@ -2941,7 +3011,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
                   <span className="flex items-center gap-1 whitespace-nowrap text-red-500">
                     <IconAlertTriangle size={14} />
-                    {negativeCount} negative
+                    {t("{{count}} negative", { count: negativeCount })}
                   </span>
                 </>
               )}
@@ -2988,7 +3058,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 onClick={() => setIsAccountMappingModalOpen(true)}
                 icon={IconSettings}
               >
-                Mappings
+                {t("Mappings")}
               </Button>
             )}
 
@@ -2999,12 +3069,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               disabled={isSaving || !hasUnsavedChanges}
               icon={IconDeviceFloppy}
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? t("Saving...") : t("Save")}
             </Button>
 
             {hasUnsavedChanges && (
               <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-                Unsaved
+                {t("Unsaved")}
               </span>
             )}
           </div>
@@ -3025,7 +3095,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               <IconChevronRight size={16} className="shrink-0 text-default-500" />
             )}
             <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
-              Closing Stock (Financial Statements)
+              {t("Closing Stock (Financial Statements)")}
             </h2>
             {!isClosingStockOpen && (
               <span className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-default-500 dark:text-gray-400">
@@ -3036,9 +3106,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
                   return (
                     <span key={field.note} className="whitespace-nowrap">
-                      {field.label}:{" "}
+                      {t(field.label)}:{" "}
                       <span className="font-mono tabular-nums text-default-700 dark:text-gray-200">
-                        {hasValue ? `RM ${formatNumber(keyed)}` : "not keyed"}
+                        {hasValue ? `RM ${formatNumber(keyed)}` : t("not keyed")}
                       </span>
                     </span>
                   );
@@ -3051,16 +3121,16 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           <div className="mt-1.5 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
             <div className="min-w-0 max-w-xl pl-6">
               <p className="text-xs text-default-500 dark:text-gray-400">
-                Confirmed month-end values injected into the Balance Sheet, Income
-                Statement and CoGM for this month. Reference totals come from this
-                page's stock data.
+                {t(
+                  "Confirmed month-end values injected into the Balance Sheet, Income Statement and CoGM for this month. Reference totals come from this page's stock data.",
+                )}
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">
               {closingStockFields.map((field) => (
                 <div key={field.note} className="w-44">
                   <label className="mb-1 block text-xs font-medium text-default-600 dark:text-gray-300">
-                    {field.label}
+                    {t(field.label)}
                   </label>
                   <input
                     type="number"
@@ -3089,10 +3159,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           })
                         )
                       }
-                      title="Click to use this value"
+                      title={t("Click to use this value")}
                       className="mt-1 inline-flex items-center rounded-full bg-default-100 px-2 py-0.5 text-xs text-default-500 transition-colors hover:bg-sky-100 hover:text-sky-700 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-sky-900/40 dark:hover:text-sky-300"
                     >
-                      Page total: RM {formatNumber(closingStockReference[field.referenceKey])}
+                      {t("Page total: RM {{amount}}", {
+                        amount: formatNumber(closingStockReference[field.referenceKey]),
+                      })}
                     </button>
                   )}
                 </div>
@@ -3104,7 +3176,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 disabled={isSavingClosingStock}
                 icon={IconDeviceFloppy}
               >
-                {isSavingClosingStock ? "Saving..." : "Save"}
+                {isSavingClosingStock ? t("Saving...") : t("Save")}
               </Button>
             </div>
           </div>
@@ -3124,7 +3196,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm font-semibold uppercase tracking-wide text-default-600 dark:text-gray-300">
-                      Categories
+                      {t("Categories")}
                     </h2>
                     <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-default-100 px-1.5 text-xs font-medium text-default-500 dark:bg-gray-700 dark:text-gray-400">
                       {generalStockCategories.length}
@@ -3138,7 +3210,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     className="h-8 rounded-lg !px-3"
                     onClick={() => setIsCategoryModalOpen(true)}
                   >
-                    Manage
+                    {t("Manage")}
                   </Button>
                 </div>
             {generalStockCategories.length === 0 ? (
@@ -3148,7 +3220,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 className="flex min-h-16 w-full items-center justify-center gap-2 rounded-lg border border-dashed border-default-300 px-3 py-3 text-sm text-default-500 transition-colors hover:border-sky-400 hover:text-sky-600 dark:border-gray-600 dark:text-gray-400 dark:hover:border-sky-500 dark:hover:text-sky-300"
               >
                 <IconPlus size={16} />
-                No categories yet — add your first one
+                {t("No categories yet — add your first one")}
               </button>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -3157,7 +3229,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     key={category.id}
                     type="button"
                     onClick={() => setIsCategoryModalOpen(true)}
-                    title="Manage categories"
+                    title={t("Manage categories")}
                     className="group flex h-8 items-center gap-1.5 rounded-full border border-default-200 bg-default-50 pl-3 pr-2.5 text-sm text-default-700 transition-colors hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:border-sky-700 dark:hover:bg-sky-900/20 dark:hover:text-sky-300"
                   >
                     <IconCategory2
@@ -3192,7 +3264,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                         handleAddGeneralCategory();
                       }
                     }}
-                    placeholder="New category"
+                    placeholder={t("New category")}
                     className="h-8 min-w-0 flex-1 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                   />
                   <Button
@@ -3204,7 +3276,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                     onClick={handleAddGeneralCategory}
                     disabled={!newGeneralCategoryName.trim()}
                   >
-                    Add
+                    {t("Add")}
                   </Button>
                 </div>
               </aside>
@@ -3224,7 +3296,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setGeneralSearchQuery(event.target.value)
                 }
-                placeholder="Search category, item, supplier..."
+                placeholder={t("Search category, item, supplier...")}
                 className="h-9 w-full rounded-lg border border-default-300 bg-white pl-9 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               />
               {generalSearchQuery && (
@@ -3232,8 +3304,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   type="button"
                   onClick={() => setGeneralSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-500 dark:hover:bg-gray-600 dark:hover:text-gray-200"
-                  title="Clear search"
-                  aria-label="Clear search"
+                  title={t("Clear search")}
+                  aria-label={t("Clear search")}
                 >
                   <IconX size={14} />
                 </button>
@@ -3243,7 +3315,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-default-200 bg-white px-2.5 text-sm text-default-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               {!showZeroBalanceGeneralStock && hiddenZeroBalanceGeneralStockCount > 0 && (
                 <span className="border-r border-default-200 pr-2 text-xs text-default-400 dark:border-gray-700 dark:text-gray-500">
-                  {hiddenZeroBalanceGeneralStockCount} hidden
+                  {t("{{count}} hidden", { count: hiddenZeroBalanceGeneralStockCount })}
                 </span>
               )}
               <Checkbox
@@ -3252,9 +3324,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 size={18}
                 checkedColor="text-indigo-600 dark:text-indigo-400"
                 uncheckedColor="text-default-400 dark:text-gray-500"
-                label="Show zero balance"
+                label={t("Show zero balance")}
                 buttonClassName="rounded"
-                ariaLabel="Show zero balance general stock items"
+                ariaLabel={t("Show zero balance general stock items")}
               />
               </div>
             </div>
@@ -3268,25 +3340,25 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               >
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                    Purchase
+                    {t("Purchase")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                    Supplier / Description
+                    {t("Supplier / Description")}
                   </th>
                   <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                    Source Qty
+                    {t("Source Qty")}
                   </th>
                   <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                    Added
+                    {t("Added")}
                   </th>
                   <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                    Used
+                    {t("Used")}
                   </th>
                   <th className="w-28 px-2 py-2 text-center text-xs font-medium uppercase tracking-wider text-indigo-600 dark:text-indigo-300">
-                    Adjustment
+                    {t("Adjustment")}
                   </th>
                   <th className="w-28 px-2 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                    Current
+                    {t("Current")}
                   </th>
                 </tr>
               </thead>
@@ -3320,7 +3392,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                             key={row.line_id}
                             onClick={() => openGeneralPurchase(row)}
                             className="cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700/30"
-                            title="Open source general purchase"
+                            title={t("Open source general purchase")}
                           >
                             <td className="whitespace-nowrap px-3 py-2 text-sm">
                               <div className="font-mono font-medium text-sky-700 hover:underline dark:text-sky-300">
@@ -3391,11 +3463,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       <p>
                         {generalSearchQuery.trim()
                           ? hiddenZeroBalanceGeneralStockCount > 0
-                            ? "Only zero-balance rows match your search."
-                            : "No General stock rows match your search."
+                            ? t("Only zero-balance rows match your search.")
+                            : t("No General stock rows match your search.")
                           : showZeroBalanceGeneralStock
-                            ? "No General stock rows found."
-                            : "No General stock rows with balance found."}
+                            ? t("No General stock rows found.")
+                            : t("No General stock rows with balance found.")}
                       </p>
                     </td>
                   </tr>
@@ -3419,7 +3491,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setMaterialSearchQuery(event.target.value)
                 }
-                placeholder="Search material, code, variant..."
+                placeholder={t("Search material, code, variant...")}
                 className="h-9 w-full rounded-lg border border-default-300 bg-white pl-9 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               />
               {materialSearchQuery && (
@@ -3427,8 +3499,8 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   type="button"
                   onClick={() => setMaterialSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-500 dark:hover:bg-gray-600 dark:hover:text-gray-200"
-                  title="Clear search"
-                  aria-label="Clear search"
+                  title={t("Clear search")}
+                  aria-label={t("Clear search")}
                 >
                   <IconX size={14} />
                 </button>
@@ -3438,7 +3510,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
             <div className="inline-flex h-9 items-center gap-3 rounded-lg border border-default-200 bg-white px-2.5 text-sm text-default-600 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
               {hiddenMaterialCount > 0 && (
                 <span className="border-r border-default-200 pr-3 text-xs text-default-400 dark:border-gray-700 dark:text-gray-500">
-                  {hiddenMaterialCount} hidden
+                  {t("{{count}} hidden", { count: hiddenMaterialCount })}
                 </span>
               )}
               <Checkbox
@@ -3447,9 +3519,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 size={18}
                 checkedColor="text-sky-600 dark:text-sky-400"
                 uncheckedColor="text-default-400 dark:text-gray-500"
-                label="Show empty rows"
+                label={t("Show empty rows")}
                 buttonClassName="rounded"
-                ariaLabel="Show materials with no stock count this month"
+                ariaLabel={t("Show materials with no stock count this month")}
               />
               <Checkbox
                 checked={showRunningBalance}
@@ -3457,9 +3529,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 size={18}
                 checkedColor="text-sky-600 dark:text-sky-400"
                 uncheckedColor="text-default-400 dark:text-gray-500"
-                label="Show running balance"
+                label={t("Show running balance")}
                 buttonClassName="rounded"
-                ariaLabel="Show the cumulative Opening and Closing columns"
+                ariaLabel={t("Show the cumulative Opening and Closing columns")}
               />
             </div>
           </div>
@@ -3477,15 +3549,15 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   className="border-b border-default-200/70 px-3 py-2 text-left align-middle text-xs font-medium text-default-600 dark:border-gray-700 dark:text-gray-400 uppercase tracking-wider"
                 >
                   <div className="flex items-center gap-2">
-                    <span>Material</span>
+                    <span>{t("Material")}</span>
                     {variantMaterialCount > 0 && (
                       <button
                         onClick={toggleAllExpansion}
                         className="text-purple-500 hover:text-purple-600 dark:text-gray-400 dark:hover:text-gray-200 text-[10px] font-normal normal-case flex items-center gap-0.5 px-1.5 py-0.5 bg-purple-100 dark:bg-gray-700 rounded"
-                        title={allCollapsed ? "Expand all variants" : "Collapse all variants"}
+                        title={allCollapsed ? t("Expand all variants") : t("Collapse all variants")}
                       >
                         {allCollapsed ? <IconChevronRight size={10} /> : <IconChevronDown size={10} />}
-                        {allCollapsed ? "Expand" : "Collapse"}
+                        {allCollapsed ? t("Expand") : t("Collapse")}
                       </button>
                     )}
                   </div>
@@ -3494,58 +3566,58 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   <th
                     className="border-b border-l border-default-300 px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:border-gray-600 dark:text-gray-400 uppercase tracking-wider"
                   >
-                    Opening
+                    {t("Opening")}
                   </th>
                 )}
                 <th
                   colSpan={3}
                   className="border-b border-l border-sky-200 bg-sky-50 px-2 pb-1 pt-2 text-center text-xs font-semibold text-sky-600 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 uppercase tracking-wider"
                 >
-                  Stock Count
+                  {t("Stock Count")}
                 </th>
                 {showRunningBalance && (
                   <th
                     colSpan={2}
                     className="border-b border-l border-default-300 px-2 pb-1 pt-2 text-center text-xs font-semibold text-default-600 dark:border-gray-600 dark:text-gray-400 uppercase tracking-wider"
                   >
-                    Closing
+                    {t("Closing")}
                   </th>
                 )}
               </tr>
               <tr>
                 {showRunningBalance && (
                   <th className="w-24 border-l border-default-300 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:border-gray-600 dark:text-gray-500 uppercase tracking-wider">
-                    Qty
+                    {t("Qty")}
                   </th>
                 )}
                 <th className="w-24 border-l border-sky-200 bg-sky-50 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-sky-600 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 uppercase tracking-wider">
-                  Unit Cost
+                  {t("Unit Cost")}
                 </th>
                 <th className="w-28 bg-sky-50 px-2 pb-2 pt-1 text-center text-[11px] font-medium text-sky-600 dark:bg-sky-900/20 dark:text-sky-400 uppercase tracking-wider">
-                  Qty
+                  {t("Qty")}
                 </th>
                 <th
                   className="w-28 bg-sky-50 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-sky-600 dark:bg-sky-900/20 dark:text-sky-400 uppercase tracking-wider"
-                  title="Stock Count Value = Qty × Unit Cost"
+                  title={t("Stock Count Value = Qty × Unit Cost")}
                 >
-                  <span className="block">Value</span>
+                  <span className="block">{t("Value")}</span>
                   <span className="block text-[10px] font-normal normal-case tracking-normal">
                     Qty × Unit Cost
                   </span>
                 </th>
                 {showRunningBalance && (
                   <th className="w-28 whitespace-nowrap border-l border-default-300 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:border-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                    Qty
+                    {t("Qty")}
                   </th>
                 )}
                 {showRunningBalance && (
                 <th
                   className="w-32 px-2 pb-2 pt-1 text-right text-[11px] font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
-                  title="Closing Value = Opening Value + Purchases Value + Stock Count Value — a running balance that also contains earlier months"
+                  title={t("Closing Value = Opening Value + Purchases Value + Stock Count Value — a running balance that also contains earlier months")}
                 >
-                  <span className="block">Value</span>
+                  <span className="block">{t("Value")}</span>
                   <span className="block text-[10px] font-normal normal-case tracking-normal">
-                    Opening + Movements
+                    {t("Opening + Movements")}
                   </span>
                 </th>
                 )}
@@ -3568,7 +3640,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           type="button"
                           onClick={() => toggleSection(category)}
                           aria-expanded={!isSectionCollapsed}
-                          title={isSectionCollapsed ? `Show ${categoryLabels[category]}` : `Hide ${categoryLabels[category]}`}
+                          title={
+                            isSectionCollapsed
+                              ? t("Show {{category}}", { category: t(categoryLabels[category]) })
+                              : t("Hide {{category}}", { category: t(categoryLabels[category]) })
+                          }
                           className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-left transition-colors hover:bg-default-200/70 dark:hover:bg-gray-700"
                         >
                           <div className="mr-auto flex items-center gap-2 text-xs font-semibold text-default-700 dark:text-gray-300">
@@ -3582,27 +3658,30 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                             <span className="font-normal text-default-400">({items.length})</span>
                             {visibleItems.length !== items.length && (
                               <span className="font-normal text-default-400 dark:text-gray-500">
-                                · {visibleItems.length} shown
+                                {t("· {{count}} shown", { count: visibleItems.length })}
                               </span>
                             )}
                             {unsavedInSection > 0 && (
                               <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                                {unsavedInSection} unsaved
+                            {t("{{count}} unsaved", { count: unsavedInSection })}
                               </span>
                             )}
                           </div>
                           <div
                             className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs"
-                            title={`Running balance (not this month's count) — Opening RM ${formatNumber(
-                              categoryTotals[category].opening
-                            )} · Closing RM ${formatNumber(categoryTotals[category].closing)}`}
+                            title={t("Running balance (not this month's count) — Opening RM {{opening}} · Closing RM {{closing}}", {
+                              opening: formatNumber(categoryTotals[category].opening),
+                              closing: formatNumber(categoryTotals[category].closing),
+                            })}
                           >
                             {categoryTotals[category].purchases !== 0 && (
                               <span className="whitespace-nowrap text-blue-600 dark:text-blue-400">
-                                Purchases RM {formatNumber(categoryTotals[category].purchases)}
+                                {t("Purchases RM {{amount}}", {
+                                  amount: formatNumber(categoryTotals[category].purchases),
+                                })}
                               </span>
                             )}
-                            <span className="text-default-500 dark:text-gray-400">Stock count</span>
+                            <span className="text-default-500 dark:text-gray-400">{t("Stock count")}</span>
                             <span className="whitespace-nowrap font-mono font-medium tabular-nums text-sky-600 dark:text-sky-400">
                               RM {formatNumber(categoryTotals[category].adjustments)}
                             </span>
@@ -3617,7 +3696,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           colSpan={materialColumnCount}
                           className="px-3 py-2 pl-10 text-xs text-default-400 dark:text-gray-500"
                         >
-                          All {items.length} rows hidden by the current filter
+                          {t("All {{count}} rows hidden by the current filter", { count: items.length })}
                         </td>
                       </tr>
                     )}
@@ -3659,8 +3738,12 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
-                                    aria-label={`Move ${material.name}`}
-                                    title={isMaterialFilterActive ? "Clear the search/filter to reorder materials" : "Drag to reorder material"}
+                                    aria-label={t("Move {{name}}", { name: material.name })}
+                                    title={
+                                      isMaterialFilterActive
+                                        ? t("Clear the search/filter to reorder materials")
+                                        : t("Drag to reorder material")
+                                    }
                                     disabled={isMaterialDragDisabled}
                                     onPointerDown={(event) =>
                                       handleMaterialDragPointerDown(
@@ -3701,15 +3784,15 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                     {material.code}
                                   </span>
                                   {isNegative && (
-                                    <IconAlertTriangle size={14} className="text-red-500" title="Negative closing stock" />
+                                    <IconAlertTriangle size={14} className="text-red-500" title={t("Negative closing stock")} />
                                   )}
                                   <button
                                     type="button"
                                     onClick={(event) => handleDeleteMaterialClick(material, event)}
                                     disabled={isDeleting}
                                     className="p-1 text-default-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:cursor-not-allowed disabled:opacity-50"
-                                    title="Deactivate material"
-                                    aria-label={`Deactivate material ${material.name}`}
+                                    title={t("Deactivate material")}
+                                    aria-label={t("Deactivate material {{name}}", { name: material.name })}
                                   >
                                     <IconTrash size={14} />
                                   </button>
@@ -3727,7 +3810,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                               <td className="px-2 py-1.5 text-right">
                                 {renderAdjustmentValue(
                                   material.adjustment_value,
-                                  "Total stock count value for all variants",
+                                  t("Total stock count value for all variants"),
                                   true
                                 )}
                               </td>
@@ -3775,8 +3858,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                       {variant.variant_id ? (
                                         <button
                                           type="button"
-                                          aria-label={`Move ${getVariantDisplayName(variant)}`}
-                                          title="Drag to reorder variant"
+                                          aria-label={t("Move {{name}}", {
+                                            name: getVariantDisplayName(variant, t),
+                                          })}
+                                          title={t("Drag to reorder variant")}
                                           disabled={isSaving || isAnyRowSaving || isDeleting}
                                           onPointerDown={(event) =>
                                             handleVariantDragPointerDown(
@@ -3817,7 +3902,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                         }
                                         onClick={(event) => event.stopPropagation()}
                                         className="text-sm text-default-700 dark:text-gray-300 bg-transparent border-b border-transparent hover:border-dashed hover:border-purple-300 dark:hover:border-gray-500 focus:outline-none focus:border-solid focus:border-purple-500 dark:focus:border-gray-400 px-1 py-0.5 min-w-[120px]"
-                                        placeholder="Variant name..."
+                                        placeholder={t("Variant name...")}
                                       />
                                       {variantNegative && (
                                         <IconAlertTriangle size={12} className="text-red-500" />
@@ -3826,7 +3911,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                         variantRowSaveKey(material.id, variant),
                                         isVariantRowDirty(material.id, variant),
                                         (event) => handleSaveVariantRow(material, variant, event),
-                                        `Save ${getVariantDisplayName(variant)}`
+                                        t("Save {{name}}", {
+                                          name: getVariantDisplayName(variant, t),
+                                        })
                                       )}
                                       {variant.variant_id && (
                                         <button
@@ -3834,8 +3921,10 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                           onClick={(event) => handleDeleteVariantClick(material, variant, event)}
                                           disabled={isDeleting}
                                           className="p-1 text-default-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:cursor-not-allowed disabled:opacity-50"
-                                          title="Deactivate variant"
-                                          aria-label={`Deactivate variant ${getVariantDisplayName(variant)}`}
+                                          title={t("Deactivate variant")}
+                                          aria-label={t("Deactivate variant {{name}}", {
+                                            name: getVariantDisplayName(variant, t),
+                                          })}
                                         >
                                           <IconTrash size={13} />
                                         </button>
@@ -3876,7 +3965,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   <td className="px-2 py-1.5 text-right">
                                     {renderAdjustmentValue(
                                       variant.adjustment_value,
-                                      `${formatQty(variant.adjustment_quantity)} × ${formatUnitCost(variant.unit_cost)} = ${formatNumber(variant.adjustment_value)}`
+                                      t("{{qty}} × {{cost}} = {{value}}", { qty: formatQty(variant.adjustment_quantity), cost: formatUnitCost(variant.unit_cost), value: formatNumber(variant.adjustment_value) })
                                     )}
                                   </td>
                                   {showRunningBalance && (
@@ -3917,19 +4006,19 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                       value={newVariant.variant_name || ""}
                                       onChange={(event) => handleNewVariantChange(material.id, "variant_name", event.target.value)}
                                       className="flex-1 px-2 py-0.5 text-sm border border-sky-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-700"
-                                      placeholder="Enter variant name..."
+                                      placeholder={t("Enter variant name...")}
                                       autoFocus
                                     />
                                     {renderRowSaveButton(
                                       newVariantRowSaveKey(material.id),
                                       isNewVariantRowDirty(material.id),
                                       (event) => handleSaveNewVariantRow(material, event),
-                                      `Save new variant for ${material.name}`
+                                      t("Save new variant for {{name}}", { name: material.name })
                                     )}
                                     <button
                                       onClick={() => handleCancelNewVariant(material.id)}
                                       className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                                      title="Cancel"
+                                      title={t("Cancel")}
                                     >
                                       <IconX size={14} />
                                     </button>
@@ -3953,7 +4042,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                 <td className="px-2 py-1.5 text-right">
                                   {renderAdjustmentValue(
                                     newVariant.adjustment_value,
-                                    `${formatQty(newVariant.adjustment_quantity)} × ${formatUnitCost(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                    t("{{qty}} × {{cost}} = {{value}}", { qty: formatQty(newVariant.adjustment_quantity), cost: formatUnitCost(newVariant.unit_cost), value: formatNumber(newVariant.adjustment_value) })
                                   )}
                                 </td>
                                 {showRunningBalance && (
@@ -3985,7 +4074,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                     className="text-xs text-purple-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-gray-200 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-purple-50 dark:hover:bg-gray-700 transition-colors"
                                   >
                                     <IconPlus size={12} />
-                                    Add new variant
+                                    {t("Add new variant")}
                                   </button>
                                 </td>
                               </tr>
@@ -4014,8 +4103,14 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
-                                  aria-label={`Move ${getMaterialDisplayName(material)}`}
-                                  title={isMaterialFilterActive ? "Clear the search/filter to reorder materials" : "Drag to reorder material"}
+                                  aria-label={t("Move {{name}}", {
+                                    name: getMaterialDisplayName(material),
+                                  })}
+                                  title={
+                                    isMaterialFilterActive
+                                      ? t("Clear the search/filter to reorder materials")
+                                      : t("Drag to reorder material")
+                                  }
                                   disabled={isMaterialDragDisabled}
                                   onPointerDown={(event) =>
                                     handleMaterialDragPointerDown(
@@ -4051,14 +4146,14 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   <IconAlertTriangle
                                     size={14}
                                     className="text-red-500"
-                                    title="Negative closing stock"
+                                    title={t("Negative closing stock")}
                                   />
                                 )}
                                 {!newVariant && (
                                   <button
                                     onClick={() => handleAddVariantRow(material.id, material.default_unit_cost)}
                                     className="text-xs text-default-400 hover:text-purple-500 dark:text-gray-500 dark:hover:text-purple-400 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity"
-                                    title="Add variant"
+                                    title={t("Add variant")}
                                   >
                                     <IconPlus size={14} />
                                   </button>
@@ -4067,15 +4162,17 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                   materialRowSaveKey(material.id),
                                   isMaterialRowDirty(material),
                                   (event) => handleSaveMaterialRow(material, event),
-                                  `Save ${getMaterialDisplayName(material)}`
+                                  t("Save {{name}}", { name: getMaterialDisplayName(material) })
                                 )}
                                 <button
                                   type="button"
                                   onClick={(event) => handleDeleteMaterialClick(material, event)}
                                   disabled={isDeleting}
                                   className="p-1 text-default-400 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded disabled:cursor-not-allowed disabled:opacity-50"
-                                  title="Deactivate material"
-                                  aria-label={`Deactivate material ${getMaterialDisplayName(material)}`}
+                                  title={t("Deactivate material")}
+                                  aria-label={t("Deactivate material {{name}}", {
+                                    name: getMaterialDisplayName(material),
+                                  })}
                                 >
                                   <IconTrash size={14} />
                                 </button>
@@ -4103,7 +4200,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                             <td className="px-2 py-1.5 text-right">
                               {renderAdjustmentValue(
                                 material.adjustment_value,
-                                `${formatQty(material.adjustment_quantity)} × ${formatUnitCost(material.unit_cost)} = ${formatNumber(material.adjustment_value)}`
+                                t("{{qty}} × {{cost}} = {{value}}", { qty: formatQty(material.adjustment_quantity), cost: formatUnitCost(material.unit_cost), value: formatNumber(material.adjustment_value) })
                               )}
                             </td>
                             {showRunningBalance && (
@@ -4146,19 +4243,21 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                     value={newVariant.variant_name || ""}
                                     onChange={(event) => handleNewVariantChange(material.id, "variant_name", event.target.value)}
                                     className="flex-1 px-2 py-0.5 text-sm border border-sky-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-700"
-                                    placeholder="Enter variant name..."
+                                    placeholder={t("Enter variant name...")}
                                     autoFocus
                                   />
                                   {renderRowSaveButton(
                                     newVariantRowSaveKey(material.id),
                                     isNewVariantRowDirty(material.id),
                                     (event) => handleSaveNewVariantRow(material, event),
-                                    `Save new variant for ${getMaterialDisplayName(material)}`
+                                    t("Save new variant for {{name}}", {
+                                      name: getMaterialDisplayName(material),
+                                    })
                                   )}
                                   <button
                                     onClick={() => handleCancelNewVariant(material.id)}
                                     className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                                    title="Cancel"
+                                    title={t("Cancel")}
                                   >
                                     <IconX size={14} />
                                   </button>
@@ -4182,7 +4281,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                               <td className="px-2 py-1.5 text-right">
                                 {renderAdjustmentValue(
                                   newVariant.adjustment_value,
-                                  `${formatQty(newVariant.adjustment_quantity)} × ${formatUnitCost(newVariant.unit_cost)} = ${formatNumber(newVariant.adjustment_value)}`
+                                  t("{{qty}} × {{cost}} = {{value}}", { qty: formatQty(newVariant.adjustment_quantity), cost: formatUnitCost(newVariant.unit_cost), value: formatNumber(newVariant.adjustment_value) })
                                 )}
                               </td>
                               {showRunningBalance && (
@@ -4212,7 +4311,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                         type="button"
                         onClick={() => toggleSection("stock_kilang")}
                         aria-expanded={!collapsedSections.has("stock_kilang")}
-                        title={collapsedSections.has("stock_kilang") ? "Show Stock Kilang" : "Hide Stock Kilang"}
+                        title={
+                          collapsedSections.has("stock_kilang")
+                            ? t("Show Stock Kilang")
+                            : t("Hide Stock Kilang")
+                        }
                         className="flex w-full flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-left transition-colors hover:bg-emerald-200/60 dark:hover:bg-emerald-900/50"
                       >
                         <div className="mr-auto flex items-center gap-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
@@ -4222,18 +4325,18 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                             <IconChevronDown size={14} className="text-emerald-600 dark:text-emerald-400" />
                           )}
                           <IconBuildingFactory2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-                          Stock Kilang
+                          {t("Stock Kilang")}
                           <span className="text-emerald-500 dark:text-emerald-400 font-normal">
                             ({stockKilang.length})
                           </span>
                           {unsavedCountBySection.stock_kilang > 0 && (
                             <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                              {unsavedCountBySection.stock_kilang} unsaved
+                              {t("{{count}} unsaved", { count: unsavedCountBySection.stock_kilang })}
                             </span>
                           )}
                         </div>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                          <span className="text-emerald-600/80 dark:text-emerald-400/80">Stock count</span>
+                          <span className="text-emerald-600/80 dark:text-emerald-400/80">{t("Stock count")}</span>
                           <span className="whitespace-nowrap font-mono font-medium tabular-nums text-emerald-700 dark:text-emerald-300">
                             RM {formatNumber(stockKilangTotal)}
                           </span>
@@ -4255,7 +4358,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                             stockKilangRowSaveKey(item.product_id),
                             isStockKilangRowDirty(item),
                             (event) => handleSaveStockKilangRow(item, event),
-                            `Save ${item.name}`
+                            t("Save {{name}}", { name: item.name })
                           )}
                         </div>
                       </td>
@@ -4276,7 +4379,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       </td>
                       <td
                         className="px-2 py-1.5 text-right"
-                        title={`${formatQty(item.quantity)} × ${formatUnitCost(item.unit_cost)} = ${formatNumber(item.value)}`}
+                        title={t("{{qty}} × {{cost}} = {{value}}", { qty: formatQty(item.quantity), cost: formatUnitCost(item.unit_cost), value: formatNumber(item.value) })}
                       >
                         <span className="font-mono text-sm font-medium text-emerald-600 dark:text-emerald-400">
                           {formatNumber(item.value)}
@@ -4300,7 +4403,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               {isLoadingStockKilang && (
                 <tr>
                   <td colSpan={materialColumnCount} className="px-4 py-4 text-center text-default-400 dark:text-gray-500 text-sm">
-                    Loading finished goods stock...
+                    {t("Loading finished goods stock...")}
                   </td>
                 </tr>
               )}
@@ -4309,7 +4412,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 <tr>
                   <td colSpan={materialColumnCount} className="px-4 py-12 text-center text-default-500 dark:text-gray-400">
                     <IconPackage size={32} className="mx-auto mb-2 text-default-300 dark:text-gray-600" />
-                    <p>No materials found for {activeTab.toUpperCase()}</p>
+                    <p>{t("No materials found for {{tab}}", { tab: activeTab.toUpperCase() })}</p>
                   </td>
                 </tr>
               )}
@@ -4321,17 +4424,17 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                   <tr>
                     <td colSpan={materialColumnCount} className="px-3 pb-1 pt-2">
                       <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-xs text-default-400 dark:text-gray-500">
-                        <span>Reference only (running balance, not this month's count):</span>
+                        <span>{t("Reference only (running balance, not this month's count):")}</span>
                         <span className="whitespace-nowrap font-mono">
-                          Opening RM {formatNumber(grandTotal.opening)}
+                          {t("Opening RM {{amount}}", { amount: formatNumber(grandTotal.opening) })}
                         </span>
                         {grandTotal.purchases !== 0 && (
                           <span className="whitespace-nowrap font-mono">
-                            Purchases RM {formatNumber(grandTotal.purchases)}
+                            {t("Purchases RM {{amount}}", { amount: formatNumber(grandTotal.purchases) })}
                           </span>
                         )}
                         <span className="whitespace-nowrap font-mono">
-                          Closing RM {formatNumber(grandTotal.closing)}
+                          {t("Closing RM {{amount}}", { amount: formatNumber(grandTotal.closing) })}
                         </span>
                       </div>
                     </td>
@@ -4348,7 +4451,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                                 key={category}
                                 className="flex items-baseline justify-between gap-4 py-0.5 text-default-600 dark:text-gray-400"
                               >
-                                <span>{categoryLabels[category]}</span>
+                                <span>{t(categoryLabels[category])}</span>
                                 <span className="whitespace-nowrap font-mono tabular-nums">
                                   {formatNumber(categoryTotals[category].adjustments)}
                                 </span>
@@ -4357,9 +4460,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           )}
                           <div
                             className="mt-1 flex items-baseline justify-between gap-4 border-t border-default-200 py-1 font-medium text-sky-600 dark:border-gray-600 dark:text-sky-400"
-                            title="Total of the Adjustment (Qty × Unit Cost) column — this month's material stock count"
+                            title={t("Total of the Adjustment (Qty × Unit Cost) column — this month's material stock count")}
                           >
-                            <span>Stock Count Total</span>
+                            <span>{t("Stock Count Total")}</span>
                             <span className="whitespace-nowrap font-mono tabular-nums">
                               {formatNumber(grandTotal.adjustments)}
                             </span>
@@ -4368,7 +4471,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       )}
                       {stockKilang.length > 0 && (
                         <div className="flex items-baseline justify-between gap-4 py-0.5 font-medium text-emerald-600 dark:text-emerald-400">
-                          <span>Stock Kilang</span>
+                          <span>{t("Stock Kilang")}</span>
                           <span className="whitespace-nowrap font-mono tabular-nums">
                             {formatNumber(stockKilangTotal)}
                           </span>
@@ -4376,9 +4479,9 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                       )}
                       <div
                         className="mt-1 flex items-baseline justify-between gap-4 border-t-[3px] border-double border-default-400 pt-1.5 text-base font-semibold text-default-800 dark:border-gray-500 dark:text-gray-100"
-                        title="Grand Total = this month's stock count value + Stock Kilang"
+                        title={t("Grand Total = this month's stock count value + Stock Kilang")}
                       >
-                        <span className="uppercase tracking-wide">Grand Total</span>
+                        <span className="uppercase tracking-wide">{t("Grand Total")}</span>
                         <span className="whitespace-nowrap font-mono tabular-nums">
                           RM {formatNumber(grandTotal.adjustments + stockKilangTotal)}
                         </span>
@@ -4434,7 +4537,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
           onMouseEnter={handleTooltipMouseEnter}
           onMouseLeave={handleTooltipMouseLeave}
         >
-          <div className="mb-1 text-xs font-semibold text-default-600 dark:text-gray-300">Used adjustments</div>
+          <div className="mb-1 text-xs font-semibold text-default-600 dark:text-gray-300">{t("Used adjustments")}</div>
           {tooltipRow.used_adjustments.map((adjustment: GeneralStockAdjustment) => (
             <button
               key={adjustment.id}
@@ -4446,10 +4549,14 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                 handleRevertGeneralUsedAdjustment(adjustment);
               }}
               className="mb-1 flex w-full items-center justify-between gap-3 rounded border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-300 dark:hover:bg-red-900/40"
-              title={`Revert used adjustment from ${adjustment.adjustment_date}`}
+              title={t("Revert used adjustment from {{date}}", { date: adjustment.adjustment_date })}
             >
               <span>{adjustment.adjustment_date}</span>
-              <span>Revert {formatQty(Math.abs(makeNumber(adjustment.adjustment_quantity)))}</span>
+              <span>
+                {t("Revert {{quantity}}", {
+                  quantity: formatQty(Math.abs(makeNumber(adjustment.adjustment_quantity))),
+                })}
+              </span>
             </button>
           ))}
         </div>
@@ -4474,7 +4581,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         onConfirm={handleConfirmDeleteTarget}
         title={deleteDialogTitle}
         message={deleteDialogMessage}
-        confirmButtonText={isDeleting ? "Deactivating..." : "Deactivate"}
+        confirmButtonText={isDeleting ? t("Deactivating...") : t("Deactivate")}
         variant="danger"
       />
     </div>

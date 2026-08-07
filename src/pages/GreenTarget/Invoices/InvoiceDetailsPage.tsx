@@ -2,6 +2,7 @@
 import React, { useState, useEffect, Fragment, useCallback } from "react"; // Added Fragment, useCallback
 import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconFileInvoice,
   IconCash,
@@ -250,6 +251,7 @@ function getGTTotalAdjustment(invoice: InvoiceGT): {
 const InvoiceDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation("nav");
   const [invoice, setInvoice] = useState<InvoiceGT | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
@@ -2760,6 +2762,16 @@ const InvoiceDetailsPage: React.FC = () => {
                     {balanceStatusLabel}
                   </span>
                 )}
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
+                {t("Delivery Order")}
+              </span>
+              <div className="flex items-center">
+                <span className="text-gray-900 dark:text-gray-100 font-medium">
+                  {invoice.delivery_order || "—"}
+                </span>
               </div>
             </div>
           </div>

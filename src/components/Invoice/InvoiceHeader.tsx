@@ -6,6 +6,7 @@ import { FormInput } from "../FormComponents"; // Reusable components
 import PillSelect, { PillSelectOption } from "../PillSelect";
 import { CustomerCombobox } from "./CustomerCombobox"; // Reusable component
 import TimeNavigator, { TimeRange } from "../TimeNavigator";
+import { TimeSelector } from "./DateTimePicker";
 import {
   formatDateForAPI,
   parseDatabaseTimestamp,
@@ -223,20 +224,27 @@ const InvoiceHeader: React.FC<InvoiceHeaderProps> = ({
       </div>
 
       {/* Time */}
-      <div className="w-32 lg:w-24">
-        <FormInput
-          name="time"
-          label={t("Time")}
-          type="time"
-          value={
-            parseDatabaseTimestamp(invoice.createddate).formattedTime?.slice(
-              0,
-              5
-            ) ?? ""
-          }
-          onChange={(e) => handleDateTimeChange("time", e.target.value)}
-          disabled={readOnly} // Use readOnly
-        />
+      <div className="w-40 lg:w-36">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
+            {t("Time")}
+          </label>
+          <TimeSelector
+            value={invoiceDate}
+            onChange={(date: Date) =>
+              handleDateTimeChange(
+                "time",
+                `${String(date.getHours()).padStart(2, "0")}:${String(
+                  date.getMinutes()
+                ).padStart(2, "0")}`
+              )
+            }
+            disabled={readOnly}
+            size="md"
+            className="w-full"
+            triggerClassName="w-full justify-between"
+          />
+        </div>
       </div>
 
       <FieldDivider />

@@ -3,6 +3,7 @@
 // material stock records so purchases keyed in the journal system feed the
 // Material Stock page's Purchases column.
 import React, { useState, useEffect, Fragment, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import {
   Dialog,
@@ -88,6 +89,8 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
   onClose,
   onMappingComplete,
 }) => {
+  const { t } = useTranslation("stock");
+
   const [rows, setRows] = useState<MappingRow[]>([]);
   const [originalRows, setOriginalRows] = useState<Map<string, string>>(new Map());
   const [materials, setMaterials] = useState<MaterialDropdown[]>([]);
@@ -124,11 +127,11 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
       setMaterials(materialsResponse || []);
     } catch (error) {
       console.error("Error loading account mappings:", error);
-      toast.error("Failed to load account mappings");
+      toast.error(t("Failed to load account mappings"));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -190,7 +193,7 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
       (row) => row.material_option_id && !row.product_line
     );
     if (incomplete) {
-      toast.error(`Select a stock bucket for ${incomplete.code}`);
+      toast.error(t("Select a stock bucket for {{code}}", { code: incomplete.code }));
       return;
     }
 
@@ -210,14 +213,15 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
       });
 
       await api.post("/api/materials/account-mappings/batch", { mappings });
-      toast.success("Account mappings saved");
+      toast.success(t("Account mappings saved"));
       setOriginalRows(new Map(rows.map((row) => [row.code, rowSignature(row)])));
       if (onMappingComplete) {
         onMappingComplete();
       }
     } catch (error: unknown) {
       console.error("Error saving account mappings:", error);
-      const message = error instanceof Error ? error.message : "Failed to save account mappings";
+      const message =
+        error instanceof Error ? error.message : t("Failed to save account mappings");
       toast.error(message);
     } finally {
       setIsSaving(false);
@@ -262,7 +266,7 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Purchase Account Mappings
+                    {t("Purchase Account Mappings")}
                   </DialogTitle>
                   <button
                     onClick={handleClose}
@@ -274,10 +278,9 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                 </div>
 
                 <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
-                  Link purchase account codes from the journal system to material stock
-                  records. Posted journal amounts on a mapped account appear as Purchases
-                  on the Material Stock page (value only — quantities are keyed via the
-                  adjustment column).
+                  {t(
+                    "Link purchase account codes from the journal system to material stock records. Posted journal amounts on a mapped account appear as Purchases on the Material Stock page (value only — quantities are keyed via the adjustment column).",
+                  )}
                 </p>
 
                 <div className="relative mb-3 max-w-xs">
@@ -287,7 +290,7 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                   />
                   <input
                     type="text"
-                    placeholder="Search accounts..."
+                    placeholder={t("Search accounts...")}
                     className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -305,16 +308,16 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                         <thead className="sticky top-0 z-10">
                           <tr className="bg-default-50 dark:bg-gray-700">
                             <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300">
-                              Account
+                              {t("Account")}
                             </th>
                             <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300 w-36">
-                              Journal Total (RM)
+                              {t("Journal Total (RM)")}
                             </th>
                             <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300 w-72">
-                              Material
+                              {t("Material")}
                             </th>
                             <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                              Stock
+                              {t("Stock")}
                             </th>
                           </tr>
                         </thead>
@@ -325,7 +328,7 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                                 colSpan={4}
                                 className="px-3 py-8 text-center text-sm text-default-500 dark:text-gray-400"
                               >
-                                No purchase accounts found
+                                {t("No purchase accounts found")}
                               </td>
                             </tr>
                           ) : (
@@ -362,7 +365,9 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                                     </div>
                                     {row.last_entry_date && (
                                       <div className="text-xs text-default-400 dark:text-gray-500">
-                                        last {format(new Date(row.last_entry_date), "yyyy-MM-dd")}
+                                        {t("last {{date}}", {
+                                          date: format(new Date(row.last_entry_date), "yyyy-MM-dd"),
+                                        })}
                                       </div>
                                     )}
                                   </td>
@@ -392,12 +397,14 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                                                 : "truncate text-gray-400 dark:text-gray-500"
                                             }
                                           >
-                                            {stockBucketOptions.find(
-                                              (option) => option.id === row.product_line
-                                            )?.name ||
-                                              (bucketOptions.length === 0
-                                                ? "-"
-                                                : "Select")}
+                                            {t(
+                                              stockBucketOptions.find(
+                                                (option) => option.id === row.product_line
+                                              )?.name ||
+                                                (bucketOptions.length === 0
+                                                  ? "-"
+                                                  : "Select"),
+                                            )}
                                           </span>
                                           <IconChevronDown
                                             className="ml-1 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
@@ -459,12 +466,16 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                   <div className="text-sm">
                     {changedRows.length > 0 ? (
                       <span className="text-amber-600 dark:text-amber-400 font-medium">
-                        {changedRows.length} unsaved change
-                        {changedRows.length > 1 ? "s" : ""}
+                        {t(
+                          changedRows.length === 1
+                            ? "{{count}} unsaved change"
+                            : "{{count}} unsaved changes",
+                          { count: changedRows.length },
+                        )}
                       </span>
                     ) : (
                       <span className="text-default-400 dark:text-gray-500">
-                        Unmapped accounts are ignored by Material Stock
+                        {t("Unmapped accounts are ignored by Material Stock")}
                       </span>
                     )}
                   </div>
@@ -475,7 +486,7 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                       onClick={handleClose}
                       disabled={isSaving}
                     >
-                      Close
+                      {t("Close")}
                     </Button>
                     <Button
                       type="button"
@@ -484,7 +495,7 @@ const MaterialAccountMappingModal: React.FC<MaterialAccountMappingModalProps> = 
                       onClick={handleSave}
                       disabled={isSaving || changedRows.length === 0}
                     >
-                      {isSaving ? "Saving..." : "Save Changes"}
+                      {isSaving ? t("Saving...") : t("Save Changes")}
                     </Button>
                   </div>
                 </div>
@@ -523,6 +534,8 @@ const MaterialCombobox: React.FC<MaterialComboboxProps> = ({
   materials,
   onChange,
 }) => {
+  const { t } = useTranslation("stock");
+
   const [query, setQuery] = useState("");
 
   const selectedMaterial = materials.find((m) => String(m.id) === value);
@@ -560,7 +573,7 @@ const MaterialCombobox: React.FC<MaterialComboboxProps> = ({
                 : ""
             }
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Not mapped"
+            placeholder={t("Not mapped")}
           />
           <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-1">
             <IconChevronDown
@@ -585,18 +598,18 @@ const MaterialCombobox: React.FC<MaterialComboboxProps> = ({
                 }`
               }
             >
-              Clear mapping
+              {t("Clear mapping")}
             </ComboboxOption>
           )}
           {filteredGroups.length === 0 ? (
             <div className="relative cursor-default select-none px-3 py-2 text-default-500 dark:text-gray-400">
-              No materials found.
+              {t("No materials found.")}
             </div>
           ) : (
             filteredGroups.map((group) => (
               <div key={group.category}>
                 <div className="bg-gray-100 dark:bg-gray-600 px-3 py-1.5 text-xs font-semibold text-gray-600 dark:text-gray-200 uppercase tracking-wide">
-                  {formatCategory(group.category)}
+                  {t(formatCategory(group.category))}
                 </div>
                 {group.items.map((material) => (
                   <ComboboxOption

@@ -36,6 +36,7 @@ import {
   TIENHOCK_INFO,
 } from "../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { AdjustmentDocTypeBadge } from "../../components/AdjustmentDocs/AdjustmentDocBadge";
 import type { AdjustmentDocType } from "../../types/types";
 import { formatAdjustmentDocDisplayId } from "../../utils/adjustments/formatDocId";
@@ -434,6 +435,7 @@ const getAdjustmentBalanceEffect = (
 const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   config = DEFAULT_DEBTORS_REPORT_CONFIG,
 }) => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const adjustmentDocDetailsPath = config.adjustmentDocDetailsPath;
   const showsAdjustmentDocs: boolean = Boolean(adjustmentDocDetailsPath);
@@ -593,13 +595,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
           setExpandedSalesmen(new Set(salesmenIds));
         }
       } catch (err) {
-        setError("Failed to fetch debtors data. Please try again later.");
+        setError(t("Failed to fetch debtors data. Please try again later."));
         console.error("Error fetching debtors:", err);
       } finally {
         setLoading(false);
       }
     },
-    [config.debtorsEndpoint, initialStoredSalesmen]
+    [config.debtorsEndpoint, initialStoredSalesmen, t]
   );
 
   // Customer-view fetch: the general-statement endpoint with includeZero=1 so
@@ -625,14 +627,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         setCustomerListData(data);
       } catch (err) {
         setCustomerListError(
-          "Failed to fetch customer list. Please try again later."
+          t("Failed to fetch customer list. Please try again later.")
         );
         console.error("Error fetching customer list:", err);
       } finally {
         setCustomerListLoading(false);
       }
     },
-    [config.generalStatementEndpoint]
+    [config.generalStatementEndpoint, t]
   );
 
   // Fetch the active view's dataset for the selected month
@@ -922,7 +924,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   const handlePrint = async (): Promise<void> => {
     if (!filteredData) return;
     try {
-      const loadingToast = toast.loading("Generating PDF...");
+      const loadingToast = toast.loading(t("Generating PDF..."));
       const filterName = allTimeMode
         ? undefined
         : selectedMonth.toLocaleDateString("en", {
@@ -934,21 +936,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         companyName: config.companyName,
       });
       toast.dismiss(loadingToast);
-      toast.success("Print dialog opened");
+      toast.success(t("Print dialog opened"));
     } catch (error) {
       console.error("Error printing report:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     }
   };
 
   const handlePrintStatement = async (customerId: string): Promise<void> => {
     if (allTimeMode) {
-      toast.error("Please select a specific month to print statement");
+      toast.error(t("Please select a specific month to print statement"));
       return;
     }
 
     try {
-      const loadingToast = toast.loading("Generating statement...");
+      const loadingToast = toast.loading(t("Generating statement..."));
       const month = selectedMonth.getMonth() + 1;
       const year = selectedMonth.getFullYear();
 
@@ -961,21 +963,21 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         companyName: config.statementCompanyName,
       });
       toast.dismiss(loadingToast);
-      toast.success("Statement generated");
+      toast.success(t("Statement generated"));
     } catch (error) {
       console.error("Error generating customer statement:", error);
-      toast.error("Failed to generate statement");
+      toast.error(t("Failed to generate statement"));
     }
   };
 
   const handlePrintGeneralStatement = async (): Promise<void> => {
     if (allTimeMode) {
-      toast.error("Please select a specific month to print general statement");
+      toast.error(t("Please select a specific month to print general statement"));
       return;
     }
 
     try {
-      const loadingToast = toast.loading("Generating trade debtor list...");
+      const loadingToast = toast.loading(t("Generating trade debtor list..."));
       const month = selectedMonth.getMonth() + 1;
       const year = selectedMonth.getFullYear();
 
@@ -995,10 +997,10 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         });
       }
       toast.dismiss(loadingToast);
-      toast.success("Trade debtor list generated");
+      toast.success(t("Trade debtor list generated"));
     } catch (error) {
       console.error("Error generating general statement:", error);
-      toast.error("Failed to generate trade debtor list");
+      toast.error(t("Failed to generate trade debtor list"));
     }
   };
 
@@ -1057,11 +1059,11 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       <div className="text-center py-12 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
         <IconAlertCircle size={48} className="text-rose-500 dark:text-rose-400 mb-4 mx-auto" />
         <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
-          Error Loading Report
+          {t("Error Loading Report")}
         </h3>
         <p className="text-default-500 dark:text-gray-400 mb-6">{activeError}</p>
         <Button onClick={handleRefresh} icon={IconRefresh} variant="outline">
-          Refresh
+          {t("Refresh")}
         </Button>
       </div>
     );
@@ -1118,7 +1120,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     <div className="relative">
       <input
         type="text"
-        placeholder="Search customers..."
+        placeholder={t("Search customers...")}
         value={searchTerm}
         onChange={(e) => handleSearchChange(e.target.value)}
         onBlur={commitSearch}
@@ -1134,7 +1136,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
           className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
           onMouseDown={(e) => e.preventDefault()}
           onClick={handleClearSearch}
-          title="Clear search"
+          title={t("Clear search")}
         >
           ×
         </button>
@@ -1168,7 +1170,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                   : "bg-default-50 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
               }`}
             >
-              Customer
+              {t("Customer")}
             </button>
             <button
               type="button"
@@ -1179,7 +1181,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                   : "bg-default-50 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
               }`}
             >
-              Salesman
+              {t("Salesman")}
             </button>
           </div>
 
@@ -1203,7 +1205,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               <span className="font-semibold text-default-700 dark:text-gray-200">
                 RM {formatCurrency(statsTotal)}
               </span>
-              <span className="text-default-400 dark:text-gray-400">total</span>
+              <span className="text-default-400 dark:text-gray-400">{t("total")}</span>
             </div>
             <span className="text-default-300 dark:text-gray-600">•</span>
             <div className="flex items-center gap-1.5">
@@ -1211,7 +1213,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                 RM {formatCurrency(statsPaid)}
               </span>
-              <span className="text-default-400 dark:text-gray-400">paid</span>
+              <span className="text-default-400 dark:text-gray-400">{t("paid")}</span>
             </div>
             <span className="text-default-300 dark:text-gray-600">•</span>
             <div className="flex items-center gap-1.5">
@@ -1219,7 +1221,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               <span className="font-semibold text-rose-700 dark:text-rose-300">
                 RM {formatCurrency(statsOutstanding)}
               </span>
-              <span className="text-default-400 dark:text-gray-400">outstanding</span>
+              <span className="text-default-400 dark:text-gray-400">{t("outstanding")}</span>
             </div>
             {!isCustomerView && (
               <>
@@ -1233,7 +1235,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                       : "bg-default-50 dark:bg-gray-700 border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-600"
                   }`}
                 >
-                  All Time
+                  {t("All Time")}
                 </button>
               </>
             )}
@@ -1262,7 +1264,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               icon={IconDownload}
               disabled={loading}
             >
-              Report
+              {t("Report")}
             </Button>
           )}
           <Button
@@ -1271,9 +1273,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
             variant="outline"
             icon={IconReceipt}
             disabled={activeLoading || allTimeMode}
-            title={allTimeMode ? "Select a specific month to print debtor list" : "Print debtor list for all customers"}
+            title={
+              allTimeMode
+                ? t("Select a specific month to print debtor list")
+                : t("Print debtor list for all customers")
+            }
           >
-            Debtor List
+            {t("Debtor List")}
           </Button>
         </div>
       </div>
@@ -1290,8 +1296,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               className="sticky top-0 z-30 flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 border-b border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg"
             >
               <p className="text-sm text-default-500 dark:text-gray-400">
-                {customerTotalCount} customer
-                {customerTotalCount !== 1 ? "s" : ""} • as at{" "}
+                {t(
+                  customerTotalCount === 1
+                    ? "{{count}} customer"
+                    : "{{count}} customers",
+                  { count: customerTotalCount }
+                )}{" "}
+                {"\u2022"} {t("as at")}{" "}
                 {customerListData?.statement_date}
               </p>
               <div className="flex items-center gap-2">
@@ -1306,8 +1317,8 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                   }`}
                 >
                   {hideZeroBalances
-                    ? config.hideZeroActiveLabel ?? "Zero balances hidden"
-                    : config.hideZeroLabel ?? "Hide zero balances"}
+                    ? t(config.hideZeroActiveLabel ?? "Zero balances hidden")
+                    : t(config.hideZeroLabel ?? "Hide zero balances")}
                 </button>
                 {refreshButton}
               </div>
@@ -1317,14 +1328,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               <div className="text-center py-8">
                 <IconUser size={48} className="text-default-400 dark:text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
-                  No Results Found
+                  {t("No Results Found")}
                 </h3>
                 <p className="text-default-500 dark:text-gray-400">
                   {searchTerm
-                    ? "No customers match your search criteria."
+                    ? t("No customers match your search criteria.")
                     : hideZeroBalances
-                    ? "No customers with an outstanding balance for the selected period."
-                    : "No customers available for the selected period."}
+                    ? t("No customers with an outstanding balance for the selected period.")
+                    : t("No customers available for the selected period.")}
                 </p>
               </div>
             ) : (
@@ -1339,43 +1350,43 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                       >
-                        Account No
+                        {t("Account No")}
                       </th>
                       <th
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                       >
-                        Customer
+                        {t("Customer")}
                       </th>
                       <th
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                       >
-                        Bal B/F
+                        {t("Bal B/F")}
                       </th>
                       <th
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                       >
-                        Current
+                        {t("Current")}
                       </th>
                       <th
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                       >
-                        Payment
+                        {t("Payment")}
                       </th>
                       <th
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                       >
-                        Total Due
+                        {t("Total Due")}
                       </th>
                       <th
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
                       >
-                        Actions
+                        {t("Actions")}
                       </th>
                     </tr>
                   </thead>
@@ -1443,12 +1454,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                 size="sm"
                                 variant="outline"
                                 icon={IconFileText}
-                                title={`Print statement as at ${statementEndDateLabel}`}
+                                title={t("Print statement as at {{date}}", {
+                                  date: statementEndDateLabel,
+                                })}
                                 onClick={() =>
                                   handlePrintStatement(row.account_no)
                                 }
                               >
-                                Statement
+                                {t("Statement")}
                               </Button>
                               <Button
                                 size="sm"
@@ -1456,7 +1469,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                   handleCustomerClick(row.account_no)
                                 }
                               >
-                                Invoices
+                                {t("Invoices")}
                               </Button>
                             </div>
                           </td>
@@ -1471,7 +1484,10 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               {customerTotalPages > 1 && (
                 <div className="flex items-center justify-between flex-wrap gap-2 px-4 py-2.5 border-t border-default-200 dark:border-gray-700">
                   <p className="text-sm text-default-500 dark:text-gray-400">
-                    Page {customerCurrentPage} of {customerTotalPages}
+                    {t("Page {{page}} of {{total}}", {
+                      page: customerCurrentPage,
+                      total: customerTotalPages,
+                    })}
                   </p>
                   <div className="flex items-center gap-2">
                     <Button
@@ -1483,7 +1499,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                         handleCustomerPageChange(customerCurrentPage - 1)
                       }
                     >
-                      Prev
+                      {t("Prev")}
                     </Button>
                     <Button
                       size="sm"
@@ -1494,7 +1510,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                         handleCustomerPageChange(customerCurrentPage + 1)
                       }
                     >
-                      Next
+                      {t("Next")}
                     </Button>
                   </div>
                 </div>
@@ -1504,13 +1520,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
               <div className="p-4 bg-default-50 dark:bg-gray-900/40">
                 <div className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-4">
                   <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
-                    <span>Total Bal B/F</span>
+                    <span>{t("Total Bal B/F")}</span>
                     <span className="font-semibold text-default-900 dark:text-gray-100">
                       RM {formatCurrency(customerListData?.totals.bal_bf ?? 0)}
                     </span>
                   </div>
                   <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
-                    <span>Total Current</span>
+                    <span>{t("Total Current")}</span>
                     <span className="font-semibold text-default-900 dark:text-gray-100">
                       RM{" "}
                       {formatCurrency(
@@ -1519,13 +1535,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
-                    <span>Total Payment</span>
+                    <span>{t("Total Payment")}</span>
                     <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                       RM {formatCurrency(customerListData?.totals.payment ?? 0)}
                     </span>
                   </div>
                   <div className="mt-2 flex justify-between border-t border-default-200 dark:border-gray-700 pt-3 text-base font-bold text-default-900 dark:text-gray-100">
-                    <span>Total Outstanding Balance</span>
+                    <span>{t("Total Outstanding Balance")}</span>
                     <span className="text-rose-600 dark:text-rose-400">
                       RM{" "}
                       {formatCurrency(customerListData?.totals.total_due ?? 0)}
@@ -1540,12 +1556,12 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
           <div className="text-center py-8">
             <IconUser size={48} className="text-default-400 dark:text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-2">
-              No Results Found
+              {t("No Results Found")}
             </h3>
             <p className="text-default-500 dark:text-gray-400">
               {searchTerm
-                ? "No customers match your search criteria."
-                : "No debtors data available for the selected period."}
+                ? t("No customers match your search criteria.")
+                : t("No debtors data available for the selected period.")}
             </p>
           </div>
         ) : (
@@ -1575,21 +1591,25 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                       </h3>
                       <p className="flex flex-wrap items-center gap-2 text-sm text-default-500 dark:text-gray-400">
                         <span>
-                          {salesman.customers.length} customer
-                          {salesman.customers.length !== 1 ? "s" : ""}
+                          {t(
+                            salesman.customers.length === 1
+                              ? "{{count}} customer"
+                              : "{{count}} customers",
+                            { count: salesman.customers.length }
+                          )}
                         </span>
                         <button
                           type="button"
                           className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700 transition-colors hover:border-sky-300 hover:bg-sky-100 hover:text-sky-800 dark:border-sky-800 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:border-sky-700 dark:hover:bg-sky-900/50 dark:hover:text-sky-200"
                           title={
                             isSalesmanFullyExpanded(salesman)
-                              ? "Collapse salesman details"
-                              : "Expand all customer details for this salesman"
+                              ? t("Collapse salesman details")
+                              : t("Expand all customer details for this salesman")
                           }
                           aria-label={
                             isSalesmanFullyExpanded(salesman)
-                              ? "Collapse salesman details"
-                              : "Expand all customer details for this salesman"
+                              ? t("Collapse salesman details")
+                              : t("Expand all customer details for this salesman")
                           }
                           onClick={(
                             e: React.MouseEvent<HTMLButtonElement>
@@ -1601,15 +1621,15 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                           <IconListDetails size={14} />
                           <span>
                             {isSalesmanFullyExpanded(salesman)
-                              ? "Collapse details"
-                              : "Expand details"}
+                              ? t("Collapse details")
+                              : t("Expand details")}
                           </span>
                         </button>
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-default-500 dark:text-gray-400">Outstanding</p>
+                    <p className="text-sm text-default-500 dark:text-gray-400">{t("Outstanding")}</p>
                     <p className="text-lg font-bold text-rose-600 dark:text-rose-400">
                       RM {formatCurrency(salesman.total_balance)}
                     </p>
@@ -1663,9 +1683,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                     customer.customer_id}
                                 </span>
                                 <p className="text-sm text-default-500 dark:text-gray-400">
-                                  ID: {customer.customer_id} •{" "}
-                                  {customer.invoices.length} invoice
-                                  {customer.invoices.length !== 1 ? "s" : ""}
+                                  {t("ID:")} {customer.customer_id} {"\u2022"}{" "}
+                                  {t(
+                                    customer.invoices.length === 1
+                                      ? "{{count}} invoice"
+                                      : "{{count}} invoices",
+                                    { count: customer.invoices.length }
+                                  )}
                                 </p>
                               </div>
                             </div>
@@ -1683,7 +1707,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="text-right">
-                              <p className="text-xs text-default-500 dark:text-gray-400">Balance</p>
+                              <p className="text-xs text-default-500 dark:text-gray-400">{t("Balance")}</p>
                               <p className="font-semibold text-rose-600 dark:text-rose-400">
                                 RM {formatCurrency(customer.total_balance)}
                               </p>
@@ -1695,15 +1719,17 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               disabled={allTimeMode}
                               title={
                                 allTimeMode
-                                  ? "Select a specific month to print statement"
-                                  : `Print statement as at ${statementEndDateLabel}`
+                                  ? t("Select a specific month to print statement")
+                                  : t("Print statement as at {{date}}", {
+                                      date: statementEndDateLabel,
+                                    })
                               }
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handlePrintStatement(customer.customer_id);
                               }}
                             >
-                              Statement
+                              {t("Statement")}
                             </Button>
                             <Button
                               size="sm"
@@ -1712,7 +1738,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                 handleCustomerClick(customer.customer_id);
                               }}
                             >
-                              Invoices
+                              {t("Invoices")}
                             </Button>
                           </div>
                         </div>
@@ -1724,7 +1750,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                               <div>
                                 <p className="text-xs text-default-500 dark:text-gray-400 uppercase">
-                                  Total Amount
+                                  {t("Total Amount")}
                                 </p>
                                 <p className="font-medium text-default-800 dark:text-gray-100">
                                   RM {formatCurrency(customer.total_amount)}
@@ -1732,7 +1758,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </div>
                               <div>
                                 <p className="text-xs text-default-500 dark:text-gray-400 uppercase">
-                                  Total Paid
+                                  {t("Total Paid")}
                                 </p>
                                 <p className="font-medium text-emerald-600 dark:text-emerald-400">
                                   RM {formatCurrency(customer.total_paid)}
@@ -1740,7 +1766,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </div>
                               <div>
                                 <p className="text-xs text-default-500 dark:text-gray-400 uppercase">
-                                  Credit Limit
+                                  {t("Credit Limit")}
                                 </p>
                                 <p className="font-medium text-default-800 dark:text-gray-100">
                                   RM {formatCurrency(customer.credit_limit)}
@@ -1748,7 +1774,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </div>
                               <div>
                                 <p className="text-xs text-default-500 dark:text-gray-400 uppercase">
-                                  Credit Balance
+                                  {t("Credit Balance")}
                                 </p>
                                 <p className="font-medium text-default-800 dark:text-gray-100">
                                   RM {formatCurrency(customer.credit_balance)}
@@ -1756,10 +1782,12 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </div>
                               {(customer.unapplied_overpayment ?? 0) > 0.005 && (
                                 <div
-                                  title="Overpaid amount held in customer deposits (CUST_DEP). Not offset against the outstanding balance."
+                                  title={t(
+                                    "Overpaid amount held in customer deposits (CUST_DEP). Not offset against the outstanding balance."
+                                  )}
                                 >
                                   <p className="text-xs text-amber-600 dark:text-amber-400 uppercase">
-                                    Overpayment Held
+                                    {t("Overpayment Held")}
                                   </p>
                                   <p className="font-medium text-amber-700 dark:text-amber-300">
                                     RM{" "}
@@ -1781,29 +1809,29 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
                                       {showsAdjustmentDocs
-                                        ? "Invoice / Document No."
-                                        : "Invoice No."}
+                                        ? t("Invoice / Document No.")
+                                        : t("Invoice No.")}
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Date
+                                      {t("Date")}
                                     </th>
                                     <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Amount
+                                      {t("Amount")}
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Payment Method
+                                      {t("Payment Method")}
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Reference
+                                      {t("Reference")}
                                     </th>
                                     <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Payment Date
+                                      {t("Payment Date")}
                                     </th>
                                     <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Paid Amount
+                                      {t("Paid Amount")}
                                     </th>
                                     <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                                      Balance
+                                      {t("Balance")}
                                     </th>
                                   </tr>
                                 </thead>
@@ -1924,11 +1952,13 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                               )}
                                               <td className="px-3 py-2">
                                                 {payment.payment_method
-                                                  ? payment.payment_method
-                                                      .charAt(0)
-                                                      .toUpperCase() +
-                                                    payment.payment_method.slice(
-                                                      1
+                                                  ? t(
+                                                      payment.payment_method
+                                                        .charAt(0)
+                                                        .toUpperCase() +
+                                                        payment.payment_method.slice(
+                                                          1
+                                                        )
                                                     )
                                                   : "-"}
                                               </td>
@@ -2017,7 +2047,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                                   -
                                                 </td>
                                                 <td className="px-3 py-2 text-sky-700 dark:text-sky-300">
-                                                  Adjustment
+                                                  {t("Adjustment")}
                                                 </td>
                                                 <td
                                                   className="px-3 py-2 max-w-xs truncate"
@@ -2032,7 +2062,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                                         ? "text-rose-600 dark:text-rose-400"
                                                         : "text-emerald-600 dark:text-emerald-400"
                                                     }`}
-                                                    title="Effect on outstanding balance"
+                                                    title={t("Effect on outstanding balance")}
                                                   >
                                                     {formatBalanceEffect(
                                                       balanceEffect
@@ -2059,7 +2089,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                 <tfoot>
                                   <tr className="border-t-2 border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 font-semibold text-default-800 dark:text-gray-100">
                                     <td className="px-3 py-2" colSpan={3}>
-                                      Subtotal for {customer.customer_id}
+                                      {t("Subtotal for {{id}}", {
+                                        id: customer.customer_id,
+                                      })}
                                     </td>
                                     <td className="px-3 py-2 text-right">
                                       RM {formatCurrency(customer.total_amount)}
@@ -2086,19 +2118,19 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
             <div className="p-4 bg-default-50 dark:bg-gray-900/40">
               <div className="rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 p-4">
                 <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
-                  <span>Total Invoice Amount</span>
+                  <span>{t("Total Invoice Amount")}</span>
                   <span className="font-semibold text-default-900 dark:text-gray-100">
                     RM {formatCurrency(filteredData.grand_total_amount)}
                   </span>
                 </div>
                 <div className="flex justify-between py-1 text-sm text-default-600 dark:text-gray-300">
-                  <span>Total Amount Paid</span>
+                  <span>{t("Total Amount Paid")}</span>
                   <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                     RM {formatCurrency(filteredData.grand_total_paid)}
                   </span>
                 </div>
                 <div className="mt-2 flex justify-between border-t border-default-200 dark:border-gray-700 pt-3 text-base font-bold text-default-900 dark:text-gray-100">
-                  <span>Total Outstanding Balance</span>
+                  <span>{t("Total Outstanding Balance")}</span>
                   <span className="text-rose-600 dark:text-rose-400">
                     RM {formatCurrency(filteredData.grand_total_balance)}
                   </span>

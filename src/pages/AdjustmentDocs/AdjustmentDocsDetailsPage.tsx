@@ -320,6 +320,38 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                 status={doc.status}
                 einvoiceStatus={doc.einvoice_status}
               />
+              {doc.journal_entry_id && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(
+                      `${
+                        company === "jellypolly"
+                          ? "/jellypolly/accounting/journal-entries"
+                          : "/accounting/journal-entries"
+                      }/${doc.journal_entry_id}`
+                    )
+                  }
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 hover:underline"
+                  title={t("View journal entry")}
+                >
+                  <IconReceipt size={14} />
+                  {t("View Journal {{reference}}", {
+                    reference:
+                      doc.journal_reference || formatAdjustmentDocDisplayId(doc),
+                  })}
+                  {doc.journal_status && (
+                    <span className="opacity-80">
+                      {" "}
+                      ({t(
+                        doc.journal_status === "cancelled"
+                          ? "Cancelled"
+                          : "Posted"
+                      )})
+                    </span>
+                  )}
+                </button>
+              )}
             </h1>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

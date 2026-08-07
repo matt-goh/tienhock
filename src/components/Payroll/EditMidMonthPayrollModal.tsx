@@ -15,6 +15,7 @@ import {
   MidMonthPayroll,
 } from "../../utils/payroll/midMonthPayrollUtils";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 type MidMonthPaymentMethod = "Cash" | "Bank" | "Cheque";
 
@@ -39,7 +40,12 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
   onSuccess,
   payroll,
 }) => {
+  const { t } = useTranslation("payroll");
   const [amount, setAmount] = useState<number>(0);
+  const paymentMethodOptions = PAYMENT_METHOD_OPTIONS.map((opt) => ({
+    ...opt,
+    label: t(opt.label),
+  }));
   const [paymentMethod, setPaymentMethod] =
     useState<MidMonthPaymentMethod>("Cash");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -58,7 +64,7 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
     if (!payroll) return;
 
     if (amount <= 0) {
-      toast.error("Amount must be greater than 0");
+      toast.error(t("Amount must be greater than 0"));
       return;
     }
 
@@ -69,12 +75,12 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
         payment_method: paymentMethod,
       });
 
-      toast.success("Mid-month payroll updated successfully");
+      toast.success(t("Mid-month payroll updated successfully"));
       onSuccess();
       onClose();
     } catch (error) {
       console.error("Error updating payroll:", error);
-      toast.error("Failed to update payroll");
+      toast.error(t("Failed to update payroll"));
     } finally {
       setIsUpdating(false);
     }
@@ -119,14 +125,14 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100 mb-4"
                 >
-                  Edit Mid-month Payroll
+                  {t("Edit Mid-month Payroll")}
                 </DialogTitle>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   {/* Employee Info (Read-only) */}
                   <div className="rounded-lg border border-default-200 bg-default-50 p-4 dark:border-gray-700 dark:bg-gray-900/50">
                     <div className="mb-1 text-sm text-default-600 dark:text-gray-400">
-                      Employee
+                      {t("Employee")}
                     </div>
                     <div className="font-medium text-default-900 dark:text-gray-100">
                       {payroll.employee_name} ({payroll.employee_id})
@@ -136,7 +142,7 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
                   {/* Amount Input */}
                   <FormInput
                     name="amount"
-                    label="Amount (RM)"
+                    label={t("Amount (RM)")}
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(Number(e.target.value))}
@@ -149,15 +155,15 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
                   {/* Payment Method */}
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Select payment method
+                      {t("Select payment method")}
                     </label>
                     <PillSelect<MidMonthPaymentMethod>
                       value={paymentMethod}
                       onChange={(value: MidMonthPaymentMethod) =>
                         setPaymentMethod(value)
                       }
-                      options={PAYMENT_METHOD_OPTIONS}
-                      ariaLabel="Payment method"
+                      options={paymentMethodOptions}
+                      ariaLabel={t("Payment method")}
                       size="md"
                     />
                   </div>
@@ -170,7 +176,7 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
                       onClick={handleClose}
                       disabled={isUpdating}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -178,7 +184,7 @@ const EditMidMonthPayrollModal: React.FC<EditMidMonthPayrollModalProps> = ({
                       variant="filled"
                       disabled={isUpdating}
                     >
-                      {isUpdating ? "Updating..." : "Update"}
+                      {isUpdating ? t("Updating...") : t("Update")}
                     </Button>
                   </div>
                 </form>

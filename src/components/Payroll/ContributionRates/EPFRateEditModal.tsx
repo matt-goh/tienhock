@@ -13,6 +13,7 @@ import { EPFRate } from "../../../types/types";
 import { api } from "../../../routes/utils/api";
 import { refreshContributionRatesCache } from "../../../utils/payroll/useContributionRatesCache";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 interface EPFRateEditModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
   onClose,
   rate,
 }) => {
+  const { t } = useTranslation("payroll");
   const [formData, setFormData] = useState({
     employee_rate_percentage: "",
     employer_rate_percentage: "",
@@ -73,12 +75,12 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
       // Refresh cache
       await refreshContributionRatesCache();
 
-      toast.success("EPF rate updated successfully");
+      toast.success(t("EPF rate updated successfully"));
       onClose();
     } catch (error) {
       console.error("Error updating EPF rate:", error);
-      setError("Failed to update EPF rate. Please try again.");
-      toast.error("Failed to update EPF rate");
+      setError(t("Failed to update EPF rate. Please try again."));
+      toast.error(t("Failed to update EPF rate"));
     } finally {
       setIsSubmitting(false);
     }
@@ -134,17 +136,18 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Edit EPF Rate
+                  {t("Edit EPF Rate")}
                 </DialogTitle>
 
                 {rate && (
                   <div className="mt-2">
                     <p className="text-sm text-gray-600">
-                      {getEmployeeTypeLabel(rate.employee_type)}
+                      {t(getEmployeeTypeLabel(rate.employee_type))}
                       {rate.wage_threshold && (
                         <span className="block">
-                          Wage threshold: ≤ RM{" "}
-                          {Number(rate.wage_threshold).toFixed(2)}
+                          {t("Wage threshold: ≤ RM {{amount}}", {
+                            amount: Number(rate.wage_threshold).toFixed(2),
+                          })}
                         </span>
                       )}
                     </p>
@@ -154,7 +157,7 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                   <FormInput
                     name="employee_rate_percentage"
-                    label="Employee Rate (%)"
+                    label={t("Employee Rate (%)")}
                     type="number"
                     value={formData.employee_rate_percentage}
                     onChange={(e) =>
@@ -168,7 +171,7 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
 
                   <FormInput
                     name="employer_rate_percentage"
-                    label="Employer Rate (%)"
+                    label={t("Employer Rate (%)")}
                     type="number"
                     value={formData.employer_rate_percentage}
                     onChange={(e) =>
@@ -192,7 +195,7 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
                       onClick={onClose}
                       disabled={isSubmitting}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -200,7 +203,7 @@ const EPFRateEditModal: React.FC<EPFRateEditModalProps> = ({
                       variant="filled"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? "Updating..." : "Update Rate"}
+                      {isSubmitting ? t("Updating...") : t("Update Rate")}
                     </Button>
                   </div>
                 </form>

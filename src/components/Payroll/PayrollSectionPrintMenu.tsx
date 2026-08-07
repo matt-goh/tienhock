@@ -20,6 +20,7 @@ import { useJobsCache } from "../../utils/catalogue/useJobsCache";
 import { useJPStaffsCache } from "../../utils/JellyPolly/useJPStaffsCache";
 import { useJPJobsCache } from "../../utils/JellyPolly/useJPJobsCache";
 import { JOB_CONFIGS } from "../../configs/payrollJobConfigs";
+import { useTranslation } from "react-i18next";
 
 interface PayrollSectionPrintMenuProps {
   payrolls: EmployeePayroll[];
@@ -106,6 +107,7 @@ const PayrollSectionPrintMenuContent: React.FC<
   staffs,
   jobs,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number }>({
     top: 0,
@@ -259,7 +261,7 @@ const PayrollSectionPrintMenuContent: React.FC<
 
   const print = async (filtered: EmployeePayroll[]): Promise<void> => {
     if (filtered.length === 0) {
-      toast.error("No payslips to print");
+      toast.error(t("No payslips to print"));
       return;
     }
     setIsVisible(false);
@@ -321,10 +323,10 @@ const PayrollSectionPrintMenuContent: React.FC<
         className={buttonClasses}
         type="button"
         disabled={triggerDisabled}
-        title="Print pay slips by section or job"
+        title={t("Print pay slips by section or job")}
       >
         <IconPrinter size={iconSize} className="mr-2" />
-        {isPrinting ? "Printing..." : buttonLabel}
+        {isPrinting ? t("Printing...") : t(buttonLabel)}
       </button>
 
       {isVisible &&
@@ -348,7 +350,7 @@ const PayrollSectionPrintMenuContent: React.FC<
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
-                  Print Pay Slips
+                  {t("Print Pay Slips")}
                 </h3>
                 <div className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 rounded-full text-xs font-medium">
                   {selectedGroupCount}/{printGroups.length}
@@ -362,7 +364,7 @@ const PayrollSectionPrintMenuContent: React.FC<
                   className="mr-1.5"
                   checkedColor="text-sky-700"
                 />
-                {allSelected ? "Deselect All" : "Select All"}
+                {allSelected ? t("Deselect All") : t("Select All")}
               </div>
             </div>
 
@@ -370,7 +372,7 @@ const PayrollSectionPrintMenuContent: React.FC<
             <div className="flex-grow overflow-y-auto py-1 max-h-80">
               {printGroups.length === 0 ? (
                 <div className="px-4 py-6 text-center text-sm text-default-500 dark:text-gray-400">
-                  No pay slips available.
+                  {t("No pay slips available.")}
                 </div>
               ) : (
                 <div className="px-1 space-y-1">
@@ -385,7 +387,7 @@ const PayrollSectionPrintMenuContent: React.FC<
                           {label}
                         </div>
                         <div className="text-xs text-default-500 dark:text-gray-400">
-                          {count} {count === 1 ? "employee" : "employees"}
+                          {t(count === 1 ? "{{count}} employee" : "{{count}} employees", { count })}
                         </div>
                       </div>
                       <button
@@ -397,7 +399,7 @@ const PayrollSectionPrintMenuContent: React.FC<
                           void print(rows);
                         }}
                         className="ml-2 mr-1 p-1.5 rounded-md text-sky-600 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition-colors"
-                        title={`Print ${label} only`}
+                        title={t("Print {{label}} only", { label })}
                       >
                         <IconPrinter size={16} />
                       </button>
@@ -417,9 +419,11 @@ const PayrollSectionPrintMenuContent: React.FC<
             {/* Actions */}
             <div className="flex-shrink-0 border-t border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-800/50 rounded-b-lg">
               <div className="text-sm text-default-600 dark:text-gray-400 mb-2">
-                <span className="font-medium">Selected:</span>{" "}
-                {selectedPayslipCount} of {totalPayslipCount} payslip
-                {totalPayslipCount === 1 ? "" : "s"}
+                <span className="font-medium">{t("Selected:")}</span>{" "}
+                {t(totalPayslipCount === 1 ? "{{selected}} of {{total}} payslip" : "{{selected}} of {{total}} payslips", {
+                  selected: selectedPayslipCount,
+                  total: totalPayslipCount,
+                })}
               </div>
               <button
                 onClick={(): void => {
@@ -430,9 +434,14 @@ const PayrollSectionPrintMenuContent: React.FC<
                 className="w-full flex items-center justify-center px-3 h-9 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 dark:bg-sky-500 dark:hover:bg-sky-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <IconPrinter size={16} className="mr-2" />
-                Print
-                {selectedPayslipCount > 0 ? ` ${selectedPayslipCount} ` : " "}
-                Payslip{selectedPayslipCount === 1 ? "" : "s"}
+                {t(
+                  selectedPayslipCount === 0
+                    ? "Print Payslips"
+                    : selectedPayslipCount === 1
+                    ? "Print {{count}} Payslip"
+                    : "Print {{count}} Payslips",
+                  { count: selectedPayslipCount },
+                )}
               </button>
             </div>
           </div>,
@@ -441,10 +450,13 @@ const PayrollSectionPrintMenuContent: React.FC<
 
       {showOverlay && (
         <LoadingOverlay
-          message={`Preparing ${printingCount} payslip${
-            printingCount !== 1 ? "s" : ""
-          } for printing...`}
-          processingMessage="Opening print dialog..."
+          message={t(
+            printingCount === 1
+              ? "Preparing {{count}} payslip for printing..."
+              : "Preparing {{count}} payslips for printing...",
+            { count: printingCount },
+          )}
+          processingMessage={t("Opening print dialog...")}
           onClose={() => setShowOverlay(false)}
         />
       )}

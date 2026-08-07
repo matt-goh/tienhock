@@ -660,11 +660,106 @@ export default function (pool) {
         entryResult.rows[0].id
       );
 
+      // Surface the journals this entry is related to, so the details page can
+      // link between an invoice's sale journal and its adjustment journals:
+      // - invoice sales journal (S) -> the invoice's CN/DN/RN journals
+      // - adjustment journal -> the invoice's S journal + sibling adjustments
+      const entryRow = entryResult.rows[0];
+      let relatedInvoiceId = null;
+      let relatedJournals = [];
+      const mapAdjustmentJournals = (rows) =>
+        rows.map((r) => ({
+          kind: "adjustment",
+          doc_id: r.doc_id,
+          doc_type: r.doc_type,
+          doc_status: r.doc_status,
+          amount: parseFloat(r.amount || 0),
+          journal_entry_id: r.journal_entry_id,
+          journal_reference: r.journal_reference,
+          journal_status: r.journal_status,
+          journal_date: r.journal_date,
+        }));
+      if (entryRow.source_type === "invoice" && entryRow.source_id) {
+        relatedInvoiceId = entryRow.source_id;
+        const adjResult = await pool.query(
+          `SELECT a.id AS doc_id, a.type AS doc_type, a.status AS doc_status,
+                  a.totalamountpayable AS amount,
+                  a.journal_entry_id,
+                  COALESCE(je.display_reference, je.reference_no) AS journal_reference,
+                  je.status AS journal_status,
+                  je.entry_date AS journal_date
+             FROM adjustment_documents a
+             JOIN journal_entries je ON je.id = a.journal_entry_id
+            WHERE a.original_invoice_id = $1
+              AND COALESCE(a.is_consolidated, false) = false
+            ORDER BY a.created_at DESC`,
+          [relatedInvoiceId]
+        );
+        relatedJournals = mapAdjustmentJournals(adjResult.rows);
+      } else if (entryRow.source_type === "adjustment" && entryRow.source_id) {
+        const docResult = await pool.query(
+          `SELECT id, type, status, totalamountpayable, original_invoice_id, journal_entry_id
+             FROM adjustment_documents
+            WHERE id = $1`,
+          [entryRow.source_id]
+        );
+        if (docResult.rows.length > 0) {
+          relatedInvoiceId = docResult.rows[0].original_invoice_id || null;
+          if (relatedInvoiceId) {
+            const salesResult = await pool.query(
+              `SELECT je.id AS journal_entry_id,
+                      COALESCE(je.display_reference, je.reference_no) AS journal_reference,
+                      je.status AS journal_status,
+                      je.entry_date AS journal_date,
+                      je.total_debit AS amount
+                 FROM journal_entries je
+                WHERE je.source_type = 'invoice'
+                  AND je.source_id = $1
+                  AND je.entry_type = 'S'`,
+              [relatedInvoiceId]
+            );
+            if (salesResult.rows.length > 0) {
+              relatedJournals.push({
+                kind: "sales",
+                doc_id: null,
+                doc_type: null,
+                doc_status: null,
+                amount: parseFloat(salesResult.rows[0].amount || 0),
+                journal_entry_id: salesResult.rows[0].journal_entry_id,
+                journal_reference: salesResult.rows[0].journal_reference,
+                journal_status: salesResult.rows[0].journal_status,
+                journal_date: salesResult.rows[0].journal_date,
+              });
+            }
+            const adjResult = await pool.query(
+              `SELECT a.id AS doc_id, a.type AS doc_type, a.status AS doc_status,
+                      a.totalamountpayable AS amount,
+                      a.journal_entry_id,
+                      COALESCE(je.display_reference, je.reference_no) AS journal_reference,
+                      je.status AS journal_status,
+                      je.entry_date AS journal_date
+                 FROM adjustment_documents a
+                 JOIN journal_entries je ON je.id = a.journal_entry_id
+                WHERE a.original_invoice_id = $1
+                  AND COALESCE(a.is_consolidated, false) = false
+                  AND a.journal_entry_id <> $2
+                ORDER BY a.created_at DESC`,
+              [relatedInvoiceId, entryRow.id]
+            );
+            relatedJournals = relatedJournals.concat(
+              mapAdjustmentJournals(adjResult.rows)
+            );
+          }
+        }
+      }
+
       res.json({
         ...entryResult.rows[0],
         lines: linesResult.rows,
         source,
         cheque_duplicates: chequeDuplicates,
+        related_invoice_id: relatedInvoiceId,
+        related_journals: relatedJournals,
       });
     } catch (error) {
       console.error("Error fetching journal entry:", error);
@@ -1091,14 +1186,39 @@ export default function (pool) {
       // cancelSupplierPaymentJournalEntry 'PAY', cancelAdjustmentJournalEntry
       // CN/DN/RN, …). Plain manual journals ('J' …) stay fully free-form; legacy
       // IMP is blocked above. See syncSalesJournalEntry / updateGPJournalEntry.
-      const SYSTEM_ENTRY_TYPES = [
-        "S", "REC", "PUR", "GP", "PAY", "CN", "DN", "RN", "JVDR", "JVSL",
-      ];
+      // The entry type alone does NOT make a journal source-owned: users key
+      // manual journals with system-looking types (e.g. a CN created straight
+      // from the Journal page), and those stay free-form so the type can be
+      // changed to J. A journal is source-owned only when a document depends
+      // on it: source_type is set, a GP/PUR/PAY journal is linked from its
+      // owning table (those post without source_type), it is a B payment with
+      // a PRP: description, or it is a system payroll voucher (JVDR/JVSL).
       const isSourceOwned =
         existing.source_type != null ||
-        SYSTEM_ENTRY_TYPES.includes(existing.entry_type) ||
         (existing.entry_type === "B" &&
-          String(existing.description || "").startsWith("PRP:"));
+          String(existing.description || "").startsWith("PRP:")) ||
+        (existing.entry_type === "JVDR" || existing.entry_type === "JVSL") ||
+        (existing.entry_type === "GP" &&
+          (
+            await client.query(
+              "SELECT 1 FROM self_billed_invoices WHERE journal_entry_id = $1",
+              [id]
+            )
+          ).rows.length > 0) ||
+        (existing.entry_type === "PUR" &&
+          (
+            await client.query(
+              "SELECT 1 FROM purchase_invoices WHERE journal_entry_id = $1",
+              [id]
+            )
+          ).rows.length > 0) ||
+        (existing.entry_type === "PAY" &&
+          (
+            await client.query(
+              "SELECT 1 FROM supplier_payments WHERE journal_entry_id = $1",
+              [id]
+            )
+          ).rows.length > 0);
       const effectiveEntryType = isSourceOwned ? existing.entry_type : entry_type;
 
       // Check if reference_no is unique (excluding current entry)

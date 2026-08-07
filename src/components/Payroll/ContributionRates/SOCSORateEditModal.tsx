@@ -13,6 +13,7 @@ import { SOCSORRate } from "../../../types/types";
 import { api } from "../../../routes/utils/api";
 import { refreshContributionRatesCache } from "../../../utils/payroll/useContributionRatesCache";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 interface SOCSORateEditModalProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
   onClose,
   rate,
 }) => {
+  const { t } = useTranslation("payroll");
   const [formData, setFormData] = useState({
     wage_from: "",
     wage_to: "",
@@ -71,12 +73,12 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
       // Refresh cache
       await refreshContributionRatesCache();
 
-      toast.success("SOCSO rate updated successfully");
+      toast.success(t("SOCSO rate updated successfully"));
       onClose();
     } catch (error) {
       console.error("Error updating SOCSO rate:", error);
-      setError("Failed to update SOCSO rate. Please try again.");
-      toast.error("Failed to update SOCSO rate");
+      setError(t("Failed to update SOCSO rate. Please try again."));
+      toast.error(t("Failed to update SOCSO rate"));
     } finally {
       setIsSubmitting(false);
     }
@@ -117,14 +119,14 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  Edit SOCSO Rate
+                  {t("Edit SOCSO Rate")}
                 </DialogTitle>
 
                 <form onSubmit={handleSubmit} className="mt-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <FormInput
                       name="wage_from"
-                      label="Wage From (RM)"
+                      label={t("Wage From (RM)")}
                       type="number"
                       value={formData.wage_from}
                       onChange={(e) =>
@@ -137,7 +139,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
 
                     <FormInput
                       name="wage_to"
-                      label="Wage To (RM)"
+                      label={t("Wage To (RM)")}
                       type="number"
                       value={formData.wage_to}
                       onChange={(e) => handleChange("wage_to", e.target.value)}
@@ -150,7 +152,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
                   <div className="grid grid-cols-2 gap-4">
                     <FormInput
                       name="employee_rate"
-                      label="Employee Rate — Keilatan (RM)"
+                      label={t("Employee Rate — Keilatan (RM)")}
                       type="number"
                       value={formData.employee_rate}
                       onChange={(e) =>
@@ -163,7 +165,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
 
                     <FormInput
                       name="employee_rate_skbbk"
-                      label="Employee Rate — SKBBK (RM)"
+                      label={t("Employee Rate — SKBBK (RM)")}
                       type="number"
                       value={formData.employee_rate_skbbk}
                       onChange={(e) =>
@@ -176,7 +178,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
                   </div>
 
                   <div className="-mt-2 text-xs text-default-500 dark:text-gray-400">
-                    Employee Total (&lt;60) ={" "}
+                    {t("Employee Total (<60) =")}{" "}
                     <span className="font-medium text-sky-700 dark:text-sky-300">
                       RM{" "}
                       {(
@@ -185,7 +187,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
                       ).toFixed(2)}
                     </span>
                     {"  •  "}
-                    Employee Total (≥60) ={" "}
+                    {t("Employee Total (≥60) =")}{" "}
                     <span className="font-medium text-sky-700 dark:text-sky-300">
                       RM{" "}
                       {(parseFloat(formData.employee_rate_skbbk) || 0).toFixed(
@@ -196,7 +198,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
 
                   <FormInput
                     name="employer_rate"
-                    label="Employer Rate (RM)"
+                    label={t("Employer Rate (RM)")}
                     type="number"
                     value={formData.employer_rate}
                     onChange={(e) =>
@@ -209,7 +211,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
 
                   <FormInput
                     name="employer_rate_over_60"
-                    label="Employer Rate for 60+ (RM)"
+                    label={t("Employer Rate for 60+ (RM)")}
                     type="number"
                     value={formData.employer_rate_over_60}
                     onChange={(e) =>
@@ -233,7 +235,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
                       onClick={onClose}
                       disabled={isSubmitting}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -241,7 +243,7 @@ const SOCSORateEditModal: React.FC<SOCSORateEditModalProps> = ({
                       variant="filled"
                       disabled={isSubmitting}
                     >
-                      {isSubmitting ? "Updating..." : "Update Rate"}
+                      {isSubmitting ? t("Updating...") : t("Update Rate")}
                     </Button>
                   </div>
                 </form>

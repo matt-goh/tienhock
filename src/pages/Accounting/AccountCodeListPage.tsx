@@ -24,6 +24,7 @@ import {
 } from "@headlessui/react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { AccountCode, LedgerType } from "../../types/types";
 import {
@@ -195,6 +196,7 @@ const FsNoteListbox: React.FC<FsNoteListboxProps> = ({
 const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
   company = "tienhock",
 }: AccountCodeListPageProps) => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const isGreenTarget: boolean = company === "greentarget";
   const accountCodesPagePath: string = isGreenTarget
@@ -355,13 +357,13 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
 
   const ledgerTypeOptions = useMemo((): ListboxSelectOption[] => {
     return [
-      { value: "All", label: "All Types" },
+      { value: "All", label: t("All Types") },
       ...ledgerTypes.map((ledgerType: LedgerType): ListboxSelectOption => ({
         value: ledgerType.code,
         label: `${ledgerType.code} - ${ledgerType.name}`,
       })),
     ];
-  }, [ledgerTypes]);
+  }, [ledgerTypes, t]);
 
   const fsNoteOptions = useMemo((): ListboxSelectOption[] => {
     return [
@@ -731,7 +733,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
   const handleDeleteClick = (account: AccountCode, e: React.MouseEvent) => {
     e.stopPropagation();
     if (account.is_system) {
-      toast.error("Cannot delete system account");
+      toast.error(t("Cannot delete system account"));
       return;
     }
     setAccountToDelete(account);
@@ -747,14 +749,14 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
           ? `/greentarget/api/account-codes/${accountToDelete.code}`
           : `/api/account-codes/${accountToDelete.code}`
       );
-      toast.success("Account code deleted successfully");
+      toast.success(t("Account code deleted successfully"));
       setShowDeleteDialog(false);
       setAccountToDelete(null);
       // Refresh the cache to reflect the deletion
       refreshAccountCodes();
     } catch (error: unknown) {
       console.error("Error deleting account:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to delete account code";
+      const errorMessage = error instanceof Error ? error.message : t("Failed to delete account code");
       toast.error(errorMessage);
     }
   };
@@ -768,11 +770,11 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
       await api.patch(`/api/account-codes/${accountCode}/fs-note`, {
         fs_note: newFsNote,
       });
-      toast.success("Note updated");
+      toast.success(t("Note updated"));
       refreshAccountCodes();
     } catch (error) {
       console.error("Error updating fs_note:", error);
-      toast.error("Failed to update note");
+      toast.error(t("Failed to update note"));
     }
   };
 
@@ -819,10 +821,10 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 className="mr-1 rounded p-1 hover:bg-default-200 disabled:cursor-default disabled:hover:bg-transparent dark:hover:bg-gray-600 dark:disabled:hover:bg-transparent"
                 title={
                   revealFilteredBranches
-                    ? "Search result branches are expanded automatically"
+                    ? t("Search result branches are expanded automatically")
                     : isExpanded
-                    ? "Collapse account"
-                    : "Expand account"
+                    ? t("Collapse account")
+                    : t("Expand account")
                 }
               >
                 {isVisuallyExpanded ? (
@@ -857,7 +859,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             </span>
             {isFavouriteShortcut && (
               <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                Favourite
+                {t("Favourite")}
               </span>
             )}
           </div>
@@ -886,7 +888,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 void handleFsNoteChange(node.code, value || null);
               }}
               options={fsNoteOptions}
-              ariaLabel={`FS Note for ${node.code}`}
+              ariaLabel={t("FS Note for {{code}}", { code: node.code })}
             />
           )}
         </td>
@@ -898,7 +900,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
             }`}
           >
-            {node.is_active ? "Active" : "Inactive"}
+            {node.is_active ? t("Active") : t("Inactive")}
           </span>
         </td>
         <td className="px-4 py-2 text-center text-sm">
@@ -913,14 +915,14 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 aria-pressed={favouriteCodes.has(node.code)}
                 aria-label={
                   favouriteCodes.has(node.code)
-                    ? `Remove ${node.code} from favourites`
-                    : `Add ${node.code} to favourites`
+                    ? t("Remove {{code}} from favourites", { code: node.code })
+                    : t("Add {{code}} to favourites", { code: node.code })
                 }
                 className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
                 title={
                   favouriteCodes.has(node.code)
-                    ? "Remove from favourites"
-                    : "Add to favourites"
+                    ? t("Remove from favourites")
+                    : t("Add to favourites")
                 }
               >
                 {favouriteCodes.has(node.code) ? (
@@ -939,7 +941,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 handleEditClick(node);
               }}
               className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-              title="Edit"
+              title={t("Edit")}
             >
               <IconPencil size={18} />
             </button>
@@ -949,7 +951,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                   handleDeleteClick(node, event)
                 }
                 className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                title="Delete"
+                title={t("Delete")}
               >
                 <IconTrash size={18} />
               </button>
@@ -1002,7 +1004,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 void handleFsNoteChange(account.code, value || null);
               }}
               options={fsNoteOptions}
-              ariaLabel={`FS Note for ${account.code}`}
+              ariaLabel={t("FS Note for {{code}}", { code: account.code })}
             />
           )}
         </td>
@@ -1014,7 +1016,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 : "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300"
             }`}
           >
-            {account.is_active ? "Active" : "Inactive"}
+            {account.is_active ? t("Active") : t("Inactive")}
           </span>
         </td>
         <td className="px-4 py-2 text-center text-sm">
@@ -1029,14 +1031,14 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 aria-pressed={favouriteCodes.has(account.code)}
                 aria-label={
                   favouriteCodes.has(account.code)
-                    ? `Remove ${account.code} from favourites`
-                    : `Add ${account.code} to favourites`
+                    ? t("Remove {{code}} from favourites", { code: account.code })
+                    : t("Add {{code}} to favourites", { code: account.code })
                 }
                 className="text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
                 title={
                   favouriteCodes.has(account.code)
-                    ? "Remove from favourites"
-                    : "Add to favourites"
+                    ? t("Remove from favourites")
+                    : t("Add to favourites")
                 }
               >
                 {favouriteCodes.has(account.code) ? (
@@ -1055,7 +1057,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 handleEditClick(account);
               }}
               className="text-sky-600 hover:text-sky-800"
-              title="Edit"
+              title={t("Edit")}
             >
               <IconPencil size={18} />
             </button>
@@ -1065,7 +1067,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                   handleDeleteClick(account, event)
                 }
                 className="text-rose-600 hover:text-rose-800"
-                title="Delete"
+                title={t("Delete")}
               >
                 <IconTrash size={18} />
               </button>
@@ -1083,7 +1085,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-2 xl:flex-nowrap 2xl:gap-x-3">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-default-700 dark:text-gray-200">
-              Type:
+              {t("Type:")}
             </span>
             <ListboxSelect
               value={selectedLedgerType}
@@ -1091,7 +1093,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
               options={ledgerTypeOptions}
               className="w-32 2xl:w-40"
               buttonClassName="!rounded-md !py-1.5 !text-sm !shadow-none"
-              ariaLabel="Filter by ledger type"
+              ariaLabel={t("Filter by ledger type")}
             />
           </div>
 
@@ -1100,14 +1102,14 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             onChange={setShowInactive}
             label={
               <>
-                <span className="2xl:hidden">Inactive</span>
-                <span className="hidden 2xl:inline">Show Inactive</span>
+                <span className="2xl:hidden">{t("Inactive")}</span>
+                <span className="hidden 2xl:inline">{t("Show Inactive")}</span>
               </>
             }
             size={18}
             checkedColor="text-sky-600 dark:text-sky-400"
             className="whitespace-nowrap"
-            ariaLabel="Show inactive accounts"
+            ariaLabel={t("Show inactive accounts")}
           />
 
           {/* View Mode Toggle */}
@@ -1121,7 +1123,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                   : "text-default-600 hover:text-default-900 dark:text-gray-300 dark:hover:text-gray-100"
               }`}
             >
-              Tree
+              {t("Tree")}
             </button>
             <button
               type="button"
@@ -1132,7 +1134,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                   : "text-default-600 hover:text-default-900 dark:text-gray-300 dark:hover:text-gray-100"
               }`}
             >
-              Flat
+              {t("Flat")}
             </button>
           </div>
 
@@ -1146,10 +1148,10 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 className="rounded p-1.5 text-default-600 hover:bg-default-100 hover:text-default-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                 title={
                   revealFilteredBranches
-                    ? "Search result branches are expanded automatically"
-                    : "Expand All"
+                    ? t("Search result branches are expanded automatically")
+                    : t("Expand All")
                 }
-                aria-label="Expand all accounts"
+                aria-label={t("Expand all accounts")}
               >
                 <IconFolderOpen size={19} />
               </button>
@@ -1160,10 +1162,10 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 className="rounded p-1.5 text-default-600 hover:bg-default-100 hover:text-default-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                 title={
                   revealFilteredBranches
-                    ? "Search result branches are expanded automatically"
-                    : "Collapse All"
+                    ? t("Search result branches are expanded automatically")
+                    : t("Collapse All")
                 }
-                aria-label="Collapse all accounts"
+                aria-label={t("Collapse all accounts")}
               >
                 <IconFolder size={19} />
               </button>
@@ -1172,16 +1174,16 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
 
           <div className="flex items-center gap-2 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
             <span>
-              Total:{" "}
+              {t("Total:")}{" "}
               <span className="font-medium text-default-900 dark:text-gray-100">
                 {flatAccounts.length}
               </span>
-              <span className="hidden 2xl:inline"> accounts</span>
+              <span className="hidden 2xl:inline"> {t("accounts")}</span>
             </span>
             <span className="text-default-300 dark:text-gray-600">|</span>
             <span>
-              <span className="2xl:hidden">Shown: </span>
-              <span className="hidden 2xl:inline">Showing: </span>
+              <span className="2xl:hidden">{t("Shown:")} </span>
+              <span className="hidden 2xl:inline">{t("Showing:")} </span>
               <span className="font-medium text-default-900 dark:text-gray-100">
                 {filteredAccounts.length}
               </span>
@@ -1197,7 +1199,7 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             />
             <input
               type="text"
-              placeholder="Search code or description..."
+              placeholder={t("Search code or description...")}
               className="w-full rounded-full border border-default-300 bg-white py-1.5 pl-9 pr-8 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               value={searchTerm}
               onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
@@ -1209,8 +1211,8 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                 type="button"
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-[0px] text-default-400 hover:text-default-700 dark:text-gray-400 dark:hover:text-gray-200"
                 onClick={(): void => setSearchTerm("")}
-                title="Clear search"
-                aria-label="Clear search"
+                title={t("Clear search")}
+                aria-label={t("Clear search")}
               >
                 <IconX size={15} />
               </button>
@@ -1226,8 +1228,8 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
             size="sm"
             className="whitespace-nowrap"
           >
-            <span className="2xl:hidden">Add</span>
-            <span className="hidden 2xl:inline">Add Account</span>
+            <span className="2xl:hidden">{t("Add")}</span>
+            <span className="hidden 2xl:inline">{t("Add Account")}</span>
           </Button>
         </div>
       </div>
@@ -1244,27 +1246,27 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
               <thead className="bg-default-100 dark:bg-gray-800">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 min-w-[200px]">
-                    Code
+                    {t("Code")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-28">
-                    Type
+                    {t("Type")}
                   </th>
                   {viewMode === "flat" && (
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
-                      Parent
+                      {t("Parent")}
                     </th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-40">
-                    FS Note
+                    {t("FS Note")}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
-                    Status
+                    {t("Status")}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 w-24">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -1281,12 +1283,12 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                         colSpan={6}
                         className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                       >
-                        No account codes found.{" "}
+                        {t("No account codes found.")}{" "}
                         {searchTerm ||
                         selectedLedgerType !== "All" ||
                         !showInactive
-                          ? "Try adjusting your filters."
-                          : "Create one to get started."}
+                          ? t("Try adjusting your filters.")
+                          : t("Create one to get started.")}
                       </td>
                     </tr>
                   )
@@ -1298,12 +1300,12 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                       colSpan={7}
                       className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                     >
-                      No account codes found.{" "}
+                      {t("No account codes found.")}{" "}
                       {searchTerm ||
                       selectedLedgerType !== "All" ||
                       !showInactive
-                        ? "Try adjusting your filters."
-                        : "Create one to get started."}
+                        ? t("Try adjusting your filters.")
+                        : t("Create one to get started.")}
                     </td>
                   </tr>
                 )}
@@ -1314,32 +1316,30 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
           {totalDisplayItems > 0 && (
             <div className="flex flex-col items-start justify-between gap-3 text-sm text-default-600 dark:text-gray-400 md:flex-row md:items-center">
               <p>
-                Showing{" "}
-                <span className="font-medium text-default-900 dark:text-gray-100">
-                  {pageStartDisplay}
-                </span>{" "}
-                to{" "}
-                <span className="font-medium text-default-900 dark:text-gray-100">
-                  {pageEndIndex}
-                </span>{" "}
-                of{" "}
-                <span className="font-medium text-default-900 dark:text-gray-100">
-                  {totalDisplayItems}
-                </span>{" "}
-                {viewMode === "tree" ? "visible rows" : "accounts"}
+                {viewMode === "tree"
+                  ? t("Showing {{start}} to {{end}} of {{count}} visible rows", {
+                      start: pageStartDisplay,
+                      end: pageEndIndex,
+                      count: totalDisplayItems,
+                    })
+                  : t("Showing {{start}} to {{end}} of {{count}} accounts", {
+                      start: pageStartDisplay,
+                      end: pageEndIndex,
+                      count: totalDisplayItems,
+                    })}
               </p>
 
               {totalPages > 1 && (
                 <nav
                   className="flex items-center gap-1"
-                  aria-label="Account code pagination"
+                  aria-label={t("Account code pagination")}
                 >
                   <button
                     onClick={() => handlePageChange(effectiveCurrentPage - 1)}
                     disabled={effectiveCurrentPage === 1}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-default-300 bg-white text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                    title="Previous page"
-                    aria-label="Previous page"
+                    title={t("Previous page")}
+                    aria-label={t("Previous page")}
                   >
                     <IconChevronLeft size={18} />
                   </button>
@@ -1374,8 +1374,8 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
                     onClick={() => handlePageChange(effectiveCurrentPage + 1)}
                     disabled={effectiveCurrentPage === totalPages}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-default-300 bg-white text-default-700 transition-colors hover:bg-default-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
-                    title="Next page"
-                    aria-label="Next page"
+                    title={t("Next page")}
+                    aria-label={t("Next page")}
                   >
                     <IconChevronRight size={18} />
                   </button>
@@ -1392,8 +1392,11 @@ const AccountCodeListPage: React.FC<AccountCodeListPageProps> = ({
           isOpen={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
           onConfirm={handleConfirmDelete}
-          title="Delete Account Code"
-          message={`Are you sure you want to delete account "${accountToDelete?.code}"? This action cannot be undone.`}
+          title={t("Delete Account Code")}
+          message={t(
+            'Are you sure you want to delete account "{{code}}"? This action cannot be undone.',
+            { code: accountToDelete?.code }
+          )}
           variant="danger"
         />
       )}

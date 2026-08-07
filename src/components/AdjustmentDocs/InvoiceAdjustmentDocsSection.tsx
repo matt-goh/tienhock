@@ -217,6 +217,9 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
               <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
                 {t("Paired")}
               </th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
+                {t("Journal")}
+              </th>
               <th className="px-2 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
                 PDF
               </th>
@@ -251,6 +254,44 @@ const InvoiceAdjustmentDocsSection: React.FC<Props> = ({
                         d.paired_display_id || d.paired_doc_id
                       )}`
                     : "—"}
+                </td>
+                <td className="px-4 py-2">
+                  {d.journal_entry_id ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(
+                          `${
+                            company === "jellypolly"
+                              ? "/jellypolly/accounting/journal-entries"
+                              : "/accounting/journal-entries"
+                          }/${d.journal_entry_id}`
+                        );
+                      }}
+                      className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                      title={t("View journal entry")}
+                    >
+                      <IconFileText size={14} />
+                      <span className="font-mono">
+                        {d.journal_reference || `#${d.journal_entry_id}`}
+                      </span>
+                      {d.journal_status && (
+                        <span className="opacity-80">
+                          {" "}
+                          ({t(
+                            d.journal_status === "cancelled"
+                              ? "Cancelled"
+                              : "Posted"
+                          )})
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      -
+                    </span>
+                  )}
                 </td>
                 <td
                   className="px-2 py-2 text-center"

@@ -1,5 +1,7 @@
 # June 2026 Reclassification Design (Phase 1)
 
+> **PARTIALLY SUPERSEDED 7 Aug 2026 — read [§e](#e-post-print-legacy-amendments-7-aug-2026) before acting on this document.** Three of the corrections below (move **#3**, edits **E10** and **E11**) were derived from the June legacy **print**, which itself carried keying errors. The coworker corrected them in the legacy program and in the ERP on 7 Aug 2026. Everything else in this document stands and is verified in production.
+
 **Created 5 Aug 2026. Phase 2 EXECUTED on dev 6 Aug 2026** — both migrations applied and verified (see the migration note at the bottom); §d.1 resolved by `JUNE_MRM&MGT.pdf`. Phase 2 turns this into the guarded migrations `dev/migrations/2026-08-05_june_legacy_reclass.sql` (moves + E8–E11) and `dev/migrations/2026-08-06_june_legacy_reclass_e1_e7_mrm_mgt.sql` (E1–E7 + MRM/MGT offsets). Parent plan: [JUNE_TB_BIHUN_RECON_HANDOVER.md](JUNE_TB_BIHUN_RECON_HANDOVER.md); Phase 0 artifacts: `dev/import/legacy-june-tb/`; corrected premises A–E from the Phase 1 brief apply (no margin marks; tie-target 17,102,880.87 already met when dev is folded into legacy's presentation; real scope = 18 classification diffs netting exactly 40.00 = CR_LD; CR_LD is a source-document anomaly and out of scope).
 
 ## Method and validation
@@ -15,12 +17,12 @@ Every proposed move below was simulated against the fixture: **all 23 accounts l
 | account | legacy move | dev move | gap | resolution |
 |---|---:|---:|---:|---|
 | BRM | 1,413.74 | 940.48 | −473.26 | moves #1, #14 + edits E6, E7 |
-| MBC | 959.10 | 913.55 | −45.55 | moves #2, #3 + edit E1 |
+| MBC | 959.10 | 913.55 | −45.55 | moves #2, #3 + edit E1 — **§e: legacy amended to 919.10; move #3 dropped** |
 | MBOR | 1,598.80 | 2,044.71 | +445.91 | moves #1, #2 out; #4, #5 in |
 | MBRM | 1,810.95 | 2,211.00 | +400.05 | move #8 out + edits E2, E8, E9 |
-| MBRMF | 5,035.60 | 4,735.60 | −300.00 | move #8 in + edit E10 |
-| MBSAF | 1,429.55 | 1,329.56 | −99.99 | edits E3, E11 |
-| MBSM_K | 3,086.49 | 3,249.20 | +162.71 | moves #3, #4, #5, #7 out; #6 in + edits E4, E5 |
+| MBRMF | 5,035.60 | 4,735.60 | −300.00 | move #8 in + edit E10 — **§e: legacy amended to 5,135.60; E10 dropped** |
+| MBSAF | 1,429.55 | 1,329.56 | −99.99 | edits E3, E11 — **§e: legacy amended to 1,329.55; E11 dropped** |
+| MBSM_K | 3,086.49 | 3,249.20 | +162.71 | moves #3, #4, #5, #7 out; #6 in + edits E4, E5 — **§e: legacy amended to 3,126.49; move #3 dropped** |
 | MBSM_O | 2,251.70 | 2,170.50 | −81.20 | moves #6 out, #7 in |
 | OIL6323 | 370.35 | 340.35 | −30.00 | move #11 in |
 | OIL9698 | 315.50 | 468.50 | +153.00 | moves #9, #10, #11 out |
@@ -43,7 +45,7 @@ All 14 lines sit on **manual, source-less C/B journals** (`source_type` NULL, `m
 |---|---|---|---|---:|---|---|
 | 1 | 7779 | PCE004/06 (PV004/06) | 2026-06-10 | 482.30¹ | MBOR → BRM | BRM seq5 — TAOBAO-JING XIAN YOU #51124865792222003605 (BIHUN food-grade rubber; dev miskeyed to Office Refreshment) |
 | 2 | 7668 | PCE004/06 (PV004/06) | 2026-06-10 | 5.50 | MBOR → MBC | MBC seq2 — EMART 54.30; dev split the same receipt (LJP08202603240094) into MBC 48.80 + this 5.50 leg; 48.80 + 5.50 = 54.30 exactly |
-| 3 | 7696 | PCE004/06 (PV004/06) | 2026-06-10 | 40.00 | MBSM_K → MBC | MBC seq8 — KFC LINTAS JAYA BOULEVARD #130134-14/03/2026 |
+| ~~3~~ | 7696 | PCE004/06 (PV004/06) | 2026-06-10 | 40.00 | ~~MBSM_K → MBC~~ | ~~MBC seq8 — KFC LINTAS JAYA BOULEVARD #130134-14/03/2026~~ **REVERSED — see §e. Legacy's MBC placement was its own keying error; KFC is factory staff food and stays in `MBSM_K`.** |
 | 4 | 7760 | PCE004/06 (PV004/06) | 2026-06-10 | 29.00 | MBSM_K → MBOR | MBOR seq21 — LIDO MARKET #400256-15/05/2026 |
 | 5 | 21055 | PCE008/06 (PV008/06) | 2026-06-30 | 12.90 | MBSM_K → MBOR | MBOR seq43 — MIX STORE #79002112261660070037 |
 | 6 | 7689 | PCE004/06 (PV004/06) | 2026-06-10 | 26.50 | MBSM_O → MBSM_K | MBSM_K seq18 — HO KEE HAINANESE CHICKEN RICE #SLHQ01CT01202600008640 |
@@ -71,10 +73,10 @@ All 14 lines sit on **manual, source-less C/B journals** (`source_type` NULL, `m
 | E7 | 7779 | BRM (with move 1) | PCE004/06 | 482.31 → 482.30 | BRM seq5 — TAOBAO-JING XIAN YOU |
 | E8 | 21042 | MBRM | PCE008/06 | 43.85 → 43.90 | MBRM seq9 — TAOBAO-GU DE LI QI HANG (compressor air gun) |
 | E9 | 21047 | MBRM | PCE008/06 | 629.50 → 629.45 | MBRM seq11 — TAOBAO-HANG ZHOU JIN XIN gearbox RV63 |
-| E10 | 20956 | MBRMF | PBE054/06 | 565.00 → 465.00 | MBRMF seq10 — PAUMIN #2606-2133 cutting-disc leg |
-| E11 | 20955 | MBSAF | PBE054/06 | 144.00 → 244.00 | MBSAF seq4 — PAUMIN #2606-2133 gloves/spectacles leg |
+| ~~E10~~ | 20956 | MBRMF | PBE054/06 | ~~565.00 → 465.00~~ | ~~MBRMF seq10 — PAUMIN #2606-2133 cutting-disc leg~~ **REVERSED — see §e. 565.00 is the receipt's real disc/drill-bit/tape total.** |
+| ~~E11~~ | 20955 | MBSAF | PBE054/06 | ~~144.00 → 244.00~~ | ~~MBSAF seq4 — PAUMIN #2606-2133 gloves/spectacles leg~~ **REVERSED — see §e. 144.00 is the receipt's real gloves/spectacles total.** |
 
-E10+E11 are one receipt whose two legs dev keyed 565/144 where legacy keyed 465/244 — same total 709.00, so PBE054/06 stays balanced.
+E10+E11 are one receipt whose two legs dev keyed 565/144 where legacy keyed 465/244 — same total 709.00, so PBE054/06 stays balanced either way. **§e: dev was right and legacy was wrong; both are now 565/144.**
 
 ### Journal-total invariants (constraint: no journal's total may change)
 
@@ -116,6 +118,8 @@ Global assertions: (i) the seven control accounts (OIL9897 530.00 / OILFORK 172.
 
 ### BIHUN estimated-unit-cost check (task 5)
 
+**§e re-pin (7 Aug 2026):** four of these rows moved when move #3 / E10 / E11 were reversed — MBC 919.10/2 = **459.55** · MBRMF 5,135.60/2 = **2,567.80** · MBSAF 1,329.55/2 = 664.775 ≈ **664.78** · Staff Messing (2,251.70+3,126.49)/2 = 2,689.095 ≈ **2,689.10**. The four deltas (−20 / +50 / −50 / +20) net to zero, so the expenses subtotal and FINAL below are unchanged. `dump-bihun-june.mjs` carries the re-pinned targets.
+
 Post-move June movements reproduce the boss's corrected rows through the existing engine mappings (`estimated_report_line_sources`): MBC 959.10/2 = **479.55** · MBOR 1,598.80/2 = **799.40** · MBRMF 5,035.60/2 = **2,517.80** · MBSAF 1,429.55/2 = 714.775 ≈ **714.78** · Staff Messing (2,251.70+3,086.49)/2 = 2,669.095 ≈ **2,669.10** · VRE-Diesel (OIL9922+OIL9698+OIL6323+OILOTH+OILFORK+OILHT18+OILHT15+OIL9897; OIL7369/5163/CASE/JCB/9753 have zero June movement — verified) 3,111.33/2 = 1,555.665 ≈ **1,555.67** · VRE-Repair (R9922+R9698+ROTH+RBFORK) 3,507.00/2 = **1,753.50** exact · machine repair BRM + MBRM/2 = 1,413.74 + 905.475 = 2,319.215 ≈ **2,319.22**. The expenses subtotal (64,238.82) and FINAL (≈14.0504) follow by construction — every mapped account's movement now equals legacy's, which is what the boss's figures were derived from. Phase 2 verifies with `node dev/pdf-render/dump-bihun-june.mjs`. Note: the four exact-half-sen rows (714.775 / 2,669.095 / 1,555.665 / 2,319.215) may *display* 1 sen below the boss's handwritten figure under JS float rounding — a display artifact, not a data gap.
 
 ## (d) Unresolved / left open
@@ -132,6 +136,45 @@ Post-move June movements reproduce the boss's corrected rows through the existin
 5. **Premise-pair corrections (task 4):** the guessed pairs were verified and one was wrong — OIL9882 +80.00 pairs with **OIL9922** (not OIL920): fixture-exact (OIL9922 seq5 = dev OIL9882 line id21038). OIL920 −40.00 pairs with OILOTH +40.00 as guessed. OIL6323 −30.00 pairs with **OIL9698**, not OILOTH: the dev OIL9698 line id7731 is the verbatim receipt (#01001886-22/03/2026) of legacy OIL6323 seq11.
 6. **Observed, deliberately NOT proposed for change** (same-account/same-total or cosmetic): dev MBOR splits OWL TEA 35.30 into two 17.65 lines where legacy prints one (same account, same total); PCE008/06's `display_reference` is `PCE008/06` while legacy prints `PV008/06` (display only); a few dev particulars carry harmless receipt-text typos (e.g. OIL6323 `#01007826` vs legacy `#01001826`, `#01001990` vs `#01001996`, PETRON `24/02` vs `24/06`). None affects any balance; listing them here so Phase 2 does not "fix" them opportunistically.
 
+## (e) Post-print legacy amendments (7 Aug 2026)
+
+The coworker was shown [KEYING_GUIDE_BM.md](KEYING_GUIDE_BM.md) and flagged three of its rows. Two were real: **the June print we reconciled against contained keying errors of her own**, so aligning our ledger to it moved two correct classifications to wrong ones. She corrected both in the legacy program *and* in the ERP (journals `PCE004/06` at 2026-08-07 00:29 and `PBE054/06` at 00:46), which reverses move #3, E10 and E11.
+
+| # | line | what the print said | what is actually correct | why |
+|---|---|---|---|---|
+| move #3 | `PCE004/06` KFC LINTAS JAYA #130134, 40.00 | `MBC` (Cleaning Expenses) | **`MBSM_K`** | KFC is a meal for factory staff. It cannot be a cleaning expense — rule 4 of the keying guide. |
+| E10 | `PBE054/06` PAUMIN #2606-2133 disc leg | 465.00 | **565.00** | The receipt's cutting/grinding discs, non-woven wheel, flap disc, roller refill, drill bits, holesaw and insulating tape total 565.00. |
+| E11 | `PBE054/06` PAUMIN #2606-2133 PPE leg | 244.00 | **144.00** | 2 doz batik cotton gloves + 12 spectacles total 144.00. |
+
+E10+E11 are one receipt (709.00 either way) so no voucher total moved; move #3 is a pure account change. All five reconciled vouchers still foot exactly, `manual_override` is still false on all of them, and the June TB is unchanged at 17,106,536.00/side.
+
+**The result is arithmetically self-confirming.** Amend the legacy targets the way she describes, drop those three corrections, and every affected account still ties to the cent — no plug, nothing left over:
+
+| account | amended legacy | ERP now (prod, verified 7 Aug) | |
+|---|---:|---:|---|
+| MBC | 959.10 − 40 = 919.10 | 913.55 + 5.50 (move #2) + 0.05 (E1) = **919.10** | ✓ |
+| MBSM_K | 3,086.49 + 40 = 3,126.49 | 3,249.20 − 29.00 − 12.90 − 107.70 + 26.50 + 0.40 − 0.01 = **3,126.49** | ✓ |
+| MBRMF | 5,035.60 + 100 = 5,135.60 | 4,735.60 + 400.00 (move #8) = **5,135.60** | ✓ |
+| MBSAF | 1,429.55 − 100 = 1,329.55 | 1,329.56 − 0.01 (E3) = **1,329.55** | ✓ |
+
+Her third flag — `PCE004/06`'s sen-level edits — needed no action: her screenshots show the legacy program and the ERP both at 21.25 / 160.55 / 88.20 / 61.93 / 26.71 / 89.12 / 46.65 / 482.30 / 9.05. E1–E7 and the §d.1 MRM/MGT offsets were right and are already in on both sides. "It seems it amended already" was our 6 Aug migration.
+
+### §e resolution — it flipped twice; `MBSM_K` / 565-144 stands
+
+Later on 7 Aug the coworker, asked to reconcile §e against her own 4 Aug annotated scans (`CORRECTED_BIHUN_JUNE_ESTIMATED_UNIT_COST.pdf`, which shows MBC 479.55 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10), said the **4 Aug figures** were right — which would have required reversing move #3, E10 and E11 again. A reversal handover was drafted and then withdrawn: **a second person independently confirmed KFC belongs in `MBSM_K`**, and MBC 479.55 is arithmetically nothing other than KFC 40.00 sitting in Cleaning Expenses. The 4 Aug scans predate the correction and are stale on exactly these four lines, in the same way the June TB print is stale on the four matching accounts.
+
+**Outcome — CLOSED 7 Aug 2026: no data change.** She re-confirmed the 4 Aug figures once more, and the contradiction was then resolved by the missing fact: **she had also updated the estimated unit cost inside the legacy program**. Legacy and the ERP therefore carry the same June classification, and the bottom line agrees on both sides (expenses subtotal 64,238.82, FINAL 14.0504). Production keeps the 7 Aug state (KFC 40.00 in `MBSM_K`; PAUMIN `MBRMF` 565.00 / `MBSAF` 144.00), the re-pinned targets stand, and the 4 Aug annotated scans are a superseded pre-amendment snapshot. June estimated unit cost is done; see [JUNE_TB_BIHUN_RECON_HANDOVER.md](JUNE_TB_BIHUN_RECON_HANDOVER.md).
+
+One thing to watch:
+
+- **The 4 Aug paper scans are still the old figures.** Legacy's own estimated unit cost was updated, but the annotated printout in circulation was not. If it resurfaces, it is stale — the current figures are 459.55 / 2,567.80 / 664.78 / 2,689.10.
+
+**Do not use the subtotal, FINAL or the Trial Balance total to adjudicate this.** The four deltas are −20 / +50 / −50 / +20 and net to zero, so 64,238.82, 14.0504 and 17,102,880.87 are identical under both classifications. Only the receipt settles it.
+
+**Method lesson.** Every row of the keying guide and every correction in this document was derived from a single printed source. A print is evidence of *what was keyed*, not of *what is correct* — where legacy and the ERP disagreed, we assumed legacy was right by default. For the 28 rows backed by an unambiguous vendor/part rule that assumption held; for these three it inverted a correct ERP entry. Future reconciliations should treat a legacy-vs-ERP difference as a question for the receipt, and prefer a fresh month-end export over a print that the coworker may still be editing.
+
 ### Migration shape note for Phase 2 — EXECUTED on dev 6 Aug 2026
 
 Two guarded, idempotent, fail-closed transactions in the style of `dev/migrations/2026-08-05_pce002_acwj_sal_reclass.sql`: `dev/migrations/2026-08-05_june_legacy_reclass.sql` (14 moves + E8–E11, the independent-safe scope) and `dev/migrations/2026-08-06_june_legacy_reclass_e1_e7_mrm_mgt.sql` (E1–E7 + the six §d.1 MRM/MGT offsets, applied together once `JUNE_MRM&MGT.pdf` confirmed them). Each asserts every line's current journal/account/amount/particulars before updating; the post-assertions re-verify the (c) table per account (June movement AND June YTD), per-journal totals, and net 0.00 change. Dev result: all assertions pass; `dump-bihun-june.mjs` lands every boss target (MBC 479.55 · MBOR 799.40 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10 · VRE-Diesel 1,555.67 · VRE-Repair 1,753.50 · expenses 64,238.82 · machine repair 2,319.22 · FINAL 14.0504). Prod applies the same two files in Phase 4 after user sign-off. **Prod caveat:** the jel.id values above are dev ids — both migrations resolve lines by (journal reference, account, amount, particulars), not by id, so they port to prod unchanged.
+
+**Do not re-run either migration.** Both are applied in production, and §e has since reversed move #3, E10 and E11 by hand. Re-running would re-assert the pre-edit line state, fail its own guards, and — if forced — reintroduce the three wrong classifications. The current production state is correct; the files are kept only as the historical record.

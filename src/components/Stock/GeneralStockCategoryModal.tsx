@@ -1,5 +1,6 @@
 // src/components/Stock/GeneralStockCategoryModal.tsx
 import React, { Fragment, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -33,6 +34,8 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
   categories,
   onChanged,
 }) => {
+  const { t } = useTranslation("stock");
+
   const [newName, setNewName] = useState<string>("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState<string>("");
@@ -58,10 +61,10 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
       });
       setNewName("");
       await onChanged();
-      toast.success("Category added");
+      toast.success(t("Category added"));
     } catch (error: unknown) {
       console.error("Error adding general stock category:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to add category");
+      toast.error(error instanceof Error ? error.message : t("Failed to add category"));
     } finally {
       setIsBusy(false);
     }
@@ -94,10 +97,10 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
       });
       cancelEditing();
       await onChanged();
-      toast.success("Category updated");
+      toast.success(t("Category updated"));
     } catch (error: unknown) {
       console.error("Error updating general stock category:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to update category");
+      toast.error(error instanceof Error ? error.message : t("Failed to update category"));
     } finally {
       setIsBusy(false);
     }
@@ -105,16 +108,16 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
 
   const handleDelete = async (category: GeneralStockCategory): Promise<void> => {
     if (isBusy) return;
-    if (!window.confirm(`Remove category "${category.name}"?`)) return;
+    if (!window.confirm(t('Remove category "{{name}}"?', { name: category.name }))) return;
 
     setIsBusy(true);
     try {
       await api.delete(`/api/general-purchases/general-stock/categories/${category.id}`);
       await onChanged();
-      toast.success("Category removed");
+      toast.success(t("Category removed"));
     } catch (error: unknown) {
       console.error("Error removing general stock category:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to remove category");
+      toast.error(error instanceof Error ? error.message : t("Failed to remove category"));
     } finally {
       setIsBusy(false);
     }
@@ -158,10 +161,10 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                         as="h3"
                         className="text-base font-semibold text-default-800 dark:text-gray-100"
                       >
-                        Manage Categories
+                        {t("Manage Categories")}
                       </DialogTitle>
                       <p className="text-xs text-default-500 dark:text-gray-400">
-                        Add, rename, or remove general stock categories.
+                        {t("Add, rename, or remove general stock categories.")}
                       </p>
                     </div>
                   </div>
@@ -169,7 +172,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                     type="button"
                     onClick={onClose}
                     className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                    aria-label="Close"
+                    aria-label={t("Close")}
                   >
                     <IconX size={18} />
                   </button>
@@ -190,7 +193,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                           handleAdd();
                         }
                       }}
-                      placeholder="New category name"
+                      placeholder={t("New category name")}
                       className="h-9 flex-1 rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     />
                     <Button
@@ -201,7 +204,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                       onClick={handleAdd}
                       disabled={!newName.trim() || isBusy}
                     >
-                      Add
+                      {t("Add")}
                     </Button>
                   </div>
                 </div>
@@ -212,7 +215,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                     <div className="flex flex-col items-center justify-center gap-2 py-10 text-center">
                       <IconCategory2 size={32} className="text-default-300 dark:text-gray-600" />
                       <p className="text-sm text-default-500 dark:text-gray-400">
-                        No categories yet. Add one above to get started.
+                        {t("No categories yet. Add one above to get started.")}
                       </p>
                     </div>
                   ) : (
@@ -249,7 +252,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                                   onClick={() => handleUpdate(category)}
                                   disabled={!editingName.trim() || isBusy}
                                   className="rounded-md p-1.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:opacity-40 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
-                                  title="Save"
+                                  title={t("Save")}
                                 >
                                   <IconCheck size={16} />
                                 </button>
@@ -257,7 +260,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                                   type="button"
                                   onClick={cancelEditing}
                                   className="rounded-md p-1.5 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                                  title="Cancel"
+                                  title={t("Cancel")}
                                 >
                                   <IconX size={16} />
                                 </button>
@@ -271,7 +274,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                                   type="button"
                                   onClick={() => startEditing(category)}
                                   className="rounded-md p-1.5 text-default-400 transition-colors hover:bg-default-100 hover:text-sky-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-sky-300"
-                                  title="Rename"
+                                  title={t("Rename")}
                                 >
                                   <IconPencil size={16} />
                                 </button>
@@ -280,7 +283,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                                   onClick={() => handleDelete(category)}
                                   disabled={isBusy}
                                   className="rounded-md p-1.5 text-default-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 dark:text-gray-500 dark:hover:bg-rose-900/20 dark:hover:text-rose-300"
-                                  title="Remove"
+                                  title={t("Remove")}
                                 >
                                   <IconTrash size={16} />
                                 </button>
@@ -296,7 +299,7 @@ const GeneralStockCategoryModal: React.FC<GeneralStockCategoryModalProps> = ({
                 {/* Footer */}
                 <div className="flex justify-end border-t border-default-200 px-5 py-3 dark:border-gray-700">
                   <Button type="button" variant="outline" size="sm" onClick={onClose}>
-                    Done
+                    {t("Done")}
                   </Button>
                 </div>
               </DialogPanel>

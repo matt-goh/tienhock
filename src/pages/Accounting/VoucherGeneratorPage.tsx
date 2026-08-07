@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import MonthNavigator from "../../components/MonthNavigator";
@@ -192,6 +193,7 @@ const AccountCodeTooltip: React.FC<AccountCodeTooltipProps> = ({
   accountDescription,
   type = "expense",
 }) => {
+  const { t } = useTranslation("accounting");
   const [isVisible, setIsVisible] = useState(false);
   const [tooltipPos, setTooltipPos] = useState({ top: 0, left: 0, placement: "top" as "top" | "bottom" });
   const triggerRef = useRef<HTMLSpanElement>(null);
@@ -291,23 +293,23 @@ const AccountCodeTooltip: React.FC<AccountCodeTooltipProps> = ({
         >
           <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg p-3">
             <div className="font-medium text-gray-300 dark:text-gray-200 mb-1.5 pb-1.5 border-b border-gray-700 dark:border-gray-600">
-              Account Details
+              {t("Account Details")}
             </div>
             <div className="space-y-1.5">
               <div className="flex justify-between gap-2">
-                <span className="text-gray-400">Code:</span>
+                <span className="text-gray-400">{t("Code:")}</span>
                 <span className="text-sky-400">{accountCode}</span>
               </div>
               {accountDescription && (
                 <div className="flex justify-between gap-2">
-                  <span className="text-gray-400">Name:</span>
+                  <span className="text-gray-400">{t("Name:")}</span>
                   <span className="text-gray-200 text-right">{accountDescription}</span>
                 </div>
               )}
               <div className="flex justify-between gap-2">
-                <span className="text-gray-400">Type:</span>
+                <span className="text-gray-400">{t("Type:")}</span>
                 <span className={type === "expense" ? "text-blue-400" : "text-amber-400"}>
-                  {type === "expense" ? "Expense" : "Payable"}
+                  {type === "expense" ? t("Expense") : t("Payable")}
                 </span>
               </div>
             </div>
@@ -339,6 +341,7 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
   totalCredit,
   accountName,
 }) => {
+  const { t } = useTranslation("accounting");
   const fmt = (n: number): string =>
     new Intl.NumberFormat("en-MY", {
       minimumFractionDigits: 2,
@@ -350,15 +353,15 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
     <div className="p-4 border-t border-default-200 dark:border-gray-700">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-sm font-medium text-default-700 dark:text-gray-200">
-          Journal entry preview — exactly what will be posted
+          {t("Journal entry preview \u2014 exactly what will be posted")}
         </h4>
         {balanced ? (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
-            <IconCheck size={12} /> Balanced
+            <IconCheck size={12} /> {t("Balanced")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300">
-            <IconAlertCircle size={12} /> Out of balance
+            <IconAlertCircle size={12} /> {t("Out of balance")}
           </span>
         )}
       </div>
@@ -367,16 +370,16 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
           <thead className="bg-default-100 dark:bg-gray-900/50">
             <tr>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400 w-28">
-                Acc/Code
+                {t("Acc/Code")}
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400">
-                Description
+                {t("Description")}
               </th>
               <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
-                Debit (RM)
+                {t("Debit (RM)")}
               </th>
               <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-default-600 dark:text-gray-400 w-32">
-                Credit (RM)
+                {t("Credit (RM)")}
               </th>
             </tr>
           </thead>
@@ -384,7 +387,7 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
             {lines.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-3 py-6 text-center text-default-500 dark:text-gray-400">
-                  No lines to post for this month
+                  {t("No lines to post for this month")}
                 </td>
               </tr>
             ) : (
@@ -414,7 +417,7 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
           <tfoot className="bg-default-100 dark:bg-gray-900/50 border-t-2 border-default-300 dark:border-gray-600">
             <tr className="font-semibold">
               <td colSpan={2} className="px-3 py-2 text-right text-default-800 dark:text-gray-200">
-                Total
+                {t("Total")}
               </td>
               <td className="px-3 py-2 text-right text-default-900 dark:text-gray-100">
                 {fmt(totalDebit)}
@@ -435,6 +438,7 @@ const JournalPreviewTable: React.FC<JournalPreviewTableProps> = ({
 // ============================================================================
 
 const VoucherGeneratorPage: React.FC = () => {
+  const { t, i18n } = useTranslation("accounting");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { accountCodes } = useAccountCodesCache();
@@ -462,7 +466,9 @@ const VoucherGeneratorPage: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [printingSummary, setPrintingSummary] = useState(false);
   const [previewData, setPreviewData] = useState<PreviewData | null>(null);
-  const [helpLanguage, setHelpLanguage] = useState<"ms" | "en">("ms");
+  const [helpLanguage, setHelpLanguage] = useState<"ms" | "en">(() =>
+    i18n.resolvedLanguage === "ms" ? "ms" : "en"
+  );
 
   useScrollRestoration("voucher-generator", !loading && previewData !== null);
 
@@ -493,11 +499,11 @@ const VoucherGeneratorPage: React.FC = () => {
       setPreviewData(response as PreviewData);
     } catch (error) {
       console.error("Error fetching preview:", error);
-      toast.error("Failed to load voucher preview");
+      toast.error(t("Failed to load voucher preview"));
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, t]);
 
   useEffect(() => {
     fetchPreview();
@@ -530,17 +536,33 @@ const VoucherGeneratorPage: React.FC = () => {
       }
 
       if (successCount > 0) {
-        toast.success(`Generated ${successCount} voucher(s) successfully`);
+        toast.success(
+          t(
+            successCount === 1
+              ? "Generated {{count}} voucher successfully"
+              : "Generated {{count}} vouchers successfully",
+            { count: successCount }
+          )
+        );
       }
       if (skippedCount > 0) {
-        toast(`${skippedCount} voucher(s) already exist`, { icon: "⚠️" });
+        toast(
+          t(
+            skippedCount === 1
+              ? "{{count}} voucher already exists"
+              : "{{count}} vouchers already exist",
+            { count: skippedCount }
+          ),
+          { icon: "⚠️" }
+        );
       }
 
       // Refresh preview
       fetchPreview();
     } catch (error: unknown) {
       console.error("Error generating vouchers:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to generate vouchers";
+      const errorMessage =
+        error instanceof Error ? error.message : t("Failed to generate vouchers");
       toast.error(errorMessage);
     } finally {
       setGenerating(false);
@@ -562,7 +584,8 @@ const VoucherGeneratorPage: React.FC = () => {
       });
     } catch (error: unknown) {
       console.error("Error printing payroll summary:", error);
-      const msg = error instanceof Error ? error.message : "Failed to print payroll summary";
+      const msg =
+        error instanceof Error ? error.message : t("Failed to print payroll summary");
       toast.error(msg);
     } finally {
       setPrintingSummary(false);
@@ -633,10 +656,10 @@ const VoucherGeneratorPage: React.FC = () => {
       <div className="mb-4 flex flex-col lg:flex-row justify-between lg:items-center gap-4">
         <div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Payroll Voucher Generator
+            {t("Payroll Voucher Generator")}
           </h1>
           <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
-            Generate journal vouchers from payroll data
+            {t("Generate journal vouchers from payroll data")}
           </p>
         </div>
 
@@ -649,9 +672,11 @@ const VoucherGeneratorPage: React.FC = () => {
             iconPosition="left"
             size="md"
             disabled={loading || printingSummary}
-            title="Print the Director/Workers payroll summary that reconciles to these vouchers"
+            title={t(
+              "Print the Director/Workers payroll summary that reconciles to these vouchers"
+            )}
           >
-            {printingSummary ? "Preparing..." : "Payroll Summary"}
+            {printingSummary ? t("Preparing...") : t("Payroll Summary")}
           </Button>
           <span className="h-6 w-px bg-default-300 dark:bg-gray-600" />
           <MonthNavigator
@@ -668,7 +693,7 @@ const VoucherGeneratorPage: React.FC = () => {
             size="md"
             disabled={loading || generating}
           >
-            {generating ? "Generating..." : "Generate All"}
+            {generating ? t("Generating...") : t("Generate All")}
           </Button>
         </div>
       </div>
@@ -691,10 +716,12 @@ const VoucherGeneratorPage: React.FC = () => {
                   </span>
                   <div>
                     <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-                      Director's Remuneration
+                      {t("Director's Remuneration")}
                     </h2>
                     <p className="text-sm text-default-500 dark:text-gray-400">
-                      Reference: {previewData.jvdr.reference}
+                      {t("Reference: {{reference}}", {
+                        reference: previewData.jvdr.reference,
+                      })}
                     </p>
                   </div>
                 </div>
@@ -703,7 +730,7 @@ const VoucherGeneratorPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                         <IconCheck size={14} />
-                        Generated
+                        {t("Generated")}
                       </span>
                       <Button
                         onClick={() => handleViewEntry(previewData.jvdr.entry_id)}
@@ -713,7 +740,7 @@ const VoucherGeneratorPage: React.FC = () => {
                         iconPosition="left"
                         size="sm"
                       >
-                        View Entry
+                        {t("View Entry")}
                       </Button>
                     </div>
                   ) : (
@@ -726,7 +753,7 @@ const VoucherGeneratorPage: React.FC = () => {
                       size="sm"
                       disabled={generating || previewData.jvdr.locations.length === 0}
                     >
-                      Generate JVDR
+                      {t("Generate JVDR")}
                     </Button>
                   )}
                 </div>
@@ -739,29 +766,29 @@ const VoucherGeneratorPage: React.FC = () => {
                 <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/30">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <MiniSummaryCard
-                      label="Total Gross Pay"
+                      label={t("Total Gross Pay")}
                       value={previewData.jvdr.locations.reduce((sum, loc) => sum + loc.salary, 0)}
                       color="blue"
                       icon={<IconCash size={14} />}
                     />
                     <MiniSummaryCard
-                      label="Employer Contributions"
+                      label={t("Employer Contributions")}
                       value={calculateJVDRTotals(previewData.jvdr.locations).totalContributions}
-                      sublabel="EPF + SOCSO + SIP"
+                      sublabel={t("EPF + SOCSO + SIP")}
                       color="blue"
                       icon={<IconBuildingBank size={14} />}
                     />
                     <MiniSummaryCard
-                      label="Tax Payable"
+                      label={t("Tax Payable")}
                       value={previewData.jvdr.locations.reduce((sum, loc) => sum + loc.pcb, 0)}
-                      sublabel="PCB to LHDN"
+                      sublabel={t("PCB to LHDN")}
                       color="amber"
                       icon={<IconReceipt size={14} />}
                     />
                     <MiniSummaryCard
-                      label="Net Salary Payable"
+                      label={t("Net Salary Payable")}
                       value={previewData.jvdr.locations.reduce((sum, loc) => sum + loc.net_salary, 0)}
-                      sublabel="To pay directors"
+                      sublabel={t("To pay directors")}
                       color="amber"
                       icon={<IconCash size={14} />}
                     />
@@ -775,35 +802,39 @@ const VoucherGeneratorPage: React.FC = () => {
                       {/* Grouped Header Row */}
                       <tr className="bg-default-50 dark:bg-gray-900/50">
                         <th rowSpan={2} className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 border-b border-default-200 dark:border-gray-700">
-                          Director
+                          {t("Director")}
                         </th>
                         <th colSpan={4} className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-b border-blue-200 dark:border-blue-800">
-                          <div>Company Expenses</div>
-                          <div className="text-[10px] font-normal normal-case mt-0.5">Recorded as costs</div>
+                          <div>{t("Company Expenses")}</div>
+                          <div className="text-[10px] font-normal normal-case mt-0.5">
+                            {t("Recorded as costs")}
+                          </div>
                         </th>
                         <th colSpan={2} className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-b border-amber-200 dark:border-amber-800">
-                          <div>Amounts to Pay</div>
-                          <div className="text-[10px] font-normal normal-case mt-0.5">Owed to directors/govt</div>
+                          <div>{t("Amounts to Pay")}</div>
+                          <div className="text-[10px] font-normal normal-case mt-0.5">
+                            {t("Owed to directors/govt")}
+                          </div>
                         </th>
                       </tr>
                       <tr className="bg-default-50 dark:bg-gray-900/50">
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          Gross Pay
+                          {t("Gross Pay")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          EPF
+                          {t("EPF")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          SOCSO
+                          {t("SOCSO")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          SIP
+                          {t("SIP")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-amber-50/50 dark:bg-amber-900/10">
-                          Tax
+                          {t("Tax")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-amber-50/50 dark:bg-amber-900/10">
-                          Net Salary
+                          {t("Net Salary")}
                         </th>
                       </tr>
                     </thead>
@@ -813,7 +844,7 @@ const VoucherGeneratorPage: React.FC = () => {
                           <td className="px-4 py-2.5 text-sm font-medium text-default-800 dark:text-gray-200">
                             <span className="text-purple-600 dark:text-purple-400">{loc.location_id}</span>
                             <span className="mx-1">-</span>
-                            {loc.location_name || "Director"}
+                            {loc.location_name || t("Director")}
                           </td>
                           <td className="px-4 py-2.5 text-sm text-right bg-blue-50/30 dark:bg-blue-900/5">
                             <AccountCodeTooltip
@@ -869,7 +900,7 @@ const VoucherGeneratorPage: React.FC = () => {
                     <tfoot className="bg-default-100 dark:bg-gray-900/50">
                       <tr className="font-semibold">
                         <td className="px-4 py-2.5 text-sm text-default-800 dark:text-gray-200">
-                          Total
+                          {t("Total")}
                         </td>
                         <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(previewData.jvdr.locations.reduce((sum, loc) => sum + loc.salary, 0))}
@@ -907,7 +938,7 @@ const VoucherGeneratorPage: React.FC = () => {
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
                 <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500 dark:text-amber-400" />
-                <p>No director salary data for this month</p>
+                <p>{t("No director salary data for this month")}</p>
               </div>
             )}
           </div>
@@ -923,10 +954,12 @@ const VoucherGeneratorPage: React.FC = () => {
                   </span>
                   <div>
                     <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-                      Staff Salary Wages
+                      {t("Staff Salary Wages")}
                     </h2>
                     <p className="text-sm text-default-500 dark:text-gray-400">
-                      Reference: {previewData.jvsl.reference}
+                      {t("Reference: {{reference}}", {
+                        reference: previewData.jvsl.reference,
+                      })}
                     </p>
                   </div>
                 </div>
@@ -935,7 +968,7 @@ const VoucherGeneratorPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300">
                         <IconCheck size={14} />
-                        Generated
+                        {t("Generated")}
                       </span>
                       <Button
                         onClick={() => handleViewEntry(previewData.jvsl.entry_id)}
@@ -945,7 +978,7 @@ const VoucherGeneratorPage: React.FC = () => {
                         iconPosition="left"
                         size="sm"
                       >
-                        View Entry
+                        {t("View Entry")}
                       </Button>
                     </div>
                   ) : (
@@ -958,7 +991,7 @@ const VoucherGeneratorPage: React.FC = () => {
                       size="sm"
                       disabled={generating || previewData.jvsl.locations.length === 0}
                     >
-                      Generate JVSL
+                      {t("Generate JVSL")}
                     </Button>
                   )}
                 </div>
@@ -977,11 +1010,12 @@ const VoucherGeneratorPage: React.FC = () => {
                       <IconAlertTriangle className="text-amber-500 mt-0.5 flex-shrink-0" size={20} />
                       <div>
                         <h4 className="font-medium text-amber-800 dark:text-amber-300">
-                          Some amounts are missing account mappings
+                          {t("Some amounts are missing account mappings")}
                         </h4>
                         <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                          Generation is blocked until every amount has an account —
-                          an incomplete voucher would not balance.
+                          {t(
+                            "Generation is blocked until every amount has an account \u2014 an incomplete voucher would not balance."
+                          )}
                         </p>
                         {(previewData.jvsl.unmapped?.length ?? 0) > 0 && (
                           <ul className="mt-2 text-xs text-amber-700 dark:text-amber-400 list-disc list-inside space-y-0.5">
@@ -999,7 +1033,7 @@ const VoucherGeneratorPage: React.FC = () => {
                           icon={IconExternalLink}
                           iconPosition="left"
                         >
-                          Configure Mappings
+                          {t("Configure Mappings")}
                         </Button>
                       </div>
                     </div>
@@ -1010,37 +1044,37 @@ const VoucherGeneratorPage: React.FC = () => {
                 <div className="p-4 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/30">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                     <MiniSummaryCard
-                      label="Total Gross Pay"
+                      label={t("Total Gross Pay")}
                       value={calculateJVSLTotals(previewData.jvsl.locations).totalSalary}
                       color="blue"
                       icon={<IconCash size={14} />}
                     />
                     <MiniSummaryCard
-                      label="EPF (Company)"
+                      label={t("EPF (Company)")}
                       value={calculateJVSLTotals(previewData.jvsl.locations).totalEPF}
                       sublabel={previewData.jvsl.totals?.accrual_accounts?.accrual_epf || "ACW_EPF"}
                       color="blue"
                     />
                     <MiniSummaryCard
-                      label="SOCSO (Company)"
+                      label={t("SOCSO (Company)")}
                       value={calculateJVSLTotals(previewData.jvsl.locations).totalSOCSO}
                       sublabel={previewData.jvsl.totals?.accrual_accounts?.accrual_socso || "ACW_SC"}
                       color="blue"
                     />
                     <MiniSummaryCard
-                      label="SIP (Company)"
+                      label={t("SIP (Company)")}
                       value={calculateJVSLTotals(previewData.jvsl.locations).totalSIP}
                       sublabel={previewData.jvsl.totals?.accrual_accounts?.accrual_sip || "ACW_SIP"}
                       color="blue"
                     />
                     <MiniSummaryCard
-                      label="Tax Payable"
+                      label={t("Tax Payable")}
                       value={calculateJVSLTotals(previewData.jvsl.locations).totalPCB}
                       sublabel={previewData.jvsl.totals?.accrual_accounts?.accrual_pcb || "ACW_PCB"}
                       color="amber"
                     />
                     <MiniSummaryCard
-                      label="Salary Payable"
+                      label={t("Salary Payable")}
                       value={calculateJVSLTotals(previewData.jvsl.locations).totalNetSalary}
                       sublabel={previewData.jvsl.totals?.accrual_accounts?.accrual_salary || "ACW_SAL"}
                       color="amber"
@@ -1055,31 +1089,33 @@ const VoucherGeneratorPage: React.FC = () => {
                       {/* Grouped Header Row */}
                       <tr className="bg-default-50 dark:bg-gray-900/50">
                         <th rowSpan={2} className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 border-b border-default-200 dark:border-gray-700">
-                          Location
+                          {t("Location")}
                         </th>
                         <th colSpan={4} className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-b border-blue-200 dark:border-blue-800">
-                          <div>Company Expenses</div>
-                          <div className="text-[10px] font-normal normal-case mt-0.5">Recorded as costs per department</div>
+                          <div>{t("Company Expenses")}</div>
+                          <div className="text-[10px] font-normal normal-case mt-0.5">
+                            {t("Recorded as costs per department")}
+                          </div>
                         </th>
                         <th rowSpan={2} className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 border-b border-default-200 dark:border-gray-700">
-                          Total
+                          {t("Total")}
                         </th>
                         <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 border-b border-default-200 dark:border-gray-700">
-                          Status
+                          {t("Status")}
                         </th>
                       </tr>
                       <tr className="bg-default-50 dark:bg-gray-900/50">
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          Gross Pay
+                          {t("Gross Pay")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          EPF
+                          {t("EPF")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          SOCSO
+                          {t("SOCSO")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-400 bg-blue-50/50 dark:bg-blue-900/10">
-                          SIP
+                          {t("SIP")}
                         </th>
                       </tr>
                     </thead>
@@ -1134,7 +1170,9 @@ const VoucherGeneratorPage: React.FC = () => {
                               {missingMappings.length > 0 ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300">
                                   <IconAlertCircle size={12} />
-                                  {missingMappings.join(", ")}
+                                  {missingMappings
+                                    .map((mapping) => t(mapping))
+                                    .join(", ")}
                                 </span>
                               ) : (
                                 <IconCheck size={16} className="mx-auto text-green-600 dark:text-green-400" />
@@ -1147,7 +1185,9 @@ const VoucherGeneratorPage: React.FC = () => {
                     <tfoot className="bg-default-100 dark:bg-gray-900/50">
                       <tr className="font-semibold">
                         <td className="px-4 py-2.5 text-sm text-default-800 dark:text-gray-200">
-                          Total ({previewData.jvsl.locations.length} locations)
+                          {t("Total ({{count}} locations)", {
+                            count: previewData.jvsl.locations.length,
+                          })}
                         </td>
                         <td className="px-4 py-2.5 text-sm text-right text-default-800 dark:text-gray-200 bg-blue-100/50 dark:bg-blue-900/20">
                           {formatCurrency(calculateJVSLTotals(previewData.jvsl.locations).totalSalary)}
@@ -1188,7 +1228,7 @@ const VoucherGeneratorPage: React.FC = () => {
             ) : (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
                 <IconAlertCircle size={32} className="mx-auto mb-2 text-amber-500 dark:text-amber-400" />
-                <p>No staff salary data for this month</p>
+                <p>{t("No staff salary data for this month")}</p>
               </div>
             )}
           </div>
@@ -1303,7 +1343,7 @@ const VoucherGeneratorPage: React.FC = () => {
         </div>
       ) : (
         <div className="p-8 text-center text-default-500 dark:text-gray-400">
-          No preview data available
+          {t("No preview data available")}
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { Trans, useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { AccountCode, LedgerType } from "../../types/types";
 import {
@@ -161,6 +162,7 @@ const createEmptyFormData = (sortOrder: number = 0): AccountCodeFormData => ({
 const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   company = "tienhock",
 }: AccountCodeFormPageProps) => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const { code } = useParams<{ code: string }>();
   const isEditMode: boolean = !!code;
@@ -300,16 +302,17 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       if (accountRequestIdRef.current !== requestId) return;
       console.error("Error fetching account data:", fetchError);
       setError(
-        `Failed to load account code: ${
-          fetchError instanceof Error ? fetchError.message : "Unknown error"
-        }`
+        t("Failed to load account code: {{message}}", {
+          message:
+            fetchError instanceof Error ? fetchError.message : t("Unknown error"),
+        })
       );
     } finally {
       if (accountRequestIdRef.current === requestId) {
         setLoading(false);
       }
     }
-  }, [apiBase, code]);
+  }, [apiBase, code, t]);
 
   // Initial data loading
   useEffect(() => {
@@ -388,7 +391,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
         setOverviewError(
           fetchError instanceof Error
             ? fetchError.message
-            : "Failed to load account activity"
+            : t("Failed to load account activity")
         );
       } finally {
         if (overviewRequestIdRef.current === requestId) {
@@ -410,6 +413,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
     overviewRefreshKey,
     overviewYear,
     pageLoading,
+    t,
   ]);
 
   // Form change detection
@@ -483,22 +487,22 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   // Form validation
   const validateForm = (): boolean => {
     if (!formData.code.trim()) {
-      toast.error("Account code is required");
+      toast.error(t("Account code is required"));
       return false;
     }
 
     if (!formData.description.trim()) {
-      toast.error("Description is required");
+      toast.error(t("Description is required"));
       return false;
     }
 
     if (isGreenTarget && !formData.ledger_type) {
-      toast.error("Ledger type is required for Green Target accounts");
+      toast.error(t("Ledger type is required for Green Target accounts"));
       return false;
     }
 
     if (isGreenTarget && !formData.fs_note) {
-      toast.error("FS Note / Report Code is required for Green Target accounts");
+      toast.error(t("FS Note / Report Code is required for Green Target accounts"));
       return false;
     }
 
@@ -512,8 +516,8 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
     ) {
       toast.error(
         isGreenTarget
-          ? "Account code can only contain letters, numbers, spaces, hyphens, underscores, and periods"
-          : "Account code can only contain letters, numbers, hyphens, underscores, and periods"
+          ? t("Account code can only contain letters, numbers, spaces, hyphens, underscores, and periods")
+          : t("Account code can only contain letters, numbers, hyphens, underscores, and periods")
       );
       return false;
     }
@@ -523,13 +527,13 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       !isEditMode &&
       GT_RESERVED_ACCOUNT_CODES.has(formData.code.trim().toUpperCase())
     ) {
-      toast.error("This account code is reserved. Please choose another code.");
+      toast.error(t("This account code is reserved. Please choose another code."));
       return false;
     }
 
     // Prevent circular reference
     if (formData.parent_code === formData.code) {
-      toast.error("An account cannot be its own parent");
+      toast.error(t("An account cannot be its own parent"));
       return false;
     }
 
@@ -572,7 +576,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       }
 
       toast.success(
-        `Account code ${isEditMode ? "updated" : "created"} successfully`
+        t(isEditMode ? "Account code updated successfully" : "Account code created successfully")
       );
 
       // Refresh cache to reflect changes
@@ -593,7 +597,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       }
     } catch (err: unknown) {
       console.error("Error saving account code:", err);
-      const errorMessage = err instanceof Error ? err.message : `Failed to ${isEditMode ? "update" : "create"} account code`;
+      const errorMessage = err instanceof Error ? err.message : t(isEditMode ? "Failed to update account code" : "Failed to create account code");
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -603,12 +607,12 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   // Delete handler
   const handleDeleteClick = (): void => {
     if (isSystem) {
-      toast.error("Cannot delete system account code");
+      toast.error(t("Cannot delete system account code"));
       return;
     }
     if (hasChildAccounts) {
       toast.error(
-        "Cannot delete account with child accounts. Delete or reassign children first."
+        t("Cannot delete account with child accounts. Delete or reassign children first.")
       );
       return;
     }
@@ -621,7 +625,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
     setIsSaving(true);
     try {
       await api.delete(`${apiBase}/account-codes/${code}`);
-      toast.success("Account code deleted successfully");
+      toast.success(t("Account code deleted successfully"));
       setShowDeleteDialog(false);
       // Refresh cache to reflect deletion
       await refreshAccountCodesCache(company).catch(
@@ -632,7 +636,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       navigate(accountCodesPagePath);
     } catch (err: unknown) {
       console.error("Error deleting account:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete account code";
+      const errorMessage = err instanceof Error ? err.message : t("Failed to delete account code");
       toast.error(errorMessage);
     } finally {
       setIsSaving(false);
@@ -641,7 +645,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
 
   // Build select options
   const ledgerTypeOptions: SelectOption[] = [
-    { id: "", name: "None" },
+    { id: "", name: t("None") },
     ...ledgerTypes.map(
       (ledgerType: LedgerType): SelectOption => ({
         id: ledgerType.code,
@@ -651,7 +655,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   ];
 
   const fsNoteOptions: SelectOption[] = [
-    { id: "", name: "None" },
+    { id: "", name: t("None") },
     ...fsNotes.map((note: FinancialStatementNote): SelectOption => ({
       id: note.code,
       name: `${note.code} - ${note.name}`,
@@ -661,7 +665,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   const monthOptions: ListboxSelectOption[] = MONTH_NAMES.map(
     (monthName: string, index: number): ListboxSelectOption => ({
       value: String(index + 1),
-      label: monthName,
+      label: t(monthName),
     })
   );
 
@@ -706,12 +710,12 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
     if (currentCode) {
       ancestors.push({
         code: currentCode,
-        description: formData.description.trim() || "New account",
+        description: formData.description.trim() || t("New account"),
         parent_code: formData.parent_code || null,
       });
     }
     return ancestors;
-  }, [allAccountCodes, formData.code, formData.description, formData.parent_code]);
+  }, [allAccountCodes, formData.code, formData.description, formData.parent_code, t]);
 
   const controlAccount: AccountHierarchyItem | null = hierarchyPath[0] || null;
   const currentHierarchyAccount: AccountHierarchyItem | null =
@@ -783,7 +787,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       <div className="container mx-auto px-4 py-6">
         <BackButton fallbackPath={accountCodesPagePath} />
         <div className="mt-4 p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
-          Error: {error}
+          {t("Error:")} {error}
         </div>
       </div>
     );
@@ -803,12 +807,12 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
             <IconFolder size={24} className="text-amber-500 dark:text-amber-400" />
             <div>
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                {isEditMode ? "Edit Account Code" : "Add New Account Code"}
+                {isEditMode ? t("Edit Account Code") : t("Add New Account Code")}
               </h1>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
-                  ? `Menyunting akaun ${formData.code}`
-                  : "Cipta akaun baharu dalam carta akaun"}
+                  ? t("Editing account {{code}}", { code: formData.code })
+                  : t("Create a new account in the chart of accounts")}
               </p>
             </div>
           </div>
@@ -821,7 +825,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
               <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-4 rounded-lg shadow-lg border border-default-200 dark:border-gray-700">
                 <LoadingSpinner hideText />
                 <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                  Saving account code...
+                  {t("Saving account code...")}
                 </span>
               </div>
             </div>
@@ -838,31 +842,31 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                       </span>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-default-800 dark:text-gray-100">
-                          Account Hierarchy
+                          {t("Account Hierarchy")}
                         </p>
                         <p className="text-xs text-default-500 dark:text-gray-400">
-                          Control A/C ialah kod utama; akaun terakhir ialah rekod yang sedang dibuka.
+                          {t("Control A/C is the main code; the last account is the record being opened.")}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-default-500 dark:text-gray-400">
                       <span>
-                        Control A/C:{" "}
+                        {t("Control A/C:")}{" "}
                         <strong className="font-mono font-semibold text-default-800 dark:text-gray-100">
                           {controlAccount?.code || "-"}
                         </strong>
                       </span>
                       <span>
-                        Current ACC No:{" "}
+                        {t("Current ACC No:")}{" "}
                         <strong className="font-mono font-semibold text-default-800 dark:text-gray-100">
                           {currentHierarchyAccount?.code || "-"}
                         </strong>
                       </span>
                       <span>
-                        Immediate Parent:{" "}
+                        {t("Immediate Parent:")}{" "}
                         <strong className="font-mono font-semibold text-default-800 dark:text-gray-100">
-                          {directParentAccount?.code || "None"}
+                          {directParentAccount?.code || t("None")}
                         </strong>
                       </span>
                     </div>
@@ -878,12 +882,12 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                           index === hierarchyPath.length - 1;
                         const roleLabel: string =
                           index === 0
-                            ? "Control / Main A/C"
+                            ? t("Control / Main A/C")
                             : isCurrentAccount
                             ? hasChildAccounts
-                              ? "Parent / ACC No."
-                              : "Sub-Ledger A/C"
-                            : "ACC No. / Code Bapa";
+                              ? t("Parent / ACC No.")
+                              : t("Sub-Ledger A/C")
+                            : t("ACC No. / Parent Code");
                         return (
                           <React.Fragment key={hierarchyAccount.code}>
                             {index > 0 && (
@@ -935,7 +939,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
               {/* Basic Info Section */}
               <div className="space-y-4">
                 <h3 className="text-base font-medium text-default-700 dark:text-gray-300 border-b border-default-200 dark:border-gray-700 pb-2">
-                  Account Details
+                  {t("Account Details")}
                 </h3>
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -943,10 +947,10 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                   <div className={FORM_INPUT_SURFACE_CLASSNAME}>
                     <FormInput
                       name="code"
-                      label="Account No. / Code"
+                      label={t("Account No. / Code")}
                       value={formData.code}
                       onChange={handleInputChange}
-                      placeholder="e.g., 1000, SALES-001"
+                      placeholder={t("e.g., 1000, SALES-001")}
                       required
                       disabled={isEditMode || isSaving} // Code cannot be changed in edit mode
                     />
@@ -956,10 +960,10 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                   <div className={FORM_INPUT_SURFACE_CLASSNAME}>
                     <FormInput
                       name="description"
-                      label="Particular / Description"
+                      label={t("Particular / Description")}
                       value={formData.description}
                       onChange={handleInputChange}
-                      placeholder="e.g., Cash and Bank"
+                      placeholder={t("e.g., Cash and Bank")}
                       required
                       disabled={isSaving}
                     />
@@ -970,7 +974,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                   {/* Ledger Type */}
                   <FormListbox
                     name="ledger_type"
-                    label="Title / Ledger Type"
+                    label={t("Title / Ledger Type")}
                     value={formData.ledger_type}
                     onChange={(value: string): void =>
                       handleListboxChange("ledger_type", value)
@@ -978,13 +982,13 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                     options={ledgerTypeOptions}
                     required={isGreenTarget}
                     disabled={isSaving || hasLockedGtStructure}
-                    placeholder="Select ledger type..."
+                    placeholder={t("Select ledger type...")}
                     className={FORM_LISTBOX_SURFACE_CLASSNAME}
                   />
 
                   <FormListbox
                     name="fs_note"
-                    label="FS Note / Report Code"
+                    label={t("FS Note / Report Code")}
                     value={formData.fs_note}
                     onChange={(value: string): void =>
                       handleListboxChange("fs_note", value)
@@ -992,7 +996,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                     options={fsNoteOptions}
                     required={isGreenTarget}
                     disabled={isSaving || hasLockedGtStructure}
-                    placeholder="Select report code..."
+                    placeholder={t("Select report code...")}
                     className={FORM_LISTBOX_SURFACE_CLASSNAME}
                   />
 
@@ -1000,28 +1004,27 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                   <div>
                     <AccountCodeCombobox
                       company={company}
-                      label="Immediate Parent Account"
+                      label={t("Immediate Parent Account")}
                       value={formData.parent_code}
                       onChange={(value: string): void =>
                         handleListboxChange("parent_code", value)
                       }
                       disabled={isSaving || hasLockedGtStructure}
-                      placeholder="Search parent account..."
+                      placeholder={t("Search parent account...")}
                       filter={canSelectParentAccount}
                       hierarchical
                       allowEmpty
-                      emptyLabel="No parent (Top level)"
+                      emptyLabel={t("No parent (Top level)")}
                       className="[&_input]:shadow-none dark:[&_input]:!bg-gray-900/50"
                     />
                     <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                      Akaun peringkat teratas dipaparkan dahulu. Kembangkan folder untuk melihat
-                      akaun anak di bawahnya.
+                      {t("Top-level accounts are shown first. Expand folders to see child accounts below them.")}
                     </p>
                     {hasLockedGtStructure && (
                       <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
                         {isSystem
-                          ? "Parent, ledger type and report code are fixed for a system account."
-                          : "Trade debtor accounts must remain leaf accounts under DEBTOR or CD_SD with ledger type TD and report code 22."}
+                          ? t("Parent, ledger type and report code are fixed for a system account.")
+                          : t("Trade debtor accounts must remain leaf accounts under DEBTOR or CD_SD with ledger type TD and report code 22.")}
                       </p>
                     )}
                   </div>
@@ -1031,7 +1034,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
               {/* Additional Settings Section */}
               <div className="space-y-4">
                 <h3 className="text-base font-medium text-default-700 dark:text-gray-300 border-b border-default-200 dark:border-gray-700 pb-2">
-                  Settings & Notes
+                  {t("Settings & Notes")}
                 </h3>
 
                 <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
@@ -1039,7 +1042,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                   <div className={FORM_INPUT_SURFACE_CLASSNAME}>
                     <FormInput
                       name="sort_order"
-                      label="Sort Order"
+                      label={t("Sort Order")}
                       value={formData.sort_order}
                       onChange={handleInputChange}
                       type="number"
@@ -1052,7 +1055,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                   {/* Active Status */}
                   <div className="rounded-lg border border-default-200 bg-default-50/60 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/30">
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-default-500 dark:text-gray-400">
-                      Account Status
+                      {t("Account Status")}
                     </p>
                     <Checkbox
                       checked={formData.is_active}
@@ -1065,17 +1068,17 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                         )
                       }
                       disabled={isSaving || isSystem}
-                      label="Active Account"
+                      label={t("Active Account")}
                       size={18}
                       checkedColor="text-sky-600 dark:text-sky-400"
-                      ariaLabel="Active account"
+                      ariaLabel={t("Active account")}
                     />
                     <p className="mt-1 pl-7 text-xs text-default-500 dark:text-gray-400">
                       {isSystem
-                        ? "Akaun sistem mesti kekal aktif."
+                        ? t("System accounts must remain active.")
                         : isGreenTarget
-                        ? "Hanya akaun yang belum digunakan boleh dinyahaktifkan. Akaun dengan jurnal atau baki pembukaan mesti kekal aktif."
-                        : "Akaun tidak aktif kekal dalam rekod sedia ada tetapi tidak boleh dipilih untuk catatan baharu."}
+                        ? t("Only unused accounts can be deactivated. Accounts with journals or opening balances must remain active.")
+                        : t("Inactive accounts remain in existing records but cannot be selected for new entries.")}
                     </p>
                   </div>
                 </div>
@@ -1089,10 +1092,10 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                     />
                     <div>
                       <p className="text-sm font-medium text-purple-800 dark:text-purple-200">
-                        System Account
+                        {t("System Account")}
                       </p>
                       <p className="mt-0.5 text-xs text-purple-700 dark:text-purple-300">
-                        Akaun ini dilindungi dan tidak boleh dinyahaktifkan atau dipadam.
+                        {t("This account is protected and cannot be deactivated or deleted.")}
                       </p>
                     </div>
                   </div>
@@ -1104,7 +1107,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                     htmlFor="notes"
                     className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2"
                   >
-                    Notes
+                    {t("Notes")}
                   </label>
                   <textarea
                     id="notes"
@@ -1124,7 +1127,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                       )
                     }
                     disabled={isSaving}
-                    placeholder="Catatan pilihan tentang akaun ini..."
+                    placeholder={t("Optional notes about this account...")}
                     className={clsx(
                       "block w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm disabled:bg-gray-50 dark:disabled:bg-gray-800 disabled:text-gray-500 dark:disabled:text-gray-400 disabled:cursor-not-allowed",
                       FIELD_SURFACE_CLASSNAME
@@ -1141,10 +1144,10 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                     </span>
                     <div className="min-w-0">
                       <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-                        Account Activity
+                        {t("Account Activity")}
                       </h4>
                       <p className="text-xs text-default-500 dark:text-gray-400">
-                        Jumlah akaun ini termasuk semua akaun anak di bawahnya.
+                        {t("This account's total includes all child accounts below it.")}
                       </p>
                     </div>
                   </div>
@@ -1153,17 +1156,17 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                     <div className="flex flex-wrap items-end gap-2">
                       <div className="rounded-md border border-default-200 bg-white px-3 py-1.5 dark:border-gray-700 dark:bg-gray-800">
                         <span className="block text-[10px] font-semibold uppercase tracking-wide text-default-400 dark:text-gray-500">
-                          Opening Month
+                          {t("Opening Month")}
                         </span>
                         <span className="flex items-center gap-1.5 text-sm font-medium text-default-700 dark:text-gray-200">
                           <IconCalendar size={14} />{" "}
-                          {MONTH_NAMES[(overview?.period.opening_month || 1) - 1]}{" "}
+                          {t(MONTH_NAMES[(overview?.period.opening_month || 1) - 1])}{" "}
                           {overviewYear}
                         </span>
                       </div>
                       <div>
                         <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-default-400 dark:text-gray-500">
-                          Year
+                          {t("Year")}
                         </span>
                         <ListboxSelect
                           value={String(overviewYear)}
@@ -1174,12 +1177,12 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                           options={yearOptions}
                           className="w-24"
                           buttonClassName="!rounded-md !py-1.5 !text-xs !shadow-none"
-                          ariaLabel="Account activity year"
+                          ariaLabel={t("Account activity year")}
                         />
                       </div>
                       <div>
                         <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-default-400 dark:text-gray-500">
-                          Current Month
+                          {t("Current Month")}
                         </span>
                         <ListboxSelect
                           value={String(overviewMonth)}
@@ -1190,7 +1193,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                           options={monthOptions}
                           className="w-36"
                           buttonClassName="!rounded-md !py-1.5 !text-xs !shadow-none"
-                          ariaLabel="Account activity current month"
+                          ariaLabel={t("Account activity current month")}
                         />
                       </div>
                     </div>
@@ -1204,21 +1207,21 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                       className="mx-auto text-default-300 dark:text-gray-600"
                     />
                     <p className="mt-2 text-sm font-medium text-default-600 dark:text-gray-300">
-                      Activity is available after this account is created
+                      {t("Activity is available after this account is created")}
                     </p>
                     <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                      Monthly amounts and child balances are calculated from posted journals.
+                      {t("Monthly amounts and child balances are calculated from posted journals.")}
                     </p>
                   </div>
                 ) : overviewLoading ? (
                   <div className="flex items-center justify-center gap-3 px-4 py-12 text-sm text-default-500 dark:text-gray-400">
                     <LoadingSpinner hideText />
-                    Loading account activity...
+                    {t("Loading account activity...")}
                   </div>
                 ) : overviewError ? (
                   <div className="px-4 py-8 text-center">
                     <p className="text-sm font-medium text-rose-700 dark:text-rose-300">
-                      Account activity could not be loaded
+                      {t("Account activity could not be loaded")}
                     </p>
                     <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
                       {overviewError}
@@ -1232,7 +1235,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                       }
                       className="mt-3"
                     >
-                      Retry
+                      {t("Retry")}
                     </Button>
                   </div>
                 ) : overview ? (
@@ -1240,26 +1243,29 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                       {[
                         {
-                          label: "Opening Balance",
+                          label: t("Opening Balance"),
                           value: overview.totals.opening_balance,
                           tone: "text-default-800 dark:text-gray-100",
                         },
                         {
-                          label: `Balance B/F (${
-                            overviewMonth > 1
-                              ? MONTH_NAMES[overviewMonth - 2]
-                              : "Opening"
-                          })`,
+                          label: t("Balance B/F ({{month}})", {
+                            month:
+                              overviewMonth > 1
+                                ? t(MONTH_NAMES[overviewMonth - 2])
+                                : t("Opening"),
+                          }),
                           value: overview.totals.balance_brought_forward,
                           tone: "text-amber-700 dark:text-amber-300",
                         },
                         {
-                          label: `${MONTH_NAMES[overviewMonth - 1]} Movement`,
+                          label: t("{{month}} Movement", {
+                            month: t(MONTH_NAMES[overviewMonth - 1]),
+                          }),
                           value: overview.totals.current_month_movement,
                           tone: "text-sky-700 dark:text-sky-300",
                         },
                         {
-                          label: "Accumulative",
+                          label: t("Accumulative"),
                           value: overview.totals.accumulative_balance,
                           tone: "text-emerald-700 dark:text-emerald-300",
                         },
@@ -1308,7 +1314,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                                         : "text-default-500 dark:text-gray-400"
                                     )}
                                   >
-                                    {MONTH_NAMES[month.month - 1]}
+                                    {t(MONTH_NAMES[month.month - 1])}
                                   </span>
                                   {isCurrentMonth && (
                                     <span className="h-1.5 w-1.5 rounded-full bg-sky-500" />
@@ -1319,8 +1325,10 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                                 </p>
                                 {(month.debit !== 0 || month.credit !== 0) && (
                                   <p className="mt-0.5 text-[10px] text-default-400 dark:text-gray-500">
-                                    Dr {formatCurrency(month.debit)} · Cr{" "}
-                                    {formatCurrency(month.credit)}
+                                    {t("Dr {{debit}} \u00b7 Cr {{credit}}", {
+                                      debit: formatCurrency(month.debit),
+                                      credit: formatCurrency(month.credit),
+                                    })}
                                   </p>
                                 )}
                               </div>
@@ -1339,19 +1347,24 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                           overview.direct_account.accumulative_balance
                         ) >= 0.005) && (
                       <p className="text-xs text-default-500 dark:text-gray-400">
-                        Amount posted directly to {formData.code}: current month{" "}
-                        <span className="font-medium text-default-700 dark:text-gray-200">
-                          {formatSignedBalance(
-                            overview.direct_account.current_month_movement
-                          )}
-                        </span>
-                        , accumulative{" "}
-                        <span className="font-medium text-default-700 dark:text-gray-200">
-                          {formatSignedBalance(
-                            overview.direct_account.accumulative_balance
-                          )}
-                        </span>
-                        .
+                        <Trans
+                          ns="accounting"
+                          i18nKey="Amount posted directly to {{code}}: current month <bold>{{current}}</bold>, accumulative <bold>{{accumulative}}</bold>."
+                          values={{
+                            code: formData.code,
+                            current: formatSignedBalance(
+                              overview.direct_account.current_month_movement
+                            ),
+                            accumulative: formatSignedBalance(
+                              overview.direct_account.accumulative_balance
+                            ),
+                          }}
+                          components={{
+                            bold: (
+                              <span className="font-medium text-default-700 dark:text-gray-200" />
+                            ),
+                          }}
+                        />
                       </p>
                     )}
                   </div>
@@ -1369,18 +1382,24 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                       <div className="min-w-0">
                         <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
                           {isControlAccountView
-                            ? "Parent / ACC Accounts"
-                            : "Sub-Ledger / Child Accounts"}
+                            ? t("Parent / ACC Accounts")
+                            : t("Sub-Ledger / Child Accounts")}
                         </h4>
                         <p className="text-xs text-default-500 dark:text-gray-400">
-                          Semua kod anak terus dan amaun bagi {MONTH_NAMES[overviewMonth - 1]}{" "}
-                          {overviewYear}
+                          {t("All direct child codes and amounts for {{month}} {{year}}", {
+                            month: t(MONTH_NAMES[overviewMonth - 1]),
+                            year: overviewYear,
+                          })}
                         </p>
                       </div>
                     </div>
                     <span className="rounded-full bg-default-200 px-2.5 py-1 text-xs font-medium text-default-700 dark:bg-gray-700 dark:text-gray-200">
-                      {displayedChildAccounts.length}{" "}
-                      {displayedChildAccounts.length === 1 ? "account" : "accounts"}
+                      {t(
+                        displayedChildAccounts.length === 1
+                          ? "{{count}} account"
+                          : "{{count}} accounts",
+                        { count: displayedChildAccounts.length }
+                      )}
                     </span>
                   </div>
 
@@ -1391,11 +1410,12 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                         className="mx-auto text-default-300 dark:text-gray-600"
                       />
                       <p className="mt-2 text-sm font-medium text-default-600 dark:text-gray-300">
-                        Tiada akaun anak
+                        {t("No child accounts")}
                       </p>
                       <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                        Akaun yang memilih {formData.code} sebagai akaun induk akan dipaparkan di
-                        sini.
+                        {t("Accounts that select {{code}} as their parent account will appear here.", {
+                          code: formData.code,
+                        })}
                       </p>
                     </div>
                   ) : (
@@ -1405,20 +1425,20 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                           <tr className="text-[10px] font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
                             <th className="px-4 py-2 text-left">
                               {isControlAccountView
-                                ? "ACC No. / Code Bapa"
-                                : "Sub-Ledger ACC / Code Anak"}
+                                ? t("ACC No. / Parent Code")
+                                : t("Sub-Ledger ACC / Child Code")}
                             </th>
-                            <th className="min-w-48 px-4 py-2 text-left">Particular</th>
+                            <th className="min-w-48 px-4 py-2 text-left">{t("Particular")}</th>
                             <th className="whitespace-nowrap px-4 py-2 text-right">
-                              Balance B/F
-                            </th>
-                            <th className="whitespace-nowrap px-4 py-2 text-right">
-                              {MONTH_NAMES[overviewMonth - 1]} Amount
+                              {t("Balance B/F")}
                             </th>
                             <th className="whitespace-nowrap px-4 py-2 text-right">
-                              Accumulative
+                              {t("{{month}} Amount", { month: t(MONTH_NAMES[overviewMonth - 1]) })}
                             </th>
-                            <th className="px-4 py-2 text-center">Status</th>
+                            <th className="whitespace-nowrap px-4 py-2 text-right">
+                              {t("Accumulative")}
+                            </th>
+                            <th className="px-4 py-2 text-center">{t("Status")}</th>
                             <th className="w-10 px-2 py-2" />
                           </tr>
                         </thead>
@@ -1454,7 +1474,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                                         openChildAccount();
                                       }}
                                       className="flex items-center gap-2 rounded text-left focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed dark:focus:ring-offset-gray-800"
-                                      aria-label={`Open account ${childAccount.code}`}
+                                      aria-label={t("Open account {{code}}", { code: childAccount.code })}
                                     >
                                       <span className="flex h-7 w-7 items-center justify-center rounded-md bg-default-100 text-default-500 group-hover:bg-sky-100 group-hover:text-sky-600 dark:bg-gray-700 dark:text-gray-400 dark:group-hover:bg-sky-900/40 dark:group-hover:text-sky-400">
                                         <IconFile size={15} />
@@ -1509,7 +1529,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                                           : "bg-default-200 text-default-600 dark:bg-gray-700 dark:text-gray-400"
                                       )}
                                     >
-                                      {childAccount.is_active ? "Active" : "Inactive"}
+                                      {childAccount.is_active ? t("Active") : t("Inactive")}
                                     </span>
                                   </td>
                                   <td className="px-2 py-2.5 text-center">
@@ -1518,8 +1538,8 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                                       disabled={isSaving}
                                       onClick={(): void => openChildAccount()}
                                       className="inline-flex h-8 w-8 items-center justify-center text-default-300 transition-colors hover:text-sky-600 focus:outline-none focus-visible:rounded-full focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-600 dark:hover:text-sky-400"
-                                      aria-label={`Open child account ${childAccount.code}`}
-                                      title="Open child account"
+                                      aria-label={t("Open child account {{code}}", { code: childAccount.code })}
+                                      title={t("Open child account")}
                                     >
                                       <IconChevronRight
                                         size={17}
@@ -1535,7 +1555,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                         </tbody>
                       </table>
                       <p className="border-t border-default-100 px-4 py-2 text-xs text-default-500 dark:border-gray-700 dark:text-gray-400">
-                        Setiap amaun termasuk aktiviti semua akaun di bawah kod anak tersebut.
+                        {t("Each amount includes the activity of all accounts below that child code.")}
                       </p>
                     </div>
                   )}
@@ -1553,7 +1573,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                   onClick={handleDeleteClick}
                   disabled={isSaving || hasChildAccounts}
                 >
-                  Delete Account
+                  {t("Delete Account")}
                 </Button>
               )}
               <Button
@@ -1564,10 +1584,10 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
                 size="lg"
               >
                 {isSaving
-                  ? "Saving..."
+                  ? t("Saving...")
                   : isEditMode
-                  ? "Update Account"
-                  : "Create Account"}
+                  ? t("Update Account")
+                  : t("Create Account")}
               </Button>
             </div>
           </form>
@@ -1579,18 +1599,23 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
         isOpen={showDeleteDialog}
         onClose={(): void => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Account Code"
-        message={`Adakah anda pasti mahu memadam akaun "${formData.code}"? Tindakan ini tidak boleh dibatalkan.`}
-        confirmButtonText="Delete"
+        title={t("Delete Account Code")}
+        message={t(
+          'Are you sure you want to delete account "{{code}}"? This action cannot be undone.',
+          { code: formData.code }
+        )}
+        confirmButtonText={t("Delete")}
       />
 
       <ConfirmationDialog
         isOpen={pendingNavigation !== null}
         onClose={(): void => setPendingNavigation(null)}
         onConfirm={handleConfirmNavigation}
-        title="Discard Changes"
-        message="Anda mempunyai perubahan yang belum disimpan. Adakah anda pasti mahu meninggalkan akaun ini? Semua perubahan akan hilang."
-        confirmButtonText="Discard"
+        title={t("Discard Changes")}
+        message={t(
+          "You have unsaved changes. Are you sure you want to leave this account? All changes will be lost."
+        )}
+        confirmButtonText={t("Discard")}
       />
     </div>
   );

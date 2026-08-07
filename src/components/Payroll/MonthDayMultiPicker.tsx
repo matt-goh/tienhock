@@ -3,6 +3,7 @@ import React, { Fragment, useMemo } from "react";
 import { Popover, PopoverButton, PopoverPanel, Transition } from "@headlessui/react";
 import { IconCalendarMonth, IconChevronDown } from "@tabler/icons-react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 
 interface MonthDayMultiPickerProps {
   year: number;
@@ -41,6 +42,7 @@ const MonthDayMultiPicker: React.FC<MonthDayMultiPickerProps> = ({
   allowMulti = true,
   triggerClassName = "",
 }) => {
+  const { t } = useTranslation("payroll");
   const daysInMonth = useMemo(
     () => new Date(year, month, 0).getDate(),
     [year, month],
@@ -77,13 +79,13 @@ const MonthDayMultiPicker: React.FC<MonthDayMultiPickerProps> = ({
   };
 
   const triggerLabel = useMemo(() => {
-    if (monthSelected.length === 0) return "Select dates";
+    if (monthSelected.length === 0) return t("Select dates");
     const monthName = formatMonthLabel(year, month).split(" ")[0];
     if (monthSelected.length === 1) {
       return `${monthName} ${formatDateChip(monthSelected[0])}`;
     }
-    return `${monthSelected.length} dates: ${monthSelected.map(formatDateChip).join(", ")}`;
-  }, [monthSelected, year, month]);
+    return `${t("{{count}} dates:", { count: monthSelected.length })} ${monthSelected.map(formatDateChip).join(", ")}`;
+  }, [monthSelected, year, month, t]);
 
   return (
     <Popover className="relative">
@@ -117,7 +119,7 @@ const MonthDayMultiPicker: React.FC<MonthDayMultiPickerProps> = ({
                   {formatMonthLabel(year, month)}
                 </div>
                 <div className="text-xs text-default-500 dark:text-gray-400">
-                  {monthSelected.length} selected
+                  {t("{{count}} selected", { count: monthSelected.length })}
                 </div>
               </div>
               <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-medium uppercase text-default-400 dark:text-gray-500 mb-1">
@@ -156,21 +158,21 @@ const MonthDayMultiPicker: React.FC<MonthDayMultiPickerProps> = ({
                     onClick={handleSelectAll}
                     className="text-sky-600 hover:text-sky-700 dark:text-sky-300 dark:hover:text-sky-200"
                   >
-                    Select all
+                    {t("Select all")}
                   </button>
                   <button
                     type="button"
                     onClick={handleClear}
                     className="text-rose-600 hover:text-rose-700 dark:text-rose-300 dark:hover:text-rose-200"
                   >
-                    Clear
+                    {t("Clear")}
                   </button>
                   <button
                     type="button"
                     onClick={() => close()}
                     className="rounded-md bg-default-100 dark:bg-gray-700 px-3 py-1 font-medium text-default-700 dark:text-gray-200 hover:bg-default-200 dark:hover:bg-gray-600"
                   >
-                    Done
+                    {t("Done")}
                   </button>
                 </div>
               )}
