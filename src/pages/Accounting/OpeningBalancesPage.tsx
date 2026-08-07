@@ -2,7 +2,9 @@
 // Bulk opening-balance sheet: every GL account's anchor for ONE as-of date on a
 // single screen, laid out like the auditor's "Opening balances as at ..."
 // schedule (code / particulars / Debit RM / Credit RM, grouped by financial
-// statement note, Dr and Cr totalled at the bottom).
+// statement note, Dr and Cr totalled at the bottom). Parametrised by company so
+// the same screen serves Tien Hock (public schema) and Green Target
+// (greentarget schema, swapped base path + scoped localStorage).
 //
 // Replaces the one-account-at-a-time OpeningBalanceModal flow: type into the
 // Debit or Credit cell of any row, then save every change in one transaction.
@@ -47,7 +49,14 @@ import {
   generateOpeningBalancesPDF,
   type OpeningBalancesPDFSection,
 } from "../../utils/accounting/OpeningBalancesPDF";
+import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
+
+export type OpeningBalancesCompany = "tienhock" | "greentarget";
+
+interface OpeningBalancesPageProps {
+  company?: OpeningBalancesCompany;
+}
 
 interface OpeningBalanceAccount {
   code: string;
@@ -103,12 +112,19 @@ const STORAGE_KEY = "openingBalancesFilters";
 // (everything expanded) is a real state, so a missing key is the only default.
 const COLLAPSED_SECTIONS_STORAGE_KEY = "openingBalances.collapsedSections";
 
-const readStoredCollapsedSections = (): string[] => {
+const getCompanyStorageKey = (
+  baseKey: string,
+  company: OpeningBalancesCompany
+): string => (company === "tienhock" ? baseKey : `${baseKey}:${company}`);
+
+const readStoredCollapsedSections = (
+  company: OpeningBalancesCompany
+): string[] => {
   if (typeof window === "undefined") return [];
 
   try {
     const stored: string | null = window.localStorage.getItem(
-      COLLAPSED_SECTIONS_STORAGE_KEY
+      getCompanyStorageKey(COLLAPSED_SECTIONS_STORAGE_KEY, company)
     );
     if (stored === null) return [];
     const parsed: unknown = JSON.parse(stored);
@@ -119,12 +135,15 @@ const readStoredCollapsedSections = (): string[] => {
   }
 };
 
-const storeCollapsedSections = (collapsed: Set<string>): void => {
+const storeCollapsedSections = (
+  collapsed: Set<string>,
+  company: OpeningBalancesCompany
+): void => {
   if (typeof window === "undefined") return;
 
   try {
     window.localStorage.setItem(
-      COLLAPSED_SECTIONS_STORAGE_KEY,
+      getCompanyStorageKey(COLLAPSED_SECTIONS_STORAGE_KEY, company),
       JSON.stringify([...collapsed])
     );
   } catch (_error: unknown) {
@@ -345,7 +364,13 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
 );
 BalanceRow.displayName = "BalanceRow";
 
-const OpeningBalancesPage: React.FC = () => {
+const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
+  company = "tienhock",
+}: OpeningBalancesPageProps) => {
+  const openingBalancesApiPath: string =
+    company === "greentarget"
+      ? "/greentarget/api/opening-balances"
+      : "/api/opening-balances";
   const [data, setData] = useState<OpeningBalancesResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -357,7 +382,7 @@ const OpeningBalancesPage: React.FC = () => {
   // by section key, so a reload that returns a different set of notes simply
   // leaves stale keys unused.
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(
-    () => new Set(readStoredCollapsedSections())
+    () => new Set(readStoredCollapsedSections(company))
   );
   // The sticky header is a variable height (filters wrap on narrow screens), so
   // the table head has to be offset by whatever it currently measures.
@@ -386,12 +411,14 @@ const OpeningBalancesPage: React.FC = () => {
 
   const cached = useMemo(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(
+        getCompanyStorageKey(STORAGE_KEY, company)
+      );
       return raw ? JSON.parse(raw) : null;
     } catch {
       return null;
     }
-  }, []);
+  }, [company]);
 
   const [asOfDate, setAsOfDate] = useState<string>(
     () =>
@@ -419,7 +446,7 @@ const OpeningBalancesPage: React.FC = () => {
   useEffect(() => {
     try {
       localStorage.setItem(
-        STORAGE_KEY,
+        getCompanyStorageKey(STORAGE_KEY, company),
         JSON.stringify({
           asOfDate,
           rowFilter,
@@ -431,12 +458,12 @@ const OpeningBalancesPage: React.FC = () => {
     } catch {
       // Ignore storage failures so the page stays usable.
     }
-  }, [asOfDate, rowFilter, searchTerm, includeInactive, showNotes]);
+  }, [asOfDate, rowFilter, searchTerm, includeInactive, showNotes, company]);
 
   // Preserve the collapsed note sections across navigations.
   useEffect(() => {
-    storeCollapsedSections(collapsedSections);
-  }, [collapsedSections]);
+    storeCollapsedSections(collapsedSections, company);
+  }, [collapsedSections, company]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
@@ -491,7 +518,7 @@ const OpeningBalancesPage: React.FC = () => {
       setLoading(true);
       setError(null);
       const response = await api.get<OpeningBalancesResponse>(
-        `/api/opening-balances?${params.toString()}`
+        `${openingBalancesApiPath}?${params.toString()}`
       );
       setData(response);
       const nextDrafts: Record<string, DraftRow> = {};
@@ -505,13 +532,22 @@ const OpeningBalancesPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [asOfDate, rowFilter, debouncedSearch, includeInactive]);
+  }, [
+    asOfDate,
+    rowFilter,
+    debouncedSearch,
+    includeInactive,
+    openingBalancesApiPath,
+  ]);
 
   useEffect(() => {
     fetchBalances();
   }, [fetchBalances]);
 
-  useScrollRestoration("opening-balances", !loading && !!data);
+  useScrollRestoration(
+    company === "tienhock" ? "opening-balances" : `opening-balances:${company}`,
+    !loading && !!data
+  );
 
   const handleDraftChange = useCallback(
     (code: string, next: DraftRow): void => {
@@ -549,7 +585,7 @@ const OpeningBalancesPage: React.FC = () => {
         notes: drafts[code].notes.trim() || null,
       }));
       const result = await api.put<{ saved: number; deleted: number }>(
-        "/api/opening-balances/bulk",
+        `${openingBalancesApiPath}/bulk`,
         { as_of_date: asOfDate, entries }
       );
       const parts: string[] = [];
@@ -682,6 +718,8 @@ const OpeningBalancesPage: React.FC = () => {
       await generateOpeningBalancesPDF({
         asOfDate,
         sections: pdfSections.filter((section) => section.rows.length > 0),
+        companyName:
+          company === "greentarget" ? GREENTARGET_INFO.name : undefined,
       });
     } catch (err) {
       console.error("Error printing opening balances PDF:", err);

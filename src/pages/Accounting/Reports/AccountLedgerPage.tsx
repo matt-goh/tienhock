@@ -71,6 +71,7 @@ export interface AccountLedgerPageProps {
 // list with posted-transaction counts, so the usage-counts fetch is skipped.
 interface CompanyLedgerAccount extends AccountCode {
   transaction_count: number;
+  is_subledger?: boolean;
 }
 
 type CompanyLedgerAccountResponse = Omit<CompanyLedgerAccount, "id">;
@@ -485,6 +486,18 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
     [accountCodes, selectedAccount]
   );
 
+  // GT CD/SD subledger identities read their opening balance from
+  // debtor_subledger_snapshots, not account_opening_balances, so the anchor
+  // button/modal is only meaningful for real GL accounts there.
+  const selectedAccountIsSubledger: boolean = useMemo(
+    () =>
+      accountCodes.find((a) => a.code === selectedAccount)?.is_subledger ===
+      true,
+    [accountCodes, selectedAccount]
+  );
+  const canSetOpeningBalance: boolean =
+    !isJellyPolly && (!isGreenTarget || !selectedAccountIsSubledger);
+
   const accountDescriptionByCode = useMemo(() => {
     const map: Record<string, string> = {};
     accountCodes.forEach((account) => {
@@ -549,9 +562,13 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
   );
 
   const handleOpenOpeningModal = async (): Promise<void> => {
-    if (hasCompanyAccounts) return;
+    if (!canSetOpeningBalance) return;
     try {
-      const res = await api.get(`/api/opening-balances/${selectedAccount}`);
+      const res = await api.get(
+        isGreenTarget
+          ? `/greentarget/api/opening-balances/${selectedAccount}`
+          : `/api/opening-balances/${selectedAccount}`
+      );
       setCurrentAnchor(res?.opening_balance || null);
     } catch (err) {
       console.error("Error fetching opening balance:", err);
@@ -732,7 +749,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
           )}
           {selectedAccount && (
             <>
-              {!hasCompanyAccounts && (
+              {canSetOpeningBalance && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -1144,12 +1161,13 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
         </div>
       )}
 
-      {!hasCompanyAccounts && (
+      {company !== "jellypolly" && (
         <OpeningBalanceModal
           isOpen={showOpeningModal}
           onClose={() => setShowOpeningModal(false)}
           accountCode={selectedAccount}
           accountDescription={selectedAccountDescription}
+          company={isGreenTarget ? "greentarget" : "tienhock"}
           current={currentAnchor}
           onSaved={fetchStatement}
         />
