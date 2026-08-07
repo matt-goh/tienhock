@@ -129,9 +129,14 @@ export default function (pool) {
       include_cancelled = "true",
     } = req.query;
 
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      500,
+      Math.max(1, parseInt(req.query.limit, 10) || 200)
+    );
+
     try {
-      let query = `
-      SELECT
+      const selectFields = `
         p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
         p.payment_method, p.payment_reference, p.internal_reference,
         p.bank_account, p.journal_entry_id, p.is_auto_collection,
@@ -151,17 +156,23 @@ export default function (pool) {
         p.notes, p.created_at, p.status, p.cancellation_date,
         i.customerid, i.salespersonid, c.name as customer_name,
         COALESCE(je.display_reference, je.reference_no) as journal_reference_no
-      FROM payments p
-      JOIN invoices i ON p.invoice_id = i.id
-      LEFT JOIN customers c ON i.customerid = c.id
-      LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
-      LEFT JOIN receipts r ON r.id = ra.receipt_id
-      LEFT JOIN journal_entries je
-        ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id,
-          CASE WHEN p.is_auto_collection THEN i.journal_entry_id END)
-      WHERE 1=1
-        AND NOT (p.is_auto_collection = true AND p.status = 'cancelled')
-    `;
+      `;
+
+      const fromClause = `
+        FROM payments p
+        JOIN invoices i ON p.invoice_id = i.id
+        LEFT JOIN customers c ON i.customerid = c.id
+        LEFT JOIN receipt_allocations ra ON ra.id = p.receipt_allocation_id
+        LEFT JOIN receipts r ON r.id = ra.receipt_id
+        LEFT JOIN journal_entries je
+          ON je.id = COALESCE(r.journal_entry_id, p.journal_entry_id,
+            CASE WHEN p.is_auto_collection THEN i.journal_entry_id END)
+      `;
+
+      let whereClause = `
+        WHERE 1=1
+          AND NOT (p.is_auto_collection = true AND p.status = 'cancelled')
+      `;
 
       const queryParams = [];
       let paramCounter = 1;
@@ -172,42 +183,53 @@ export default function (pool) {
           new Date(parseInt(startDate)),
           new Date(parseInt(endDate))
         );
-        query += ` AND p.payment_date BETWEEN $${paramCounter++} AND $${paramCounter++}`;
+        whereClause += ` AND p.payment_date BETWEEN $${paramCounter++} AND $${paramCounter++}`;
       }
 
       // Payment method filter
       if (paymentMethod) {
         queryParams.push(paymentMethod);
-        query += ` AND p.payment_method = $${paramCounter++}`;
+        whereClause += ` AND p.payment_method = $${paramCounter++}`;
       }
 
       // Status filter
       if (status) {
         if (status === "active") {
-          query += ` AND (p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
+          whereClause += ` AND (p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
         } else {
           queryParams.push(status);
-          query += ` AND p.status = $${paramCounter++}`;
+          whereClause += ` AND p.status = $${paramCounter++}`;
         }
       } else if (include_cancelled !== "true") {
-        query += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
+        whereClause += ` AND (p.status IS NULL OR p.status = 'active' OR p.status = 'pending' OR p.status = 'overpaid')`;
       }
 
       // Search filter
       if (search) {
         queryParams.push(`%${search}%`);
         const searchParam = `$${paramCounter++}`;
-        query += ` AND (
-        p.invoice_id ILIKE ${searchParam} OR
-        p.payment_reference ILIKE ${searchParam} OR
-        CAST(p.amount_paid AS TEXT) ILIKE ${searchParam} OR
-        c.name ILIKE ${searchParam}
-      )`;
+        whereClause += ` AND (
+          p.invoice_id ILIKE ${searchParam} OR
+          p.payment_reference ILIKE ${searchParam} OR
+          CAST(p.amount_paid AS TEXT) ILIKE ${searchParam} OR
+          c.name ILIKE ${searchParam}
+        )`;
       }
 
-      query += " ORDER BY p.payment_date DESC, p.created_at DESC";
+      const countResult = await pool.query(
+        `SELECT COUNT(*)::integer AS total ${fromClause} ${whereClause}`,
+        queryParams
+      );
+      const total = countResult.rows[0].total;
 
-      const result = await pool.query(query, queryParams);
+      queryParams.push(limit, (page - 1) * limit);
+      const result = await pool.query(
+        `SELECT ${selectFields} ${fromClause} ${whereClause}
+          ORDER BY CASE WHEN p.status = 'pending' THEN 0 ELSE 1 END,
+                   p.payment_date DESC, p.created_at DESC
+          LIMIT $${paramCounter++} OFFSET $${paramCounter++}`,
+        queryParams
+      );
 
       // Parse amount_paid to number before sending
       const payments = result.rows.map((p) => ({
@@ -215,7 +237,15 @@ export default function (pool) {
         amount_paid: parseFloat(p.amount_paid || 0),
       }));
 
-      res.json(payments);
+      res.json({
+        data: payments,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / limit)),
+        },
+      });
     } catch (error) {
       console.error("Error fetching all payments:", error);
       res
