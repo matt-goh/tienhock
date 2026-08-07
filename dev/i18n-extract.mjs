@@ -31,7 +31,18 @@ if (filesFlag >= 0) {
       if (d.isFile() && d.name.endsWith(".tsx")) return [p];
       return [];
     });
-  files = walk(base).filter((p) => p.replaceAll("\\", "/").includes(glob.replaceAll("\\", "/").replace(/\*\*/g, "").replace(/\*/g, "")));
+  const globRegex = new RegExp(
+    "^" +
+      glob
+        .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+        .replace(/\*\*/g, "\u0000")
+        .replace(/\*/g, "[^/]*")
+        .replace(/\u0000/g, ".*") +
+      "$",
+  );
+  files = walk(base).filter((p) =>
+    globRegex.test(p.replaceAll("\\", "/")),
+  );
 } else {
   console.error("Pass --glob <pattern> or --files <paths>");
   process.exit(1);
