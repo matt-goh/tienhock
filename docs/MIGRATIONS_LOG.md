@@ -30,6 +30,31 @@ requires separate approval).
 
 ---
 
+## Removed 7 Aug 2026 — 1 file (Green Target invoice Delivery Order reference)
+
+Applied to **dev** on 2026-08-07. The file was removed per the project
+convention, then **restored on 2026-08-07** because production had not run it
+yet; the exact SQL is also embedded below for recovery.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-07_greentarget_invoice_delivery_order.sql` | Added nullable `delivery_order varchar(100)` to `greentarget.invoices` — an optional record-only Delivery Order (DO) reference keyed on the invoice form and shown on the invoice list cards / details page. No accounting, e-Invoice, rental or payment effect. Companion code: invoice POST/PUT in `src/routes/greentarget/invoices.js`; the old rental-based GT Delivery Order page/route/endpoint were removed at the same time. | dev ✓, prod ✓ (both 2026-08-07) |
+
+Exact SQL:
+
+```sql
+-- Add an optional Delivery Order (DO) reference to Green Target invoices.
+-- Record-only field: the user keys any DO number linked to an invoice; it has
+-- no effect on accounting, e-invoice, rental or payment logic.
+
+ALTER TABLE greentarget.invoices
+  ADD COLUMN IF NOT EXISTS delivery_order character varying(100);
+```
+
+**Production:** applied on 2026-08-07.
+
+---
+
 ## Removed 6 Aug 2026 (second batch) — 1 file (bill 2005042 same-day counter cash → CH_REV1)
 
 Applied to **dev and production** on 2026-08-06, then removed per the project convention. The file

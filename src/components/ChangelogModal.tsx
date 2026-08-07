@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-07",
+    ms: "Green Target: invois kini boleh merekod nombor Delivery Order (DO) sebagai rujukan sahaja. Masukkan DO pada borang invois (pilihan) dan ia dipaparkan pada kad senarai invois serta halaman butiran invois. Ia tidak menjejaskan jumlah, e-Invois, sewaan atau pembayaran. Halaman Delivery Order lama di bawah Sewaan telah dibuang; rujukan DO kini direkod terus pada invois.",
+    en: "Green Target: invoices can now record a Delivery Order (DO) number as a reference only. Enter the DO on the invoice form (optional) and it appears on the invoice list cards and the invoice details page. It does not affect totals, e-Invoices, rentals or payments. The old Delivery Order page under Rentals has been removed; DO references are now recorded directly on the invoice.",
+  },
+  {
+    date: "2026-08-07",
     ms: "Green Target: halaman Opening Balances baharu kini tersedia di bawah Accounting, sama seperti Tien Hock. Ia memaparkan baki pembukaan semua akaun pada satu tarikh dalam satu helaian, disusun mengikut nota penyata kewangan, dan anda boleh menaip terus ke dalam ruangan Debit atau Kredit mana-mana baris serta menyimpan semua perubahan sekali gus. Mengosongkan kedua-dua ruangan akan membuang baki pembukaan akaun itu semasa disimpan, dan butang Print mengeluarkan PDF dengan susun atur jadual juruaudit. Halaman Account Ledger Green Target juga kini mempunyai butang set baki pembukaan untuk akaun GL, sama seperti Tien Hock.",
     en: "Green Target: a new Opening Balances page is now available under Accounting, matching Tien Hock. It shows every account's opening balance for one date on a single sheet, grouped by financial statement note, and you can type straight into the Debit or Credit column of any row and save all your changes at once. Clearing both columns removes that account's opening balance when you save, and the Print button produces a PDF laid out like the auditor's schedule. The Green Target Account Ledger page also now has a set-opening-balance button for GL accounts, just like Tien Hock.",
   },

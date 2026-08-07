@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/Invoices/InvoiceListPage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import {
   IconSearch,
@@ -350,6 +351,7 @@ const InvoiceCard = ({
   onSelect,
 }: InvoiceCardProps) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("nav");
   const [isCardHovered, setIsCardHovered] = useState(false);
 
   const handleClick = () => {
@@ -722,6 +724,18 @@ const InvoiceCard = ({
               />
               {invoice.driver}
               {invoice.tong_no ? `, ${invoice.tong_no}` : ""}
+            </p>
+          )}
+          {invoice.delivery_order && (
+            <p
+              className="text-sm text-default-600 dark:text-gray-300 mt-0.5 truncate"
+              title={invoice.delivery_order}
+            >
+              <IconTruck
+                size={14}
+                className="inline mr-1 mt-[3px] align-top flex-shrink-0"
+              />
+              {t("Delivery Order")}: {invoice.delivery_order}
             </p>
           )}
 

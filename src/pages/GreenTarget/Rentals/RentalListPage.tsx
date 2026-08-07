@@ -8,7 +8,6 @@ import {
   IconChevronRight,
   IconPlus,
   IconFileInvoice,
-  IconReceipt,
   IconSquareCheckFilled,
   IconSquare,
   IconTrash,
@@ -77,13 +76,11 @@ const toLocalDateString = (value: string): string => {
 
 const RentalCard = ({
   rental,
-  onGenerateDeliveryOrder,
   onCreateInvoice,
   onDeleteRental,
   onPickupRental,
 }: {
   rental: Rental;
-  onGenerateDeliveryOrder: (rental: Rental) => void;
   onCreateInvoice: (rental: Rental) => void;
   onDeleteRental: (rental: Rental) => void;
   onPickupRental: (rental: Rental) => void;
@@ -303,16 +300,6 @@ const RentalCard = ({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onGenerateDeliveryOrder(rental);
-              }}
-              className="p-1.5 hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded transition-colors"
-              title="Delivery Order"
-            >
-              <IconReceipt size={16} stroke={1.5} />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
                 onDeleteRental(rental);
               }}
               className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-500 dark:text-rose-400 rounded transition-colors"
@@ -525,12 +512,6 @@ const RentalListPage = () => {
   const handleNoInvoiceOnlyToggle = (): void => {
     setNoInvoiceOnly((prev) => !prev);
     setCurrentPage(1);
-  };
-
-  const handleGenerateDeliveryOrder = (rental: Rental) => {
-    navigate(`/greentarget/rentals/${rental.rental_id}/delivery-order`, {
-      state: { rentalData: rental }, // Pass rental data to avoid extra API call
-    });
   };
 
   const handleCreateInvoice = (rental: Rental) => {
@@ -850,7 +831,6 @@ const RentalListPage = () => {
             <RentalCard
               key={rental.rental_id}
               rental={rental}
-              onGenerateDeliveryOrder={handleGenerateDeliveryOrder}
               onCreateInvoice={handleCreateInvoice}
               onDeleteRental={handleDeleteRental}
               onPickupRental={handlePickupRental}
