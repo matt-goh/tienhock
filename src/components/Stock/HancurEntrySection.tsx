@@ -1,5 +1,6 @@
 // src/components/Stock/HancurEntrySection.tsx
 import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import WorkerEntryGrid from "./WorkerEntryGrid";
@@ -39,6 +40,8 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
   onSearchChange,
   workerOrderRefreshKey = 0,
 }, ref) => {
+  const { t } = useTranslation("stock");
+
   // Get special item configs
   const hancurConfig = getHancurItem();
   const karungConfig = getKarungHancurItem();
@@ -204,7 +207,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
   // Handle save
   const handleSave = async () => {
     if (!selectedDate || !hancurConfig || !karungConfig) {
-      toast.error("Configuration error");
+      toast.error(t("Configuration error"));
       return;
     }
 
@@ -258,7 +261,10 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
         0
       );
       toast.success(
-        `Saved: ${totalHancur.toFixed(2)} kg Hancur, ${karungValue} sack Karung`
+        t("Saved: {{kg}} kg Hancur, {{sacks}} sack Karung", {
+          kg: totalHancur.toFixed(2),
+          sacks: karungValue,
+        })
       );
 
       // Update original values
@@ -267,7 +273,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
       setOriginalKarungValue(karungValue);
     } catch (error) {
       console.error("Error saving hancur entries:", error);
-      toast.error("Failed to save entries");
+      toast.error(t("Failed to save entries"));
     } finally {
       setIsSaving(false);
     }
@@ -284,7 +290,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
     return (
       <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 p-4">
         <p className="text-red-600 dark:text-red-400">
-          Configuration error: Hancur items not found
+          {t("Configuration error: Hancur items not found")}
         </p>
       </div>
     );
@@ -315,7 +321,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
           <div className="flex items-center gap-2">
             <IconPackage size={16} className="text-amber-600 dark:text-amber-400" />
             <span className="font-medium text-sm text-default-900 dark:text-gray-100">
-              Karung Hancur - Timbang
+              {t("Karung Hancur (Sack Weighing)")}
             </span>
             <span className="rounded-full bg-amber-100 dark:bg-amber-900/40 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-300">
               sack
@@ -328,13 +334,13 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
             {/* Worker Selector */}
             <div className="flex-1 max-w-xs">
               <label className="mb-1.5 block text-sm font-medium text-default-700 dark:text-gray-300">
-                Worker
+                {t("Worker")}
               </label>
               <StyledListbox
                 value={karungWorkerId}
                 onChange={(value) => setKarungWorkerId(value as string)}
                 options={workerOptions}
-                placeholder="Select worker..."
+                placeholder={t("Select worker...")}
                 rounded="lg"
                 anchor="top"
                 className="w-full"
@@ -344,7 +350,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
             {/* Sack Count Input */}
             <div className="w-40">
               <label className="mb-1.5 block text-sm font-medium text-default-700 dark:text-gray-300">
-                Sacks
+                {t("Sacks")}
               </label>
               <input
                 type="number"
@@ -364,13 +370,13 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
             {/* Info */}
             <div className="flex-1 text-sm text-default-500 dark:text-gray-400">
               <p>
-                Default worker:{" "}
+                {t("Default worker:")}{" "}
                 <span className="font-medium text-default-700 dark:text-gray-300">
                   RAMBU
                 </span>
               </p>
               <p>
-                Pay code:{" "}
+                {t("Pay code:")}{" "}
                 <span className="font-mono text-xs bg-default-100 dark:bg-gray-700 px-1 rounded">
                   TIMBANG_HANCUR
                 </span>
@@ -385,11 +391,11 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
         <div className="flex items-center gap-3">
           {hasUnsavedChanges && (
             <span className="rounded-full bg-amber-100 dark:bg-amber-900/30 px-3 py-1 text-sm font-medium text-amber-700 dark:text-amber-300">
-              Unsaved changes
+              {t("Unsaved changes")}
             </span>
           )}
           <span className="text-sm text-default-500 dark:text-gray-400">
-            Total Hancur:{" "}
+            {t("Total Hancur:")}{" "}
             <span className="font-semibold text-default-900 dark:text-gray-100">
               {Object.values(hancurEntries)
                 .reduce((sum, val) => sum + (Number(val) || 0), 0)
@@ -397,7 +403,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
               kg
             </span>
             {" | "}
-            Karung:{" "}
+            {t("Karung:")}{" "}
             <span className="font-semibold text-default-900 dark:text-gray-100">
               {karungValue} sack
             </span>
@@ -411,7 +417,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
             color="default"
             icon={IconRefresh}
           >
-            Reset
+            {t("Reset")}
           </Button>
           <Button
             onClick={handleSave}
@@ -419,7 +425,7 @@ const HancurEntrySection = forwardRef<HancurEntrySectionHandle, HancurEntrySecti
             color="sky"
             icon={IconDeviceFloppy}
           >
-            {isSaving ? "Saving..." : "Save All"}
+            {isSaving ? t("Saving...") : t("Save All")}
           </Button>
         </div>
       </div>

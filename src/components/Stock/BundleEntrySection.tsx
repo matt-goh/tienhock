@@ -1,5 +1,6 @@
 // src/components/Stock/BundleEntrySection.tsx
 import { useState, useEffect, useMemo, useCallback, forwardRef, useImperativeHandle } from "react";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import WorkerEntryGrid from "./WorkerEntryGrid";
@@ -66,6 +67,8 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
   initialTab = "BUNDLE_BP",
   workerOrderRefreshKey = 0,
 }, ref) => {
+  const { t } = useTranslation("stock");
+
   // Get bundle configs
   const bundleItems = getBundleItems();
   const bundleConfigMap = useMemo(() => {
@@ -236,13 +239,13 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
   // Handle save (current tab only)
   const handleSave = async () => {
     if (!selectedDate) {
-      toast.error("Please select a date first");
+      toast.error(t("Please select a date first"));
       return;
     }
 
     const config = bundleConfigMap[activeTab];
     if (!config) {
-      toast.error("Configuration error");
+      toast.error(t("Configuration error"));
       return;
     }
 
@@ -273,7 +276,11 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
       });
 
       toast.success(
-        `${TAB_CONFIG[activeTab].label} saved: ${response.total_bags} total from ${response.entry_count} workers`
+        t("{{label}} saved: {{total}} total from {{count}} workers", {
+          label: t(TAB_CONFIG[activeTab].label),
+          total: response.total_bags,
+          count: response.entry_count,
+        })
       );
 
       // Update original entries for this tab
@@ -283,7 +290,7 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
       }));
     } catch (error) {
       console.error("Error saving bundle entries:", error);
-      toast.error("Failed to save entries");
+      toast.error(t("Failed to save entries"));
     } finally {
       setIsSaving(false);
     }
@@ -327,8 +334,7 @@ const BundleEntrySection = forwardRef<BundleEntrySectionHandle, BundleEntrySecti
       {hasAnyUnsavedChanges && (
         <div className="mx-4 mb-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-4 py-2">
           <p className="text-sm text-amber-700 dark:text-amber-300">
-            You have unsaved changes in one or more bundle tabs. Save each tab
-            individually.
+            {t("You have unsaved changes in one or more bundle tabs. Save each tab individually.")}
           </p>
         </div>
       )}

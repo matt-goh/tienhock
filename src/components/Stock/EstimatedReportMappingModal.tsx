@@ -10,6 +10,8 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   Combobox,
   ComboboxButton,
@@ -211,7 +213,8 @@ const toDraftSources = (line: MappingLine): DraftSource[] =>
 /** Display label for a draft member, resolving names from the options lists. */
 const describeDraftSource = (
   source: DraftSource,
-  options: MappingOptions
+  options: MappingOptions,
+  t: TFunction
 ): string => {
   switch (source.source_type) {
     case "material": {
@@ -225,13 +228,15 @@ const describeDraftSource = (
               ?.variant_name ?? null;
       const base = material
         ? `${material.code} - ${material.name}`
-        : `Material ${source.material_id}`;
+        : t("Material {{id}}", { id: source.material_id });
       return `${base}${variant ? ` (${variant})` : ""} [${(
         source.stock_bucket ?? ""
       ).toUpperCase()}]`;
     }
     case "kilang":
-      return `Kilang stock [${(source.stock_bucket ?? "").toUpperCase()}]`;
+      return t("Kilang stock [{{bucket}}]", {
+        bucket: (source.stock_bucket ?? "").toUpperCase(),
+      });
     case "account": {
       const account = options.accounts.find(
         (item) => item.code === source.account_code
@@ -249,14 +254,14 @@ const describeDraftSource = (
         : source.product_id ?? "";
     }
     case "product_type":
-      return `Product type: ${source.product_type}`;
+      return t("Product type: {{type}}", { type: source.product_type });
     case "line": {
       const reference = options.referenceLines.find(
         (item) => item.id === source.ref_line_id
       );
       return reference
         ? `${reference.line_key} - ${reference.description}`
-        : `Line ${source.ref_line_id}`;
+        : t("Line {{id}}", { id: source.ref_line_id });
     }
     default:
       return source.source_type;
@@ -276,6 +281,7 @@ const SearchableCombobox: React.FC<{
   placeholder: string;
   className?: string;
 }> = ({ items, value, onChange, placeholder, className }) => {
+  const { t } = useTranslation("stock");
   const [query, setQuery] = useState("");
   const selected = items.find((item) => item.id === value) ?? null;
   const filtered =
@@ -315,7 +321,7 @@ const SearchableCombobox: React.FC<{
         >
           {filtered.length === 0 ? (
             <div className="px-3 py-2 text-default-500 dark:text-gray-400">
-              No matches.
+              {t("No matches.")}
             </div>
           ) : (
             <>
@@ -351,7 +357,7 @@ const SearchableCombobox: React.FC<{
               ))}
               {hiddenCount > 0 && (
                 <div className="px-3 py-2 text-xs text-default-400 dark:text-gray-500">
-                  {hiddenCount} more — type to narrow down
+                  {t("{{count}} more — type to narrow down", { count: hiddenCount })}
                 </div>
               )}
             </>
@@ -368,13 +374,15 @@ const MiniListbox: React.FC<{
   options: { id: string; name: string }[];
   onChange: (id: string) => void;
   className?: string;
-}> = ({ value, options, onChange, className }) => (
-  <Listbox value={value} onChange={onChange}>
-    <div className={clsx("relative", className)}>
-      <ListboxButton className="flex w-full items-center justify-between rounded border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 px-2 py-1.5 text-left text-sm text-default-900 dark:text-gray-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
-        <span className="truncate">
-          {options.find((option) => option.id === value)?.name ?? "Select"}
-        </span>
+}> = ({ value, options, onChange, className }) => {
+  const { t } = useTranslation("stock");
+  return (
+    <Listbox value={value} onChange={onChange}>
+      <div className={clsx("relative", className)}>
+        <ListboxButton className="flex w-full items-center justify-between rounded border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 px-2 py-1.5 text-left text-sm text-default-900 dark:text-gray-100 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500">
+          <span className="truncate">
+            {options.find((option) => option.id === value)?.name ?? t("Select")}
+          </span>
         <IconChevronDown
           className="ml-1 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
           aria-hidden="true"
@@ -415,9 +423,10 @@ const MiniListbox: React.FC<{
           </ListboxOption>
         ))}
       </ListboxOptions>
-    </div>
-  </Listbox>
-);
+      </div>
+    </Listbox>
+  );
+};
 
 /** Inline editor for one report line's members, active flag and notes. */
 const LineEditor: React.FC<{
@@ -431,6 +440,8 @@ const LineEditor: React.FC<{
   ) => Promise<void>;
   onCancel: () => void;
 }> = ({ line, options, saving, onSave, onCancel }) => {
+  const { t } = useTranslation("stock");
+
   const [sources, setSources] = useState<DraftSource[]>(() =>
     toDraftSources(line)
   );
@@ -514,7 +525,7 @@ const LineEditor: React.FC<{
       return !Number.isFinite(parsed) || parsed < 0 || parsed > 100;
     });
     if (invalid) {
-      toast.error("Every percentage must be between 0 and 100");
+      toast.error(t("Every percentage must be between 0 and 100"));
       return;
     }
     await onSave(sources, isActive, notes);
@@ -527,7 +538,7 @@ const LineEditor: React.FC<{
         <Checkbox
           checked={isActive}
           onChange={setIsActive}
-          label="Active"
+          label={t("Active")}
           disabled={saving}
         />
         <input
@@ -536,7 +547,7 @@ const LineEditor: React.FC<{
           onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
             setNotes(event.target.value)
           }
-          placeholder="Notes (optional)"
+          placeholder={t("Notes (optional)")}
           disabled={saving}
           className="min-w-[200px] flex-1 rounded border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 px-2 py-1.5 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:placeholder:text-gray-500"
         />
@@ -546,7 +557,7 @@ const LineEditor: React.FC<{
       <div className="space-y-1">
         {sources.length === 0 && (
           <p className="text-sm text-default-400 dark:text-gray-500">
-            No source members - this line will evaluate to zero.
+            {t("No source members - this line will evaluate to zero.")}
           </p>
         )}
         {sources.map((source, index) => (
@@ -558,14 +569,14 @@ const LineEditor: React.FC<{
               {source.source_type}
             </span>
             <span className="min-w-[180px] flex-1 text-sm text-default-800 dark:text-gray-100">
-              {describeDraftSource(source, options)}
+              {describeDraftSource(source, options, t)}
             </span>
             <div className="flex overflow-hidden rounded border border-default-300 dark:border-gray-600">
               {([1, -1] as const).map((sign) => (
                 <button
                   key={sign}
                   type="button"
-                  title={sign === 1 ? "Include" : "Exclude"}
+                  title={sign === 1 ? t("Include") : t("Exclude")}
                   onClick={() =>
                     setSources((prev) =>
                       prev.map((item, itemIndex) =>
@@ -612,7 +623,7 @@ const LineEditor: React.FC<{
             </div>
             <button
               type="button"
-              title="Remove member"
+              title={t("Remove member")}
               onClick={() =>
                 setSources((prev) =>
                   prev.filter((_, itemIndex) => itemIndex !== index)
@@ -631,7 +642,10 @@ const LineEditor: React.FC<{
       <div className="flex flex-wrap items-center gap-2 border-t border-default-200 dark:border-gray-600 pt-2">
         <MiniListbox
           value={newType}
-          options={SOURCE_TYPE_OPTIONS}
+          options={SOURCE_TYPE_OPTIONS.map((option) => ({
+            ...option,
+            name: t(option.name),
+          }))}
           onChange={(id) => {
             setNewType(id as SourceType);
             resetNewPickers();
@@ -651,14 +665,14 @@ const LineEditor: React.FC<{
                 setNewMaterialId(id);
                 setNewVariantId("");
               }}
-              placeholder="Select material"
+              placeholder={t("Select material")}
               className="w-72"
             />
             {selectedMaterial && selectedMaterial.variants.length > 0 && (
               <MiniListbox
                 value={newVariantId}
                 options={[
-                  { id: "", name: "All variants" },
+                  { id: "", name: t("All variants") },
                   ...selectedMaterial.variants.map((variant) => ({
                     id: String(variant.id),
                     name: variant.variant_name,
@@ -694,7 +708,7 @@ const LineEditor: React.FC<{
             }))}
             value={newAccountCode}
             onChange={setNewAccountCode}
-            placeholder="Select account"
+            placeholder={t("Select account")}
             className="w-72"
           />
         )}
@@ -707,7 +721,7 @@ const LineEditor: React.FC<{
             }))}
             value={newProductId}
             onChange={setNewProductId}
-            placeholder="Select product"
+            placeholder={t("Select product")}
             className="w-72"
           />
         )}
@@ -744,7 +758,7 @@ const LineEditor: React.FC<{
         >
           <span className="flex items-center whitespace-nowrap">
             <IconPlus className="mr-1 h-4 w-4" />
-            Add
+            {t("Add")}
           </span>
         </Button>
       </div>
@@ -757,7 +771,7 @@ const LineEditor: React.FC<{
           onClick={onCancel}
           disabled={saving}
         >
-          Cancel
+          {t("Cancel")}
         </Button>
         <Button
           type="button"
@@ -766,7 +780,7 @@ const LineEditor: React.FC<{
           onClick={handleSave}
           disabled={saving}
         >
-          {saving ? "Saving..." : "Save Line"}
+          {saving ? t("Saving...") : t("Save Line")}
         </Button>
       </div>
     </div>
@@ -776,6 +790,8 @@ const LineEditor: React.FC<{
 const EstimatedReportMappingModal: React.FC<
   EstimatedReportMappingModalProps
 > = ({ isOpen, onClose, onMappingComplete }) => {
+  const { t } = useTranslation("stock");
+
   const [lines, setLines] = useState<MappingLine[]>([]);
   const [options, setOptions] = useState<MappingOptions | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -795,11 +811,11 @@ const EstimatedReportMappingModal: React.FC<
       setOptions(optionsResponse);
     } catch (error) {
       console.error("Error loading estimated report mappings:", error);
-      toast.error("Failed to load report mappings");
+      toast.error(t("Failed to load report mappings"));
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (isOpen) {
@@ -892,7 +908,7 @@ const EstimatedReportMappingModal: React.FC<
         isActive,
         notes: notes.trim() === "" ? null : notes.trim(),
       });
-      toast.success(`Mapping saved for ${line.line_key}`);
+      toast.success(t("Mapping saved for {{lineKey}}", { lineKey: line.line_key }));
       setEditingLineId(null);
       await loadData();
       if (onMappingComplete) {
@@ -900,7 +916,7 @@ const EstimatedReportMappingModal: React.FC<
       }
     } catch (error) {
       console.error("Error saving estimated report mapping:", error);
-      toast.error(getErrorMessage(error, "Failed to save mapping"));
+      toast.error(getErrorMessage(error, t("Failed to save mapping")));
     } finally {
       setSavingLineId(null);
     }
@@ -950,7 +966,7 @@ const EstimatedReportMappingModal: React.FC<
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Estimated Report Mappings
+                    {t("Estimated Report Mappings")}
                   </DialogTitle>
                   <button
                     onClick={handleClose}
@@ -962,9 +978,9 @@ const EstimatedReportMappingModal: React.FC<
                 </div>
 
                 <p className="mb-4 text-sm text-default-500 dark:text-gray-400">
-                  Each report line derives its amount from the source members
-                  listed here. Expand a line to add, remove or re-weight its
-                  members; nothing is written until that line's Save is clicked.
+                  {t(
+                    "Each report line derives its amount from the source members listed here. Expand a line to add, remove or re-weight its members; nothing is written until that line's Save is clicked.",
+                  )}
                 </p>
 
                 <div className="relative mb-3 max-w-xs">
@@ -974,7 +990,7 @@ const EstimatedReportMappingModal: React.FC<
                   />
                   <input
                     type="text"
-                    placeholder="Search lines..."
+                    placeholder={t("Search lines...")}
                     className="w-full rounded-lg border border-default-300 dark:border-gray-500 bg-white dark:bg-gray-900/50 py-1.5 pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:text-gray-100 dark:placeholder-gray-400"
                     value={search}
                     onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
@@ -991,7 +1007,7 @@ const EstimatedReportMappingModal: React.FC<
                   <div className="max-h-[60vh] space-y-2 overflow-y-auto pr-1">
                     {groups.length === 0 ? (
                       <p className="py-8 text-center text-sm text-default-500 dark:text-gray-400">
-                        No report lines found.
+                        {t("No report lines found.")}
                       </p>
                     ) : (
                       groups.map((group) => {
@@ -1019,13 +1035,17 @@ const EstimatedReportMappingModal: React.FC<
                                 />
                               )}
                               <span className="text-sm font-semibold text-default-800 dark:text-gray-100">
-                                {PAGE_LABELS[group.page] ?? group.page} ·{" "}
-                                {SECTION_LABELS[group.section] ?? group.section}{" "}
+                                {t(PAGE_LABELS[group.page] ?? group.page)} ·{" "}
+                                {t(SECTION_LABELS[group.section] ?? group.section)}{" "}
                                 · {group.productLine.toUpperCase()}
                               </span>
                               <span className="ml-auto text-xs text-default-400 dark:text-gray-400">
-                                {group.lines.length} line
-                                {group.lines.length === 1 ? "" : "s"}
+                                {t(
+                                  group.lines.length === 1
+                                    ? "{{count}} line"
+                                    : "{{count}} lines",
+                                  { count: group.lines.length },
+                                )}
                               </span>
                             </button>
 
@@ -1051,12 +1071,16 @@ const EstimatedReportMappingModal: React.FC<
                                         </div>
                                       </div>
                                       <span className="text-xs text-default-400 dark:text-gray-500">
-                                        {line.sources.length} member
-                                        {line.sources.length === 1 ? "" : "s"}
+                                        {t(
+                                          line.sources.length === 1
+                                            ? "{{count}} member"
+                                            : "{{count}} members",
+                                          { count: line.sources.length },
+                                        )}
                                       </span>
                                       {!line.is_active && (
                                         <span className="rounded bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 text-xs font-medium text-default-500 dark:text-gray-300">
-                                          Inactive
+                                          {t("Inactive")}
                                         </span>
                                       )}
                                       <Button
@@ -1075,8 +1099,8 @@ const EstimatedReportMappingModal: React.FC<
                                         }
                                       >
                                         {editingLineId === line.id
-                                          ? "Close"
-                                          : "Edit"}
+                                          ? t("Close")
+                                          : t("Edit")}
                                       </Button>
                                     </div>
 
@@ -1115,7 +1139,7 @@ const EstimatedReportMappingModal: React.FC<
                     onClick={handleClose}
                     disabled={savingLineId !== null}
                   >
-                    Close
+                    {t("Close")}
                   </Button>
                 </div>
               </DialogPanel>
