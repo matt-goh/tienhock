@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import {
   JournalEntry,
@@ -30,6 +31,7 @@ import { printCashReceiptVoucherPDF } from "../../utils/accounting/CashReceiptVo
 import { generateJournalVoucherPDF } from "../../utils/accounting/JournalVoucherPDFMake";
 import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo";
 import GreenTargetLogo from "../../utils/GreenTargetLogo.png";
+import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId";
 import {
   IconFileText,
   IconPencil,
@@ -41,6 +43,12 @@ import {
 } from "@tabler/icons-react";
 
 const LEGACY_IMPORT_ENTRY_TYPE: string = "IMP";
+
+const ADJUSTMENT_TYPE_LABEL_KEY: Record<string, string> = {
+  credit_note: "Credit Note",
+  debit_note: "Debit Note",
+  refund_note: "Refund Note",
+};
 
 const isLegacyImportEntry = (entry: JournalEntry): boolean =>
   entry.is_legacy_import === true ||
@@ -81,6 +89,7 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 }) => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation("adjustments");
 
   const apiBase: string = isGreenTarget ? "/greentarget/api" : "/api";
   const journalEntriesPath: string = isGreenTarget
@@ -723,6 +732,98 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
             </div>
           )}
         </div>
+
+        {/* Related journals (invoice sale / adjustment cross-links) */}
+        {entry.related_journals && entry.related_journals.length > 0 && (
+            <div className="px-6 pb-4">
+              <div className="rounded-lg border border-default-200 dark:border-gray-700 overflow-hidden">
+                <div className="px-4 py-3 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/30">
+                  <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100">
+                    {t("Related journals for Invoice {{id}}", {
+                      id: entry.related_invoice_id || "",
+                    })}
+                  </h3>
+                </div>
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="bg-default-100 dark:bg-gray-900/50">
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("Type")}
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("ID")}
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("Journal")}
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-semibold text-default-600 dark:text-gray-400 uppercase tracking-wider">
+                        {t("amount", { ns: "common" })}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-default-100 dark:divide-gray-800 bg-white dark:bg-gray-800">
+                    {entry.related_journals.map((adj) => (
+                      <tr
+                        key={adj.journal_entry_id}
+                        className="hover:bg-default-50/50 dark:hover:bg-gray-700/30 cursor-pointer"
+                        onClick={() =>
+                          navigate(
+                            `/accounting/journal-entries/${adj.journal_entry_id}`
+                          )
+                        }
+                      >
+                        <td className="px-4 py-2.5 text-sm font-medium text-default-900 dark:text-gray-100">
+                          {adj.kind === "sales"
+                            ? t("Sales")
+                            : t(
+                                (adj.doc_type &&
+                                  ADJUSTMENT_TYPE_LABEL_KEY[adj.doc_type]) ||
+                                  adj.doc_type ||
+                                  ""
+                              )}
+                        </td>
+                        <td className="px-4 py-2.5 text-sm text-default-600 dark:text-gray-300">
+                          {adj.kind === "sales"
+                            ? "-"
+                            : formatAdjustmentDocId(adj.doc_id)}
+                        </td>
+                        <td className="px-4 py-2.5 text-sm">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(
+                                `/accounting/journal-entries/${adj.journal_entry_id}`
+                              );
+                            }}
+                            className="inline-flex items-center gap-1 text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
+                            title={t("View journal entry")}
+                          >
+                            <IconFileText size={14} />
+                            <span className="font-mono">
+                              {adj.journal_reference ||
+                                `#${adj.journal_entry_id}`}
+                            </span>
+                            <span className="opacity-80">
+                              {" "}
+                              ({t(
+                                adj.journal_status === "cancelled"
+                                  ? "Cancelled"
+                                  : "Posted"
+                              )})
+                            </span>
+                          </button>
+                        </td>
+                        <td className="px-4 py-2.5 text-sm text-right font-medium text-default-900 dark:text-gray-100">
+                          {formatAmount(adj.amount)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
         {/* Metadata */}
         <div className="px-6 py-4 border-t border-default-200 dark:border-gray-700 bg-default-50/50 dark:bg-gray-900/30">

@@ -15,10 +15,11 @@
 // owning document of an organic journal into a "View Source" link, like Tien
 // Hock; imported (legacy_import) journals have no source page.
 //
-// Editing a system-owned journal (an S/REC/CN/DN/RN type, or any journal
-// with a source document) DETACHES it: manual_override is set, the entry
-// type is preserved, and the owning service stops re-syncing it — the same
-// detach rule as Tien Hock. Imported (IMP) journals stay immutable.
+// Editing a journal owned by a source document DETACHES it: manual_override
+// is set, the entry type is preserved, and the owning service stops
+// re-syncing it — the same detach rule as Tien Hock. Manually keyed journals
+// stay free-form even when they use a system-looking type (e.g. CN). Imported
+// (IMP) journals stay immutable.
 import { Router } from "express";
 import {
   assertGreenTargetAccountingDateUnlocked,
@@ -32,9 +33,6 @@ import {
 } from "./posting-utils.js";
 
 const LEGACY_IMPORT_ENTRY_TYPE = "IMP";
-// Entry types owned by the operational services; hand-editing one detaches it.
-const GT_SYSTEM_ENTRY_TYPES = ["S", "REC", "CN", "DN", "RN"];
-
 const GT_ADJUSTMENT_DOC_TYPE_LABELS = {
   credit_note: "Credit Note",
   debit_note: "Debit Note",
@@ -740,9 +738,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
       );
       await validateDebtorSubledgerLines(client, lines, entryDate);
 
-      const isSystemOwned =
-        existing.source_type !== null ||
-        GT_SYSTEM_ENTRY_TYPES.includes(existing.entry_type);
+      const isSystemOwned = existing.source_type !== null;
       const finalEntryType = isSystemOwned ? existing.entry_type : entry_type;
 
       let totalDebit = 0;
