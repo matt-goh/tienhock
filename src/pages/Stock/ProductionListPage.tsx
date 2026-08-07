@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   IconAlertTriangle,
@@ -248,6 +249,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
   title = "Production Records",
   apiBasePath = "/api/production-entries",
 }) => {
+  const { t } = useTranslation("stock");
   const navigate = useNavigate();
   const today: Date = useMemo(() => new Date(), []);
   const { products: orderedProducts } = useProductsCache("all");
@@ -378,12 +380,12 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
       setWorkerOrderByScope(nextWorkerOrderByScope);
     } catch (error) {
       console.error("Error fetching production records:", error);
-      toast.error("Failed to load production records");
+      toast.error(t("Failed to load production records"));
       setEntries([]);
     } finally {
       setIsLoading(false);
     }
-  }, [dateRange.end, dateRange.start, productTypes, productIds, apiBasePath]);
+  }, [dateRange.end, dateRange.start, productTypes, productIds, apiBasePath, t]);
 
   useEffect(() => {
     fetchEntries();
@@ -795,7 +797,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
       });
     } catch (error) {
       console.error("Error printing production summary:", error);
-      toast.error("Failed to generate production summary PDF");
+      toast.error(t("Failed to generate production summary PDF"));
     } finally {
       setIsPrintingSummary(false);
     }
@@ -808,7 +810,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                {title}
+                {t(title)}
               </h1>
               <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
                 |
@@ -818,9 +820,9 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               </span>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-default-500 dark:text-gray-400">
-              <span>{summaryStats.dayCount} days</span>
-              <span>{summaryStats.productCount} product records</span>
-              <span>{summaryStats.rowCount} entry rows</span>
+              <span>{t("{{count}} days", { count: summaryStats.dayCount })}</span>
+              <span>{t("{{count}} product records", { count: summaryStats.productCount })}</span>
+              <span>{t("{{count}} entry rows", { count: summaryStats.rowCount })}</span>
             </div>
           </div>
 
@@ -841,7 +843,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               variant="outline"
               size="sm"
             >
-              {isPrintingSummary ? "Preparing..." : "Print Summary"}
+              {isPrintingSummary ? t("Preparing...") : t("Print Summary")}
             </Button>
           </div>
         </div>
@@ -869,7 +871,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                       productIds.includes(product.id)
                   : productionProductFilter
               }
-              placeholder="All production products"
+              placeholder={t("All production products")}
               showCategories
             />
             {/* Quick access to the shared product display order */}
@@ -880,7 +882,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                 className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
               >
                 <IconArrowsSort size={14} />
-                Reorder products
+                {t("Reorder products")}
               </button>
             </div>
           </div>
@@ -895,7 +897,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                 setSearchTerm(event.target.value)
               }
-              placeholder="Search product or worker"
+              placeholder={t("Search product or worker")}
               className="w-full rounded-lg border border-default-300 bg-white py-2 pl-9 pr-9 text-sm leading-5 text-default-900 outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
             />
             {searchTerm && (
@@ -903,7 +905,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                 type="button"
                 onClick={clearSearch}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-gray-200"
-                title="Clear search"
+                title={t("Clear search")}
               >
                 <IconX size={14} />
               </button>
@@ -920,7 +922,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
             ) : (
               <IconChevronsDown size={15} />
             )}
-            {areAllVisibleRowsExpanded ? "Collapse All" : "Open All"}
+            {areAllVisibleRowsExpanded ? t("Collapse All") : t("Open All")}
           </button>
         </div>
       </div>
@@ -936,10 +938,10 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
               <IconPackage className="text-default-400 dark:text-gray-400" size={28} />
             </div>
             <p className="mt-4 font-medium text-default-700 dark:text-gray-200">
-              No production records found
+              {t("No production records found")}
             </p>
             <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-              Try another date range, product, or search term.
+              {t("Try another date range, product, or search term.")}
             </p>
           </div>
         ) : (
@@ -952,10 +954,13 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                       {formatDisplayDate(dateGroup.date)}
                     </h2>
                     <p className="text-xs text-default-500 dark:text-gray-400">
-                      {dateGroup.productCount} products, {dateGroup.rowCount} rows
+                      {t("{{products}} products, {{rows}} rows", {
+                        products: dateGroup.productCount,
+                        rows: dateGroup.rowCount,
+                      })}
                       {dateGroup.totalsByUnit.length > 0 && (
                         <span className="ml-2 font-semibold text-default-700 dark:text-gray-200">
-                          Total:{" "}
+                          {t("Total:")}{" "}
                           {dateGroup.totalsByUnit
                             .map(
                               (unitTotal: UnitTotal): string =>
@@ -973,13 +978,13 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                       className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-default-300 text-default-600 transition-colors hover:bg-white hover:text-default-900 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100"
                       title={
                         areDateGroupRowsExpanded(dateGroup)
-                          ? "Collapse this day"
-                          : "Open this day"
+                          ? t("Collapse this day")
+                          : t("Open this day")
                       }
                       aria-label={
                         areDateGroupRowsExpanded(dateGroup)
-                          ? "Collapse this day"
-                          : "Open this day"
+                          ? t("Collapse this day")
+                          : t("Open this day")
                       }
                     >
                       {areDateGroupRowsExpanded(dateGroup) ? (
@@ -994,7 +999,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                       className="inline-flex items-center gap-1.5 rounded-lg border border-default-300 px-3 py-1.5 text-sm font-medium text-default-700 transition-colors hover:bg-white dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
                     >
                       <IconEdit size={15} />
-                      Open Day
+                      {t("Open Day")}
                     </button>
                   </div>
                 </div>
@@ -1013,7 +1018,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                             CATEGORY_CLASSES[category]
                           )}
                         >
-                          {CATEGORY_LABELS[category]} ({productGroups.length})
+                          {t(CATEGORY_LABELS[category])} ({productGroups.length})
                         </div>
 
                         <div className="overflow-hidden rounded-lg border border-default-200 dark:border-gray-700">
@@ -1026,7 +1031,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                                     <tr
                                       onClick={() => toggleExpanded(group.key)}
                                       className="cursor-pointer bg-white transition-colors hover:bg-default-50 dark:bg-gray-800 dark:hover:bg-gray-700/70"
-                                      title={isExpanded ? "Hide details" : "Show details"}
+                                      title={isExpanded ? t("Hide details") : t("Show details")}
                                     >
                                       <td className="w-10 px-3 py-2">
                                         <div
@@ -1048,7 +1053,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                                           {group.machineBroken && (
                                             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                               <IconAlertTriangle size={12} />
-                                              Mesin Rosak
+                                              {t("Machine Broken")}
                                             </span>
                                           )}
                                         </div>
@@ -1066,8 +1071,8 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                                       </td>
                                       <td className="w-32 px-3 py-2 text-center text-sm text-default-600 dark:text-gray-300">
                                         {group.workerCount > 0
-                                          ? `${group.workerCount} workers`
-                                          : "Stock-only"}
+                                          ? t("{{count}} workers", { count: group.workerCount })
+                                          : t("Stock-only")}
                                       </td>
                                       <td className="w-24 px-3 py-2 text-right">
                                         <button
@@ -1081,7 +1086,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                                           className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm font-medium text-sky-600 transition-colors hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
                                         >
                                           <IconEdit size={15} />
-                                          Edit
+                                          {t("Edit")}
                                         </button>
                                       </td>
                                     </tr>
@@ -1101,12 +1106,12 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
                                                     title={
                                                       entry.worker_name ||
                                                       entry.worker_id ||
-                                                      "Stock-only quantity"
+                                                      t("Stock-only quantity")
                                                     }
                                                   >
                                                     {entry.worker_name ||
                                                       entry.worker_id ||
-                                                      "Stock-only quantity"}
+                                                      t("Stock-only quantity")}
                                                   </div>
                                                   {entry.worker_id && (
                                                     <div className="text-xs text-default-400 dark:text-gray-500">

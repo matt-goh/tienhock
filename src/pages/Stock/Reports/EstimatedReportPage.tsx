@@ -6,6 +6,8 @@
 // hardcoded here. Doc: docs/Account/ESTIMATED_REPORT_HANDOVER.md
 import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   IconAdjustments,
   IconChevronDown,
@@ -197,7 +199,7 @@ const tdClass = "py-1.5 pr-2 text-sm text-default-700 dark:text-gray-300";
 const tdRightClass = clsx(tdClass, "text-right");
 
 /** Read-only label for one mapping source member. */
-const describeSource = (source: MappingSourceRow): string => {
+const describeSource = (source: MappingSourceRow, t: TFunction): string => {
   switch (source.source_type) {
     case "material": {
       const variant = source.variant_name ? ` (${source.variant_name})` : "";
@@ -205,11 +207,13 @@ const describeSource = (source: MappingSourceRow): string => {
         ? ` [${source.stock_bucket.toUpperCase()}]`
         : "";
       return `${source.material_code ?? source.material_id} - ${
-        source.material_name ?? "Material"
+        source.material_name ?? t("Material")
       }${variant}${bucket}`;
     }
     case "kilang":
-      return `Kilang stock [${(source.stock_bucket ?? "").toUpperCase()}]`;
+      return t("Kilang stock [{{bucket}}]", {
+        bucket: (source.stock_bucket ?? "").toUpperCase(),
+      });
     case "account":
       return `${source.account_code}${
         source.account_description ? ` - ${source.account_description}` : ""
@@ -219,7 +223,7 @@ const describeSource = (source: MappingSourceRow): string => {
         source.product_description ? ` - ${source.product_description}` : ""
       }`;
     case "product_type":
-      return `Product type: ${source.product_type}`;
+      return t("Product type: {{type}}", { type: source.product_type });
     case "line":
       return `${source.ref_line_key ?? source.ref_line_id}${
         source.ref_line_description ? ` - ${source.ref_line_description}` : ""
@@ -230,14 +234,16 @@ const describeSource = (source: MappingSourceRow): string => {
 };
 
 /** Read-only expanded panel listing a report line's mapping members. */
-const SourceMembers: React.FC<{ line: MappingLine }> = ({ line }) => (
+const SourceMembers: React.FC<{ line: MappingLine }> = ({ line }) => {
+  const { t } = useTranslation("stock");
+  return (
   <div className="my-1 rounded-md border border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/60 px-3 py-2">
     <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-      Mapping sources · {line.line_key}
+      {t("Mapping sources · {{lineKey}}", { lineKey: line.line_key })}
     </div>
     {line.sources.length === 0 ? (
       <div className="text-xs text-default-400 dark:text-gray-500">
-        No source members.
+        {t("No source members.")}
       </div>
     ) : (
       <ul className="space-y-0.5">
@@ -249,10 +255,10 @@ const SourceMembers: React.FC<{ line: MappingLine }> = ({ line }) => (
             <span className="inline-flex items-center rounded bg-default-100 dark:bg-gray-700 px-1.5 py-0.5 font-medium uppercase text-default-500 dark:text-gray-300">
               {source.source_type}
             </span>
-            <span>{describeSource(source)}</span>
+            <span>{describeSource(source, t)}</span>
             {Number(source.sign) === -1 && (
               <span className="font-medium text-rose-600 dark:text-rose-400">
-                excluded (-1)
+                {t("excluded (-1)")}
               </span>
             )}
             {Number(source.percentage) !== 100 && (
@@ -265,7 +271,8 @@ const SourceMembers: React.FC<{ line: MappingLine }> = ({ line }) => (
       </ul>
     )}
   </div>
-);
+  );
+};
 
 const SectionTitle: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -352,16 +359,17 @@ const PLRowTable: React.FC<
   expandedLineIds,
   onToggleLine,
 }) => {
+  const { t } = useTranslation("stock");
   const columnCount = (enableDrilldown ? 1 : 0) + 2 + (showBags ? 1 : 0) + 1;
   return (
     <table className="min-w-full">
       <thead>
         <tr className="border-b border-gray-200 dark:border-gray-700">
           {enableDrilldown && <th className={clsx(thClass, "w-8")}></th>}
-          <th className={thClass}>Code</th>
-          <th className={thClass}>Description</th>
-          {showBags && <th className={thRightClass}>Bags</th>}
-          <th className={thRightClass}>Amount</th>
+          <th className={thClass}>{t("Code")}</th>
+          <th className={thClass}>{t("Description")}</th>
+          {showBags && <th className={thRightClass}>{t("Bags")}</th>}
+          <th className={thRightClass}>{t("Amount")}</th>
         </tr>
       </thead>
       <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
@@ -384,7 +392,7 @@ const PLRowTable: React.FC<
                         onClick={() => onToggleLine(row.lineId as number)}
                         className="rounded p-0.5 text-default-400 hover:bg-default-100 hover:text-default-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                         aria-label={
-                          isExpanded ? "Hide mapping sources" : "Show mapping sources"
+                          isExpanded ? t("Hide mapping sources") : t("Show mapping sources")
                         }
                       >
                         {isExpanded ? (
@@ -432,15 +440,17 @@ const UnitCostRowTable: React.FC<DrilldownProps & { rows: UnitCostRow[] }> = ({
   mappings,
   expandedLineIds,
   onToggleLine,
-}) => (
+}) => {
+  const { t } = useTranslation("stock");
+  return (
   <table className="min-w-full">
     <thead>
       <tr className="border-b border-gray-200 dark:border-gray-700">
         <th className={clsx(thClass, "w-8")}></th>
-        <th className={thClass}>Code</th>
-        <th className={thClass}>Description</th>
-        <th className={thRightClass}>Amount</th>
-        <th className={thRightClass}>Unit</th>
+        <th className={thClass}>{t("Code")}</th>
+        <th className={thClass}>{t("Description")}</th>
+        <th className={thRightClass}>{t("Amount")}</th>
+        <th className={thRightClass}>{t("Unit")}</th>
       </tr>
     </thead>
     <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
@@ -458,7 +468,7 @@ const UnitCostRowTable: React.FC<DrilldownProps & { rows: UnitCostRow[] }> = ({
                     onClick={() => onToggleLine(row.lineId)}
                     className="rounded p-0.5 text-default-400 hover:bg-default-100 hover:text-default-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-300"
                     aria-label={
-                      isExpanded ? "Hide mapping sources" : "Show mapping sources"
+                      isExpanded ? t("Hide mapping sources") : t("Show mapping sources")
                     }
                   >
                     {isExpanded ? (
@@ -487,14 +497,16 @@ const UnitCostRowTable: React.FC<DrilldownProps & { rows: UnitCostRow[] }> = ({
         );
       })}
     </tbody>
-  </table>
-);
+    </table>
+  );
+};
 
 interface EstimatedReportPageProps {
   view: EstimatedReportView;
 }
 
 const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
+  const { t } = useTranslation("stock");
   const [report, setReport] = useState<EstimatedReportResponse | null>(null);
   const [mappings, setMappings] = useState<Map<number, MappingLine>>(
     new Map()
@@ -547,11 +559,11 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
       setReport(response);
     } catch (err) {
       console.error("Error fetching estimated report:", err);
-      setError(getErrorMessage(err, "Failed to fetch the estimated report."));
+      setError(getErrorMessage(err, t("Failed to fetch the estimated report.")));
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, t]);
 
   const fetchMappings = useCallback(async (): Promise<void> => {
     try {
@@ -604,7 +616,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
   const handleSaveAddBack = async (): Promise<void> => {
     const parsed = Number(addBackInput);
     if (!Number.isFinite(parsed)) {
-      toast.error("Add Back must be a number");
+      toast.error(t("Add Back must be a number"));
       return;
     }
 
@@ -616,11 +628,11 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
         month: selectedMonth.getMonth() + 1,
         addBack: parsed,
       });
-      toast.success("Add Back saved");
+      toast.success(t("Add Back saved"));
       await fetchReport();
     } catch (err) {
       console.error("Error saving add back:", err);
-      toast.error(getErrorMessage(err, "Failed to save Add Back"));
+      toast.error(getErrorMessage(err, t("Failed to save Add Back")));
     } finally {
       setSavingAddBack(false);
     }
@@ -637,7 +649,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
     const lines: ProductLine[] =
       target === "all" ? ["mee", "bihun"] : [target];
     if (!lines.some((line) => report.reports[line])) {
-      toast.error("No report data to print for this month.");
+      toast.error(t("No report data to print for this month."));
       return;
     }
 
@@ -646,7 +658,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
       await generateEstimatedReportPDF(report, view, lines);
     } catch (err) {
       console.error("Error printing PDF:", err);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setExporting(null);
     }
@@ -710,7 +722,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
               iconSize={16}
               onClick={fetchReport}
               disabled={loading}
-              title="Refresh"
+              title={t("Refresh")}
               additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
             />
             <Button
@@ -720,7 +732,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
               iconSize={16}
               onClick={() => setIsMappingModalOpen(true)}
             >
-              Mappings
+              {t("Mappings")}
             </Button>
             {/* Print the selected month: one product line, or both */}
             {(["mee", "bihun", "all"] as PrintTarget[]).map((target) => (
@@ -739,10 +751,10 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 }
               >
                 {exporting === target
-                  ? "Preparing..."
+                  ? t("Preparing...")
                   : target === "all"
-                  ? "Print All"
-                  : `Print ${target.toUpperCase()}`}
+                  ? t("Print All")
+                  : t(`Print ${target.toUpperCase()}`)}
               </Button>
             ))}
           </div>
@@ -752,7 +764,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
         {lineReport && (
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm px-0.5">
             <span className="font-medium text-default-700 dark:text-gray-200">
-              {view === "pl" ? "Estimated P&L" : "Estimated Unit Cost"} —{" "}
+              {view === "pl" ? t("Estimated P&L") : t("Estimated Unit Cost")} —{" "}
               {productLine.toUpperCase()}
               <span className="ml-1.5 font-normal text-default-500 dark:text-gray-400">
                 {lineReport.period.label}
@@ -762,21 +774,21 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
               <>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Sales{" "}
+                  {t("Sales")}{" "}
                   <span className="font-semibold text-default-700 dark:text-gray-200">
                     {formatCurrency(lineReport.pl.totals.amount)}
                   </span>
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Usage{" "}
+                  {t("Usage")}{" "}
                   <span className="font-semibold text-default-700 dark:text-gray-200">
                     {formatCurrency(lineReport.pl.usage)}
                   </span>
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  P/L{" "}
+                  {t("P/L")}{" "}
                   <span
                     className={clsx(
                       "font-semibold",
@@ -788,7 +800,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Final P/L{" "}
+                  {t("Final P/L")}{" "}
                   <span
                     className={clsx(
                       "font-semibold",
@@ -800,7 +812,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Accumulative{" "}
+                  {t("Accumulative")}{" "}
                   <span
                     className={clsx(
                       "font-semibold",
@@ -815,31 +827,31 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
               <>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Production{" "}
+                  {t("Production")}{" "}
                   <span className="font-semibold text-default-700 dark:text-gray-200">
-                    {formatBags(lineReport.unitCost.production.bags)} bags
+                    {t("{{bags}} bags", { bags: formatBags(lineReport.unitCost.production.bags) })}
                   </span>
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Bags sold{" "}
+                  {t("Bags sold")}{" "}
                   <span className="font-semibold text-default-700 dark:text-gray-200">
                     {formatBags(lineReport.unitCost.bagsSold)}
                   </span>
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Total{" "}
+                  {t("Total")}{" "}
                   <span className="font-semibold text-default-700 dark:text-gray-200">
                     {formatCurrency(lineReport.unitCost.total.amount)}
                   </span>
                   <span className="ml-1 text-default-500 dark:text-gray-400">
-                    ({formatUnit(lineReport.unitCost.total.unit)} / bag)
+                    {t("({{unit}} / bag)", { unit: formatUnit(lineReport.unitCost.total.unit) })}
                   </span>
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  Final unit cost{" "}
+                  {t("Final unit cost")}{" "}
                   <span className="font-semibold text-emerald-700 dark:text-emerald-300">
                     {formatUnit(lineReport.unitCost.finalUnitCost)} / bag
                   </span>
@@ -870,7 +882,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
       {!lineReport && !loading && !error && (
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8 text-center text-default-500 dark:text-gray-400">
-          No report data for this month.
+          {t("No report data for this month.")}
         </div>
       )}
 
@@ -880,7 +892,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
           <div className="space-y-5 p-4">
             {/* PRODUCT */}
             <div>
-              <SectionTitle>Product</SectionTitle>
+              <SectionTitle>{t("Product")}</SectionTitle>
               <PLRowTable
                 rows={lineReport.pl.products}
                 showBags
@@ -888,14 +900,16 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 {...drilldownProps}
               />
               <TotalRow
-                label={`Total Sales (${formatBags(lineReport.pl.totals.bags)} bags)`}
+                label={t("Total Sales ({{bags}} bags)", {
+                  bags: formatBags(lineReport.pl.totals.bags),
+                })}
                 value={formatCurrency(lineReport.pl.totals.amount)}
               />
             </div>
 
             {/* CLOSING STOCK */}
             <div>
-              <SectionTitle>Closing Stock</SectionTitle>
+              <SectionTitle>{t("Closing Stock")}</SectionTitle>
               <PLRowTable
                 rows={lineReport.pl.closingStock}
                 showBags={false}
@@ -903,18 +917,18 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 {...drilldownProps}
               />
               <TotalRow
-                label="Total Closing Stock"
+                label={t("Total Closing Stock")}
                 value={formatCurrency(lineReport.pl.closingStockTotal)}
               />
               <InfoRow
-                label="Closing Stock + Sales"
+                label={t("Closing Stock + Sales")}
                 value={formatCurrency(lineReport.pl.closingStockPlusSales)}
               />
             </div>
 
             {/* OPENING STOCK */}
             <div>
-              <SectionTitle>Opening Stock</SectionTitle>
+              <SectionTitle>{t("Opening Stock")}</SectionTitle>
               <PLRowTable
                 rows={lineReport.pl.openingStock}
                 showBags={false}
@@ -922,14 +936,14 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 {...drilldownProps}
               />
               <TotalRow
-                label="Total Opening Stock"
+                label={t("Total Opening Stock")}
                 value={formatCurrency(lineReport.pl.openingStockTotal)}
               />
             </div>
 
             {/* PURCHASE + RETURNS */}
             <div>
-              <SectionTitle>Purchase</SectionTitle>
+              <SectionTitle>{t("Purchase")}</SectionTitle>
               <PLRowTable
                 rows={lineReport.pl.purchases}
                 showBags={false}
@@ -937,13 +951,13 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 {...drilldownProps}
               />
               <TotalRow
-                label="Total Purchase"
+                label={t("Total Purchase")}
                 value={formatCurrency(lineReport.pl.purchaseTotal)}
               />
 
               {lineReport.pl.returns.length > 0 && (
                 <div className="mt-3">
-                  <SectionTitle>Returns</SectionTitle>
+                  <SectionTitle>{t("Returns")}</SectionTitle>
                   <PLRowTable
                     rows={lineReport.pl.returns}
                     showBags
@@ -951,14 +965,14 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                     {...drilldownProps}
                   />
                   <TotalRow
-                    label="Total Returns"
+                    label={t("Total Returns")}
                     value={formatCurrency(lineReport.pl.returnsTotal)}
                   />
                 </div>
               )}
 
               <InfoRow
-                label="Opening + Purchase + Returns"
+                label={t("Opening + Purchase + Returns")}
                 value={formatCurrency(
                   lineReport.pl.openingPlusPurchasesPlusReturns
                 )}
@@ -967,7 +981,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
             {/* USAGE */}
             <BandRow
-              label="USAGE (Opening + Purchase + Returns - Closing)"
+              label={t("USAGE (Opening + Purchase + Returns - Closing)")}
               value={formatCurrency(lineReport.pl.usage)}
             />
 
@@ -978,18 +992,18 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 signedAmountClass(lineReport.pl.gross)
               )}
             >
-              <span>GROSS (Sales - Usage)</span>
+              <span>{t("GROSS (Sales - Usage)")}</span>
               <span>{formatCurrency(lineReport.pl.gross)}</span>
             </div>
 
             {/* EXPENSES */}
             <div>
-              <SectionTitle>Expenses</SectionTitle>
+              <SectionTitle>{t("Expenses")}</SectionTitle>
               <div className="space-y-0.5 pl-3">
                 {EXPENSE_BREAKDOWN_LABELS.map(({ key, label }) => (
                   <div key={key} className="flex justify-between text-sm">
                     <span className="text-gray-700 dark:text-gray-300">
-                      {label}
+                      {t(label)}
                     </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(lineReport.pl.expenseBreakdown[key])}
@@ -998,24 +1012,28 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 ))}
               </div>
               <TotalRow
-                label="Total Expenses"
+                label={t("Total Expenses")}
                 value={`(${formatCurrency(lineReport.pl.expenses)})`}
               />
               <p className="mt-1 text-xs text-default-400 dark:text-gray-500">
-                Expense line detail is on the{" "}
-                <Link
-                  to="/stock/reports/estimated-unit-cost"
-                  className="text-sky-600 dark:text-sky-400 hover:underline"
-                >
-                  Estimated Unit Cost
-                </Link>{" "}
-                page.
+                <Trans
+                  i18nKey="Expense line detail is on the <link>Estimated Unit Cost</link> page."
+                  ns="stock"
+                  components={{
+                    link: (
+                      <Link
+                        to="/stock/reports/estimated-unit-cost"
+                        className="text-sky-600 dark:text-sky-400 hover:underline"
+                      />
+                    ),
+                  }}
+                />
               </p>
             </div>
 
             {/* P/L */}
             <BandRow
-              label="PROFIT / (LOSS)"
+              label={t("PROFIT / (LOSS)")}
               value={
                 <span className={signedAmountClass(lineReport.pl.profitLoss)}>
                   {formatCurrency(lineReport.pl.profitLoss)}
@@ -1031,11 +1049,12 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                     htmlFor="addBack"
                     className="text-sm font-bold text-gray-900 dark:text-white"
                   >
-                    ADD BACK
+                    {t("ADD BACK")}
                   </label>
                   <p className="mt-0.5 text-xs text-default-500 dark:text-gray-400">
-                    Key the month's Add Back here — it raises Final P/L and
-                    lowers the estimated unit cost.
+                    {t(
+                      "Key the month's Add Back here — it raises Final P/L and lowers the estimated unit cost.",
+                    )}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1061,7 +1080,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                     onClick={handleSaveAddBack}
                     disabled={savingAddBack}
                   >
-                    {savingAddBack ? "Saving..." : "Save"}
+                    {savingAddBack ? t("Saving...") : t("Save")}
                   </Button>
                 </div>
               </div>
@@ -1070,7 +1089,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
             {/* FINAL P/L */}
             <div className="flex items-center justify-between text-sm font-bold">
               <span className="text-gray-900 dark:text-white">
-                FINAL PROFIT / (LOSS)
+                {t("FINAL PROFIT / (LOSS)")}
               </span>
               <span
                 className={signedAmountClass(lineReport.pl.finalProfitLoss)}
@@ -1082,7 +1101,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
             {/* ACCUMULATIVE */}
             <BandRow
               accent
-              label="ACCUMULATIVE P/L"
+              label={t("ACCUMULATIVE P/L")}
               value={
                 <span className={signedAmountClass(lineReport.pl.accumulative)}>
                   RM {formatCurrency(lineReport.pl.accumulative)}
@@ -1092,11 +1111,16 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
             {lineReport.anchor && (
               <p className="text-xs text-default-400 dark:text-gray-500">
-                Anchor {lineReport.anchor.asOfDate}: RM{" "}
-                {formatCurrency(lineReport.anchor.accumulative)} ·{" "}
-                {lineReport.monthlyTrail.length} month
-                {lineReport.monthlyTrail.length === 1 ? "" : "s"} accumulated
-                since.
+                {t(
+                  lineReport.monthlyTrail.length === 1
+                    ? "Anchor {{date}}: RM {{amount}} · {{months}} month accumulated since."
+                    : "Anchor {{date}}: RM {{amount}} · {{months}} months accumulated since.",
+                  {
+                    date: lineReport.anchor.asOfDate,
+                    amount: formatCurrency(lineReport.anchor.accumulative),
+                    months: lineReport.monthlyTrail.length,
+                  },
+                )}
               </p>
             )}
           </div>
@@ -1111,17 +1135,17 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
             {lineReport.unitCost.groups.map((group) => (
               <div key={group.key}>
                 <SectionTitle>
-                  {UNIT_COST_GROUP_LABELS[group.key] ?? group.key}
+                  {t(UNIT_COST_GROUP_LABELS[group.key] ?? group.key)}
                 </SectionTitle>
                 {group.rows.length === 0 ? (
                   <p className="text-sm text-default-400 dark:text-gray-500">
-                    No mapped lines.
+                    {t("No mapped lines.")}
                   </p>
                 ) : (
                   <UnitCostRowTable rows={group.rows} {...drilldownProps} />
                 )}
                 <TotalRow
-                  label="Subtotal"
+                  label={t("Subtotal")}
                   value={
                     <>
                       {formatCurrency(group.subtotal.amount)}
@@ -1136,7 +1160,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
             {/* TOTAL before repair */}
             <BandRow
-              label="TOTAL"
+              label={t("TOTAL")}
               value={
                 <>
                   {formatCurrency(lineReport.unitCost.totalBeforeRepair.amount)}
@@ -1150,10 +1174,10 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
             {/* MACHINE REPAIR */}
             <div>
-              <SectionTitle>Machine Repair</SectionTitle>
+              <SectionTitle>{t("Machine Repair")}</SectionTitle>
               {lineReport.unitCost.machineRepair.rows.length === 0 ? (
                 <p className="text-sm text-default-400 dark:text-gray-500">
-                  No mapped lines.
+                  {t("No mapped lines.")}
                 </p>
               ) : (
                 <UnitCostRowTable
@@ -1162,7 +1186,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 />
               )}
               <TotalRow
-                label="Total Machine Repair"
+                label={t("Total Machine Repair")}
                 value={
                   <>
                     {formatCurrency(lineReport.unitCost.machineRepair.amount)}
@@ -1177,7 +1201,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
             {/* TOTAL incl. repair */}
             <div className="flex items-center justify-between text-sm font-bold">
               <span className="text-gray-900 dark:text-white">
-                TOTAL (incl. Machine Repair)
+                {t("TOTAL (incl. Machine Repair)")}
               </span>
               <span className="text-gray-900 dark:text-white">
                 {formatCurrency(lineReport.unitCost.total.amount)}
@@ -1189,7 +1213,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
 
             {/* ADD BACK (read-only; keyed on the Estimated P&L page) */}
             <InfoRow
-              label="ADD BACK (keyed on the Estimated P&L page)"
+              label={t("ADD BACK (keyed on the Estimated P&L page)")}
               value={
                 <>
                   {formatCurrency(lineReport.unitCost.addBack.amount)}
@@ -1203,7 +1227,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
             {/* FINAL UNIT COST */}
             <BandRow
               accent
-              label="FINAL ESTIMATED UNIT COST"
+              label={t("FINAL ESTIMATED UNIT COST")}
               value={`${formatUnit(lineReport.unitCost.finalUnitCost)} / bag`}
             />
           </div>

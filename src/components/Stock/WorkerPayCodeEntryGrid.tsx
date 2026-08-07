@@ -12,6 +12,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import clsx from "clsx";
 import toast from "react-hot-toast";
@@ -231,6 +232,8 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
   workerOrderApiBase = "/jellypolly/api/production-entries",
   workerOrderRefreshKey = 0,
 }) => {
+  const { t } = useTranslation("stock");
+
   const [workerOrderIds, setWorkerOrderIds] = useState<string[]>([]);
   const [isLoadingWorkerOrder, setIsLoadingWorkerOrder] = useState(false);
   const [draggedWorkerId, setDraggedWorkerId] = useState<string | null>(null);
@@ -557,10 +560,10 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
         console.error("Error saving worker order:", error);
         invalidateWorkerOrderCache(workerOrderScope);
         applyWorkerOrderIds(dragState.previousOrderIds);
-        toast.error("Failed to save worker order");
+        toast.error(t("Failed to save worker order"));
       }
     },
-    [applyWorkerOrderIds, clearDragOverlayFrame, workerOrderApiBase, workerOrderScope]
+    [applyWorkerOrderIds, clearDragOverlayFrame, workerOrderApiBase, workerOrderScope, t]
   );
 
   const handleDragHandlePointerCancel = useCallback(
@@ -621,7 +624,7 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
         <div className="flex flex-col items-center gap-2">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-sky-500 border-t-transparent"></div>
           <span className="text-sm text-default-500 dark:text-gray-400">
-            Loading worker order...
+            {t("Loading worker order...")}
           </span>
         </div>
       </div>
@@ -632,10 +635,10 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
     return (
       <div className="rounded-lg border border-dashed border-default-300 dark:border-gray-600 p-8 text-center">
         <p className="text-default-500 dark:text-gray-400">
-          No workers found for the selected product type.
+          {t("No workers found for the selected product type.")}
         </p>
         <p className="mt-1 text-sm text-default-400 dark:text-gray-500">
-          Ensure workers are assigned to the JP_PACKING job.
+          {t("Ensure workers are assigned to the JP_PACKING job.")}
         </p>
       </div>
     );
@@ -645,11 +648,10 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
     return (
       <div className="rounded-lg border border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-900/20 p-8 text-center">
         <p className="text-amber-700 dark:text-amber-300 font-medium">
-          No pay codes mapped to this product.
+          {t("No pay codes mapped to this product.")}
         </p>
         <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
-          Use the Mappings button to map at least one pay code before entering
-          production.
+          {t("Use the Mappings button to map at least one pay code before entering production.")}
         </p>
       </div>
     );
@@ -666,7 +668,7 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
           >
             <div className="px-2 py-2" />
             <div className="px-1 py-2 text-right">#</div>
-            <div className="px-2 py-2">Worker</div>
+            <div className="px-2 py-2">{t("Worker")}</div>
             {payCodeColumns.map((column) => (
               <div
                 key={column.pay_code_id}
@@ -682,7 +684,7 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
               </div>
             ))}
             <div className="px-2 py-2 text-center border-l border-default-200 dark:border-gray-700">
-              Total
+              {t("Total")}
             </div>
           </div>
 
@@ -704,8 +706,8 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
               >
                 <button
                   type="button"
-                  aria-label={`Move ${worker.name}`}
-                  title="Drag to reorder worker"
+                  aria-label={t("Move {{name}}", { name: worker.name })}
+                  title={t("Drag to reorder worker")}
                   disabled={!canReorderWorkers}
                   onPointerDown={(event) =>
                     handleDragHandlePointerDown(event, worker.id)
@@ -853,7 +855,7 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
             <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
               {workingWorkersCount}{" "}
               <span className="text-base font-normal text-default-500 dark:text-gray-400">
-                perkerja
+                {t("workers")}
               </span>
             </p>
           </div>
@@ -867,7 +869,7 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
               color="default"
               icon={IconRefresh}
             >
-              Reset
+              {t("Reset")}
             </Button>
             <Button
               onClick={onSave}
@@ -875,7 +877,7 @@ const WorkerPayCodeEntryGrid: React.FC<WorkerPayCodeEntryGridProps> = ({
               color="sky"
               icon={IconDeviceFloppy}
             >
-              {isSaving ? "Saving..." : "Save Production"}
+              {isSaving ? t("Saving...") : t("Save Production")}
             </Button>
           </div>
         )}
