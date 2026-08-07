@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-07",
+    ms: "Invois (Tien Hock dan Jelly Polly): pemilih tarikh dan masa pada borang invois serta dialog Change Date & Time kini menggunakan pemilih kalendar aplikasi dengan pemilih jam/minit yang kemas dan bukannya kotak masa lalai pelayar. Tingkah laku pembayaran dan perakaunan tidak berubah.",
+    en: "Invoices (Tien Hock and Jelly Polly): the date and time picker on the invoice form and the Change Date & Time dialog now uses the app's calendar picker with a proper hour/minute selector instead of the browser's plain time box. Payment and accounting behaviour is unchanged.",
+  },
+  {
+    date: "2026-08-07",
     ms: "Halaman Payments (Tien Hock): senarai kini memaparkan 200 bayaran pada satu masa dengan butang Previous/Next dan nombor halaman, dan bukannya memuatkan semua bayaran sekaligus. Penapis dan carian masih digunakan pada keseluruhan set hasil, dan bayaran pending masih dipaparkan dahulu.",
     en: "Payments page (Tien Hock): the list now shows 200 payments at a time with Previous/Next and page numbers, instead of loading every payment at once. Filters and search still apply to the whole result set, and pending payments are still shown first.",
   },
