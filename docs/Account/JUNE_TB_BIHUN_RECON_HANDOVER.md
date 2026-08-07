@@ -2,11 +2,73 @@
 
 **Created 5 Aug 2026. Entry point for continuing this project in a fresh session.** Parent context: [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md) §7 (read it first — this doc only covers the continuation planned on 5 Aug 2026).
 
-## Status 7 Aug 2026 — CLOSED (dev + prod), with three corrections reversed
+## ✅ DONE 7 Aug 2026 — June estimated unit cost is closed
+
+**Resolved.** The coworker confirmed she also updated the **estimated unit cost inside the legacy program**, so legacy and the ERP now carry the same June classification and the bottom line agrees on both sides: expenses subtotal **64,238.82**, **FINAL 14.0504**.
+
+Production keeps the 7 Aug state — KFC 40.00 in `MBSM_K`, PAUMIN `MBRMF` 565.00 / `MBSAF` 144.00 — and the BIHUN line items stand at MBC **459.55** · MBRMF **2,567.80** · MBSAF **664.78** · Staff Messing **2,689.10**. **No data change was made**, and the repo already matches. Nothing below this section is actionable.
+
+The 4 Aug annotated scans (MBC 479.55 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10) are the pre-amendment snapshot and are superseded — treat any future sighting of them as stale.
+
+**Next work: the P&L**, which has discrepancies in places. Separate scope, not covered by this document.
+
+### How it got here (context, no longer actionable)
+
+She has stated both positions, three days apart. On 7 Aug she said KFC belongs in `MBSM_K` ("KFC cannot be in cleaning code") and PAUMIN is 565/144, and edited both the legacy program and prod accordingly. Later the same day she confirmed her 4 Aug annotated BIHUN scans (MBC 479.55 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10) are right — but those four figures **are** the opposite scenario. A second person has since independently confirmed KFC belongs in `MBSM_K` (KFC only; PAUMIN was not covered).
+
+**Do not adjudicate this with the totals.** The four deltas are −20 / +50 / −50 / +20 and net to zero, so the expenses subtotal **64,238.82**, **FINAL 14.0504** and the Trial Balance total (**17,102,880.87** folded / 17,106,536.00 raw) come out identical under both classifications. Only the original receipts settle it.
+
+### What each answer means
+
+| her answer | BIHUN June figures | action |
+|---|---|---|
+| **`MBSM_K`** + **565/144** (current prod state) | MBC 459.55 · MBRMF 2,567.80 · MBSAF 664.78 · Staff Messing 2,689.10 | **Nothing to do.** Everything in this repo already matches. Ask her to reprint the 4 Aug BIHUN sheet from legacy so the stale scan stops resurfacing. |
+| **`MBC`** + **465/244** (the 4 Aug scans) | MBC 479.55 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10 | Apply the reversal below, then revert the repo changes listed after it. |
+| a **split** answer (e.g. KFC `MBSM_K` but PAUMIN 465/244) | mix of the two rows | Apply only the matching half. The KFC pair (MBC ↔ Staff Messing) and the PAUMIN pair (MBRMF ↔ MBSAF) are independent. |
+
+### If this ever reopens — the reversal, kept for reference (NOT needed)
+
+Three lines, two journals, applied identically to **dev and prod** as a guarded, idempotent, fail-closed migration (pattern: `git show 8bd5e45f:dev/migrations/2026-08-05_june_legacy_reclass.sql`; run with `psql -v ON_ERROR_STOP=1`).
+
+| # | journal | change | line identity |
+|---|---|---|---|
+| 1 | `PCE004/06` (display `PV004/06`, 2026-06-10) | `MBSM_K` → `MBC`, amount 40.00 unchanged | particulars `KFC LINTAS JAYA BOULEVARD #130134-14/03/2026` |
+| 2 | `PBE054/06` (2026-06-25) | `MBRMF` 565.00 → **465.00** | particulars start `PAUMIN HARDWARE S/B #2606-2133-23/06/2026 (CUTTING DISC` |
+| 3 | `PBE054/06` (2026-06-25) | `MBSAF` 144.00 → **244.00** | particulars start `PAUMIN HARDWARE S/B #2606-2133-23/06/2026 (BATIK COTTON` |
+
+- **Resolve lines by (reference_no, account_code, debit_amount, particulars), never by `jel.id`** — prod ids differ. Dev ids for reference: journal 2964 line 7696; journal 2949 lines 20956 / 20955.
+- Both journals are source-less manual C/B entries (`source_type` NULL, `manual_override` false). Assert `manual_override` stays **false**.
+- Journal totals must not move: `PCE004/06` **8,740.25**, `PBE054/06` **709.00**.
+- June 2026 is past the 2026-06-01 open date, so `assertTienHockAccountingDateUnlocked` permits it.
+- **Never re-run the two 6 Aug migrations** — still applied; they would trip their own guards.
+- Expected June movements after a full reversal: MBC **959.10** · MBSM_K **3,086.49** · MBRMF **5,035.60** · MBSAF **1,429.55**. Unchanged and re-assert: BRM 1,413.74 · MBOR 1,598.80 · MBRM 1,810.95 · MBSM_O 2,251.70 · MGT 8,908.02 · MRM 3,294.82.
+
+### Repo changes to revert alongside a full reversal
+
+`dev/pdf-render/dump-bihun-june.mjs` (restore MBC 479.55 / MBRMF 2517.8 / MBSAF 714.78 / STAFF MESSING 2669.1 and drop the re-pin comment) · [KEYING_GUIDE.md](KEYING_GUIDE.md) and [KEYING_GUIDE_BM.md](KEYING_GUIDE_BM.md) (restore the KFC row and rule 5's 465/244 example, drop the 7 Aug note) · [JUNE_RECLASS_DESIGN.md](JUNE_RECLASS_DESIGN.md) (un-strike move #3, E10, E11 and the four gap-table rows; rewrite §e) · [../MIGRATIONS_LOG.md](../MIGRATIONS_LOG.md) · this file · [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md) §7 · [LEGACY_TIEOUT_STRATEGY.md](LEGACY_TIEOUT_STRATEGY.md) and `dev/import/legacy-tieout/README.md` (restore the 1-row June proof profile, **keep** the added caution paragraphs) · `src/components/ChangelogModal.tsx` (delete the 2026-08-07 "Pembetulan lanjut akaun Jun 2026" entry — net effect versus 6 Aug becomes zero).
+
+### Verification either way
+
+```bash
+node dev/pdf-render/dump-bihun-june.mjs                      # all targets OK, SUBTOTAL 64238.82, FINAL 14.0504
+node dev/import/closing-stock-report/verify-estimated-report.mjs   # 432 exact / 40 documented / 0 failures
+node dev/import/legacy-tieout/tie-out.mjs --month 2026-06 \
+  --legacy dev/import/legacy-june-tb/june-2026-legacy-tb.json
+#   5 differing accounts = current state (CR_LD + the 4 post-print amendments)
+#   1 differing account  = after a full reversal (CR_LD +40.00 only)
+```
+
+Best evidence available: a **fresh** legacy TB export as at 2026-06-30 run through the tie-out. Whichever way those four accounts land in a fresh export is what legacy actually holds today.
+
+Environment: dev `docker exec -i tienhock_dev_db psql -U postgres -d tienhock -c "SQL"` (fresh prod copy taken 7 Aug, contains her edits) · prod `ssh tienhock@5.223.55.190`, db `tienhock_prod` on `localhost:5432` as `postgres` — **`pg_dump` backup before applying** (precedent `~/tienhock_prod_pre_june_reclass_20260806.sql.gz`).
+
+## Status 7 Aug 2026 — the reconciliation itself (dev + prod)
 
 **7 Aug 2026 — post-print legacy amendments.** The coworker reviewed [KEYING_GUIDE_BM.md](KEYING_GUIDE_BM.md) and flagged three rows. Two were genuine: the June **print** this whole reconciliation was tied to contained keying errors of her own, so we had moved two correct ERP classifications to wrong ones. She fixed both in the legacy program and in the ERP overnight — **move #3** (KFC LINTAS 40.00 belongs in `MBSM_K`, not `MBC`) and **E10+E11** (PAUMIN #2606-2133 splits `MBRMF` 565.00 / `MBSAF` 144.00, not 465.00 / 244.00). Her third flag (`PCE004/06`'s sen edits) needed no action — legacy and the ERP already agree at 46.65 / 21.25 / 160.55 / 88.20 / 89.12 / 482.30 / 9.05.
 
 Verified read-only against production on 7 Aug: June movements MBC **919.10** · MBSM_K **3,126.49** · MBRMF **5,135.60** · MBSAF **1,329.55**, every other reconciled account unchanged and still exactly at legacy, all five vouchers footing, June TB **17,106,536.00/side**. The amended figures tie to the cent with no plug (arithmetic in [JUNE_RECLASS_DESIGN.md](JUNE_RECLASS_DESIGN.md) §e). Re-pinned/updated in the same pass: `dump-bihun-june.mjs` targets (MBC 459.55 · MBRMF 2,567.80 · MBSAF 664.78 · Staff Messing 2,689.10 — the four deltas net zero, so expenses subtotal 64,238.82 and FINAL 14.0504 are unchanged), both keying guides, `JUNE_RECLASS_DESIGN.md` §e, MIGRATIONS_LOG.md and the tie-out README. `verify-estimated-report.mjs` needed no change — still 432 exact / 40 documented deltas / 0 failures. **Neither migration may be re-run.**
+
+**Challenged and upheld the same day.** The coworker's 4 Aug annotated BIHUN scans show the pre-amendment figures (MBC 479.55 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10) and she initially said those were right, which would have reversed the reversal. A second person then independently confirmed KFC belongs in `MBSM_K`, and MBC 479.55 is arithmetically just KFC 40.00 sitting in Cleaning Expenses — so the 4 Aug scans are stale on these four lines. **No data change; production keeps the 7 Aug state.** Detail and the two open follow-ups (reprint the 4 Aug sheet; PAUMIN's 565/144 split was never independently confirmed) are in [JUNE_RECLASS_DESIGN.md](JUNE_RECLASS_DESIGN.md) §e resolution.
 
 **Known consequence:** the June tie-out now reports 5 differing accounts instead of 1, because its fixture `dev/import/legacy-june-tb/june-2026-legacy-tb.json` is a faithful transcription of the pre-amendment print. That fixture is evidence and must not be edited — see the tie-out README's June proof profile.
 
