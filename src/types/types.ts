@@ -526,6 +526,8 @@ export interface AdjustmentDocument {
   cancellation_reason: string | null;
   cancellation_date: string | null;
   journal_entry_id: number | null;
+  journal_reference?: string | null;
+  journal_status?: string | null;
 
   created_by: string | null;
   created_at: string;

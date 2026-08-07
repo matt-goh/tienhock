@@ -2956,7 +2956,20 @@ const InvoiceDetailsPage: React.FC = () => {
                             title={t("View journal entry")}
                           >
                             <IconReceipt size={14} />
-                            <span className="font-mono">#{doc.journal_entry_id}</span>
+                            <span className="font-mono">
+                              {doc.journal_reference ||
+                                `#${doc.journal_entry_id}`}
+                            </span>
+                            {doc.journal_status && (
+                              <span className="opacity-80">
+                                {" "}
+                                ({t(
+                                  doc.journal_status === "cancelled"
+                                    ? "Cancelled"
+                                    : "Posted"
+                                )})
+                              </span>
+                            )}
                           </button>
                         ) : (
                           <span className="text-xs text-gray-400 dark:text-gray-500">-</span>

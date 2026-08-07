@@ -2450,11 +2450,14 @@ export default function (pool, config) {
                  c.name AS customer_name,
                  p.id AS paired_doc_id, COALESCE(p.display_id, p.id) AS paired_display_id,
                  p.type AS paired_type, p.status AS paired_status,
-                 p.einvoice_status AS paired_einvoice_status
+                 p.einvoice_status AS paired_einvoice_status,
+                 je.status AS journal_status,
+                 COALESCE(je.display_reference, je.reference_no) AS journal_reference
             FROM adjustment_documents a
             JOIN invoices i ON a.original_invoice_id = i.id
        LEFT JOIN customers c ON a.customerid = c.id
        LEFT JOIN adjustment_documents p ON a.paired_with_id = p.id
+       LEFT JOIN journal_entries je ON je.id = a.journal_entry_id
            WHERE a.original_invoice_id = $1
            ORDER BY a.created_at DESC
           `,
