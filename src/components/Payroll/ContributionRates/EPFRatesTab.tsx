@@ -5,8 +5,10 @@ import { useContributionRatesCache } from "../../../utils/payroll/useContributio
 import { EPFRate } from "../../../types/types";
 import LoadingSpinner from "../../LoadingSpinner";
 import EPFRateEditModal from "./EPFRateEditModal";
+import { useTranslation } from "react-i18next";
 
 const EPFRatesTab: React.FC = () => {
+  const { t } = useTranslation("payroll");
   const { epfRates, isLoading, error } = useContributionRatesCache();
   const [editingRate, setEditingRate] = useState<EPFRate | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -66,7 +68,7 @@ const EPFRatesTab: React.FC = () => {
   if (error) {
     return (
       <div className="text-center py-8 text-rose-600 dark:text-rose-400">
-        Error loading EPF rates: {error.message}
+        {t("Error loading EPF rates: {{message}}", { message: error.message })}
       </div>
     );
   }
@@ -80,7 +82,7 @@ const EPFRatesTab: React.FC = () => {
             <div key={type} className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
               <div className="bg-default-50 dark:bg-gray-900/50 px-4 py-3 border-b dark:border-gray-700">
                 <h3 className="font-medium text-default-800 dark:text-gray-100">
-                  {getEmployeeTypeLabel(type)}
+                  {t(getEmployeeTypeLabel(type))}
                 </h3>
               </div>
 
@@ -89,19 +91,19 @@ const EPFRatesTab: React.FC = () => {
                   <thead className="bg-default-50 dark:bg-gray-900/50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                        Wage Threshold
+                        {t("Wage Threshold")}
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                        Employee Rate
+                        {t("Employee Rate")}
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                        Employer Rate
+                        {t("Employer Rate")}
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                        Employer Fixed
+                        {t("Employer Fixed")}
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                        Actions
+                        {t("Actions")}
                       </th>
                     </tr>
                   </thead>
@@ -113,7 +115,7 @@ const EPFRatesTab: React.FC = () => {
                             `≤ ${formatCurrency(rate.wage_threshold)}`
                           ) : (
                             <span className="text-default-500 dark:text-gray-400">
-                              No threshold
+                              {t("No threshold")}
                             </span>
                           )}
                         </td>
@@ -130,7 +132,7 @@ const EPFRatesTab: React.FC = () => {
                           <button
                             onClick={() => handleEditRate(rate)}
                             className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 p-1 rounded hover:bg-sky-50 dark:hover:bg-sky-900/50"
-                            title="Edit Rate"
+                            title={t("Edit Rate")}
                           >
                             <IconEdit size={18} />
                           </button>

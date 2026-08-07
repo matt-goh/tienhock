@@ -10,6 +10,7 @@ import {
 import { IconAlertTriangle, IconExternalLink } from "@tabler/icons-react";
 import Button from "../Button";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 export interface MissingEPFEmployee {
   employee_id: number;
@@ -30,6 +31,7 @@ const MissingEPFNumberDialog: React.FC<MissingEPFNumberDialogProps> = ({
   onClose,
   employees,
 }) => {
+  const { t } = useTranslation("payroll");
   const navigate = useNavigate();
 
   const handleNavigateToStaff = (employeeId: number) => {
@@ -82,13 +84,10 @@ const MissingEPFNumberDialog: React.FC<MissingEPFNumberDialogProps> = ({
                       as="h3"
                       className="text-lg font-semibold leading-6 text-default-900 dark:text-gray-100"
                     >
-                      No. Ahli KWSP Tiada
+                      {t("No EPF Member Number")}
                     </DialogTitle>
                     <p className="mt-2 text-sm text-default-600 dark:text-gray-300">
-                      Pekerja berikut mempunyai caruman KWSP tetapi tidak
-                      termasuk dalam eksport E-Caruman kerana mereka tidak
-                      mempunyai nombor ahli KWSP yang direkodkan. Sila kemaskini
-                      profil kakitangan mereka dengan nombor KWSP yang betul.
+                      {t("The following employees have KWSP contributions but are not included in the E-Caruman export because they have no recorded KWSP member number. Please update their staff profile with the correct KWSP number.")}
                     </p>
                   </div>
                 </div>
@@ -98,13 +97,13 @@ const MissingEPFNumberDialog: React.FC<MissingEPFNumberDialogProps> = ({
                     <thead className="bg-default-50 dark:bg-gray-900/50 sticky top-0">
                       <tr>
                         <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                          Employee
+                          {t("Employee")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                          Contribution
+                          {t("Contribution")}
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                          Action
+                          {t("Action")}
                         </th>
                       </tr>
                     </thead>
@@ -114,7 +113,7 @@ const MissingEPFNumberDialog: React.FC<MissingEPFNumberDialogProps> = ({
                           <td className="px-4 py-3 text-sm text-default-900 dark:text-gray-100">
                             <div>{emp.name}</div>
                             <div className="text-xs text-default-500 dark:text-gray-400">
-                              {emp.nationality || "Unknown nationality"}
+                              {emp.nationality || t("Unknown nationality")}
                             </div>
                           </td>
                           <td className="px-4 py-3 text-sm text-default-900 dark:text-gray-100 text-right font-medium">
@@ -125,7 +124,7 @@ const MissingEPFNumberDialog: React.FC<MissingEPFNumberDialogProps> = ({
                               onClick={() => handleNavigateToStaff(emp.employee_id)}
                               className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 text-sm font-medium inline-flex items-center gap-1"
                             >
-                              Edit
+                              {t("Edit")}
                               <IconExternalLink size={14} />
                             </button>
                           </td>
@@ -137,7 +136,7 @@ const MissingEPFNumberDialog: React.FC<MissingEPFNumberDialogProps> = ({
 
                 <div className="mt-6 flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={onClose}>
-                    Close
+                    {t("Close")}
                   </Button>
                 </div>
               </DialogPanel>

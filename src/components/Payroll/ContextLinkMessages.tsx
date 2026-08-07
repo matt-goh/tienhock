@@ -4,6 +4,7 @@ import { ContextField } from "../../configs/payrollJobConfigs";
 import { createPortal } from "react-dom";
 import { useJobPayCodeMappings } from "../../utils/catalogue/useJobPayCodeMappings";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 interface ContextLinkMessagesProps {
   contextFields: ContextField[];
@@ -16,6 +17,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
   linkedPayCodes,
   children,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const labelRef = useRef<HTMLDivElement>(null);
@@ -88,7 +90,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
             onMouseLeave={handleMouseLeave}
           >
             <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-              Linked Pay Codes
+              {t("Linked Pay Codes")}
             </div>
             <div className="text-sm text-default-600 dark:text-gray-300">
               <ul className="space-y-2 mt-1">
@@ -116,13 +118,13 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                       {payCodeInfo && (
                         <div className="ml-4 mt-1 text-xs text-default-500 dark:text-gray-400">
                           <div>
-                            Rate unit:{" "}
+                            {t("Rate unit:")}{" "}
                             <span className="font-medium">
                               {payCodeInfo.rateUnit}
                             </span>
                           </div>
                           <div>
-                            Biasa:{" "}
+                            {t("Biasa:")}{" "}
                             <span className="font-medium">
                               {payCodeInfo.rateUnit === "Percent"
                                 ? `${payCodeInfo.rateBiasa.toFixed(2)}%`
@@ -130,7 +132,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                             </span>
                           </div>
                           <div>
-                            Ahad:{" "}
+                            {t("Ahad:")}{" "}
                             <span className="font-medium">
                               {payCodeInfo.rateUnit === "Percent"
                                 ? `${payCodeInfo.rateAhad.toFixed(2)}%`
@@ -138,7 +140,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                             </span>
                           </div>
                           <div>
-                            Umum:{" "}
+                            {t("Umum:")}{" "}
                             <span className="font-medium">
                               {payCodeInfo.rateUnit === "Percent"
                                 ? `${payCodeInfo.rateUmum.toFixed(2)}%`
@@ -147,8 +149,7 @@ const ContextLinkMessages: React.FC<ContextLinkMessagesProps> = ({
                           </div>
                           {payCodeInfo?.rateUnit === "Percent" && (
                             <div className="text-xs italic mt-1">
-                              Percent rates are multiplied by the {field.label}{" "}
-                              value
+                              {t("Percent rates are multiplied by the {{field}} value", { field: field.label })}
                             </div>
                           )}
                         </div>

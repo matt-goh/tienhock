@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from "react";
 import { IconBuildingFactory2 } from "@tabler/icons-react";
 import { api } from "../../routes/utils/api";
+import { useTranslation } from "react-i18next";
 
 interface CompanySummary {
   net_pay: number;
@@ -40,30 +41,41 @@ const CompanyRow: React.FC<{
   label: string;
   summary: CompanySummary;
   isCurrent: boolean;
-}> = ({ label, summary, isCurrent }) => (
-  <div className="flex items-center justify-between py-1.5">
-    <div className="min-w-0">
-      <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-        {label}
-      </span>
-      {isCurrent && (
-        <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
-          (this page)
+}> = ({ label, summary, isCurrent }) => {
+  const { t } = useTranslation("payroll");
+  return (
+    <div className="flex items-center justify-between py-1.5">
+      <div className="min-w-0">
+        <span className="text-sm font-medium text-default-700 dark:text-gray-200">
+          {label}
         </span>
-      )}
-      <p className="text-xs text-default-400 dark:text-gray-500">
-        Jumlah Digenapkan {formatCurrency(summary.setelah_digenapkan)}
-        {summary.mid_month > 0 &&
-          ` · Mid-month ${formatCurrency(summary.mid_month)}`}
-        {summary.monthly_pinjam > 0 &&
-          ` · Pinjam -${formatCurrency(summary.monthly_pinjam)}`}
-      </p>
+        {isCurrent && (
+          <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
+            {t("(this page)")}
+          </span>
+        )}
+        <p className="text-xs text-default-400 dark:text-gray-500">
+          {t("Rounded Total {{amount}}", { amount: formatCurrency(summary.setelah_digenapkan) })}
+          {summary.mid_month > 0 && (
+            <>
+              {" · "}
+              {t("Mid-month {{amount}}", { amount: formatCurrency(summary.mid_month) })}
+            </>
+          )}
+          {summary.monthly_pinjam > 0 && (
+            <>
+              {" · "}
+              {t("Pinjam -{{amount}}", { amount: formatCurrency(summary.monthly_pinjam) })}
+            </>
+          )}
+        </p>
+      </div>
+      <span className="text-base font-semibold text-default-800 dark:text-gray-100">
+        {formatCurrency(summary.final_take_home + summary.mid_month)}
+      </span>
     </div>
-    <span className="text-base font-semibold text-default-800 dark:text-gray-100">
-      {formatCurrency(summary.final_take_home + summary.mid_month)}
-    </span>
-  </div>
-);
+  );
+};
 
 const CrossCompanyTakeHomeCard: React.FC<CrossCompanyTakeHomeCardProps> = ({
   employeeId,
@@ -71,6 +83,7 @@ const CrossCompanyTakeHomeCard: React.FC<CrossCompanyTakeHomeCardProps> = ({
   month,
   currentCompany,
 }) => {
+  const { t } = useTranslation("payroll");
   const [data, setData] = useState<CrossCompanyResponse | null>(null);
 
   useEffect(() => {
@@ -109,7 +122,7 @@ const CrossCompanyTakeHomeCard: React.FC<CrossCompanyTakeHomeCardProps> = ({
           className="text-violet-500 dark:text-violet-400"
         />
         <h3 className="text-sm font-semibold text-default-700 dark:text-gray-200">
-          Combined Take-Home (Tien Hock + Jelly Polly)
+          {t("Combined Take-Home (Tien Hock + Jelly Polly)")}
         </h3>
       </div>
       <div className="divide-y divide-default-100 dark:divide-gray-700">
@@ -130,7 +143,7 @@ const CrossCompanyTakeHomeCard: React.FC<CrossCompanyTakeHomeCardProps> = ({
       </div>
       <div className="flex items-center justify-between pt-2 mt-1 border-t-2 border-default-200 dark:border-gray-600">
         <span className="text-sm font-semibold text-default-700 dark:text-gray-200">
-          Total Take-Home This Month
+          {t("Total Take-Home This Month")}
         </span>
         <span className="text-lg font-bold text-violet-600 dark:text-violet-400">
           {formatCurrency(data.combined_take_home)}

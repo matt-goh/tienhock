@@ -13,6 +13,7 @@ import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { refreshHolidaysCache } from "../../utils/payroll/useHolidayCache";
 import Checkbox from "../Checkbox";
+import { useTranslation } from "react-i18next";
 
 interface Holiday {
   id: number;
@@ -37,6 +38,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
   existingHolidays,
   onSave,
 }) => {
+  const { t } = useTranslation("payroll");
   const [formData, setFormData] = useState({
     holiday_date: "",
     end_date: "",
@@ -114,7 +116,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
       formData.end_date &&
       parseLocalDate(formData.end_date) < parseLocalDate(formData.holiday_date)
     ) {
-      setError("End date cannot be before start date");
+      setError(t("End date cannot be before start date"));
       return;
     }
 
@@ -133,7 +135,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
     });
 
     if (duplicateDate) {
-      setError(`A holiday already exists for ${duplicateDate}`);
+      setError(t("A holiday already exists for {{date}}", { date: duplicateDate }));
       return;
     }
 
@@ -146,14 +148,14 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
           description: formData.description,
           is_cuti_umum: formData.is_cuti_umum,
         });
-        toast.success("Holiday updated successfully");
+        toast.success(t("Holiday updated successfully"));
       } else if (holidayDates.length === 1) {
         await api.post("/api/holidays", {
           holiday_date: holidayDates[0],
           description: formData.description,
           is_cuti_umum: formData.is_cuti_umum,
         });
-        toast.success("Holiday added successfully");
+        toast.success(t("Holiday added successfully"));
       } else {
         await api.post("/api/holidays/batch", {
           holidays: holidayDates.map((holidayDate: string) => ({
@@ -163,7 +165,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
           })),
           overwrite: false,
         });
-        toast.success(`${holidayDates.length} holiday days added successfully`);
+        toast.success(t("{{count}} holiday days added successfully", { count: holidayDates.length }));
       }
 
       // Refresh the cache after successful save
@@ -176,12 +178,12 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
 
       // Handle specific error responses
       if (error.response?.status === 409) {
-        setError("A holiday already exists for this date");
+        setError(t("A holiday already exists for this date"));
       } else {
-        setError(error.response?.data?.message || "Failed to save holiday");
+        setError(error.response?.data?.message || t("Failed to save holiday"));
       }
 
-      toast.error(error.response?.data?.message || "Failed to save holiday");
+      toast.error(error.response?.data?.message || t("Failed to save holiday"));
     } finally {
       setIsSaving(false);
     }
@@ -218,12 +220,12 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                 >
-                  {isEditMode ? "Edit Holiday" : "Add Holiday"}
+                  {isEditMode ? t("Edit Holiday") : t("Add Holiday")}
                 </DialogTitle>
 
                 <form onSubmit={handleSubmit} className="mt-4 space-y-4">
                   <FormInput
-                    label={isEditMode ? "Holiday Date" : "Start Date"}
+                    label={isEditMode ? t("Holiday Date") : t("Start Date")}
                     name="holiday_date"
                     type="date"
                     value={formData.holiday_date}
@@ -235,7 +237,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
 
                   {!isEditMode && (
                     <FormInput
-                      label="End Date"
+                      label={t("End Date")}
                       name="end_date"
                       type="date"
                       value={formData.end_date}
@@ -246,13 +248,13 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
                   )}
 
                   <FormInput
-                    label="Description"
+                    label={t("Description")}
                     name="description"
                     value={formData.description}
                     onChange={(e) =>
                       setFormData({ ...formData, description: e.target.value })
                     }
-                    placeholder="e.g., Chinese New Year, Hari Raya, Deepavali"
+                    placeholder={t("e.g., Chinese New Year, Hari Raya, Deepavali")}
                   />
 
                   <Checkbox
@@ -260,7 +262,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
                     onChange={(checked: boolean) =>
                       setFormData({ ...formData, is_cuti_umum: checked })
                     }
-                    label="Cuti Umum"
+                    label={t("Cuti Umum")}
                     checkedColor="text-sky-600"
                     uncheckedColor="text-gray-400"
                   />
@@ -276,7 +278,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
                       onClick={onClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       type="submit"
@@ -284,7 +286,7 @@ const HolidayFormModal: React.FC<HolidayFormModalProps> = ({
                       variant="filled"
                       disabled={isSaving}
                     >
-                      {isSaving ? "Saving..." : isEditMode ? "Update" : "Add"}
+                      {isSaving ? t("Saving...") : isEditMode ? t("Update") : t("Add")}
                     </Button>
                   </div>
                 </form>
