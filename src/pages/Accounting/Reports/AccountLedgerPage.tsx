@@ -38,6 +38,7 @@ import {
 import { JELLYPOLLY_INFO, GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo";
 import { type AccountCode } from "../../../types/types";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-MY", {
@@ -209,6 +210,7 @@ const saveLastRange = (
 const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
   company = "tienhock",
 }: AccountLedgerPageProps) => {
+  const { t } = useTranslation("accounting");
   const isJellyPolly: boolean = company === "jellypolly";
   const isGreenTarget: boolean = company === "greentarget";
   const hasCompanyAccounts: boolean = isJellyPolly || isGreenTarget;
@@ -297,8 +299,8 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
         setCompanyAccounts([]);
         setError(
           isGreenTarget
-            ? "Failed to load accounts. Please try again later."
-            : "Failed to load customer debtors. Please try again later."
+            ? t("Failed to load accounts. Please try again later.")
+            : t("Failed to load customer debtors. Please try again later.")
         );
       } finally {
         if (isActive) setCompanyAccountsLoading(false);
@@ -309,7 +311,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
     return (): void => {
       isActive = false;
     };
-  }, [company, hasCompanyAccounts, isGreenTarget]);
+  }, [company, hasCompanyAccounts, isGreenTarget, t]);
 
   useEffect((): void => {
     if (hasCompanyAccounts) return;
@@ -444,7 +446,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
       setStatement(response);
       recordRecentLedger(selectedAccount);
     } catch (err) {
-      setError("Failed to fetch account ledger. Please try again later.");
+      setError(t("Failed to fetch account ledger. Please try again later."));
       console.error("Error fetching account ledger:", err);
     } finally {
       setLoading(false);
@@ -458,6 +460,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
     selectedAccount,
     range.start?.getTime(),
     range.end?.getTime(),
+    t,
   ]);
 
   useEffect(() => {
@@ -603,7 +606,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
       );
     } catch (err) {
       console.error("Error printing PDF:", err);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setExporting(false);
     }
@@ -669,8 +672,8 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             disabled={accountsLoading}
             placeholder={
               isJellyPolly
-                ? "Search customer debtor..."
-                : "Search account code or name..."
+                ? t("Search customer debtor...")
+                : t("Search account code or name...")
             }
             className="w-[28rem] max-w-full"
             hierarchical={!isJellyPolly}
@@ -687,7 +690,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
               icon={IconX}
               iconSize={16}
               onClick={() => handleAccountChange("")}
-              title="Close ledger and show recent ledgers"
+              title={t("Close ledger and show recent ledgers")}
               additionalClasses="h-[34px] w-[34px] !p-0 flex-shrink-0"
             />
           )}
@@ -701,7 +704,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             presets={[
               {
                 key: "thisMonth",
-                label: "This month",
+                label: t("This month"),
                 getRange: () => {
                   const now = new Date();
                   return {
@@ -712,7 +715,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
               },
               {
                 key: "thisYear",
-                label: "This year",
+                label: t("This year"),
                 getRange: () => {
                   const now = new Date();
                   return {
@@ -731,7 +734,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search transactions..."
+                placeholder={t("Search transactions...")}
                 value={txSearch}
                 onChange={(e) => setTxSearch(e.target.value)}
                 className="px-3 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-sm focus:outline-none focus:ring-1 focus:ring-sky-500 dark:focus:ring-sky-400 focus:border-sky-500 dark:focus:border-sky-400 w-[180px] placeholder-gray-400 dark:placeholder-gray-500"
@@ -740,7 +743,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                 <button
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
                   onClick={() => setTxSearch("")}
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   ×
                 </button>
@@ -757,7 +760,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                   iconSize={16}
                   onClick={handleOpenOpeningModal}
                   disabled={accountsLoading}
-                  title="Set opening balance"
+                  title={t("Set opening balance")}
                 />
               )}
               <Button
@@ -767,7 +770,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                 iconSize={16}
                 onClick={fetchStatement}
                 disabled={loading}
-                title="Refresh"
+                title={t("Refresh")}
                 additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
               />
             </>
@@ -781,7 +784,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             onClick={handlePrintPDF}
             disabled={exporting || !statement}
           >
-            {exporting ? "Preparing..." : "Print"}
+            {exporting ? t("Preparing...") : t("Print")}
           </Button>
         </div>
       </div>
@@ -798,7 +801,9 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                   statement.account.code
                 )}`}
                 className="hover:text-sky-600 dark:hover:text-sky-400 hover:underline transition-colors"
-                title={`Open account code ${statement.account.code}`}
+                title={t("Open account code {{code}}", {
+                  code: statement.account.code,
+                })}
               >
                 {statement.account.code}
               </Link>
@@ -812,13 +817,15 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             className="text-default-600 dark:text-gray-300"
             title={
               statement.opening_source?.type === "anchored"
-                ? `Anchored as of ${formatDate(statement.opening_source.as_of_date)}`
+                ? t("Anchored as of {{date}}", {
+                    date: formatDate(statement.opening_source.as_of_date),
+                  })
                 : isJellyPolly
-                  ? "Derived from prior customer activity"
-                  : "Derived from prior postings"
+                  ? t("Derived from prior customer activity")
+                  : t("Derived from prior postings")
             }
           >
-            Opening{" "}
+            {t("Opening")}{" "}
             <span className="font-semibold text-default-700 dark:text-gray-200">
               {formatBalance(statement.opening_balance)}
             </span>
@@ -831,29 +838,36 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
           </span>
           <span className="text-default-300 dark:text-gray-600">•</span>
           <span className="text-default-600 dark:text-gray-300">
-            Dr {formatCurrency(statement.totals.debit)} / Cr{" "}
-            {formatCurrency(statement.totals.credit)}
+            {t("Dr {{debit}} / Cr {{credit}}", {
+              debit: formatCurrency(statement.totals.debit),
+              credit: formatCurrency(statement.totals.credit),
+            })}
           </span>
           <span className="text-default-300 dark:text-gray-600">•</span>
           <span className="text-default-600 dark:text-gray-300">
-            Closing{" "}
+            {t("Closing")}{" "}
             <span className="font-semibold text-emerald-700 dark:text-emerald-300">
               {formatBalance(statement.closing_balance)}
             </span>
           </span>
           <span className="text-default-300 dark:text-gray-600">•</span>
           <span className="text-default-500 dark:text-gray-400">
-            {statement.totals.count} transactions
+            {t("{{count}} transactions", {
+              count: statement.totals.count,
+            })}
           </span>
           {(statement.unapplied_overpayment ?? 0) > 0.005 && (
             <>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <span
                 className="inline-flex items-center rounded-full bg-amber-100 dark:bg-amber-900/40 px-2 py-0.5 text-xs font-medium text-amber-800 dark:text-amber-300"
-                title="Non-posting: overpaid amount held in CUST_DEP (Customer Deposits). Not part of this ledger's lines or balances."
+                title={t(
+                  "Non-posting: overpaid amount held in CUST_DEP (Customer Deposits). Not part of this ledger's lines or balances."
+                )}
               >
-                Overpayment held: RM{" "}
-                {formatCurrency(statement.unapplied_overpayment ?? 0)}
+                {t("Overpayment held: RM {{amount}}", {
+                  amount: formatCurrency(statement.unapplied_overpayment ?? 0),
+                })}
               </span>
             </>
           )}
@@ -875,7 +889,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             <div className="flex items-center gap-2 mb-3">
               <IconHistory size={16} className="text-default-400 dark:text-gray-500" />
               <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
-                Recent ledgers
+                {t("Recent ledgers")}
               </h2>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -884,7 +898,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                   key={entry.code}
                   onClick={() => handleAccountChange(entry.code)}
                   className="group flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-default-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-600 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 cursor-pointer transition-colors"
-                  title={`Open ${entry.code} ledger`}
+                  title={t("Open {{code}} ledger", { code: entry.code })}
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-semibold font-mono text-default-800 dark:text-gray-100 truncate">
@@ -906,7 +920,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                         handleRemoveRecent(entry.code);
                       }}
                       className="opacity-0 group-hover:opacity-100 text-default-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-opacity"
-                      title="Remove from recent"
+                      title={t("Remove from recent")}
                     >
                       <IconX size={14} />
                     </button>
@@ -921,7 +935,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
-                {isJellyPolly ? "Customer debtors" : "All accounts"}
+                {isJellyPolly ? t("Customer debtors") : t("All accounts")}
               </h2>
               {browsableAccounts.length > 0 && (
                 <div className="flex items-center gap-1.5">
@@ -929,12 +943,15 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                     onClick={() => setBrowsePage((p) => Math.max(1, p - 1))}
                     disabled={browsePageClamped <= 1}
                     className="p-1 rounded text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-default-500 dark:disabled:hover:text-gray-400 transition-colors"
-                    title="Previous page"
+                    title={t("Previous page")}
                   >
                     <IconChevronLeft size={16} />
                   </button>
                   <span className="text-xs text-default-500 dark:text-gray-400 whitespace-nowrap">
-                    Page {browsePageClamped} of {browseTotalPages}
+                    {t("Page {{page}} of {{total}}", {
+                      page: browsePageClamped,
+                      total: browseTotalPages,
+                    })}
                   </span>
                   <button
                     onClick={() =>
@@ -942,7 +959,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                     }
                     disabled={browsePageClamped >= browseTotalPages}
                     className="p-1 rounded text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-default-500 dark:disabled:hover:text-gray-400 transition-colors"
-                    title="Next page"
+                    title={t("Next page")}
                   >
                     <IconChevronRight size={16} />
                   </button>
@@ -957,8 +974,8 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             ) : browsableAccounts.length === 0 ? (
               <p className="text-sm text-default-500 dark:text-gray-400 text-center py-6">
                 {isJellyPolly
-                  ? "No customer debtors found"
-                  : "No active accounts found"}
+                  ? t("No customer debtors found")
+                  : t("No active accounts found")}
               </p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -967,7 +984,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                     key={account.code}
                     onClick={() => handleAccountChange(account.code)}
                     className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg border border-default-200 dark:border-gray-700 hover:border-sky-400 dark:hover:border-sky-600 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 cursor-pointer transition-colors"
-                    title={`Open ${account.code} ledger`}
+                    title={t("Open {{code}} ledger", { code: account.code })}
                   >
                     <div className="min-w-0">
                       <div className="text-sm font-semibold font-mono text-default-800 dark:text-gray-100 truncate">
@@ -988,8 +1005,8 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                           className="text-[10px] text-sky-600 dark:text-sky-400"
                           title={
                             isJellyPolly
-                              ? "Customer ledger transactions"
-                              : "Posted transactions"
+                              ? t("Customer ledger transactions")
+                              : t("Posted transactions")
                           }
                         >
                           {usageCounts[account.code]}×
@@ -1018,25 +1035,25 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
               <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300 w-28">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-4 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300 w-36">
-                    {isJellyPolly ? "Reference" : "Journal"}
+                    {isJellyPolly ? t("Reference") : t("Journal")}
                   </th>
                   <th className="px-4 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300">
-                    Particulars
+                    {t("Particulars")}
                   </th>
                   <th className="px-4 py-2.5 text-left font-semibold text-gray-700 dark:text-gray-300 w-28">
-                    {isJellyPolly ? "Payment Ref." : "Cheque"}
+                    {isJellyPolly ? t("Payment Ref.") : t("Cheque")}
                   </th>
                   <th className="px-4 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-300 w-32">
-                    Debit (RM)
+                    {t("Debit (RM)")}
                   </th>
                   <th className="px-4 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-300 w-32">
-                    Credit (RM)
+                    {t("Credit (RM)")}
                   </th>
                   <th className="px-4 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-300 w-40">
-                    Balance
+                    {t("Balance")}
                   </th>
                 </tr>
               </thead>
@@ -1045,7 +1062,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                 {!hasActiveSearch && (
                   <tr className="bg-gray-50/70 dark:bg-gray-900/40">
                     <td colSpan={4} className="px-4 py-2.5 font-medium text-gray-700 dark:text-gray-300">
-                      Balance Brought Forward
+                      {t("Balance Brought Forward")}
                     </td>
                     <td className="px-4 py-2.5 text-right font-semibold text-gray-900 dark:text-white">
                       {statement.opening_balance > 0
@@ -1067,56 +1084,56 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
                   <tr>
                     <td colSpan={7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                       {hasActiveSearch
-                        ? "No transactions match your search"
-                        : "No transactions in this period"}
+                        ? t("No transactions match your search")
+                        : t("No transactions in this period")}
                     </td>
                   </tr>
                 ) : (
                   filteredTransactions.map(
-                    (t: AccountLedgerTransaction): React.ReactNode => {
+                    (tx: AccountLedgerTransaction): React.ReactNode => {
                       const transactionPath: string | null =
-                        getTransactionPath(t);
+                        getTransactionPath(tx);
                       return (
                         <tr
-                          key={t.line_id}
+                          key={tx.line_id}
                           className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                         >
                           <td className="px-4 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                            {formatDate(t.entry_date)}
+                            {formatDate(tx.entry_date)}
                           </td>
                           <td className="px-4 py-2 whitespace-nowrap">
                             {transactionPath ? (
                               <button
-                                onClick={(): void => handleOpenTransaction(t)}
+                                onClick={(): void => handleOpenTransaction(tx)}
                                 className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
                                 title={
                                   isJellyPolly
-                                    ? "Open source document"
-                                    : "Open journal entry"
+                                    ? t("Open source document")
+                                    : t("Open journal entry")
                                 }
                               >
-                                {t.reference_no}
+                                {tx.reference_no}
                               </button>
                             ) : (
                               <span className="text-gray-700 dark:text-gray-300">
-                                {t.reference_no}
+                                {tx.reference_no}
                               </span>
                             )}
                           </td>
                           <td className="px-4 py-2 text-gray-700 dark:text-gray-300">
-                            {t.particulars}
+                            {tx.particulars}
                           </td>
                           <td className="px-4 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                            {t.cheque_no || "-"}
+                            {tx.cheque_no || "-"}
                           </td>
                           <td className="px-4 py-2 text-right text-gray-900 dark:text-white">
-                            {t.debit > 0 ? formatCurrency(t.debit) : "-"}
+                            {tx.debit > 0 ? formatCurrency(tx.debit) : "-"}
                           </td>
                           <td className="px-4 py-2 text-right text-gray-900 dark:text-white">
-                            {t.credit > 0 ? formatCurrency(t.credit) : "-"}
+                            {tx.credit > 0 ? formatCurrency(tx.credit) : "-"}
                           </td>
                           <td className="px-4 py-2 text-right text-gray-900 dark:text-white whitespace-nowrap">
-                            {formatBalance(t.balance)}
+                            {formatBalance(tx.balance)}
                           </td>
                         </tr>
                       );
@@ -1127,7 +1144,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
               <tfoot className="bg-gray-100 dark:bg-gray-900 border-t-2 border-gray-300 dark:border-gray-600 sticky bottom-0">
                 <tr>
                   <td colSpan={4} className="px-4 py-2.5 font-bold text-gray-900 dark:text-white text-right">
-                    PERIOD TOTALS:
+                    {t("PERIOD TOTALS:")}
                   </td>
                   <td className="px-4 py-2.5 text-right font-bold text-gray-900 dark:text-white">
                     {formatCurrency(statement.totals.debit)}
@@ -1148,13 +1165,25 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
             <div className="flex justify-between flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 dark:text-gray-400">
               <span>
                 {hasActiveSearch
-                  ? `Showing ${filteredTransactions.length} of ${statement.totals.count} transactions · Dr ${formatCurrency(
-                      shownTotals.debit
-                    )} / Cr ${formatCurrency(shownTotals.credit)}`
-                  : `${statement.totals.count} transactions`}
+                  ? t(
+                      "Showing {{shown}} of {{total}} transactions \u00b7 Dr {{debit}} / Cr {{credit}}",
+                      {
+                        shown: filteredTransactions.length,
+                        total: statement.totals.count,
+                        debit: formatCurrency(shownTotals.debit),
+                        credit: formatCurrency(shownTotals.credit),
+                      }
+                    )
+                  : t("{{count}} transactions", {
+                      count: statement.totals.count,
+                    })}
               </span>
               <span>
-                {statement.account.code} · {statement.period.start_date} to {statement.period.end_date}
+                {t("{{code}} \u00b7 {{start}} to {{end}}", {
+                  code: statement.account.code,
+                  start: statement.period.start_date,
+                  end: statement.period.end_date,
+                })}
               </span>
             </div>
           </div>

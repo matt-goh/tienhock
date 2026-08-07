@@ -14,6 +14,8 @@ import {
 } from "../../../utils/accounting/GTBalanceSheetPDF";
 import { GTStatementItem } from "../../../utils/accounting/GTIncomeStatementPDF";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 
@@ -23,12 +25,19 @@ interface LineItem {
   amount: number;
 }
 
-const formatLineItemLabel = (item: LineItem): string =>
-  item.note ? `${item.name} (Note ${item.note})` : item.name;
+const formatLineItemLabel = (item: LineItem, t: TFunction): string =>
+  item.note
+    ? t("{{name}} (Note {{note}})", { name: item.name, note: item.note })
+    : item.name;
 
-const formatGTLineItemLabel = (item: GTStatementItem): string => {
-  if (item.note) return `${item.name} (Note ${item.note})`;
-  if (item.note_marker) return `${item.name} (${item.note_marker})`;
+const formatGTLineItemLabel = (item: GTStatementItem, t: TFunction): string => {
+  if (item.note)
+    return t("{{name}} (Note {{note}})", { name: item.name, note: item.note });
+  if (item.note_marker)
+    return t("{{name}} ({{marker}})", {
+      name: item.name,
+      marker: item.note_marker,
+    });
   return item.name;
 };
 
@@ -104,6 +113,7 @@ const GT_BS_AFTER_BLOCK: Partial<Record<string, GTBSAfterBlockFigure[]>> = {
 const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
   company = "tienhock",
 }) => {
+  const { t } = useTranslation("accounting");
   const isGT = company === "greentarget";
   const [data, setData] = useState<BalanceSheetData | null>(null);
   const [gtData, setGtData] = useState<GTBalanceSheetData | null>(null);
@@ -135,12 +145,12 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
         setData(response);
       }
     } catch (err) {
-      setError("Failed to fetch balance sheet. Please try again later.");
+      setError(t("Failed to fetch balance sheet. Please try again later."));
       console.error("Error fetching balance sheet:", err);
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, isGT]);
+  }, [selectedMonth, isGT, t]);
 
   useEffect(() => {
     fetchData();
@@ -164,7 +174,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
         await generateGTBalanceSheetPDF(gtData);
       } catch (err) {
         console.error("Error printing PDF:", err);
-        toast.error("Failed to generate PDF");
+        toast.error(t("Failed to generate PDF"));
       } finally {
         setExporting(false);
       }
@@ -178,7 +188,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
       await generateBalanceSheetPDF(data);
     } catch (err) {
       console.error("Error printing PDF:", err);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setExporting(false);
     }
@@ -209,7 +219,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
           className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700"
         >
           <span className="text-gray-800 dark:text-gray-200">
-            {figure.label}
+            {t(figure.label)}
           </span>
           <span className="text-gray-900 dark:text-white">
             {formatCurrency(amount)}
@@ -223,10 +233,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
         key={figure.ref}
         className="flex justify-between text-base font-bold mt-4 pt-3 border-t-2 border-gray-300 dark:border-gray-600"
       >
-        <span className="text-gray-900 dark:text-white">{figure.label}</span>
-        <span className="text-gray-900 dark:text-white">
-          RM {formatCurrency(amount)}
-        </span>
+        <span className="text-gray-900 dark:text-white">{t(figure.label)}</span>
       </div>
     );
   };
@@ -263,7 +270,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
             iconSize={16}
             onClick={fetchData}
             disabled={loading}
-            title="Refresh"
+            title={t("Refresh")}
             additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
           />
           <Button
@@ -275,7 +282,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
             onClick={handlePrintPDF}
             disabled={exporting || (isGT ? !gtData : !data)}
           >
-            {exporting ? "Preparing..." : "Print"}
+            {exporting ? t("Preparing...") : t("Print")}
           </Button>
         </div>
       </div>
@@ -301,14 +308,21 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
               <>
                 <IconCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
                 <span className="font-medium text-green-800 dark:text-green-200">
-                  Balance Sheet is Balanced (Assets = Liabilities + Equity)
+                  {t("Balance Sheet is Balanced (Assets = Liabilities + Equity)")}
                 </span>
               </>
             ) : (
               <>
                 <IconX className="h-5 w-5 text-red-600 dark:text-red-400" />
                 <span className="font-medium text-red-800 dark:text-red-200">
-                  Balance Sheet is NOT Balanced (Difference: RM {formatCurrency(Math.abs(data.totals.total_assets - data.totals.total_liabilities_equity))})
+                  {t("Balance Sheet is NOT Balanced (Difference: RM {{amount}})", {
+                    amount: formatCurrency(
+                      Math.abs(
+                        data.totals.total_assets -
+                          data.totals.total_liabilities_equity
+                      )
+                    ),
+                  })}
                 </span>
               </>
             )}
@@ -330,14 +344,21 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
               <>
                 <IconCheck className="h-5 w-5 text-green-600 dark:text-green-400" />
                 <span className="font-medium text-green-800 dark:text-green-200">
-                  Balance Sheet is Balanced (Net Assets = Financed By)
+                  {t("Balance Sheet is Balanced (Net Assets = Financed By)")}
                 </span>
               </>
             ) : (
               <>
                 <IconX className="h-5 w-5 text-red-600 dark:text-red-400" />
                 <span className="font-medium text-red-800 dark:text-red-200">
-                  Balance Sheet is NOT Balanced (Difference: RM {formatCurrency(Math.abs(gtData.subtotals.net_assets - gtData.subtotals.financed_by))})
+                  {t("Balance Sheet is NOT Balanced (Difference: RM {{amount}})", {
+                    amount: formatCurrency(
+                      Math.abs(
+                        gtData.subtotals.net_assets -
+                          gtData.subtotals.financed_by
+                      )
+                    ),
+                  })}
                 </span>
               </>
             )}
@@ -351,10 +372,13 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
           {/* Title Header */}
           <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center">
-              STATEMENT OF FINANCIAL POSITION
+              {t("STATEMENT OF FINANCIAL POSITION")}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
-              For the period {data.period.start_date} to {data.period.as_of_date}
+              {t("For the period {{start}} to {{end}}", {
+                start: data.period.start_date,
+                end: data.period.as_of_date,
+              })}
             </p>
           </div>
 
@@ -362,14 +386,14 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
             {/* ASSETS */}
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wide border-b-2 border-gray-300 dark:border-gray-600 pb-2">
-                ASSETS
+                {t("ASSETS")}
               </h3>
 
               {/* Non-Current Assets */}
               {data.assets.non_current.items.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Non-Current Assets
+                    {t("Non-Current Assets")}
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.assets.non_current.items.map((item) => (
@@ -378,7 +402,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                         className="flex justify-between text-sm"
                       >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item)}
+                          {formatLineItemLabel(item, t)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -387,7 +411,9 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                     ))}
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">Total Non-Current Assets</span>
+                    <span className="text-gray-800 dark:text-gray-200">
+                      {t("Total Non-Current Assets")}
+                    </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.assets.non_current.total)}
                     </span>
@@ -399,7 +425,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
               {data.assets.current.items.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Current Assets
+                    {t("Current Assets")}
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.assets.current.items.map((item) => (
@@ -408,7 +434,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                         className="flex justify-between text-sm"
                       >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item)}
+                          {formatLineItemLabel(item, t)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -417,7 +443,9 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                     ))}
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">Total Current Assets</span>
+                    <span className="text-gray-800 dark:text-gray-200">
+                      {t("Total Current Assets")}
+                    </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.assets.current.total)}
                     </span>
@@ -427,7 +455,9 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
 
               {/* Total Assets */}
               <div className="flex justify-between text-base font-bold mt-4 pt-3 border-t-2 border-gray-300 dark:border-gray-600">
-                <span className="text-gray-900 dark:text-white">TOTAL ASSETS</span>
+                <span className="text-gray-900 dark:text-white">
+                  {t("TOTAL ASSETS")}
+                </span>
                 <span className="text-gray-900 dark:text-white">
                   RM {formatCurrency(data.assets.total)}
                 </span>
@@ -437,14 +467,14 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
             {/* LIABILITIES & EQUITY */}
             <div>
               <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wide border-b-2 border-gray-300 dark:border-gray-600 pb-2">
-                LIABILITIES & EQUITY
+                {t("LIABILITIES & EQUITY")}
               </h3>
 
               {/* Non-Current Liabilities */}
               {data.liabilities.non_current.items.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Non-Current Liabilities
+                    {t("Non-Current Liabilities")}
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.liabilities.non_current.items.map((item) => (
@@ -453,7 +483,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                         className="flex justify-between text-sm"
                       >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item)}
+                          {formatLineItemLabel(item, t)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -462,7 +492,9 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                     ))}
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">Total Non-Current Liabilities</span>
+                    <span className="text-gray-800 dark:text-gray-200">
+                      {t("Total Non-Current Liabilities")}
+                    </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.liabilities.non_current.total)}
                     </span>
@@ -474,7 +506,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
               {data.liabilities.current.items.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Current Liabilities
+                    {t("Current Liabilities")}
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.liabilities.current.items.map((item) => (
@@ -483,7 +515,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                         className="flex justify-between text-sm"
                       >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item)}
+                          {formatLineItemLabel(item, t)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -492,7 +524,9 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                     ))}
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">Total Current Liabilities</span>
+                    <span className="text-gray-800 dark:text-gray-200">
+                      {t("Total Current Liabilities")}
+                    </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.liabilities.current.total)}
                     </span>
@@ -504,7 +538,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
               {data.equity.items.length > 0 && (
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    Equity
+                    {t("Equity")}
                   </h4>
                   <div className="space-y-1 pl-4">
                     {data.equity.items.map((item) => (
@@ -513,7 +547,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                         className="flex justify-between text-sm"
                       >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item)}
+                          {formatLineItemLabel(item, t)}
                         </span>
                         <span className="text-gray-900 dark:text-white">
                           {formatCurrency(item.amount)}
@@ -522,7 +556,9 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                     ))}
                   </div>
                   <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">Total Equity</span>
+                    <span className="text-gray-800 dark:text-gray-200">
+                      {t("Total Equity")}
+                    </span>
                     <span className="text-gray-900 dark:text-white">
                       {formatCurrency(data.equity.total)}
                     </span>
@@ -532,7 +568,9 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
 
               {/* Total Liabilities & Equity */}
               <div className="flex justify-between text-base font-bold mt-4 pt-3 border-t-2 border-gray-300 dark:border-gray-600">
-                <span className="text-gray-900 dark:text-white">TOTAL LIABILITIES & EQUITY</span>
+                <span className="text-gray-900 dark:text-white">
+                  {t("TOTAL LIABILITIES & EQUITY")}
+                </span>
                 <span className="text-gray-900 dark:text-white">
                   RM {formatCurrency(data.totals.total_liabilities_equity)}
                 </span>
@@ -543,7 +581,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Period: January - {getMonthName(selectedMonth)}
+              {t("Period:")} {t("January")} - {getMonthName(selectedMonth)}
             </p>
           </div>
         </div>
@@ -555,10 +593,10 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
           {/* Title Header */}
           <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center">
-              BALANCE SHEET
+              {t("BALANCE SHEET")}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
-              As at {gtData.period.as_of_date}
+              {t("As at {{date}}", { date: gtData.period.as_of_date })}
             </p>
           </div>
 
@@ -587,7 +625,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
                           className="flex justify-between text-sm"
                         >
                           <span className="text-gray-700 dark:text-gray-300">
-                            {formatGTLineItemLabel(item)}
+                            {formatGTLineItemLabel(item, t)}
                           </span>
                           <span className="text-gray-900 dark:text-white">
                             {formatCurrency(item.amount)}
@@ -614,7 +652,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
             <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-              Period: January - {getMonthName(selectedMonth)}
+              {t("Period:")} {t("January")} - {getMonthName(selectedMonth)}
             </p>
           </div>
         </div>

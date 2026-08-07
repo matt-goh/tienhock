@@ -18,6 +18,7 @@ import {
 } from "@tabler/icons-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import Button from "../../../components/Button";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
@@ -349,6 +350,7 @@ const getInvoicePath = (
 };
 
 const GeneralPurchaseInvoiceListPage: React.FC = () => {
+  const { t } = useTranslation("accounting");
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const cachedFilters = useMemo(() => loadCachedFilters(), []);
@@ -425,7 +427,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       setTotal(response.total || 0);
     } catch (error) {
       console.error("Error fetching general purchases:", error);
-      toast.error("Failed to load general purchases");
+      toast.error(t("Failed to load general purchases"));
     } finally {
       setLoading(false);
     }
@@ -568,7 +570,9 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
 
     if (eligibleSelectedInvoices.length === 0) {
       toast.error(
-        "No selected foreign purchases are eligible for e-invoice submission."
+        t(
+          "No selected foreign purchases are eligible for e-invoice submission."
+        )
       );
       return;
     }
@@ -577,7 +581,12 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       const ineligibleCount =
         selectedInvoiceIds.size - eligibleSelectedInvoices.length;
       toast.error(
-        `${ineligibleCount} selected invoice(s) will be skipped because they are cancelled locally or already pending, valid, or cancelled in MyInvois.`,
+        t(
+          ineligibleCount === 1
+            ? "{{count}} selected invoice will be skipped because they are cancelled locally or already pending, valid, or cancelled in MyInvois."
+            : "{{count}} selected invoices will be skipped because they are cancelled locally or already pending, valid, or cancelled in MyInvois.",
+          { count: ineligibleCount }
+        ),
         { duration: 6000 }
       );
     }
@@ -609,7 +618,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       toast.error(
         error instanceof Error
           ? error.message
-          : "Failed to download supporting document"
+          : t("Failed to download supporting document")
       );
     }
   };
@@ -624,12 +633,14 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
     setRefreshingInvoiceId(invoice.id);
     try {
       await api.put(`/api/general-purchases/${invoice.id}/refresh-status`, {});
-      toast.success("E-Invoice status refreshed");
+      toast.success(t("E-Invoice status refreshed"));
       await fetchInvoices();
     } catch (error: unknown) {
       console.error("Error refreshing self-billed status:", error);
       toast.error(
-        error instanceof Error ? error.message : "Failed to refresh E-Invoice"
+        error instanceof Error
+          ? error.message
+          : t("Failed to refresh E-Invoice")
       );
     } finally {
       setRefreshingInvoiceId(null);
@@ -644,7 +655,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
     );
 
     if (invoiceIds.length === 0) {
-      toast.error("No eligible self-billed invoices found to submit.");
+      toast.error(t("No eligible self-billed invoices found to submit."));
       return;
     }
 
@@ -663,13 +674,23 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       const rejectedCount = response.rejectedDocuments?.length || 0;
 
       if (acceptedCount > 0 && rejectedCount === 0) {
-        toast.success(`Submitted ${acceptedCount} foreign purchase(s)`);
+        toast.success(
+          t(
+            acceptedCount === 1
+              ? "Submitted {{count}} foreign purchase"
+              : "Submitted {{count}} foreign purchases",
+            { count: acceptedCount }
+          )
+        );
       } else if (acceptedCount > 0 && rejectedCount > 0) {
         toast.success(
-          `Partial success: ${acceptedCount} accepted, ${rejectedCount} rejected`
+          t("Partial success: {{accepted}} accepted, {{rejected}} rejected", {
+            accepted: acceptedCount,
+            rejected: rejectedCount,
+          })
         );
       } else {
-        toast.error(response.message || "E-invoice submission failed");
+        toast.error(response.message || t("E-invoice submission failed"));
       }
 
       setSelectedInvoiceIds(new Set());
@@ -682,7 +703,9 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       } else {
         setShowSubmissionResults(false);
       }
-      toast.error(apiError.message || "Failed to submit self-billed invoices");
+      toast.error(
+        apiError.message || t("Failed to submit self-billed invoices")
+      );
     } finally {
       setSubmitting(false);
     }
@@ -693,7 +716,9 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
       <div className="flex flex-col gap-2 rounded-lg border border-default-200 bg-white px-3 py-2 shadow-sm dark:border-gray-700 dark:bg-gray-800 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-            {total > 0 && !loading ? `${total} ` : ""} Purchases
+            {total > 0 && !loading
+              ? t("{{count}} Purchases", { count: total })
+              : t("Purchases")}
           </h1>
           <span className="hidden text-default-300 dark:text-gray-600 sm:inline">
             |
@@ -721,7 +746,9 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-2">
           <div
             className="relative h-8 w-full sm:w-36"
-            title="Search by purchase number, supplier, shipping/order number, or platform"
+            title={t(
+              "Search by purchase number, supplier, shipping/order number, or platform"
+            )}
           >
             <IconSearch
               size={16}
@@ -733,7 +760,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
               onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                 setSearchTerm(event.target.value)
               }
-              placeholder="Search"
+              placeholder={t("Search")}
               className="h-8 w-full rounded-lg border border-default-300 bg-white pl-9 pr-8 text-sm text-default-900 outline-none placeholder:text-default-400 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-500"
             />
             {searchTerm && (
@@ -741,7 +768,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                 type="button"
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-700 dark:text-gray-400 dark:hover:text-gray-200"
                 onClick={clearSearch}
-                title="Clear search"
+                title={t("Clear search")}
               >
                 <IconX size={15} />
               </button>
@@ -764,7 +791,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                         : inactiveFilterChipClass
                     }`}
                   >
-                    {option.label}
+                    {t(option.label)}
                   </button>
                 );
               }
@@ -787,7 +814,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                         : inactiveFilterChipClass
                     }`}
                   >
-                    {option.label}
+                    {t(option.label)}
                   </button>
                 );
               }
@@ -810,7 +837,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             className="h-8 rounded-lg !px-3"
             onClick={() => navigate("/stock/entry")}
           >
-            Stock
+            {t("Stock")}
           </Button>
           <Button
             type="button"
@@ -827,7 +854,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
               )
             }
           >
-            Local
+            {t("Local")}
           </Button>
           <Button
             type="button"
@@ -844,7 +871,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
               )
             }
           >
-            Foreign
+            {t("Foreign")}
           </Button>
         </div>
       </div>
@@ -857,8 +884,8 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             onClick={toggleSelectionBar}
             title={
               selectedInvoiceIds.size > 0
-                ? "Clear selection"
-                : "Select all visible general purchases"
+                ? t("Clear selection")
+                : t("Select all visible general purchases")
             }
           >
             <span className="rounded-full p-1">
@@ -876,17 +903,23 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
             </span>
             {selectedInvoiceIds.size > 0 ? (
               <span className="flex flex-wrap items-center gap-x-2 text-sm font-medium text-sky-800 dark:text-sky-300">
-                <span>{selectedInvoiceIds.size} selected</span>
+                <span>
+                  {t("{{count}} selected", { count: selectedInvoiceIds.size })}
+                </span>
                 <span className="hidden h-4 border-r border-sky-300 dark:border-sky-600 sm:inline" />
                 <span>
                   {formatAmount(selectedTotalMyr, "MYR")}
                 </span>
                 <span className="hidden h-4 border-r border-sky-300 dark:border-sky-600 sm:inline" />
-                <span>{eligibleSelectedInvoices.length} eligible</span>
+                <span>
+                  {t("{{count}} eligible", {
+                    count: eligibleSelectedInvoices.length,
+                  })}
+                </span>
               </span>
             ) : (
               <span className="text-sm text-default-500 dark:text-gray-400">
-                Select foreign purchases to submit
+                {t("Select foreign purchases to submit")}
               </span>
             )}
           </button>
@@ -908,7 +941,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                 disabled={submitting}
                 onClick={handleBulkSubmitEInvoice}
               >
-                Submit e-Invoice
+                {t("Submit e-Invoice")}
               </Button>
             )}
           </div>
@@ -923,7 +956,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
         ) : invoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-default-500 dark:text-gray-400">
             <IconFileInvoice size={32} className="mb-2" />
-            <p className="text-sm">No general purchases found.</p>
+            <p className="text-sm">{t("No general purchases found.")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -937,8 +970,8 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                       onClick={toggleVisibleSelection}
                       title={
                         allVisibleSelected
-                          ? "Clear selection"
-                          : "Select all visible general purchases"
+                          ? t("Clear selection")
+                          : t("Select all visible general purchases")
                       }
                     >
                       {allVisibleSelected ? (
@@ -949,34 +982,34 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                     </button>
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Document
+                    {t("Document")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Supplier
+                    {t("Supplier")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Reference
+                    {t("Reference")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Doc
+                    {t("Doc")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Foreign
+                    {t("Foreign")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    MYR
+                    {t("MYR")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Status
+                    {t("Status")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    E-Invoice
+                    {t("E-Invoice")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                    Action
+                    {t("Action")}
                   </th>
                 </tr>
               </thead>
@@ -1007,8 +1040,8 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                         className="rounded p-1 text-default-400 hover:bg-default-100 hover:text-sky-600 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-sky-400"
                         title={
                           selectedInvoiceIds.has(invoice.id)
-                            ? "Deselect invoice"
-                            : "Select invoice"
+                            ? t("Deselect invoice")
+                            : t("Select invoice")
                         }
                       >
                         {selectedInvoiceIds.has(invoice.id) ? (
@@ -1030,7 +1063,9 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                             : "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
                         }`}
                       >
-                        {invoice.purchase_kind === "local" ? "Local" : "Foreign"}
+                        {invoice.purchase_kind === "local"
+                          ? t("Local")
+                          : t("Foreign")}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-sm text-default-700 dark:text-gray-300">
@@ -1078,14 +1113,14 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                           invoice.invoice_status
                         )}`}
                       >
-                        {getInvoiceStatusLabel(invoice.invoice_status)}
+                        {t(getInvoiceStatusLabel(invoice.invoice_status))}
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-sm">
                       <div className="flex items-center gap-1.5">
                         {invoice.purchase_kind === "local" ? (
                           <span className="inline-flex rounded-full bg-default-100 px-2.5 py-1 text-xs font-medium text-default-600 dark:bg-gray-700 dark:text-gray-300">
-                            Not Required
+                            {t("Not Required")}
                           </span>
                         ) : (
                           <span
@@ -1093,7 +1128,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                               invoice.einvoice_status
                             )}`}
                           >
-                            {getStatusLabel(invoice.einvoice_status)}
+                            {t(getStatusLabel(invoice.einvoice_status))}
                           </span>
                         )}
                         {portalUrl && (
@@ -1105,7 +1140,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                               event.stopPropagation()
                             }
                             className="rounded p-1 text-sky-600 hover:bg-sky-50 hover:text-sky-800 dark:text-sky-300 dark:hover:bg-sky-900/30 dark:hover:text-sky-100"
-                            title="View in MyInvois Portal"
+                            title={t("View in MyInvois Portal")}
                           >
                             <IconExternalLink size={15} />
                           </a>
@@ -1120,7 +1155,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                               ) => refreshEInvoiceStatus(event, invoice)}
                               disabled={refreshingInvoiceId !== null}
                               className="rounded p-1 text-default-500 hover:bg-default-100 hover:text-sky-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-sky-300"
-                              title="Refresh E-Invoice status"
+                              title={t("Refresh E-Invoice status")}
                             >
                               <IconRefresh
                                 size={15}
@@ -1144,7 +1179,7 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
                           );
                         }}
                         className="rounded p-1 text-default-500 hover:bg-default-100 hover:text-default-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
-                        title="Open general purchase"
+                        title={t("Open general purchase")}
                       >
                         <IconPencil size={17} />
                       </button>
@@ -1169,9 +1204,14 @@ const GeneralPurchaseInvoiceListPage: React.FC = () => {
         isOpen={showEInvoiceConfirm}
         onClose={() => setShowEInvoiceConfirm(false)}
         onConfirm={confirmBulkSubmitEInvoice}
-        title="Submit Selected Foreign Purchases"
-        message={`You are about to submit ${eligibleSelectedInvoices.length} eligible foreign purchase(s) to MyInvois. Continue?`}
-        confirmButtonText="Submit e-Invoices"
+        title={t("Submit Selected Foreign Purchases")}
+        message={t(
+          eligibleSelectedInvoices.length === 1
+            ? "You are about to submit {{count}} eligible foreign purchase to MyInvois. Continue?"
+            : "You are about to submit {{count}} eligible foreign purchases to MyInvois. Continue?",
+          { count: eligibleSelectedInvoices.length }
+        )}
+        confirmButtonText={t("Submit e-Invoices")}
         variant="default"
       />
     </div>

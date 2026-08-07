@@ -51,6 +51,7 @@ import {
 } from "../../utils/accounting/OpeningBalancesPDF";
 import { GREENTARGET_INFO } from "../../utils/invoice/einvoice/companyInfo";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 export type OpeningBalancesCompany = "tienhock" | "greentarget";
 
@@ -254,6 +255,7 @@ interface BalanceRowProps {
 // accounts" view is a few thousand rows).
 const BalanceRow: React.FC<BalanceRowProps> = React.memo(
   ({ account, draft, showNotes, isDirty, disabled, onChange }) => {
+    const { t } = useTranslation("accounting");
     const invalid: boolean = !isDraftValid(draft);
     const willDelete: boolean =
       account.amount !== null &&
@@ -272,7 +274,7 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
           {account.code}
           {!account.is_active && (
             <span className="ml-1.5 text-[10px] uppercase text-rose-500 dark:text-rose-400">
-              inactive
+              {t("inactive")}
             </span>
           )}
         </td>
@@ -281,7 +283,9 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
           {account.other_anchor_count > 0 && (
             <span
               className="ml-1.5 text-[10px] text-sky-600 dark:text-sky-400"
-              title={`${account.other_anchor_count} anchor(s) on other dates`}
+              title={t("{{count}} anchor(s) on other dates", {
+                count: account.other_anchor_count,
+              })}
             >
               +{account.other_anchor_count}
             </span>
@@ -333,7 +337,7 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
               type="text"
               value={draft.notes}
               disabled={disabled}
-              placeholder="Notes"
+              placeholder={t("Notes")}
               onChange={(e) =>
                 onChange(account.code, { ...draft, notes: e.target.value })
               }
@@ -351,7 +355,7 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
               onClick={() =>
                 onChange(account.code, { debit: "", credit: "", notes: "" })
               }
-              title="Clear this row (removes the opening balance on save)"
+              title={t("Clear this row (removes the opening balance on save)")}
               className="text-default-400 dark:text-gray-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
             >
               <IconX size={14} />
@@ -367,6 +371,7 @@ BalanceRow.displayName = "BalanceRow";
 const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   company = "tienhock",
 }: OpeningBalancesPageProps) => {
+  const { t } = useTranslation("accounting");
   const openingBalancesApiPath: string =
     company === "greentarget"
       ? "/greentarget/api/opening-balances"
@@ -528,7 +533,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
       setDrafts(nextDrafts);
     } catch (err) {
       console.error("Error fetching opening balances:", err);
-      setError("Failed to fetch opening balances. Please try again later.");
+      setError(t("Failed to fetch opening balances. Please try again later."));
     } finally {
       setLoading(false);
     }
@@ -538,6 +543,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
     debouncedSearch,
     includeInactive,
     openingBalancesApiPath,
+    t,
   ]);
 
   useEffect(() => {
@@ -560,7 +566,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
     const next: string = format(start, "yyyy-MM-dd");
     if (next === asOfDate) return;
     if (hasUnsavedChanges) {
-      toast.error("Save or discard your changes before switching date");
+      toast.error(t("Save or discard your changes before switching date"));
       return;
     }
     setAsOfDate(next);
@@ -574,7 +580,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   const handleSave = async (): Promise<void> => {
     if (!hasUnsavedChanges) return;
     if (invalidCount > 0) {
-      toast.error("Fix the highlighted amounts before saving");
+      toast.error(t("Fix the highlighted amounts before saving"));
       return;
     }
     setSaving(true);
@@ -589,15 +595,23 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
         { as_of_date: asOfDate, entries }
       );
       const parts: string[] = [];
-      if (result.saved) parts.push(`${result.saved} saved`);
-      if (result.deleted) parts.push(`${result.deleted} removed`);
+      if (result.saved) {
+        parts.push(t("{{count}} saved", { count: result.saved }));
+      }
+      if (result.deleted) {
+        parts.push(t("{{count}} removed", { count: result.deleted }));
+      }
       toast.success(
-        `Opening balances updated${parts.length ? ` (${parts.join(", ")})` : ""}`
+        parts.length
+          ? t("Opening balances updated ({{details}})", {
+              details: parts.join(", "),
+            })
+          : t("Opening balances updated")
       );
       await fetchBalances();
     } catch (err: any) {
       console.error("Error saving opening balances:", err);
-      toast.error(err?.message || "Failed to save opening balances");
+      toast.error(err?.message || t("Failed to save opening balances"));
     } finally {
       setSaving(false);
     }
@@ -697,7 +711,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   const handlePrintPDF = async (): Promise<void> => {
     if (!data) return;
     if (hasUnsavedChanges) {
-      toast.error("Save your changes before printing");
+      toast.error(t("Save your changes before printing"));
       return;
     }
     setExporting(true);
@@ -723,7 +737,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
       });
     } catch (err) {
       console.error("Error printing opening balances PDF:", err);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setExporting(false);
     }
@@ -756,7 +770,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             showArrows={false}
             allowFuture
             size="sm"
-            placeholder="As of date"
+            placeholder={t("As of date")}
             pickerPlacement="bottom-left"
           />
 
@@ -772,7 +786,9 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                   ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-300"
                   : "border-default-200 text-default-600 hover:border-sky-300 dark:border-gray-700 dark:text-gray-400"
               )}
-              title={`${entry.count} opening balances on this date`}
+              title={t("{{count}} opening balances on this date", {
+                count: entry.count,
+              })}
             >
               {formatDisplayDate(entry.as_of_date)} ({entry.count})
             </button>
@@ -784,12 +800,12 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                 pending rather than silently discarding them. */}
             <input
               type="text"
-              placeholder="Search code or description..."
+              placeholder={t("Search code or description...")}
               value={searchTerm}
               disabled={hasUnsavedChanges}
               title={
                 hasUnsavedChanges
-                  ? "Save or discard your changes before searching"
+                  ? t("Save or discard your changes before searching")
                   : undefined
               }
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -801,7 +817,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             value={rowFilter}
             onChange={(value: RowFilter) => {
               if (hasUnsavedChanges) {
-                toast.error("Save or discard your changes before filtering");
+                toast.error(t("Save or discard your changes before filtering"));
                 return;
               }
               setRowFilter(value);
@@ -811,7 +827,10 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
               <ListboxButton className="relative w-56 cursor-pointer rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 py-1.5 pl-8 pr-8 text-left text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <IconFilter className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <span className="block truncate">
-                  {FILTER_OPTIONS.find((o) => o.value === rowFilter)?.label}
+                  {t(
+                    FILTER_OPTIONS.find((o) => o.value === rowFilter)?.label ??
+                      "All accounts"
+                  )}
                 </span>
                 <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                   <IconChevronDown className="h-4 w-4 text-gray-400" />
@@ -845,7 +864,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                               selected ? "font-medium" : "font-normal"
                             )}
                           >
-                            {option.label}
+                            {t(option.label)}
                           </span>
                           {selected && (
                             <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
@@ -865,19 +884,19 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             checked={includeInactive}
             onChange={(checked) => {
               if (hasUnsavedChanges) {
-                toast.error("Save or discard your changes first");
+                toast.error(t("Save or discard your changes first"));
                 return;
               }
               setIncludeInactive(checked);
             }}
-            label="Inactive"
+            label={t("Inactive")}
             size={18}
             className="flex-shrink-0"
           />
           <Checkbox
             checked={showNotes}
             onChange={setShowNotes}
-            label="Notes"
+            label={t("Notes")}
             size={18}
             className="flex-shrink-0"
           />
@@ -891,7 +910,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
               onClick={() => setShowDiscardDialog(true)}
               disabled={saving}
             >
-              Discard
+              {t("Discard")}
             </Button>
           )}
           <Button
@@ -904,12 +923,15 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             disabled={saving || !hasUnsavedChanges}
           >
             {saving
-              ? "Saving..."
+              ? t("Saving...")
               : hasUnsavedChanges
-                ? `Save ${dirtyCodes.length} change${
-                    dirtyCodes.length === 1 ? "" : "s"
-                  }`
-                : "Saved"}
+                ? t(
+                    dirtyCodes.length === 1
+                      ? "Save {{count}} change"
+                      : "Save {{count}} changes",
+                    { count: dirtyCodes.length }
+                  )
+                : t("Saved")}
           </Button>
           <Button
             size="sm"
@@ -919,7 +941,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             onClick={handleToggleAllSections}
             disabled={sections.length === 0}
           >
-            {allSectionsCollapsed ? "Expand all" : "Collapse all"}
+            {allSectionsCollapsed ? t("Expand all") : t("Collapse all")}
           </Button>
           <Button
             size="sm"
@@ -928,7 +950,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             iconSize={16}
             onClick={fetchBalances}
             disabled={loading || saving}
-            title="Refresh"
+            title={t("Refresh")}
             additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
           />
           <Button
@@ -939,7 +961,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             onClick={handlePrintPDF}
             disabled={exporting || !data}
           >
-            {exporting ? "Preparing..." : "Print"}
+            {exporting ? t("Preparing...") : t("Print")}
           </Button>
         </div>
       </div>
@@ -969,18 +991,24 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
               )}
             >
               {isBalanced
-                ? "Opening balances are balanced"
-                : `Out of balance by RM ${formatCurrency(
-                    Math.abs(dateTotals.difference)
-                  )}`}
+                ? t("Opening balances are balanced")
+                : t("Out of balance by RM {{amount}}", {
+                    amount: formatCurrency(Math.abs(dateTotals.difference)),
+                  })}
             </span>
             <span className="text-default-600 dark:text-gray-300">
-              · {dateTotals.count} accounts as at {formatDisplayDate(asOfDate)}
+              {"\u00b7"}{" "}
+              {t("{{count}} accounts as at {{date}}", {
+                count: dateTotals.count,
+                date: formatDisplayDate(asOfDate),
+              })}
             </span>
           </div>
           <div className="text-default-600 dark:text-gray-300">
-            Dr {formatCurrency(dateTotals.debit)} / Cr{" "}
-            {formatCurrency(dateTotals.credit)}
+            {t("Dr {{debit}} / Cr {{credit}}", {
+              debit: formatCurrency(dateTotals.debit),
+              credit: formatCurrency(dateTotals.credit),
+            })}
           </div>
         </div>
       )}
@@ -1012,32 +1040,32 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-left w-32 rounded-tl-lg")}
                   >
-                    Code
+                    {t("Code")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-left")}
                   >
-                    Particulars
+                    {t("Particulars")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-right w-36")}
                   >
-                    Debit (RM)
+                    {t("Debit (RM)")}
                   </th>
                   <th
                     style={{ top: pageHeaderHeight }}
                     className={clsx(headerCellClasses, "text-right w-36")}
                   >
-                    Credit (RM)
+                    {t("Credit (RM)")}
                   </th>
                   {showNotes && (
                     <th
                       style={{ top: pageHeaderHeight }}
                       className={clsx(headerCellClasses, "text-left w-64")}
                     >
-                      Notes
+                      {t("Notes")}
                     </th>
                   )}
                   <th
@@ -1053,7 +1081,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                       colSpan={colSpan}
                       className="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
                     >
-                      No accounts match the current filters
+                      {t("No accounts match the current filters")}
                     </td>
                   </tr>
                 ) : (
@@ -1071,8 +1099,8 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                         aria-expanded={!isCollapsed}
                         title={
                           isCollapsed
-                            ? `Show ${section.name}`
-                            : `Hide ${section.name}`
+                            ? t("Show {{name}}", { name: section.name })
+                            : t("Hide {{name}}", { name: section.name })
                         }
                         onClick={() => toggleSection(section.key)}
                         onKeyDown={(
@@ -1104,7 +1132,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                             {section.name}
                             {section.note && (
                               <span className="font-normal text-xs text-default-500 dark:text-gray-400">
-                                Note {section.note}
+                                {t("Note {{note}}", { note: section.note })}
                               </span>
                             )}
                             <span className="font-normal text-xs text-default-400 dark:text-gray-500">
@@ -1112,12 +1140,16 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                             </span>
                             {counts.dirty > 0 && (
                               <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                                {counts.dirty} unsaved
+                                {t("{{count}} unsaved", {
+                                  count: counts.dirty,
+                                })}
                               </span>
                             )}
                             {counts.invalid > 0 && (
                               <span className="rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                                {counts.invalid} invalid
+                                {t("{{count}} invalid", {
+                                  count: counts.invalid,
+                                })}
                               </span>
                             )}
                           </span>
@@ -1165,7 +1197,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                     colSpan={2}
                     className={clsx(footerCellClasses, "text-right")}
                   >
-                    TOTALS (shown rows):
+                    {t("TOTALS (shown rows):")}
                   </td>
                   <td className={clsx(footerCellClasses, "text-right")}>
                     {formatCurrency(draftTotals.debit)}
@@ -1182,17 +1214,28 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
 
           <div className="px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-b-lg flex flex-wrap justify-between gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
             <span>
-              {data?.accounts.length || 0} accounts shown ·{" "}
-              {data?.shown_totals.count || 0} with an opening balance
+              {t("{{count}} accounts shown", {
+                count: data?.accounts.length || 0,
+              })}{" "}
+              {"\u00b7"}{" "}
+              {t("{{count}} with an opening balance", {
+                count: data?.shown_totals.count || 0,
+              })}
               {invalidCount > 0 && (
                 <span className="ml-2 text-rose-600 dark:text-rose-400">
-                  {invalidCount} invalid amount{invalidCount === 1 ? "" : "s"}
+                  {t(
+                    invalidCount === 1
+                      ? "{{count}} invalid amount"
+                      : "{{count}} invalid amounts",
+                    { count: invalidCount }
+                  )}
                 </span>
               )}
             </span>
             <span>
-              Clearing both cells removes that account's opening balance when you
-              save.
+              {t(
+                "Clearing both cells removes that account's opening balance when you save."
+              )}
             </span>
           </div>
         </div>
@@ -1202,11 +1245,14 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
         isOpen={showDiscardDialog}
         onClose={() => setShowDiscardDialog(false)}
         onConfirm={handleDiscard}
-        title="Discard changes"
-        message={`Discard ${dirtyCodes.length} unsaved change${
-          dirtyCodes.length === 1 ? "" : "s"
-        }?`}
-        confirmButtonText="Discard"
+        title={t("Discard changes")}
+        message={t(
+          dirtyCodes.length === 1
+            ? "Discard {{count}} unsaved change?"
+            : "Discard {{count}} unsaved changes?",
+          { count: dirtyCodes.length }
+        )}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
     </div>
