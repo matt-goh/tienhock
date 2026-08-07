@@ -18,6 +18,7 @@ import Checkbox from "../../../components/Checkbox";
 import ManageActivitiesModal from "../../../components/Payroll/ManageActivitiesModal";
 import ActivitiesTooltip from "../../../components/Payroll/ActivitiesTooltip";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
@@ -39,11 +40,6 @@ import { useUnsavedChanges } from "../../../hooks/useUnsavedChanges";
 import SafeLink from "../../../components/SafeLink";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import TimeNavigator, { type TimeRange } from "../../../components/TimeNavigator";
-
-const SHIFT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
-  { value: "1", label: "Day Shift" },
-  { value: "2", label: "Night Shift" },
-];
 
 interface EmployeeWithHours extends Employee {
   rowKey?: string; // Unique key for each row
@@ -135,6 +131,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
   onCancel,
   jobType = "MEE",
 }) => {
+  const { t } = useTranslation("payroll");
+  const SHIFT_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
+    { value: "1", label: t("Day Shift") },
+    { value: "2", label: t("Night Shift") },
+  ];
   const navigate = useNavigate();
   const goBack = useSmartBack(`/payroll/${jobType.toLowerCase()}-production`);
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
@@ -422,8 +423,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     confirmationMessage,
   } = useUnsavedChanges({
     hasUnsavedChanges,
-    message:
+    message: t(
       "You have unsaved changes. Are you sure you want to leave this page?",
+    ),
   });
 
   // Update activities when context values change for linked pay codes
@@ -558,11 +560,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     if (!isCleaningMode) {
       // Check for the appropriate paycode based on day type
       if (formData.dayType === "Ahad" && (!cleaningPayCode || !cleaningOTPayCode)) {
-        toast.error("Required paycodes (HARI_AHAD_JAM, OT_A) not found. Please create them first.");
+        toast.error(
+          t(
+            "Required paycodes (HARI_AHAD_JAM, OT_A) not found. Please create them first.",
+          ),
+        );
         return;
       }
       if (formData.dayType === "Biasa" && !cleaningPayCodeBiasa) {
-        toast.error("HARI_BIASA_JAM paycode not found. Please create it first.");
+        toast.error(
+          t("HARI_BIASA_JAM paycode not found. Please create it first."),
+        );
         return;
       }
     }
@@ -733,17 +741,17 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
   const leaveOptions = useMemo<LeaveOption[]>(() => {
     const options: LeaveOption[] = [
-      { value: "cuti_sakit", label: "Cuti Sakit" },
-      { value: "cuti_tahunan", label: "Cuti Tahunan" },
-      { value: "cuti_rawatan", label: "Cuti Rawatan" },
+      { value: "cuti_sakit", label: t("Sick Leave") },
+      { value: "cuti_tahunan", label: t("Annual Leave") },
+      { value: "cuti_rawatan", label: t("Hospital Leave") },
     ];
 
     if (formData.dayType === "Umum") {
-      return [{ value: "cuti_umum", label: "Cuti Umum" }, ...options];
+      return [{ value: "cuti_umum", label: t("Public Holiday") }, ...options];
     }
 
     return options;
-  }, [formData.dayType]);
+  }, [formData.dayType, t]);
 
   const selectedLeaveEmployeesForBulk = useMemo<EmployeeWithHours[]>(() => {
     return availableForLeave.filter((emp) => leaveEmployees[emp.id]?.selected);
@@ -859,7 +867,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       return newBalances;
     } catch (error) {
       console.error("Error fetching batch leave balances:", error);
-      toast.error("Failed to fetch leave balances");
+      toast.error(t("Failed to fetch leave balances"));
       return {};
     }
   };
@@ -913,7 +921,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     let message = "";
 
     if (!available) {
-      message = `${getLeaveTypeDisplayName(leaveType)} balance exhausted (${taken}/${totalAllowed} days used)`;
+      message = t(
+        "{{leaveType}} balance exhausted ({{taken}}/{{totalAllowed}} days used)",
+        {
+          leaveType: t(getLeaveTypeDisplayName(leaveType)),
+          taken,
+          totalAllowed,
+        },
+      );
     }
 
     return { available, remaining, message, taken, totalAllowed };
@@ -926,7 +941,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       case "cuti_sakit":
         return "Sick Leave";
       case "cuti_umum":
-        return "Public Holiday Leave";
+        return "Public Holiday";
       case "cuti_rawatan":
         return "Hospital Leave";
     }
@@ -1135,7 +1150,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         for (const field of requiredContextFields) {
           const value = formData.contextData[field.id];
           if (value === undefined || value === null || value === "") {
-            toast.error(`${field.label} is required`);
+            toast.error(t("{{label}} is required", { label: field.label }));
             return;
           }
         }
@@ -1176,7 +1191,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       if (!leaveBalances[employeeId]) {
         const balanceData = await fetchLeaveBalance(employeeId);
         if (!balanceData) {
-          toast.error("Failed to load leave balance. Please try again.");
+          toast.error(t("Failed to load leave balance. Please try again."));
           return; // Don't proceed if balance fetch failed
         }
       }
@@ -1197,7 +1212,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
       if (availableLeaveTypes.length === 0) {
         toast.error(
-          "No leave types available for this employee (all balances exhausted)"
+          t(
+            "No leave types available for this employee (all balances exhausted)",
+          ),
         );
         return; // Don't allow selection if no leave types are available
       }
@@ -1219,14 +1236,20 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const leaveTypeName = getLeaveTypeDisplayName(selectedLeaveType);
 
       toast.success(
-        `${leaveTypeName} selected - ${availability.remaining} days remaining`
+        t("{{leaveType}} selected - {{remaining}} days remaining", {
+          leaveType: t(leaveTypeName),
+          remaining: availability.remaining,
+        }),
       );
 
       // If we're not using the default leave type, inform the user
       if (selectedLeaveType !== defaultLeaveType) {
         const defaultTypeName = getLeaveTypeDisplayName(defaultLeaveType);
         toast(
-          `${defaultTypeName} is exhausted, using ${leaveTypeName} instead`
+          t("{{defaultType}} is exhausted, using {{leaveType}} instead", {
+            defaultType: t(defaultTypeName),
+            leaveType: t(leaveTypeName),
+          }),
         );
       }
     }
@@ -1318,7 +1341,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       ...prev,
       [employeeId]: recalculatedActivities,
     }));
-    toast.success(`Leave pay updated for ${selectedLeaveEmployee.name}`);
+    toast.success(
+      t("Leave pay updated for {{name}}", {
+        name: selectedLeaveEmployee.name,
+      }),
+    );
   };
 
   const getSelectedLeaveActivities = (employeeId: string): ActivityItem[] => {
@@ -1414,7 +1441,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       const fetchResult = await fetchLeaveBalancesBatch([employeeId]);
       balanceData = fetchResult[employeeId];
       if (!balanceData) {
-        toast.error("Failed to load leave balance");
+        toast.error(t("Failed to load leave balance"));
         return; // Don't proceed if balance fetch failed
       }
     }
@@ -1450,7 +1477,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     const available = remaining > 0;
 
     if (!available) {
-      toast.error(`${getLeaveTypeDisplayName(leaveType)} balance exhausted (${taken}/${totalAllowed} days used)`);
+      toast.error(
+        t("{{leaveType}} balance exhausted ({{taken}}/{{totalAllowed}} days used)", {
+          leaveType: t(getLeaveTypeDisplayName(leaveType)),
+          taken,
+          totalAllowed,
+        }),
+      );
       return; // Don't allow the change
     }
 
@@ -1464,7 +1497,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     // Show remaining balance for the new leave type
     toast.success(
-      `Leave type changed - ${remaining} days remaining`
+      t("Leave type changed - {{remaining}} days remaining", { remaining }),
     );
   };
 
@@ -1474,12 +1507,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     if (isSaving) return;
 
     if (leaveType === "cuti_umum" && formData.dayType !== "Umum") {
-      toast.error("Cuti Umum is only available on public holiday logs");
+      toast.error(
+        t("Public Holiday leave is only available on public holiday logs"),
+      );
       return;
     }
 
     if (selectedLeaveEmployeesForBulk.length === 0) {
-      toast.error("Select employees for leave first");
+      toast.error(t("Select employees for leave first"));
       return;
     }
 
@@ -1518,9 +1553,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
     if (employeesWithInsufficientBalance.length > 0) {
       toast.error(
-        `Cannot change all: ${employeesWithInsufficientBalance.join(
-          ", "
-        )} have insufficient ${getLeaveTypeDisplayName(leaveType)} balance`
+        t("Cannot change all: {{employees}} have insufficient {{leaveType}} balance", {
+          employees: employeesWithInsufficientBalance.join(", "),
+          leaveType: t(getLeaveTypeDisplayName(leaveType)),
+        }),
       );
       return;
     }
@@ -1538,9 +1574,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     });
 
     toast.success(
-      `Changed ${selectedLeaveEmployeesForBulk.length} selected leave ${
-        selectedLeaveEmployeesForBulk.length === 1 ? "employee" : "employees"
-      } to ${getLeaveTypeDisplayName(leaveType)}`
+      selectedLeaveEmployeesForBulk.length === 1
+        ? t("Changed 1 selected leave employee to {{leaveType}}", {
+            leaveType: t(getLeaveTypeDisplayName(leaveType)),
+          })
+        : t("Changed {{count}} selected leave employees to {{leaveType}}", {
+            count: selectedLeaveEmployeesForBulk.length,
+            leaveType: t(getLeaveTypeDisplayName(leaveType)),
+          }),
     );
   };
 
@@ -1571,9 +1612,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     setIsRefreshingCache(true);
     try {
       await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
-      toast.success("Data refreshed");
+      toast.success(t("Data refreshed"));
     } catch (err) {
-      toast.error("Failed to refresh data");
+      toast.error(t("Failed to refresh data"));
     } finally {
       setIsRefreshingCache(false);
     }
@@ -1697,7 +1738,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       if (customAmount) {
         const parsedAmount: number = Number(customAmount);
         if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
-          toast.error("Please enter a valid non-negative leave amount.");
+          toast.error(t("Please enter a valid non-negative leave amount."));
           return;
         }
         amountPaid = Math.round(parsedAmount * 100) / 100;
@@ -1720,7 +1761,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     ).filter(([_, jobTypes]) => jobTypes.length > 0);
 
     if (allSelectedEmployees.length === 0 && leaveEntries.length === 0) {
-      toast.error("Please select at least one employee for work or leave.");
+      toast.error(t("Please select at least one employee for work or leave."));
       return;
     }
 
@@ -1759,7 +1800,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     );
 
     if (invalidEmployees.length > 0) {
-      toast.error("All selected employees must have hours > 0 or activities with amounts");
+      toast.error(
+        t("All selected employees must have hours > 0 or activities with amounts"),
+      );
       return;
     }
 
@@ -1784,7 +1827,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       .flat();
 
     if (selectedEmployeeData.length === 0 && leaveEntries.length === 0) {
-      toast.error("No employees selected");
+      toast.error(t("No employees selected"));
       return;
     }
 
@@ -1811,14 +1854,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
     try {
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/api/daily-work-logs/${existingWorkLog.id}`, payload);
-        toast.success("Work log updated successfully");
+        toast.success(t("Work log updated successfully"));
       } else {
         const response: { workLogId?: number } = await api.post(
           "/api/daily-work-logs",
           payload
         );
         newLogId = response?.workLogId;
-        toast.success("Work log submitted successfully");
+        toast.success(t("Work log submitted successfully"));
       }
 
       // Reset initial state to current state after successful save
@@ -1854,7 +1897,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       toast.error(
         error?.response?.data?.message ||
           error?.message ||
-          "Failed to save work log"
+          t("Failed to save work log")
       );
     } finally {
       setIsSaving(false);
@@ -2021,9 +2064,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
       if (employeesWithInsufficientBalance.length > 0) {
         toast.error(
-          `Cannot select all: ${employeesWithInsufficientBalance.join(
-            ", "
-          )} have insufficient ${defaultLeaveType.replace("_", " ")} balance`
+          t("Cannot select all: {{employees}} have insufficient {{leaveType}} balance", {
+            employees: employeesWithInsufficientBalance.join(", "),
+            leaveType: t(getLeaveTypeDisplayName(defaultLeaveType)),
+          }),
         );
         return;
       }
@@ -2058,7 +2102,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         };
       });
 
-      toast.success(`Selected all employees for leave`);
+      toast.success(t("Selected all employees for leave"));
     }
   };
 
@@ -3013,7 +3057,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
       }));
     }
 
-    toast.success(`Activities updated for ${selectedEmployee.name}`);
+    toast.success(
+      t("Activities updated for {{name}}", {
+        name: selectedEmployee.name,
+      }),
+    );
   };
 
   return (
@@ -3025,8 +3073,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               {mode === "edit"
-                ? `Edit ${jobConfig?.name} Entry`
-                : `${jobConfig?.name} Entry`}
+                ? t("Edit {{name}} Entry", { name: jobConfig?.name })
+                : t("{{name}} Entry", { name: jobConfig?.name })}
             </h1>
           </div>
           <div className="flex space-x-2">
@@ -3034,13 +3082,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               onClick={handleRefreshCache}
               disabled={isRefreshingCache}
               className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-              title="Refresh staff, jobs, and pay codes"
+              title={t("Refresh staff, jobs, and pay codes")}
             >
               <IconRefresh
                 size={16}
                 className={isRefreshingCache ? "animate-spin" : ""}
               />
-              Refresh
+              {t("Refresh")}
             </button>
             <Button
               variant="outline"
@@ -3048,7 +3096,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               onClick={mode === "edit" && onCancel ? onCancel : handleBack}
               disabled={isSaving}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               color="sky"
@@ -3056,7 +3104,11 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
               onClick={() => handleSaveForm()}
               disabled={isSaving}
             >
-              {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
+              {isSaving
+                ? t("Saving...")
+                : mode === "edit"
+                  ? t("Update")
+                  : t("Save")}
             </Button>
           </div>
         </div>
@@ -3066,7 +3118,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           {/* Date */}
           <div>
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-              Date
+              {t("Date")}
             </label>
             <TimeNavigator
               range={selectedDateRange}
@@ -3090,9 +3142,12 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 : "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200 border border-default-200 dark:border-gray-600"
             }`}
           >
-            {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
-              ? "Sabtu"
-              : formData.dayType}
+            {t(
+              formData.dayType === "Biasa" &&
+                new Date(formData.logDate).getDay() === 6
+                ? "Sabtu"
+                : formData.dayType,
+            )}
             {formData.dayType === "Umum" &&
               getHolidayDescription(new Date(formData.logDate)) && (
                 <span className="ml-1 text-xs font-normal">
@@ -3104,7 +3159,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
           {/* Shift Field */}
           <div>
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-              Shift
+              {t("Shift")}
             </label>
             <PillSelect
               value={formData.shift}
@@ -3112,7 +3167,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                 setFormData({ ...formData, shift: value })
               }
               options={SHIFT_OPTIONS}
-              ariaLabel="Shift"
+              ariaLabel={t("Shift")}
               size="md"
             />
           </div>
@@ -3141,7 +3196,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                   ? "text-sky-700 dark:text-sky-300"
                   : "text-default-600 dark:text-gray-400"
               }`}>
-                {isCleaningMode ? "Cleaning" : "Regular"}
+                {isCleaningMode ? t("Cleaning") : t("Regular")}
               </span>
             </div>
           )}
@@ -3161,7 +3216,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         {jobConfig?.contextFields && jobConfig.contextFields.length > 3 && (
           <div className="mb-4">
             <span className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3">
-              Production Details
+              {t("Production Details")}
             </span>
             <DynamicContextForm
               contextFields={jobConfig?.contextFields || []}
@@ -3193,7 +3248,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             onChange={handleSelectAll}
                             size={20}
                             checkedColor="text-sky-600"
-                            ariaLabel="Select all employees"
+                            ariaLabel={t("Select all employees")}
                             buttonClassName="p-1 rounded-lg"
                             disabled={availableForWork.length === 0}
                           />
@@ -3202,39 +3257,41 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                           scope="col"
                           className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          ID
+                          {t("ID")}
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Name
+                          {t("Name")}
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Job
+                          {t("Job")}
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          {isBihunPage && !isCleaningMode ? "Units" : "Hours"}
+                          {isBihunPage && !isCleaningMode
+                            ? t("Units")
+                            : t("Hours")}
                         </th>
                         {isBihunPage && !isCleaningMode && (
                           <th
                             scope="col"
                             className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            JAGA STIM (OT)
+                            {t("JAGA STIM (OT)")}
                           </th>
                         )}
                         <th
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Actions
+                          {t("Actions")}
                         </th>
                       </tr>
                     </thead>
@@ -3286,7 +3343,10 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                 onChange={() => {}}
                                 size={20}
                                 checkedColor="text-sky-600"
-                                ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                                ariaLabel={t(
+                                  "Select employee {{name}} for job {{job}}",
+                                  { name: row.name, job: row.jobName },
+                                )}
                                 buttonClassName="p-1 rounded-lg"
                                 disabled={
                                   isSaving || leaveEmployees[row.id]?.selected
@@ -3418,16 +3478,18 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
 
         <div className="border-t border-default-200 dark:border-gray-700 pt-2 mt-4">
           <h2 className="text-lg font-semibold text-default-700 dark:text-gray-200 mb-2">
-            Leave & Absence Recording
+            {t("Leave & Absence Recording")}
           </h2>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
             {availableForLeave.length === 0 ? (
               <div className="text-center py-10 px-6">
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  No employees available for leave.
+                  {t("No employees available for leave.")}
                 </p>
                 <p className="text-xs text-default-400 mt-1">
-                  Employees selected for work cannot be marked as on leave.
+                  {t(
+                    "Employees selected for work cannot be marked as on leave.",
+                  )}
                 </p>
               </div>
             ) : (
@@ -3440,7 +3502,7 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                         onChange={handleLeaveSelectAll}
                         size={20}
                         checkedColor="text-amber-600"
-                        ariaLabel="Select all employees for leave"
+                        ariaLabel={t("Select all employees for leave")}
                         buttonClassName="p-1 rounded-lg"
                         disabled={availableForLeave.length === 0}
                       />
@@ -3449,14 +3511,14 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       scope="col"
                       className="w-1/3 px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
-                      Employee
+                      {t("Employee")}
                     </th>
                     <th
                       scope="col"
                       className="px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
                       <div className="flex items-center gap-2 normal-case">
-                        <span className="uppercase">SET ALL</span>
+                        <span className="uppercase">{t("SET ALL")}</span>
                         {/* "mixed" matches no option, so no pill is highlighted
                             when the selected workers have different types —
                             that is the neutral state this control needs. */}
@@ -3470,7 +3532,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             selectedLeaveEmployeesForBulk.length === 0 ||
                             isSaving
                           }
-                          ariaLabel="Set leave type for the selected employees"
+                          ariaLabel={t(
+                            "Set leave type for the selected employees",
+                          )}
                         />
                       </div>
                     </th>
@@ -3478,13 +3542,13 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                       scope="col"
                       className="w-36 px-6 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
-                      Amount
+                      {t("Amount")}
                     </th>
                     <th
                       scope="col"
                       className="w-48 px-6 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
-                      Actions
+                      {t("Actions")}
                     </th>
                   </tr>
                 </thead>
@@ -3529,7 +3593,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                             onChange={() => {}}
                             size={20}
                             checkedColor="text-amber-600"
-                            ariaLabel={`Select ${employee.name} for leave`}
+                            ariaLabel={t("Select {{name}} for leave", {
+                              name: employee.name,
+                            })}
                             buttonClassName="p-1 rounded-lg"
                             disabled={isSaving}
                           />
@@ -3573,7 +3639,8 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                                           : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                                       }`}
                                     >
-                                      {leaveTypeName}: {availability.remaining}/
+                                      {t(leaveTypeName)}:{" "}
+                                      {availability.remaining}/
                                       {availability.totalAllowed}
                                     </span>
                                   );
@@ -3594,7 +3661,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
                               }
                               options={leaveOptions}
                               disabled={!isSelected || isSaving}
-                              ariaLabel={`Leave type for ${employee.name}`}
+                              ariaLabel={t("Leave type for {{name}}", {
+                                name: employee.name,
+                              })}
                             />
                           </div>
                         </td>
@@ -3699,9 +3768,9 @@ const DailyLogEntryPage: React.FC<DailyLogEntryPageProps> = ({
         isOpen={showConfirmDialog}
         onClose={handleCancelNavigation}
         onConfirm={handleConfirmNavigation}
-        title="Unsaved Changes"
+        title={t("Unsaved Changes")}
         message={confirmationMessage}
-        confirmButtonText="Leave Page"
+        confirmButtonText={t("Leave Page")}
         variant="danger"
       />
     </div>
