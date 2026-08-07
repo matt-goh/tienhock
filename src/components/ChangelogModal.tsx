@@ -21,6 +21,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-07",
+    ms: "Pembayaran (Tien Hock): anda kini boleh membetulkan tarikh kumpulan bayaran tunai, pindahan bank atau dalam talian terus dari halaman Payments atau butiran kumpulan bayaran. Resit, rekod pembayaran dan catatan jurnal yang disiarkan semuanya bergerak ke tarikh baharu. Tunai bergerak secara automatik antara akaun kutipan hari jualan dan kutipan kemudian apabila tarikh baharu ialah hari jualan invois. Bayaran tunai yang telah dibank masuk hanya boleh dipindahkan ke tarikh pada atau sebelum tarikh bank masuk; jika tidak, batalkan bank masuk dahulu. Bayaran cek mengekalkan tingkah laku sedia ada: hanya tarikh diterima yang berubah, dan jurnal kekal pada tarikh penjelasan cek.",
+    en: "Payments (Tien Hock): you can now correct the date on a cash, bank transfer or online payment group directly from the Payments page or the payment group details. The receipt, its payment records and the posted journal entry all move to the new date together. Cash automatically moves between the same-day and later-collection accounts when the new date is the invoice's sale day. A cash payment that has already been banked in can only be moved to a date on or before its bank-in date; otherwise reverse the bank-in first. Cheque payments keep the existing behaviour: only the received date changes, and the journal stays on the cheque's clearance date.",
+  },
+  {
+    date: "2026-08-07",
+    ms: "Resit tunai C015353/C015360/C015364/C015372 (ROSE, RM91.60) telah dipindahkan dari 7 Ogos ke 7 Julai 2026. Resit, catatan jurnal dan rekod pembayarannya kini semuanya menunjukkan 7 Julai, jadi lejer Julai merangkumi tunai ini dan Ogos tidak lagi. Tunai telah dibank masuk pada 10 Julai, yang kini sepadan dengan resit.",
+    en: "Cash receipt C015353/C015360/C015364/C015372 (ROSE, RM91.60) has been moved from 7 August to 7 July 2026. The receipt, its journal entry and the payment records all now show 7 July, so the July ledgers include this cash and August no longer does. The cash was banked in on 10 July, which now matches the receipt.",
+  },
+  {
+    date: "2026-08-07",
     ms: "Green Target: invois kini boleh merekod nombor Delivery Order (DO) sebagai rujukan sahaja. Masukkan DO pada borang invois (pilihan) dan ia dipaparkan pada kad senarai invois serta halaman butiran invois. Ia tidak menjejaskan jumlah, e-Invois, sewaan atau pembayaran. Halaman Delivery Order lama di bawah Sewaan telah dibuang; rujukan DO kini direkod terus pada invois.",
     en: "Green Target: invoices can now record a Delivery Order (DO) number as a reference only. Enter the DO on the invoice form (optional) and it appears on the invoice list cards and the invoice details page. It does not affect totals, e-Invoices, rentals or payments. The old Delivery Order page under Rentals has been removed; DO references are now recorded directly on the invoice.",
   },

@@ -853,12 +853,22 @@ export async function updateReceiptReference(
 }
 
 /**
- * Corrects a mis-keyed receipt date without touching the ledger. Only cheque
- * receipts qualify: their accounting date is the separately captured clearance
- * date (posting_date), so received_date is pure payment history. Every other
- * method posts with posting_date defaulted to received_date, where moving one
- * date alone would silently desync the receipt from its own journal — those
- * corrections stay on cancel + re-key.
+ * Corrects a mis-keyed receipt date.
+ *
+ * Cheque receipts: only received_date moves (pure payment history). The ledger
+ * stays untouched because a cheque posts on its separately captured clearance
+ * date (posting_date), and a cheque cannot clear before it was received.
+ *
+ * Cash / bank transfer / online receipts: the received date IS the accounting
+ * date, so the receipt's posting_date, the posted REC journal's entry_date and
+ * every compat payment row move together in one transaction. For cash, the
+ * holding account is re-resolved against the invoices' sale days:
+ *   - moved ONTO a sale day: CH_REV2 -> CH_REV1 (joins that day's cash pool),
+ *   - moved OFF a sale day:  CH_REV1 -> CH_REV2 (must leave enough unbanked
+ *     cash in the old pool, so an already-banked pool is refused),
+ *   - a CH_REV2 receipt already in a posted bank-in may only move to a date on
+ *     or before the bank-in's posting date, so cash is never banked before it
+ *     was received.
  *
  * Receipts sharing the current reference/date/method/account move together so a
  * visible Payment Management group never splits, and their payment-history
@@ -905,9 +915,14 @@ export async function updateReceiptDate(
   if (receipt.origin !== "erp") {
     throw new Error("Imported opening payment groups cannot be changed");
   }
-  if (receipt.payment_method !== "cheque") {
+  const isCheque = receipt.payment_method === "cheque";
+  if (
+    !["cash", "cheque", "bank_transfer", "online"].includes(
+      receipt.payment_method
+    )
+  ) {
     throw new Error(
-      "Only cheque payment dates can be corrected here. For cash, bank transfer and online payments the payment date is also the accounting date — cancel this payment and record it again on the correct date."
+      `Payment method ${receipt.payment_method} cannot have its date corrected here`
     );
   }
 
@@ -937,7 +952,8 @@ export async function updateReceiptDate(
   }
 
   const groupResult = await client.query(
-    `SELECT id, journal_entry_id, received_date, posting_date
+    `SELECT id, journal_entry_id, received_date, posting_date,
+            payment_method, debit_account, status, total_amount
        FROM receipts
       WHERE display_reference IS NOT DISTINCT FROM $1
         AND received_date = $2
@@ -969,7 +985,7 @@ export async function updateReceiptDate(
       `Payment group ${receipt.display_reference || receiptId}`
     );
     // A cheque cannot clear the bank before it was received.
-    if (groupReceipt.posting_date) {
+    if (isCheque && groupReceipt.posting_date) {
       const clearanceDate = toLocalDateString(groupReceipt.posting_date);
       if (clearanceDate < nextDate) {
         const error = new Error(
@@ -991,12 +1007,171 @@ export async function updateReceiptDate(
     };
   }
 
-  await client.query(
-    `UPDATE receipts
-        SET received_date = $2::date, updated_at = NOW(), updated_by = $3
-      WHERE id = ANY($1::int[])`,
-    [receiptIds, nextDate, userId || null]
-  );
+  // Load allocations once for cash holding-account resolution.
+  const allocationsByReceipt = {};
+  if (!isCheque) {
+    const allocResult = await client.query(
+      `SELECT receipt_id, allocation_type, invoice_id
+         FROM receipt_allocations
+        WHERE receipt_id = ANY($1::int[])
+        ORDER BY receipt_id, line_number`,
+      [receiptIds]
+    );
+    for (const row of allocResult.rows) {
+      if (!allocationsByReceipt[row.receipt_id]) {
+        allocationsByReceipt[row.receipt_id] = [];
+      }
+      allocationsByReceipt[row.receipt_id].push({
+        type: row.allocation_type,
+        invoice_id: row.invoice_id,
+      });
+    }
+  }
+
+  // Resolve the new holding account per cash receipt and run the bank-in /
+  // cash-pool guards BEFORE anything is mutated.
+  const newDebitAccountByReceipt = {};
+  const poolDatesToLock = new Set();
+  for (const groupReceipt of groupResult.rows) {
+    if (groupReceipt.payment_method !== "cash") {
+      newDebitAccountByReceipt[groupReceipt.id] = groupReceipt.debit_account;
+      continue;
+    }
+    const oldAccount = groupReceipt.debit_account;
+    const newAccount = await resolveCashHoldingAccount(
+      client,
+      allocationsByReceipt[groupReceipt.id] || [],
+      nextDate
+    );
+    newDebitAccountByReceipt[groupReceipt.id] = newAccount;
+
+    if (oldAccount === newAccount) {
+      // CH_REV2 -> CH_REV2: cash already in a posted bank-in may only move
+      // earlier (or stay), never after the money was banked.
+      if (oldAccount === "CH_REV2") {
+        const bankInResult = await client.query(
+          `SELECT MIN(bi.posting_date)::text AS earliest_banked
+             FROM bank_in_allocations bia
+             JOIN bank_in_groups big ON big.id = bia.group_id
+             JOIN bank_ins bi ON bi.id = big.bank_in_id
+            WHERE bia.receipt_id = $1 AND bi.status = 'posted'`,
+          [groupReceipt.id]
+        );
+        const earliestBanked = bankInResult.rows[0]?.earliest_banked || null;
+        if (earliestBanked && nextDate > earliestBanked) {
+          throw new Error(
+            `This cash was banked in on ${earliestBanked}. Choose a date on or before ${earliestBanked}, or reverse the bank-in first.`
+          );
+        }
+      }
+      continue;
+    }
+
+    if (oldAccount === "CH_REV1" && newAccount === "CH_REV2") {
+      // Leaving a same-day pool: serialize with RV bank-ins of that pool and
+      // re-check below that enough unbanked cash remains.
+      poolDatesToLock.add(currentDate);
+    } else if (oldAccount === "CH_REV2" && newAccount === "CH_REV1") {
+      // Joining a same-day pool: the cash must not already have been banked
+      // as a CH_REV2 receipt.
+      const bankInResult = await client.query(
+        `SELECT 1
+           FROM bank_in_allocations bia
+           JOIN bank_in_groups big ON big.id = bia.group_id
+           JOIN bank_ins bi ON bi.id = big.bank_in_id
+          WHERE bia.receipt_id = $1 AND bi.status = 'posted'
+          LIMIT 1`,
+        [groupReceipt.id]
+      );
+      if (bankInResult.rows.length > 0) {
+        throw new Error(
+          `Payment group ${receipt.display_reference || receiptId} has already been included in a bank-in. Reverse that bank-in first.`
+        );
+      }
+    }
+  }
+
+  for (const dateStr of poolDatesToLock) {
+    await client.query(
+      `SELECT pg_advisory_xact_lock(hashtext('chrev1_pool_' || $1::text))`,
+      [dateStr]
+    );
+  }
+  if (poolDatesToLock.size > 0) {
+    const { pools } = await getCashSalesPools(client);
+    const poolMap = Object.fromEntries(
+      pools.map((pool) => [pool.source_date, pool])
+    );
+    const leavingByDate = {};
+    for (const groupReceipt of groupResult.rows) {
+      if (
+        groupReceipt.payment_method === "cash" &&
+        groupReceipt.debit_account === "CH_REV1" &&
+        newDebitAccountByReceipt[groupReceipt.id] === "CH_REV2"
+      ) {
+        leavingByDate[currentDate] = round2(
+          (leavingByDate[currentDate] || 0) + round2(groupReceipt.total_amount)
+        );
+      }
+    }
+    for (const [dateStr, amount] of Object.entries(leavingByDate)) {
+      const pool = poolMap[dateStr];
+      const remaining = pool ? pool.remaining : 0;
+      if (amount > remaining + 0.005) {
+        throw new Error(
+          `The cash-sales pool for ${dateStr} has already been banked in (unbanked remainder ${remaining.toFixed(2)}). Reverse that bank-in first or keep the payment on the sale day.`
+        );
+      }
+    }
+  }
+
+  // Move the date. Amounts, references and statuses are untouched; for cash
+  // the holding account and its journal lines follow the same-day rule.
+  for (const groupReceipt of groupResult.rows) {
+    const newAccount = newDebitAccountByReceipt[groupReceipt.id];
+    const postingDate = isCheque ? groupReceipt.posting_date : nextDate;
+
+    await client.query(
+      `UPDATE receipts
+          SET received_date = $2::date,
+              posting_date = $3::date,
+              debit_account = $4,
+              updated_at = NOW(),
+              updated_by = $5
+        WHERE id = $1`,
+      [groupReceipt.id, nextDate, postingDate, newAccount, userId || null]
+    );
+
+    if (
+      !isCheque &&
+      groupReceipt.status === "posted" &&
+      groupReceipt.journal_entry_id
+    ) {
+      await client.query(
+        `UPDATE journal_entries
+            SET entry_date = $2::date, updated_at = NOW(), updated_by = $3
+          WHERE id = $1 AND status = 'posted'`,
+        [groupReceipt.journal_entry_id, nextDate, userId || null]
+      );
+      if (
+        groupReceipt.payment_method === "cash" &&
+        newAccount !== groupReceipt.debit_account
+      ) {
+        await client.query(
+          `UPDATE journal_entry_lines
+              SET account_code = $3
+            WHERE journal_entry_id = $1
+              AND account_code = $2
+              AND debit_amount > 0`,
+          [
+            groupReceipt.journal_entry_id,
+            groupReceipt.debit_account,
+            newAccount,
+          ]
+        );
+      }
+    }
+  }
 
   const paymentUpdate = await client.query(
     `UPDATE payments p

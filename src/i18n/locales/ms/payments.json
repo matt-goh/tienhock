@@ -3,6 +3,7 @@
   "Contra and overpayment credits cannot be reused as payment groups.": "Kredit contra dan overpayment tidak boleh digunakan semula sebagai kumpulan bayaran.",
   "This payment group does not have a reference to reuse.": "Kumpulan bayaran ini tidak mempunyai rujukan untuk digunakan semula.",
   "Search payments by invoice, reference, or amount": "Cari bayaran mengikut invois, rujukan, atau amaun",
+  "Clear search": "Kosongkan carian",
   "All Methods": "Semua Kaedah",
   "Cash": "Tunai",
   "Cheque": "Cek",

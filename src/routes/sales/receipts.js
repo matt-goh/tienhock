@@ -302,8 +302,10 @@ export default function (pool) {
   });
 
   // --- PATCH /api/receipts/:id/date ---
-  // Cheque receipts only: corrects the mis-keyed payment date. The ledger is
-  // untouched — a cheque posts on its clearance date, not its received date.
+  // Cheque: corrects the mis-keyed received date; the ledger stays on the
+  // clearance date. Cash/bank transfer/online: the received date is also the
+  // accounting date, so the receipt, its journal and payment rows move
+  // together in one transaction.
   router.patch("/:id/date", async (req, res) => {
     const receiptId = parseInt(req.params.id, 10);
     if (!Number.isInteger(receiptId) || receiptId <= 0) {

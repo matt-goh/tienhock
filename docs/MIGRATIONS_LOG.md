@@ -30,7 +30,168 @@ requires separate approval).
 
 ---
 
-## Removed 7 Aug 2026 — 1 file (Green Target invoice Delivery Order reference)
+## Removed 7 Aug 2026 — 1 file (receipt 162 C015353/C015360/C015364/C015372 received-date correction)
+
+Applied to **dev and production** on 2026-08-07, then removed per the project
+convention. The exact SQL is embedded below for recovery.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-07_receipt_162_received_date_correction.sql` | Cash receipt 162 (ROSE, RM91.60 across invoices 015353/015360/015364/015372) was keyed as received 2026-08-07 but was actually received 2026-07-07 and banked in on 2026-07-10. Corrected `receipts.received_date`/`posting_date` for receipt 162, the owning REC journal 3743's `entry_date`, and the four `payments` rows (5584-5587) to 2026-07-07. No amounts, accounts, references, statuses or totals changed; the bank-in (bank_in 94, posted 2026-07-10) is untouched. | dev ✓, prod ✓ (both 2026-08-07) |
+
+Exact SQL:
+
+```sql
+-- 2026-08-07 Tien Hock: cash receipt 162 (ROSE, RM91.60 across invoices
+-- 015353 / 015360 / 015364 / 015372) was keyed with the wrong received date:
+-- 2026-08-07. The cash was actually received on 2026-07-07 and was banked in
+-- on 2026-07-10 (posted bank-in 94 / RV), so the receipt, its journal and its
+-- payment rows are moved to 2026-07-07.
+--
+-- WHAT THIS DOES
+--   * receipts 162: received_date and posting_date 2026-08-07 -> 2026-07-07,
+--   * journal_entries 3743 (the posted REC journal): entry_date
+--     2026-08-07 -> 2026-07-07,
+--   * payments 5584-5587 (one row per invoice allocation): payment_date
+--     2026-08-07 -> 2026-07-07.
+-- No amounts, accounts, references, statuses, balances or totals change --
+-- only the date. The bank-in itself (bank_in 94, posted 2026-07-10) is
+-- untouched and remains after the corrected receipt date.
+--
+-- Guarded, idempotent, fail-closed: one transaction, pre- and post-state
+-- asserted.
+
+BEGIN;
+
+DO $$
+DECLARE
+  v_receipt_id CONSTANT integer := 162;
+  v_journal_id CONSTANT integer := 3743;
+  v_from       CONSTANT date    := DATE '2026-08-07';
+  v_to         CONSTANT date    := DATE '2026-07-07';
+  v_count      integer;
+BEGIN
+  ------------------------------------------------------------------
+  -- Idempotency: already corrected -> no-op.
+  ------------------------------------------------------------------
+  SELECT COUNT(*) INTO v_count FROM receipts
+   WHERE id = v_receipt_id
+     AND received_date = v_to AND posting_date = v_to
+     AND status = 'posted' AND journal_entry_id = v_journal_id;
+  IF v_count = 1 THEN
+    RAISE NOTICE 'Receipt % already dated % - correction already applied, no change',
+      v_receipt_id, v_to;
+    RETURN;
+  END IF;
+
+  ------------------------------------------------------------------
+  -- Preconditions: exact pre-state.
+  ------------------------------------------------------------------
+  SELECT COUNT(*) INTO v_count FROM receipts
+   WHERE id = v_receipt_id
+     AND received_date = v_from AND posting_date = v_from
+     AND status = 'posted' AND journal_entry_id = v_journal_id;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Receipt % is not the expected posted receipt dated %',
+      v_receipt_id, v_from;
+  END IF;
+
+  SELECT COUNT(*) INTO v_count FROM journal_entries
+   WHERE id = v_journal_id
+     AND status = 'posted' AND entry_type = 'REC'
+     AND source_type = 'receipt' AND source_id = v_receipt_id::text
+     AND entry_date = v_from AND COALESCE(manual_override, false) = false;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Journal % is not the expected posted, unmodified REC journal dated %',
+      v_journal_id, v_from;
+  END IF;
+
+  SELECT COUNT(*) INTO v_count FROM payments
+   WHERE receipt_allocation_id IN (
+           SELECT id FROM receipt_allocations WHERE receipt_id = v_receipt_id)
+     AND payment_date = v_from::timestamp;
+  IF v_count <> 4 THEN
+    RAISE EXCEPTION 'Expected 4 payment rows dated % for receipt %, found %',
+      v_from, v_receipt_id, v_count;
+  END IF;
+
+  ------------------------------------------------------------------
+  -- Move the date. Amounts, accounts, references and status are untouched.
+  ------------------------------------------------------------------
+  UPDATE receipts
+     SET received_date = v_to, posting_date = v_to, updated_at = NOW()
+   WHERE id = v_receipt_id;
+
+  UPDATE journal_entries
+     SET entry_date = v_to, updated_at = NOW()
+   WHERE id = v_journal_id;
+
+  UPDATE payments
+     SET payment_date = v_to::timestamp
+   WHERE receipt_allocation_id IN (
+           SELECT id FROM receipt_allocations WHERE receipt_id = v_receipt_id)
+     AND payment_date = v_from::timestamp;
+
+  RAISE NOTICE 'Receipt % / journal % / 4 payment rows moved from % to %',
+    v_receipt_id, v_journal_id, v_from, v_to;
+END
+$$;
+
+------------------------------------------------------------------
+-- Post-conditions.
+------------------------------------------------------------------
+DO $$
+DECLARE
+  v_count integer;
+  v_debit numeric;
+  v_credit numeric;
+BEGIN
+  SELECT COUNT(*) INTO v_count FROM receipts
+   WHERE id = 162 AND received_date = DATE '2026-07-07'
+     AND posting_date = DATE '2026-07-07' AND status = 'posted';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Receipt 162 is not dated 2026-07-07';
+  END IF;
+
+  SELECT COUNT(*) INTO v_count FROM journal_entries
+   WHERE id = 3743 AND entry_date = DATE '2026-07-07' AND status = 'posted';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Journal 3743 is not dated 2026-07-07';
+  END IF;
+
+  SELECT COUNT(*) INTO v_count FROM payments
+   WHERE receipt_allocation_id IN (
+           SELECT id FROM receipt_allocations WHERE receipt_id = 162)
+     AND payment_date = TIMESTAMP '2026-07-07 00:00:00';
+  IF v_count <> 4 THEN
+    RAISE EXCEPTION 'Expected 4 payment rows dated 2026-07-07, found %', v_count;
+  END IF;
+
+  SELECT SUM(debit_amount), SUM(credit_amount) INTO v_debit, v_credit
+    FROM journal_entry_lines WHERE journal_entry_id = 3743;
+  IF v_debit IS DISTINCT FROM v_credit OR v_debit <> 91.60 THEN
+    RAISE EXCEPTION 'Journal 3743 unbalanced: DR % / CR %', v_debit, v_credit;
+  END IF;
+
+  SELECT COUNT(*) INTO v_count
+    FROM bank_in_allocations bia
+    JOIN bank_in_groups big ON big.id = bia.group_id
+    JOIN bank_ins bi ON bi.id = big.bank_in_id
+   WHERE bia.receipt_id = 162 AND bi.status = 'posted';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Expected receipt 162 in one posted bank-in, found %', v_count;
+  END IF;
+
+  RAISE NOTICE 'All post-conditions passed';
+END
+$$;
+
+COMMIT;
+```
+
+---
+
+## Removed 7 Aug 2026 - 1 file (Green Target invoice Delivery Order reference)
 
 Applied to **dev** on 2026-08-07. The file was removed per the project
 convention, then **restored on 2026-08-07** because production had not run it
