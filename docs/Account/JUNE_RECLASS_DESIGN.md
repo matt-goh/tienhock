@@ -159,6 +159,18 @@ E10+E11 are one receipt (709.00 either way) so no voucher total moved; move #3 i
 
 Her third flag — `PCE004/06`'s sen-level edits — needed no action: her screenshots show the legacy program and the ERP both at 21.25 / 160.55 / 88.20 / 61.93 / 26.71 / 89.12 / 46.65 / 482.30 / 9.05. E1–E7 and the §d.1 MRM/MGT offsets were right and are already in on both sides. "It seems it amended already" was our 6 Aug migration.
 
+### §e resolution — it flipped twice; `MBSM_K` / 565-144 stands
+
+Later on 7 Aug the coworker, asked to reconcile §e against her own 4 Aug annotated scans (`CORRECTED_BIHUN_JUNE_ESTIMATED_UNIT_COST.pdf`, which shows MBC 479.55 · MBRMF 2,517.80 · MBSAF 714.78 · Staff Messing 2,669.10), said the **4 Aug figures** were right — which would have required reversing move #3, E10 and E11 again. A reversal handover was drafted and then withdrawn: **a second person independently confirmed KFC belongs in `MBSM_K`**, and MBC 479.55 is arithmetically nothing other than KFC 40.00 sitting in Cleaning Expenses. The 4 Aug scans predate the correction and are stale on exactly these four lines, in the same way the June TB print is stale on the four matching accounts.
+
+**Outcome — CLOSED 7 Aug 2026: no data change.** She re-confirmed the 4 Aug figures once more, and the contradiction was then resolved by the missing fact: **she had also updated the estimated unit cost inside the legacy program**. Legacy and the ERP therefore carry the same June classification, and the bottom line agrees on both sides (expenses subtotal 64,238.82, FINAL 14.0504). Production keeps the 7 Aug state (KFC 40.00 in `MBSM_K`; PAUMIN `MBRMF` 565.00 / `MBSAF` 144.00), the re-pinned targets stand, and the 4 Aug annotated scans are a superseded pre-amendment snapshot. June estimated unit cost is done; see [JUNE_TB_BIHUN_RECON_HANDOVER.md](JUNE_TB_BIHUN_RECON_HANDOVER.md).
+
+One thing to watch:
+
+- **The 4 Aug paper scans are still the old figures.** Legacy's own estimated unit cost was updated, but the annotated printout in circulation was not. If it resurfaces, it is stale — the current figures are 459.55 / 2,567.80 / 664.78 / 2,689.10.
+
+**Do not use the subtotal, FINAL or the Trial Balance total to adjudicate this.** The four deltas are −20 / +50 / −50 / +20 and net to zero, so 64,238.82, 14.0504 and 17,102,880.87 are identical under both classifications. Only the receipt settles it.
+
 **Method lesson.** Every row of the keying guide and every correction in this document was derived from a single printed source. A print is evidence of *what was keyed*, not of *what is correct* — where legacy and the ERP disagreed, we assumed legacy was right by default. For the 28 rows backed by an unambiguous vendor/part rule that assumption held; for these three it inverted a correct ERP entry. Future reconciliations should treat a legacy-vs-ERP difference as a question for the receipt, and prefer a fresh month-end export over a print that the coworker may still be editing.
 
 ### Migration shape note for Phase 2 — EXECUTED on dev 6 Aug 2026
