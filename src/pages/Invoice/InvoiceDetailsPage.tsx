@@ -3281,6 +3281,9 @@ const InvoiceDetailsPage: React.FC = () => {
         onReferenceUpdated={async (): Promise<void> => {
           await fetchDetails();
         }}
+        onDateUpdated={async (): Promise<void> => {
+          await fetchDetails();
+        }}
       />
       <ConfirmationDialog
         isOpen={showClearEInvoiceConfirm}

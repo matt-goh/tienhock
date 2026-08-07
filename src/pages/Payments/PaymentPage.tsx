@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IconPlus, IconSearch } from "@tabler/icons-react";
+import { IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TimeNavigator from "../../components/TimeNavigator";
@@ -266,7 +266,7 @@ const PaymentPage: React.FC = () => {
                 title={t(
                   "Search payments by invoice, reference, or amount"
                 )}
-                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
+                className="w-full pl-10 pr-9 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
                 value={filters.searchTerm}
                 onChange={(e) =>
                   setFilters((prev) => ({
@@ -275,6 +275,22 @@ const PaymentPage: React.FC = () => {
                   }))
                 }
               />
+              {filters.searchTerm && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      searchTerm: "",
+                    }))
+                  }
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-default-400 hover:bg-default-100 hover:text-default-700 dark:text-gray-400 dark:hover:bg-gray-600 dark:hover:text-gray-200"
+                  title={t("Clear search")}
+                  aria-label={t("Clear search")}
+                >
+                  <IconX size={14} />
+                </button>
+              )}
             </div>
 
             {/* Time Navigator */}
@@ -384,6 +400,9 @@ const PaymentPage: React.FC = () => {
           await fetchPayments();
         }}
         onReferenceUpdated={async (): Promise<void> => {
+          await fetchPayments();
+        }}
+        onDateUpdated={async (): Promise<void> => {
           await fetchPayments();
         }}
       />
