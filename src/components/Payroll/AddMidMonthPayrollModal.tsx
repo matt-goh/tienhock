@@ -17,6 +17,7 @@ import {
   getMonthName,
 } from "../../utils/payroll/midMonthPayrollUtils";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 type MidMonthPaymentMethod = "Cash" | "Bank" | "Cheque";
 
@@ -43,7 +44,12 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
   currentYear,
   currentMonth,
 }) => {
+  const { t } = useTranslation("payroll");
   const defaultAmount = 500; // Default amount for new payroll
+  const paymentMethodOptions = PAYMENT_METHOD_OPTIONS.map((opt) => ({
+    ...opt,
+    label: t(opt.label),
+  }));
   const { staffs } = useStaffsCache();
   const [employeeId, setEmployeeId] = useState<string>("");
   const [amount, setAmount] = useState<number>(defaultAmount);
@@ -83,12 +89,12 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
 
   const handleSubmit = async () => {
     if (!employeeId) {
-      toast.error("Please select an employee");
+      toast.error(t("Please select an employee"));
       return;
     }
 
     if (amount <= 0) {
-      toast.error("Amount must be greater than 0");
+      toast.error(t("Amount must be greater than 0"));
       return;
     }
 
@@ -103,7 +109,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
       };
 
       await createMidMonthPayroll(data);
-      toast.success("Successfully created mid-month payroll");
+      toast.success(t("Successfully created mid-month payroll"));
       resetForm();
       onSuccess();
       onClose();
@@ -111,10 +117,10 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
       console.error("Error creating payroll:", error);
       if (error.response?.status === 409) {
         toast.error(
-          "This employee already has a mid-month payroll for this month"
+          t("This employee already has a mid-month payroll for this month")
         );
       } else {
-        toast.error("Failed to create payroll. Please try again.");
+        toast.error(t("Failed to create payroll. Please try again."));
       }
     } finally {
       setIsCreating(false);
@@ -166,8 +172,10 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100 mb-4"
                 >
-                  Add Mid-month Payroll - {getMonthName(currentMonth)}{" "}
-                  {currentYear}
+                  {t("Add Mid-month Payroll - {{month}} {{year}}", {
+                    month: t(getMonthName(currentMonth)),
+                    year: currentYear,
+                  })}
                 </DialogTitle>
 
                 <div className="space-y-4">
@@ -175,7 +183,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                   <div>
                     <FormCombobox
                       name="employee"
-                      label="Select Employee"
+                      label={t("Select Employee")}
                       value={employeeId}
                       onChange={(value) =>
                         handleEmployeeChange(value as string)
@@ -183,7 +191,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                       options={employeeOptions}
                       query={searchQuery}
                       setQuery={setSearchQuery}
-                      placeholder="Search for employee..."
+                      placeholder={t("Search for employee...")}
                       mode="single"
                     />
                   </div>
@@ -192,7 +200,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                   <div>
                     <FormInput
                       name="amount"
-                      label="Amount (RM)"
+                      label={t("Amount (RM)")}
                       type="number"
                       value={amount}
                       onChange={(e) => setAmount(Number(e.target.value))}
@@ -205,15 +213,15 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                   {/* Payment Method */}
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Payment Method
+                      {t("Payment Method")}
                     </label>
                     <PillSelect<MidMonthPaymentMethod>
                       value={paymentMethod}
                       onChange={(value: MidMonthPaymentMethod) =>
                         setPaymentMethod(value)
                       }
-                      options={PAYMENT_METHOD_OPTIONS}
-                      ariaLabel="Payment method"
+                      options={paymentMethodOptions}
+                      ariaLabel={t("Payment method")}
                       size="md"
                     />
                   </div>
@@ -227,7 +235,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                     onClick={handleClose}
                     disabled={isCreating}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </Button>
                   <Button
                     type="button"
@@ -236,7 +244,7 @@ const AddMidMonthPayrollModal: React.FC<AddMidMonthPayrollModalProps> = ({
                     onClick={handleSubmit}
                     disabled={isCreating || !employeeId || amount <= 0}
                   >
-                    {isCreating ? "Creating..." : "Create Payroll"}
+                    {isCreating ? t("Creating...") : t("Create Payroll")}
                   </Button>
                 </div>
               </DialogPanel>

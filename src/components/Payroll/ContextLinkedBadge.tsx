@@ -2,6 +2,7 @@
 import React, { useState, useRef } from "react";
 import { IconLink } from "@tabler/icons-react";
 import { createPortal } from "react-dom";
+import { useTranslation, Trans } from "react-i18next";
 
 interface ContextLinkedBadgeProps {
   contextFieldLabel: string;
@@ -14,6 +15,7 @@ const ContextLinkedBadge: React.FC<ContextLinkedBadgeProps> = ({
   contextValue,
   className = "",
 }) => {
+  const { t } = useTranslation("payroll");
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const badgeRef = useRef<HTMLSpanElement>(null);
@@ -53,7 +55,7 @@ const ContextLinkedBadge: React.FC<ContextLinkedBadgeProps> = ({
         className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 cursor-help ${className}`}
       >
         <IconLink size={12} className="mr-1" />
-        Linked
+        {t("Linked")}
       </span>
 
       {isVisible &&
@@ -69,14 +71,17 @@ const ContextLinkedBadge: React.FC<ContextLinkedBadgeProps> = ({
             onMouseLeave={handleMouseLeave}
           >
             <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-              Context-Linked Pay Code
+              {t("Context-Linked Pay Code")}
             </div>
             <div className="text-sm text-default-600 dark:text-gray-300">
-              This pay code is automatically calculated based on{" "}
-              <span className="font-medium">{contextFieldLabel}</span>
+              <Trans
+                i18nKey="This pay code is automatically calculated based on <strong>{{field}}</strong>"
+                values={{ field: contextFieldLabel }}
+                components={{ strong: <span className="font-medium" /> }}
+              />
               {contextValue !== undefined && (
                 <span className="block mt-1">
-                  Current value:{" "}
+                  {t("Current value:")}{" "}
                   <span className="font-medium">{contextValue}</span>
                 </span>
               )}

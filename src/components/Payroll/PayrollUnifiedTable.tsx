@@ -10,6 +10,7 @@ import Checkbox from "../Checkbox";
 import { EmployeePayroll } from "../../types/types";
 import { MidMonthPayroll } from "../../utils/payroll/midMonthPayrollUtils";
 import EmployeePayrollTableRow from "./EmployeePayrollTableRow";
+import { useTranslation } from "react-i18next";
 
 interface JobGroup {
   jobType: string;
@@ -40,33 +41,36 @@ interface PayrollUnifiedTableProps {
   formatCurrency: (amount: number) => string;
 }
 
-const TABLE_HEADER = (
-  <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
-    <tr>
-      <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-10">
-        {/* Checkbox column */}
-      </th>
-      <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-        Name
-      </th>
-      <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-28">
-        ID
-      </th>
-      <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-24">
-        Section
-      </th>
-      <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
-        Gross
-      </th>
-      <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
-        Net
-      </th>
-      <th className="px-3 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-24">
-        Actions
-      </th>
-    </tr>
-  </thead>
-);
+const TableHeader: React.FC = () => {
+  const { t } = useTranslation("payroll");
+  return (
+    <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
+      <tr>
+        <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-10">
+          {/* Checkbox column */}
+        </th>
+        <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
+          {t("Name")}
+        </th>
+        <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-28">
+          {t("ID")}
+        </th>
+        <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 uppercase w-24">
+          {t("Section")}
+        </th>
+        <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
+          {t("Gross")}
+        </th>
+        <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
+          {t("Net")}
+        </th>
+        <th className="px-3 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-24">
+          {t("Actions")}
+        </th>
+      </tr>
+    </thead>
+  );
+};
 
 const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
   variant,
@@ -85,6 +89,8 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
   midMonthPayrollsMap,
   formatCurrency,
 }) => {
+  const { t } = useTranslation("payroll");
+
   const renderEmployeeRow = (employeePayroll: EmployeePayroll) => (
     <EmployeePayrollTableRow
       key={employeePayroll.id}
@@ -109,7 +115,7 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
       <div className="border border-default-200 dark:border-gray-700 rounded-lg shadow-sm">
         <div data-scroll-container="payroll-list">
           <table className="min-w-full table-fixed">
-            {TABLE_HEADER}
+            <TableHeader />
             <tbody className="bg-white dark:bg-gray-800">
               {flatEmployees.map(renderEmployeeRow)}
             </tbody>
@@ -123,7 +129,7 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
     <div className="border border-default-200 dark:border-gray-700 rounded-lg shadow-sm">
       <div data-scroll-container="payroll-list">
         <table className="min-w-full table-fixed">
-          {TABLE_HEADER}
+          <TableHeader />
           <tbody className="bg-white dark:bg-gray-800">
             {jobGroups.map(({ jobType, employees }) => {
               const isGrouped = jobType.startsWith("Grouped: ");
@@ -171,7 +177,7 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
                             onSelectGroup(jobType, checked)
                           }
                           size={18}
-                          ariaLabel={`Select all ${displayJobType} employees`}
+                          ariaLabel={t("Select all {{job}} employees", { job: displayJobType })}
                         />
                       </div>
                     </td>
@@ -196,12 +202,11 @@ const PayrollUnifiedTable: React.FC<PayrollUnifiedTableProps> = ({
                         </span>
                         {isGrouped && (
                           <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300">
-                            Combined
+                            {t("Combined")}
                           </span>
                         )}
                         <span className="text-sm text-default-500 dark:text-gray-400">
-                          ({employees.length}{" "}
-                          {employees.length === 1 ? "employee" : "employees"})
+                          ({t(employees.length === 1 ? "{{count}} employee" : "{{count}} employees", { count: employees.length })})
                         </span>
                       </div>
                     </td>

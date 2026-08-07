@@ -15,6 +15,7 @@ import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import { useAuth } from "../../contexts/AuthContext";
 import { getMonthName } from "../../utils/payroll/payrollUtils";
+import { useTranslation } from "react-i18next";
 
 interface PinjamEntry {
   id: number;
@@ -71,6 +72,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
   apiBasePath = "/api/pinjam-records",
   employeeOptions,
 }) => {
+  const { t } = useTranslation("payroll");
   const { staffs } = useStaffsCache();
   const { user } = useAuth();
 
@@ -208,9 +210,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
     });
 
     if (validRecords.length === 0) {
-      toast.error(
-        "Please add at least one valid pinjam entry with employee, description, and amount."
-      );
+      toast.error(t("Please add at least one valid pinjam entry with employee, description, and amount."));
       return;
     }
 
@@ -221,7 +221,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
         // For editing, we need to update the existing record
         const updateData = validRecords[0]; // Should only be one record when editing
         await api.put(`${apiBasePath}/${editingRecord.id}`, updateData);
-        toast.success("Pinjam record updated successfully!");
+        toast.success(t("Pinjam record updated successfully!"));
       } else {
         // For creating, use batch endpoint
         const recordsWithMeta = validRecords.map((record) => ({
@@ -239,13 +239,25 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
           // Show detailed message with what succeeded and what failed
           let message = '';
           if (response.created > 0 && response.updated > 0) {
-            message = `✅ Created ${response.created}, updated ${response.updated} record(s). ❌ ${response.errors.length} failed.`;
+            message = t("✅ Created {{created}}, updated {{updated}} record(s). ❌ {{failed}} failed.", {
+              created: response.created,
+              updated: response.updated,
+              failed: response.errors.length,
+            });
           } else if (response.created > 0) {
-            message = `✅ Created ${response.created} record(s). ❌ ${response.errors.length} failed.`;
+            message = t("✅ Created {{created}} record(s). ❌ {{failed}} failed.", {
+              created: response.created,
+              failed: response.errors.length,
+            });
           } else if (response.updated > 0) {
-            message = `✅ Updated ${response.updated} record(s). ❌ ${response.errors.length} failed.`;
+            message = t("✅ Updated {{updated}} record(s). ❌ {{failed}} failed.", {
+              updated: response.updated,
+              failed: response.errors.length,
+            });
           } else {
-            message = `❌ ${response.errors.length} record(s) failed to save.`;
+            message = t("❌ {{failed}} record(s) failed to save.", {
+              failed: response.errors.length,
+            });
           }
           
           toast.error(message, { duration: 6000 });
@@ -253,13 +265,20 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
         } else {
           // All successful - show success message based on what actually happened
           if (response.created > 0 && response.updated > 0) {
-            toast.success(`Successfully created ${response.created} and updated ${response.updated} pinjam record(s)!`);
+            toast.success(t("Successfully created {{created}} and updated {{updated}} pinjam record(s)!", {
+              created: response.created,
+              updated: response.updated,
+            }));
           } else if (response.created > 0) {
-            toast.success(`Successfully created ${response.created} pinjam record(s)!`);
+            toast.success(t("Successfully created {{created}} pinjam record(s)!", {
+              created: response.created,
+            }));
           } else if (response.updated > 0) {
-            toast.success(`Successfully updated ${response.updated} pinjam record(s) by adding amounts!`);
+            toast.success(t("Successfully updated {{updated}} pinjam record(s) by adding amounts!", {
+              updated: response.updated,
+            }));
           } else {
-            toast.success(response.message || "Pinjam records processed successfully!");
+            toast.success(response.message || t("Pinjam records processed successfully!"));
           }
         }
       }
@@ -279,7 +298,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
     } catch (error: any) {
       console.error("Failed to save pinjam records:", error);
       toast.error(
-        error.response?.data?.message || "Failed to save pinjam record(s)."
+        error.response?.data?.message || t("Failed to save pinjam record(s).")
       );
     } finally {
       setIsSaving(false);
@@ -335,11 +354,13 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                     as="h3"
                     className="text-xl font-semibold text-default-800 dark:text-gray-100"
                   >
-                    {editingRecord ? "Edit Pinjam Record" : "Record Pinjam"}
+                    {editingRecord ? t("Edit Pinjam Record") : t("Record Pinjam")}
                   </DialogTitle>
                   <p className="text-sm text-default-600 dark:text-gray-400 mt-1">
-                    {monthName} {currentYear} - Enter amounts in the respective
-                    columns (Mid-month or Monthly)
+                    {t("{{month}} {{year}} - Enter amounts in the respective columns (Mid-month or Monthly)", {
+                      month: t(monthName),
+                      year: currentYear,
+                    })}
                   </p>
                 </div>
 
@@ -350,19 +371,19 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                         <thead>
                           <tr>
                             <th className="py-2 text-left font-medium text-default-600 dark:text-gray-300 w-[35%]">
-                              Staff
+                              {t("Staff")}
                             </th>
                             <th className="py-2 px-3 text-left font-medium text-default-600 dark:text-gray-300 w-[30%]">
-                              Description
+                              {t("Description")}
                             </th>
                             <th className="py-2 px-3 text-center font-medium text-default-600 dark:text-gray-300 w-[15%]">
                               <div className="bg-blue-50 dark:bg-blue-900/30 dark:text-blue-100 rounded px-2 py-1">
-                                Mid-Month (RM)
+                                {t("Mid-Month (RM)")}
                               </div>
                             </th>
                             <th className="py-2 px-3 text-center font-medium text-default-600 dark:text-gray-300 w-[15%]">
                               <div className="bg-green-50 dark:bg-green-900/30 dark:text-green-100 rounded px-2 py-1">
-                                Monthly (RM)
+                                {t("Monthly (RM)")}
                               </div>
                             </th>
                             <th className="py-2 text-center font-medium text-default-600 dark:text-gray-300 w-12"></th>
@@ -384,7 +405,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                                   setQuery={(
                                     query: React.SetStateAction<string>
                                   ) => setStaffQuery(entry.id, query)}
-                                  placeholder="Select Staff..."
+                                  placeholder={t("Select Staff...")}
                                   mode="single"
                                 />
                               </td>
@@ -447,7 +468,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                                   <button
                                     onClick={() => removeEntryRow(entry.id)}
                                     className="p-2 text-default-400 dark:text-gray-500 hover:text-rose-500 dark:hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    title="Remove row"
+                                    title={t("Remove row")}
                                   >
                                     <IconX size={18} />
                                   </button>
@@ -468,7 +489,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                       icon={IconPlus}
                       disabled={editingRecord !== null}
                     >
-                      Add Row
+                      {t("Add Row")}
                     </Button>
                     <div className="flex space-x-3">
                       <Button
@@ -476,7 +497,7 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                         onClick={handleClose}
                         disabled={isSaving}
                       >
-                        Cancel
+                        {t("Cancel")}
                       </Button>
                       <Button
                         color="sky"
@@ -485,10 +506,10 @@ const PinjamFormModal: React.FC<PinjamFormModalProps> = ({
                         icon={IconDeviceFloppy}
                       >
                         {isSaving
-                          ? "Saving..."
+                          ? t("Saving...")
                           : editingRecord
-                          ? "Update Record"
-                          : "Save Records"}
+                          ? t("Update Record")
+                          : t("Save Records")}
                       </Button>
                     </div>
                   </div>
