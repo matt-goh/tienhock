@@ -731,7 +731,7 @@ const GTSalesSummaryPage: React.FC = () => {
                     }
                   )}
                 </tbody>
-                <tfoot className="bg-emerald-50 font-bold text-emerald-950 dark:bg-emerald-950 dark:text-emerald-100">
+                <tfoot className="font-bold text-emerald-950 dark:text-emerald-100 [&_td]:sticky [&_td]:bottom-0 [&_td]:z-10 [&_td]:bg-emerald-50 dark:[&_td]:bg-emerald-950">
                   <tr>
                     <td
                       colSpan={5}
@@ -872,7 +872,10 @@ const GTSalesSummaryPage: React.FC = () => {
                   }
                 )}
               </tbody>
-              <tfoot className="border-t-2 border-gray-300 bg-default-50 font-bold text-default-900 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100">
+              {/* The top rule is an inset shadow, not a border: this table keeps
+                  border-collapse for its divide-y rows, and collapsed borders do
+                  not travel with a sticky cell. */}
+              <tfoot className="font-bold text-default-900 dark:text-gray-100 [&_td]:sticky [&_td]:bottom-0 [&_td]:z-10 [&_td]:bg-default-50 [&_td]:shadow-[inset_0_2px_0_0_#d1d5db] dark:[&_td]:bg-gray-900 dark:[&_td]:shadow-[inset_0_2px_0_0_#4b5563]">
                 <tr>
                   <td colSpan={5} className="px-4 py-3 text-right">
                     {t("Total")}
