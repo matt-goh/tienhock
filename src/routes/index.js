@@ -91,6 +91,7 @@ import greenTargetRentalRouter from "./greentarget/rentals.js";
 import greenTargetInvoiceRouter from "./greentarget/invoices.js";
 import greenTargetEInvoiceRouter from "./greentarget/einvoice.js";
 import greenTargetPaymentRouter from "./greentarget/payments.js";
+import greenTargetSalesReportRouter from "./greentarget/sales-report.js";
 import greenTargetDashboardRouter from "./greentarget/dashboard.js";
 import greenTargetPayrollEmployeesRouter from "./greentarget/payroll-employees.js";
 import greenTargetEmployeePayCodesRouter from "./greentarget/employee-pay-codes.js";
@@ -301,6 +302,11 @@ export default function setupRoutes(app, pool) {
     authMiddleware(pool),
     checkRestoreState,
     greenTargetPaymentRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/sales-report",
+    authMiddleware(pool),
+    greenTargetSalesReportRouter(pool)
   );
   app.use(
     "/greentarget/api/einvoice",

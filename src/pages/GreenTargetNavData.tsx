@@ -19,6 +19,7 @@ import GreenTargetRentalDetailsPage from "./GreenTarget/Rentals/RentalDetailsPag
 import GreenTargetInvoiceListPage from "./GreenTarget/Invoices/InvoiceListPage";
 import GreenTargetInvoiceFormPage from "./GreenTarget/Invoices/InvoiceFormPage";
 import GreenTargetInvoiceDetailsPage from "./GreenTarget/Invoices/InvoiceDetailsPage";
+import GTSalesSummaryPage from "./GreenTarget/Sales/GTSalesSummaryPage";
 import GreenTargetDebtorsReportPage from "./GreenTarget/DebtorsReportPage";
 import GreenTargetDashboardPage from "./GreenTarget/GreenTargetDashboardPage";
 import GreenTargetPaymentPage from "./GreenTarget/Payments/GreenTargetPaymentPage";
@@ -276,6 +277,11 @@ export const GreenTargetNavData: SidebarItem[] = [
             component: GreenTargetInvoiceDetailsPage,
           },
         ],
+      },
+      {
+        name: "Sales Summary",
+        path: "/sales-summary",
+        component: GTSalesSummaryPage,
       },
       {
         name: "Payments",

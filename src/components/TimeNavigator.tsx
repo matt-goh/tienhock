@@ -52,8 +52,10 @@ interface TimeNavigatorProps {
    * "bottom-left" anchors it to the trigger's left edge so it opens to the
    * right — use it when the navigator sits near the left edge of the page,
    * where a centred popover would hang off-screen.
+   * "bottom-right" anchors it to the trigger's right edge so it opens to the
+   * left — the mirror case, for a navigator sitting at the right edge.
    */
-  pickerPlacement?: "bottom-center" | "bottom-left";
+  pickerPlacement?: "bottom-center" | "bottom-left" | "bottom-right";
   className?: string;
   triggerClassName?: string;
 }
@@ -845,6 +847,8 @@ const TimeNavigator: React.FC<TimeNavigatorProps> = ({
             "absolute top-full z-50 mt-2 w-[300px] rounded-xl border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-800 shadow-xl p-3 animate-fadeIn",
             pickerPlacement === "bottom-left"
               ? "left-0"
+              : pickerPlacement === "bottom-right"
+              ? "right-0"
               : "left-1/2 -translate-x-1/2"
           )}
           role="dialog"

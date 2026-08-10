@@ -26,6 +26,9 @@ import Checkbox from "../../../components/Checkbox";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import MonthNavigator from "../../../components/MonthNavigator";
 import PayrollEmployeeManagementModal from "../../../components/GreenTarget/PayrollEmployeeManagementModal";
+import MissingIncomeTaxRatesDialog, {
+  type MissingIncomeTaxEmployee,
+} from "../../../components/Payroll/MissingIncomeTaxRatesDialog";
 import PayrollSectionPrintMenu from "../../../components/Payroll/PayrollSectionPrintMenu";
 import { api } from "../../../routes/utils/api";
 import type { EmployeePayroll } from "../../../types/types";
@@ -87,6 +90,7 @@ interface GTProcessError {
 interface GTProcessResult {
   success: boolean;
   processed_count: number;
+  missing_income_tax_employees?: MissingIncomeTaxEmployee[];
   errors?: GTProcessError[];
   message?: string;
   updated_at?: string;
@@ -301,6 +305,11 @@ const GTPayrollPage: React.FC = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [showMissingTaxDialog, setShowMissingTaxDialog] =
+    useState<boolean>(false);
+  const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
+    MissingIncomeTaxEmployee[]
+  >([]);
   const [showManageModal, setShowManageModal] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>(
     (): string => readPayrollListState(listStateStorageKey).searchTerm
@@ -539,6 +548,12 @@ const GTPayrollPage: React.FC = () => {
 
       if (result.success) {
         toast.success(`Processed ${result.processed_count} employee(s)`);
+        if ((result.missing_income_tax_employees?.length || 0) > 0) {
+          setMissingIncomeTaxEmployees(
+            result.missing_income_tax_employees || []
+          );
+          setShowMissingTaxDialog(true);
+        }
         if ((result.errors?.length || 0) > 0) {
           toast.error(
             `${result.errors?.length || 0} error(s) occurred during processing`
@@ -1389,6 +1404,12 @@ const GTPayrollPage: React.FC = () => {
         onClose={() => setShowManageModal(false)}
         availableEmployees={allStaffs}
         onUpdate={fetchPayrollData}
+      />
+
+      <MissingIncomeTaxRatesDialog
+        isOpen={showMissingTaxDialog}
+        onClose={(): void => setShowMissingTaxDialog(false)}
+        employees={missingIncomeTaxEmployees}
       />
     </div>
   );

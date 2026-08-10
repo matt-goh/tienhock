@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   calculateGTStatutoryDeductions,
   fetchActiveContributionRates,
+  findIncomeTaxRateByWage,
 } from "./gtStatutoryCalc.js";
 
 // Helper function to format date to YYYY-MM-DD string
@@ -582,7 +583,9 @@ export default function (pool) {
 
       // 3. Process each selected employee
       const processedPayrolls = [];
+      const missingIncomeTaxEmployees = [];
       const errors = [];
+      const INCOME_TAX_THRESHOLD = 3000;
 
       for (const { employeeId, jobType } of selected_employees) {
         try {
@@ -726,6 +729,17 @@ export default function (pool) {
               0
             );
           const grossPay = grossPayCents / 100;
+
+          if (
+            grossPay > INCOME_TAX_THRESHOLD &&
+            !findIncomeTaxRateByWage(incomeTaxRates, grossPay)
+          ) {
+            missingIncomeTaxEmployees.push({
+              employeeId,
+              employeeName: staff.name,
+              grossPay: Math.round(grossPay * 100) / 100,
+            });
+          }
 
           // Group items by pay type for EPF calculation (EPF base excludes Overtime)
           const groupedItems = { Base: [], Tambahan: [], Overtime: [] };
@@ -919,6 +933,7 @@ export default function (pool) {
       res.json({
         success: true,
         processed_count: processedPayrolls.length,
+        missing_income_tax_employees: missingIncomeTaxEmployees,
         errors,
         updated_at: serverTimestamp,
       });
