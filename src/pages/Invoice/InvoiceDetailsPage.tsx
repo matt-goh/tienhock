@@ -2254,16 +2254,18 @@ const InvoiceDetailsPage: React.FC = () => {
                   ) || ""}
                 </span>
               </span>
-              {!isCancelled && (
-                <button
-                  className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
-                  onClick={handleOpenDateTimeEdit}
-                  title={t("Edit date/time")}
-                  disabled={isLoading}
-                >
-                  <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
-                </button>
-              )}
+              {/* A cancelled bill still has to sit on the right day in the
+                  sales summary, so the date stays editable after cancellation
+                  (its journal and payments are already cancelled, so nothing
+                  in the ledger moves). Every other field stays locked. */}
+              <button
+                className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded flex-shrink-0"
+                onClick={handleOpenDateTimeEdit}
+                title={t("Edit date/time")}
+                disabled={isLoading}
+              >
+                <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
+              </button>
             </div>
           </div>
 

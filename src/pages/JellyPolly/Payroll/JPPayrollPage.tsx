@@ -15,6 +15,9 @@ import {
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import MonthNavigator from "../../../components/MonthNavigator";
+import MissingIncomeTaxRatesDialog, {
+  type MissingIncomeTaxEmployee,
+} from "../../../components/Payroll/MissingIncomeTaxRatesDialog";
 import PayrollSectionPrintMenu from "../../../components/Payroll/PayrollSectionPrintMenu";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -58,6 +61,13 @@ interface JPEmployeePayroll {
   mid_month_payrolls_by_employee?: Record<string, number>;
   items?: JPPayslipItem[];
   deductions?: JPPayslipDeduction[];
+}
+
+interface JPProcessResult {
+  success: boolean;
+  processed_count: number;
+  missing_income_tax_employees?: MissingIncomeTaxEmployee[];
+  message?: string;
 }
 
 const jobTypeLabel = (jobType: string): string =>
@@ -110,6 +120,11 @@ const JPPayrollPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [showMissingTaxDialog, setShowMissingTaxDialog] =
+    useState<boolean>(false);
+  const [missingIncomeTaxEmployees, setMissingIncomeTaxEmployees] = useState<
+    MissingIncomeTaxEmployee[]
+  >([]);
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({});
@@ -194,13 +209,19 @@ const JPPayrollPage: React.FC = () => {
 
     setIsProcessing(true);
     try {
-      const result = await api.post(
+      const result: JPProcessResult = await api.post(
         `/jellypolly/api/monthly-payrolls/${payroll.id}/process-all`,
         {}
       );
 
       if (result.success) {
         toast.success(`Processed ${result.processed_count} employee(s)`);
+        if ((result.missing_income_tax_employees?.length || 0) > 0) {
+          setMissingIncomeTaxEmployees(
+            result.missing_income_tax_employees || []
+          );
+          setShowMissingTaxDialog(true);
+        }
         await fetchPayrollData();
       } else {
         toast.error(result.message || "Processing failed");
@@ -568,6 +589,12 @@ const JPPayrollPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      <MissingIncomeTaxRatesDialog
+        isOpen={showMissingTaxDialog}
+        onClose={(): void => setShowMissingTaxDialog(false)}
+        employees={missingIncomeTaxEmployees}
+      />
     </div>
   );
 };
