@@ -17,6 +17,7 @@
 import {
   calculateGTStatutoryDeductions,
   fetchActiveContributionRates,
+  findIncomeTaxRateByWage,
 } from "../greentarget/gtStatutoryCalc.js";
 
 // jellypolly.jobs id -> JP payroll job type. Membership is derived from
@@ -87,7 +88,7 @@ export const ensureMonthlyPayroll = async (client, year, month, createdBy) => {
  *   payroll should be rebuilt. null/omitted = all actively assigned JP staff
  *   (a full "process month", which also prunes payrolls of unassigned staff).
  * @param {string|null} [options.createdBy]
- * @returns {Promise<{monthlyPayrollId:number, processed:Array, removed:string[]}>}
+ * @returns {Promise<{monthlyPayrollId:number, processed:Array, removed:string[], missingIncomeTaxEmployees:Array}>}
  */
 export const reprocessJPEmployees = async (
   pool,
@@ -158,6 +159,8 @@ export const reprocessJPEmployees = async (
 
     const processed = [];
     const removed = [];
+    const missingIncomeTaxEmployees = [];
+    const INCOME_TAX_THRESHOLD = 3000;
 
     if (targetCanonicalIds.length > 0) {
       // All sibling ids whose work rolls up into the targets
@@ -632,6 +635,17 @@ export const reprocessJPEmployees = async (
         const grossPay = grossCents / 100;
         const epfGrossPay = epfGrossCents / 100;
 
+        if (
+          grossPay > INCOME_TAX_THRESHOLD &&
+          !findIncomeTaxRateByWage(incomeTaxRates, grossPay)
+        ) {
+          missingIncomeTaxEmployees.push({
+            employeeId: canonicalId,
+            employeeName: staff.name,
+            grossPay: Math.round(grossPay * 100) / 100,
+          });
+        }
+
         const deductions = calculateGTStatutoryDeductions({
           staff,
           grossPay,
@@ -793,7 +807,12 @@ export const reprocessJPEmployees = async (
     );
 
     await client.query("COMMIT");
-    return { monthlyPayrollId, processed, removed };
+    return {
+      monthlyPayrollId,
+      processed,
+      removed,
+      missingIncomeTaxEmployees,
+    };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
