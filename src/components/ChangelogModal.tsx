@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-10",
+    ms: "Green Target: halaman Sales Summary baharu kini membolehkan anda melihat jualan untuk satu hari, bulan, julat tarikh tersuai atau tahun. Rekod lejar Januari hingga Jun 2026 digabungkan dengan invois sistem mulai Julai, supaya jualan dari 2026 dipaparkan dengan lengkap. Paparan Debtor Listing berbentuk helaian menyenaraikan jualan, bayaran, baki tertunggak dan perbezaan, manakala Butiran Jualan memberikan paparan menyeluruh. Rekod sebelum 2026 masih boleh dilihat, tetapi halaman akan memberi amaran bahawa liputannya tidak lengkap.",
+    en: "Green Target: a new Sales Summary page now lets you view sales for a day, month, custom date range or year. January–June 2026 ledger records are combined with system invoices from July onward, giving complete sales coverage from 2026. The spreadsheet-style Debtor Listing shows sales, payments, outstanding balances and differences, while Sales Details provides the comprehensive view. Earlier records remain viewable, with a warning that pre-2026 coverage is incomplete.",
+  },
+  {
     date: "2026-08-07",
     ms: "Jelly Polly: menukar tarikh/masa invois tidak lagi menulis semula tarikh pada pembayarannya. Pembayaran mengekalkan tarikh sebenar ia dibuat, jadi bayaran pendahuluan dan invois bertarikh lampau kekal betul.",
     en: "Jelly Polly: changing an invoice's date/time no longer rewrites the dates on its payments. Payments keep the date they were actually made, so advance payments and backdated invoices stay correct.",
