@@ -221,6 +221,7 @@ export default function (pool) {
         processed_count: result.processed.length,
         removed: result.removed,
         processed: result.processed,
+        missing_income_tax_employees: result.missingIncomeTaxEmployees,
       });
     } catch (error) {
       console.error("Error in JP payroll processing:", error);
