@@ -21,8 +21,8 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-11",
-    ms: "Invois (Tien Hock): tarikh/masa bil yang telah dibatalkan kini boleh diubah. Sebelum ini butang ubah tarikh hilang selepas bil dibatalkan, jadi bil yang tersalah tarikh terpaksa dikeluarkan semula dengan nombor baharu. Medan lain pada bil yang dibatalkan kekal terkunci, dan jumlahnya kekal sifar.",
-    en: "Invoices (Tien Hock): the date/time of a cancelled bill can now be changed. Previously the date edit button disappeared once a bill was cancelled, so a bill issued on the wrong day had to be re-issued under a new number. All other fields on a cancelled bill stay locked, and its amount stays zero.",
+    ms: "Invois (Tien Hock): tarikh/masa bil yang telah dibatalkan kini boleh diubah. Sebelum ini butang ubah tarikh hilang selepas bil dibatalkan, jadi bil yang tersalah tarikh terpaksa dikeluarkan semula dengan nombor baharu. Apabila tarikh diubah, rekod jurnal dan rekod bayaran automatik bil itu turut berpindah ke hari yang sama, jadi semuanya sepadan. Medan lain pada bil yang dibatalkan kekal terkunci, jumlahnya kekal sifar, dan tiada apa-apa dalam lejar berubah.",
+    en: "Invoices (Tien Hock): the date/time of a cancelled bill can now be changed. Previously the date edit button disappeared once a bill was cancelled, so a bill issued on the wrong day had to be re-issued under a new number. When you change the date, the bill's journal record and its automatic payment record move to the same day, so everything matches. All other fields on a cancelled bill stay locked, its amount stays zero, and nothing in the ledger changes.",
   },
   {
     date: "2026-08-11",

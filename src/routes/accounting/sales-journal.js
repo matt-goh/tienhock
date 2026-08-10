@@ -113,12 +113,38 @@ export async function syncSalesJournalEntry(client, invoice, createdBy = null) {
     }
   }
 
-  // A cancelled invoice keeps a cancelled journal; nothing to (re)post.
+  // A cancelled invoice keeps a cancelled journal; nothing to (re)post. Its
+  // DATE still follows the invoice, though: a cancelled bill re-dated to
+  // another day must not leave its journal and collection row stranded on the
+  // old one, where they show up under the wrong day in the Journal Entries
+  // list and the bill's payment history. Nothing in the ledger moves — every
+  // report engine filters status = 'posted'.
   if (inv.invoice_status === "cancelled") {
     if (journalEntryId) {
       await cancelSalesJournalEntry(client, journalEntryId);
+      // Guarded on status so this can only ever touch an already-cancelled
+      // journal, and on manual_override so a detached, human-owned journal
+      // keeps the date its owner gave it.
+      await client.query(
+        `UPDATE journal_entries
+            SET entry_date = $2, updated_at = NOW()
+          WHERE id = $1
+            AND status = 'cancelled'
+            AND manual_override = false
+            AND entry_date IS DISTINCT FROM $2::date`,
+        [journalEntryId, entryDate]
+      );
     }
     await cancelAutoCollections(client, inv.id, "Invoice cancelled");
+    await client.query(
+      `UPDATE payments
+          SET payment_date = $2
+        WHERE invoice_id = $1
+          AND is_auto_collection = true
+          AND status = 'cancelled'
+          AND payment_date::date IS DISTINCT FROM $2::date`,
+      [inv.id, entryDate]
+    );
     return journalEntryId;
   }
 
