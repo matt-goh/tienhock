@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-11",
+    ms: "Invois (Tien Hock): tarikh/masa bil yang telah dibatalkan kini boleh diubah. Sebelum ini butang ubah tarikh hilang selepas bil dibatalkan, jadi bil yang tersalah tarikh terpaksa dikeluarkan semula dengan nombor baharu. Medan lain pada bil yang dibatalkan kekal terkunci, dan jumlahnya kekal sifar.",
+    en: "Invoices (Tien Hock): the date/time of a cancelled bill can now be changed. Previously the date edit button disappeared once a bill was cancelled, so a bill issued on the wrong day had to be re-issued under a new number. All other fields on a cancelled bill stay locked, and its amount stays zero.",
+  },
+  {
+    date: "2026-08-11",
     ms: "Gaji (Green Target dan Jelly Polly): selepas gaji bulanan diproses, program kini memberi amaran apabila gaji kasar pekerja melebihi RM 3,000 tetapi tiada kadar cukai pendapatan yang meliputi julat gaji tersebut, sama seperti Tien Hock. Amaran menyenaraikan pekerja yang terlibat dan menyediakan pautan ke Kadar Cukai Pendapatan supaya potongan yang tertinggal boleh dibetulkan.",
     en: "Payroll (Green Target and Jelly Polly): after monthly payroll is processed, the program now warns you when an employee's gross pay is above RM 3,000 but no income tax rate covers that salary range, matching Tien Hock. The warning lists the affected employees and links to Income Tax Rates so missing deductions can be corrected.",
   },
