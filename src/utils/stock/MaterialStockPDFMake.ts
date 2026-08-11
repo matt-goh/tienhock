@@ -258,9 +258,13 @@ const buildDocDefinition = (
     ...Array.from({ length: columnCount - 1 }, () => ({}) as TableCell),
   ];
 
+  // numberRow only ever produces object cells, so the spread cast is safe.
+  const withTotalsFill = (cell: TableCell): TableCell =>
+    ({ ...(cell as object), fillColor: colors.fillTotals }) as TableCell;
+
   const subtotalRow = (label: string, numbers: RowNumbers): TableCell[] =>
     numberRow({ text: label, style: "tdBold" }, numbers, "tdBold").map(
-      (cell) => ({ ...cell, fillColor: colors.fillTotals }) as TableCell
+      withTotalsFill
     );
 
   const headerBody: TableCell[][] = running
@@ -425,7 +429,7 @@ const buildDocDefinition = (
             grandNumbers.total.adjustment_value + stockKilangTotal,
         },
         "tdBold"
-      ).map((cell) => ({ ...cell, fillColor: colors.fillTotals }) as TableCell)
+      ).map(withTotalsFill)
     );
   }
 
