@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-11",
+    ms: "Stok Bahan: butang Cetak baharu pada tab MEE, BIHUN dan SHARED mencetak stok bulan yang dipilih sebagai PDF. Laporan mengikut pilihan Running Balance — tanpanya ia menjadi helaian kiraan stok (kos unit, kuantiti dan nilai), dan dengannya ia turut menunjukkan lajur pembukaan, belian dan penutup. Baris tanpa kiraan boleh disembunyikan daripada cetakan melalui kotak semak baris kosong yang sedia ada. Bahagian Stock Kilang dan Jumlah Keseluruhan turut disertakan.",
+    en: "Material Stock: a new Print button on the MEE, BIHUN and SHARED tabs prints the selected month's stock as a PDF. The report follows the Running Balance toggle — off gives a stock count sheet (unit cost, quantity and value), on adds opening, purchases and closing columns. Rows with no count can be left out of the printout using the existing empty-rows checkbox. The Stock Kilang section and Grand Total are included.",
+  },
+  {
+    date: "2026-08-11",
     ms: "Penyata Akaun (Green Target): penyata pelanggan kini dibaca terus dari lejar akaun penghutang, jadi baki pembukaan dari sistem lama, bil yang digabungkan ke dalam e-Invois CON, dan bayaran yang direkodkan terus dalam jurnal semuanya turut dipaparkan. Jumlah penyata kini sentiasa sepadan dengan Lejar Akaun pelanggan. Pelanggan yang tidak mempunyai akaun penghutang yang dipautkan tidak dapat dijana penyatanya.",
     en: "Statement of Account (Green Target): the customer statement is now read straight from the debtor's account ledger, so the opening balance carried from the old system, bills merged into a consolidated (CON) e-Invoice, and payments keyed directly into the journal all appear on it. The statement total now always matches the customer's Account Ledger. Customers without a linked debtor account cannot have a statement generated.",
   },
