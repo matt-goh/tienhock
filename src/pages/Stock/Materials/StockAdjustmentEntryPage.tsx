@@ -30,6 +30,7 @@ import {
   IconSettings,
   IconTrash,
   IconGripVertical,
+  IconPrinter,
 } from "@tabler/icons-react";
 import clsx from "clsx";
 import Button from "../../../components/Button";
@@ -40,6 +41,7 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import GeneralStockCategoryModal from "../../../components/Stock/GeneralStockCategoryModal";
 import MaterialAccountMappingModal from "../../../components/Stock/MaterialAccountMappingModal";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
+import { generateMaterialStockPDF } from "../../../utils/stock/MaterialStockPDFMake";
 
 interface StockKilangItem {
   product_id: string;
@@ -810,6 +812,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
   const [closingStockReference, setClosingStockReference] =
     useState<ClosingStockReferenceResponse | null>(null);
   const [isSavingClosingStock, setIsSavingClosingStock] = useState<boolean>(false);
+  const [isPrinting, setIsPrinting] = useState<boolean>(false);
   const pageHeaderRef = useRef<HTMLDivElement | null>(null);
   const scrollRestoredRef = useRef<boolean>(false);
   const wasLoadingRef = useRef<boolean>(false);
@@ -2779,6 +2782,31 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     return materialNegativeCount + stockKilangNegativeCount;
   }, [materials, stockKilang]);
 
+  // Prints the active tab + month as currently displayed (including unsaved
+  // edits); the Running Balance toggle picks the PDF layout and the
+  // show/hide empty rows checkbox decides whether zero-count rows print.
+  const handlePrint = async (): Promise<void> => {
+    if (activeTab === "general") return;
+
+    setIsPrinting(true);
+    try {
+      await generateMaterialStockPDF({
+        productLine: activeTab,
+        year,
+        month,
+        showRunningBalance,
+        hideEmptyRows: !showEmptyMaterialRows,
+        materials,
+        stockKilang,
+      });
+    } catch (error: unknown) {
+      console.error("Error generating material stock PDF:", error);
+      toast.error(t("Failed to generate PDF"));
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
   const filteredGeneralStockRows = useMemo(() => {
     const query = generalSearchQuery.trim().toLowerCase();
 
@@ -3049,6 +3077,24 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
               />
             </div>
             <span className="hidden text-default-300 dark:text-gray-600 sm:inline">|</span>
+
+            {mode === "material" && activeTab !== "general" && (
+              <Button
+                color="default"
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                disabled={
+                  isPrinting ||
+                  isLoading ||
+                  (activeTab !== "shared" && isLoadingStockKilang)
+                }
+                icon={IconPrinter}
+                title={t("Print this tab's stock for the selected month as a PDF")}
+              >
+                {isPrinting ? t("Preparing...") : t("Print")}
+              </Button>
+            )}
 
             {mode === "material" && (
               <Button

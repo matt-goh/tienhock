@@ -1,11 +1,13 @@
 // src/components/GreenTarget/GTStatementModal.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { Dialog, TransitionChild, DialogTitle } from "@headlessui/react";
 import { IconX, IconChevronRight } from "@tabler/icons-react";
 import Button from "../Button";
 import { FormCombobox, FormListbox, SelectOption } from "../FormComponents";
 import { greenTargetApi } from "../../routes/greentarget/api";
+import { api } from "../../routes/utils/api";
 import { toast } from "react-hot-toast";
 import { pdf, Document } from "@react-pdf/renderer";
 import GTStatementPDF from "../../utils/greenTarget/PDF/GTStatementPDF";
@@ -35,27 +37,32 @@ interface CustomerWithInvoiceCounts extends SelectOption {
   overdueInvoiceCount: number;
   totalInvoiceCount: number;
   additional_info?: string;
+  debtor_account_code?: string | null;
 }
 
-const toLocalDateString = (
-  value: string | number | Date | null | undefined
-): string => {
-  if (!value) return "";
-  if (value instanceof Date) return format(value, "yyyy-MM-dd");
-  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return format(date, "yyyy-MM-dd");
-};
+interface LedgerStatementTransaction {
+  date: string;
+  reference: string;
+  particulars: string;
+  debit: number;
+  credit: number;
+  running_balance: number;
+}
 
-const parseLocalDateString = (value: string | number | Date): Date | null => {
-  const dateString = toLocalDateString(value);
-  if (!dateString) return null;
-  const [year, month, day] = dateString.split("-").map(Number);
-  return new Date(year, month - 1, day);
-};
+interface LedgerStatementResponse {
+  customer: { id: string; name: string };
+  period_start: string;
+  period_end: string;
+  previous_balance: number;
+  transactions: LedgerStatementTransaction[];
+  total_amount_due: number;
+  aging: {
+    current_month: number;
+    one_month: number;
+    two_months: number;
+    three_months_plus: number;
+  };
+}
 
 const shouldPreOpenPrintPreview = (): boolean =>
   window.location.hostname === "localhost" ||
@@ -67,6 +74,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
   month = new Date().getMonth(),
   year = new Date().getFullYear(),
 }) => {
+  const { t } = useTranslation("sales");
   const [startMonthYear, setStartMonthYear] = useState<string>(
     `${month}-${year}`
   );
@@ -176,10 +184,12 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
             customer_id: { toString: () => any };
             name: any;
             phone_number: any;
+            debtor_account_code?: string | null;
           }) => ({
             id: customer.customer_id.toString(),
             name: customer.name || `Customer ${customer.customer_id}`,
             phone_number: customer.phone_number,
+            debtor_account_code: customer.debtor_account_code,
             activeInvoiceCount:
               invoiceCounts.get(customer.customer_id.toString())?.active || 0,
             overdueInvoiceCount:
@@ -423,6 +433,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
       // Create statement PDFs for all selected customers
       const allPDFs = [];
+      const skippedCustomers: string[] = [];
 
       // Process each customer
       for (const customerId of selectedCustomers) {
@@ -430,185 +441,45 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         const customer = customerOptions.find((c) => c.id === customerId);
         if (!customer) continue;
 
-        // Get all invoices for this customer up to the end date
-        // Add status parameter to exclude cancelled invoices
-        const allInvoices = await greenTargetApi.getInvoices({
-          customer_id: customer.id,
-          end_date: endDateYmd,
-          status: "active,overdue,paid,unpaid", // Explicitly include only valid statuses
-        });
+        // Statements read the debtor's GL ledger (the same engine as the
+        // Account Ledger page), so the statement always reconciles to the
+        // account ledger: the subledger opening balance, consolidated bills
+        // and receipts keyed straight into the journal are all included by
+        // construction. Customers without a linked debtor account have no
+        // ledger identity and are skipped.
+        const debtorCode = (customer.debtor_account_code || "").trim();
+        if (!debtorCode) {
+          skippedCustomers.push(customer.name);
+          continue;
+        }
 
-        // Consolidated e-Invoice wrappers (CON-...) are submission envelopes,
-        // not customer bills. Show the underlying child invoices on the
-        // statement instead, so consolidated bills and their payments are not
-        // hidden from the customer.
-        const validInvoices = allInvoices.filter(
-          (invoice: { is_consolidated: any }) => !invoice.is_consolidated
+        const statement = await api.get<LedgerStatementResponse>(
+          `/greentarget/api/debtors/ledger-statement/${encodeURIComponent(
+            debtorCode
+          )}?start_date=${startDateYmd}&end_date=${endDateYmd}`
         );
 
-        // Filter invoices to separate those before the period (for opening balance)
-        // and those during the period (for statement details)
-        const beforePeriodInvoices = validInvoices.filter(
-          (invoice: { date_issued: string | number | Date }) =>
-            toLocalDateString(invoice.date_issued) < startDateYmd
-        );
-
-        const periodInvoices = validInvoices.filter(
-          (invoice: { date_issued: string | number | Date }) =>
-            toLocalDateString(invoice.date_issued) >= startDateYmd &&
-            toLocalDateString(invoice.date_issued) <= endDateYmd
-        );
-
-        // Calculate opening balance (sum of all unpaid amounts before the period start)
-        // Calculate opening balance (total outstanding as of start date)
-        let openingBalance = 0;
-
-        // Check if we need to fetch previous statement for this customer
-        // For simplicity, we're using the calculation method, but in a production system
-        // you might want to check if there was a previous statement and use its closing balance
-        beforePeriodInvoices.forEach(
-          (invoice: { current_balance: number; status: string }) => {
-            // Only include invoices that aren't cancelled and have an outstanding balance
-            if (invoice.status !== "cancelled" && invoice.current_balance > 0) {
-              openingBalance += parseFloat(invoice.current_balance.toString());
-            }
-          }
-        );
-
-        // Get all payments for this customer during the period
-        const allPayments = await greenTargetApi.getPayments({
-          customer_id: customer.id,
-          includeCancelled: false,
-        });
-
-        // Filter payments to only include those for valid invoices
-        const validInvoiceIds = validInvoices.map(
-          (inv: { invoice_id: any }) => inv.invoice_id
-        );
-
-        const periodPayments = allPayments.filter(
-          (payment: {
-            payment_date: string | number | Date;
-            invoice_id: any;
-          }) => {
-            const paymentDate = toLocalDateString(payment.payment_date);
-            return (
-              paymentDate >= startDateYmd &&
-              paymentDate <= endDateYmd &&
-              validInvoiceIds.includes(payment.invoice_id)
-            );
-          }
-        );
+        const totalDue: number = Number(statement.total_amount_due) || 0;
 
         // Create statement details (transactions during the period)
-        const statementDetails = [];
-
-        // Add opening balance entry
-        statementDetails.push({
-          date: startDateYmd,
-          description: "Balance Brought Forward",
-          invoiceNo: "-",
-          amount: 0, // Not a transaction itself
-          balance: openingBalance,
-        });
-
-        // Helper function to generate description for an invoice
-        const generateInvoiceDescription = (invoice: any): string => {
-          // Check if invoice has rental details for dynamic description
-          if (invoice.rental_details && invoice.rental_details.length > 0) {
-            const groupedByType: { [key: string]: number } = {};
-            
-            invoice.rental_details.forEach((rental: any) => {
-              if (rental.tong_no) {
-                const dumpsterNumber = rental.tong_no.trim();
-                const type = dumpsterNumber.startsWith("B") ? "B" : "A";
-                groupedByType[type] = (groupedByType[type] || 0) + 1;
-              }
-            });
-
-            const descriptions: string[] = [];
-            Object.entries(groupedByType).forEach(([type, quantity]) => {
-              const desc = quantity === 1 
-                ? `1x Rental Tong (${type})`
-                : `${quantity}x Rental Tong (${type})`;
-              descriptions.push(desc);
-            });
-
-            return descriptions.length > 0 
-              ? `${descriptions.join(", ")}`
-              : `Rental Tong Service`;
-          }
-          
-          // Fallback to legacy single rental fields
-          if (invoice.type === "regular" && invoice.rental_id && invoice.tong_no) {
-            const dumpsterNumber = invoice.tong_no.trim();
-            const type = dumpsterNumber.startsWith("B") ? "B" : "A";
-            return `Rental Tong (${type})`;
-          }
-
-          // Default fallback
-          return invoice.location_address 
-            ? `Rental Tong Service (${invoice.location_address})`
-            : `Rental Tong Service`;
-        };
-
-        // Sort all transactions (invoices and payments) by date
-        const allTransactions = [
-          ...periodInvoices.map(
-            (invoice: {
-              date_issued: any;
-              invoice_number: any;
-              total_amount: any;
-              invoice_id: any;
-              location_address: any;
-            }) => ({
-              date: toLocalDateString(invoice.date_issued),
-              description: generateInvoiceDescription(invoice),
-              invoiceNo: invoice.invoice_number,
-              amount: parseFloat(invoice.total_amount.toString()), // Debit (positive)
-              isInvoice: true,
-              invoiceId: invoice.invoice_id,
-            })
-          ),
-          ...periodPayments.map(
-            (payment: {
-              payment_date: any;
-              payment_method: any;
-              payment_reference?: string | null;
-              internal_reference?: any;
-              payment_id: any;
-              amount_paid: number | string;
-              invoice_id: any;
-            }) => ({
-              date: toLocalDateString(payment.payment_date),
-              description: `Payment ${
-                payment.payment_reference
-                  ? "- " + payment.payment_reference
-                  : ""
-              } (${payment.payment_method})`,
-              invoiceNo: `${payment.internal_reference || payment.payment_id}`,
-              amount: -parseFloat(payment.amount_paid.toString()), // Credit (negative)
-              isPayment: true,
-              invoiceId: payment.invoice_id,
-            })
-          ),
-        ].sort((a, b) => a.date.localeCompare(b.date));
-
-        // Calculate running balance - debits add, credits subtract
-        let runningBalance = openingBalance;
-
-        // Process transactions and update balance properly
-        allTransactions.forEach((transaction) => {
-          runningBalance += transaction.amount; // Amount is already parsed to a number above
-
-          statementDetails.push({
-            date: transaction.date,
-            description: transaction.description,
-            invoiceNo: transaction.invoiceNo,
-            amount: transaction.amount,
-            balance: runningBalance,
-          });
-        });
+        const statementDetails = [
+          // Opening balance entry
+          {
+            date: startDateYmd,
+            description: "Balance Brought Forward",
+            invoiceNo: "-",
+            amount: 0, // Not a transaction itself
+            balance: statement.previous_balance,
+          },
+          ...statement.transactions.map((tx: LedgerStatementTransaction) => ({
+            date: tx.date,
+            description:
+              tx.particulars || (tx.debit > 0 ? "Sales" : "Payment"),
+            invoiceNo: tx.reference || "-",
+            amount: tx.debit > 0 ? tx.debit : -tx.credit, // Debit positive, credit negative
+            balance: tx.running_balance,
+          })),
+        ];
 
         // Create a statement invoice object
         const statementInvoice = {
@@ -622,10 +493,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           customer_phone_number: customer.phone_number || undefined,
           amount_before_tax: 0, // Not relevant for statement
           tax_amount: 0, // Not relevant for statement
-          total_amount: runningBalance, // Current balance
+          total_amount: totalDue, // Current balance
           amount_paid: 0, // Not relevant for statement
-          current_balance: runningBalance, // Current balance
-          balance_due: runningBalance, // Current balance
+          current_balance: totalDue, // Current balance
+          balance_due: totalDue, // Current balance
           date_issued: new Date().toISOString(),
           statement_period_start: startDateYmd,
           statement_period_end: endDateYmd,
@@ -638,17 +509,13 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           consolidated_invoices: null,
           einvoice_status: null,
           additional_info: customer.additional_info || "",
-          agingData: calculateAgingData(
-            beforePeriodInvoices
-              .concat(periodInvoices)
-              .filter(
-                (invoice: { status: string; current_balance: number }) =>
-                  invoice.status !== "paid" &&
-                  invoice.status !== "cancelled" &&
-                  invoice.current_balance > 0
-              ),
-            endDate
-          ),
+          agingData: {
+            current: statement.aging.current_month,
+            month1: statement.aging.one_month,
+            month2: statement.aging.two_months,
+            month3Plus: statement.aging.three_months_plus,
+            total: totalDue,
+          },
         };
 
         // Add to the list of PDFs to generate
@@ -658,8 +525,31 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         });
       }
 
+      if (allPDFs.length === 0) {
+        if (printPreviewWindow && !printPreviewWindow.closed) {
+          printPreviewWindow.close();
+        }
+        toast.error(
+          t(
+            "None of the selected customers have a ledger debtor account linked."
+          )
+        );
+        cleanup(true);
+        return;
+      }
+
       // Generate and print all statements
       await generateMultipleStatementPDFs(allPDFs, printPreviewWindow);
+
+      if (skippedCustomers.length > 0) {
+        toast(
+          t(
+            "No ledger debtor account linked for: {{names}}. Their statements were skipped.",
+            { names: skippedCustomers.join(", ") }
+          ),
+          { duration: 6000 }
+        );
+      }
     } catch (error) {
       if (printPreviewWindow && !printPreviewWindow.closed) {
         printPreviewWindow.close();
@@ -669,46 +559,6 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
       toast.error("Error generating statement. Please try again.");
       cleanup(true);
     }
-  };
-
-  // Update the calculateAgingData function in GTStatementModal.tsx
-  const calculateAgingData = (invoices: any[], referenceDate: Date) => {
-    // Initialize aging buckets with new names
-    const agingData = {
-      current: 0,
-      month1: 0,
-      month2: 0,
-      month3Plus: 0,
-      total: 0,
-    };
-
-    // Calculate days outstanding and assign to appropriate bucket
-    invoices.forEach((invoice) => {
-      if (invoice.status === "cancelled") return; // Skip cancelled invoices
-
-      const invoiceDate = parseLocalDateString(invoice.date_issued);
-      if (!invoiceDate) return;
-      const daysDifference = Math.floor(
-        (referenceDate.getTime() - invoiceDate.getTime()) /
-          (1000 * 60 * 60 * 24)
-      );
-      const outstandingAmount = parseFloat(invoice.current_balance);
-
-      // Updated categorization based on months
-      if (daysDifference <= 30) {
-        agingData.current += outstandingAmount; // Current: 1-30 days
-      } else if (daysDifference <= 60) {
-        agingData.month1 += outstandingAmount; // 1 Month: 31-60 days
-      } else if (daysDifference <= 90) {
-        agingData.month2 += outstandingAmount; // 2 Months: 61-90 days
-      } else {
-        agingData.month3Plus += outstandingAmount; // Over 3 Months: 90+ days
-      }
-
-      agingData.total += outstandingAmount;
-    });
-
-    return agingData;
   };
 
   return (
