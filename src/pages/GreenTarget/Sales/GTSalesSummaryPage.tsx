@@ -123,13 +123,6 @@ const formatReportDate = (value: string, pattern: string): string => {
   return Number.isNaN(parsedDate.getTime()) ? "" : format(parsedDate, pattern);
 };
 
-const getDateSortKey = (value: string): string => {
-  const parsedDate: Date = parse(value, "yyyy-MM-dd", new Date());
-  return Number.isNaN(parsedDate.getTime())
-    ? ""
-    : format(parsedDate, "yyyy-MM-dd");
-};
-
 const getLocale = (language: string): string => {
   if (language.toLowerCase().startsWith("ms")) return "ms-MY";
   if (language.toLowerCase().startsWith("zh")) return "zh-CN";
@@ -315,15 +308,19 @@ const GTSalesSummaryPage: React.FC = () => {
 
   const sortedInvoices = useMemo<GreenTargetSalesReportRow[]>(() => {
     const rows: GreenTargetSalesReportRow[] = report?.rows || [];
+    // Running invoice-number order so the list can be ticked off against a
+    // consecutively numbered Excel sheet; invoice id breaks exact ties.
     return [...rows].sort(
       (
         firstInvoice: GreenTargetSalesReportRow,
         secondInvoice: GreenTargetSalesReportRow
       ): number => {
-        const dateComparison: number = getDateSortKey(
-          firstInvoice.date_issued
-        ).localeCompare(getDateSortKey(secondInvoice.date_issued));
-        if (dateComparison !== 0) return dateComparison;
+        const numberComparison: number = firstInvoice.invoice_number.localeCompare(
+          secondInvoice.invoice_number,
+          undefined,
+          { numeric: true, sensitivity: "base" }
+        );
+        if (numberComparison !== 0) return numberComparison;
         if (firstInvoice.invoice_id < 0 && secondInvoice.invoice_id < 0) {
           return (
             Math.abs(firstInvoice.invoice_id) -

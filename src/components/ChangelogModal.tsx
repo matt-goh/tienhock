@@ -21,8 +21,18 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-11",
-    ms: "Penyata Akaun (Green Target): bil yang telah digabungkan ke dalam e-Invois CON (consolidated) kini dipaparkan semula pada penyata pelanggan, bersama bayaran mereka. Sebelum ini bil-bil tersebut disorok daripada penyata, jadi jumlah penyata lebih rendah daripada lejar akaun pelanggan.",
-    en: "Statement of Account (Green Target): bills that were merged into a consolidated (CON) e-Invoice now appear on the customer statement again, together with their payments. Previously those bills were hidden from the statement, so the statement total was lower than the customer's account ledger.",
+    ms: "Stok Bahan: butang Cetak baharu pada tab MEE, BIHUN dan SHARED mencetak stok bulan yang dipilih sebagai PDF. Laporan mengikut pilihan Running Balance — tanpanya ia menjadi helaian kiraan stok (kos unit, kuantiti dan nilai), dan dengannya ia turut menunjukkan lajur pembukaan, belian dan penutup. Baris tanpa kiraan boleh disembunyikan daripada cetakan melalui kotak semak baris kosong yang sedia ada. Bahagian Stock Kilang dan Jumlah Keseluruhan turut disertakan.",
+    en: "Material Stock: a new Print button on the MEE, BIHUN and SHARED tabs prints the selected month's stock as a PDF. The report follows the Running Balance toggle — off gives a stock count sheet (unit cost, quantity and value), on adds opening, purchases and closing columns. Rows with no count can be left out of the printout using the existing empty-rows checkbox. The Stock Kilang section and Grand Total are included.",
+  },
+  {
+    date: "2026-08-11",
+    ms: "Penyata Akaun (Green Target): penyata pelanggan kini dibaca terus dari lejar akaun penghutang, jadi baki pembukaan dari sistem lama, bil yang digabungkan ke dalam e-Invois CON, dan bayaran yang direkodkan terus dalam jurnal semuanya turut dipaparkan. Jumlah penyata kini sentiasa sepadan dengan Lejar Akaun pelanggan. Pelanggan yang tidak mempunyai akaun penghutang yang dipautkan tidak dapat dijana penyatanya.",
+    en: "Statement of Account (Green Target): the customer statement is now read straight from the debtor's account ledger, so the opening balance carried from the old system, bills merged into a consolidated (CON) e-Invoice, and payments keyed directly into the journal all appear on it. The statement total now always matches the customer's Account Ledger. Customers without a linked debtor account cannot have a statement generated.",
+  },
+  {
+    date: "2026-08-11",
+    ms: "Jualan (Green Target): senarai Listing Debtor kini disusun mengikut nombor invois yang berlari (2026/01012, 2026/01013, 2026/01014 dan seterusnya) pada kedua-dua tab, bukan lagi mengikut tarikh. Ini memudahkan semakan silang dengan fail Excel yang bernombor giliran.",
+    en: "Sales (Green Target): the Listing Debtor report is now sorted by running invoice number (2026/01012, 2026/01013, 2026/01014 and so on) on both tabs, instead of by date. This makes it easier to cross-check against a sequentially numbered Excel file.",
   },
   {
     date: "2026-08-11",
