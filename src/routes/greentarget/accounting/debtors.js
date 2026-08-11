@@ -30,6 +30,7 @@ import { Router } from "express";
 import {
   buildAccountLedger,
   getMonthPeriod,
+  isDateString,
   validateYearMonth,
 } from "./report-engine.js";
 import { buildGreenTargetLegacyDebtorList } from "./trade-debtor-list.js";
@@ -687,6 +688,120 @@ export default function createGreenTargetDebtorsRouter(pool) {
       console.error("Error fetching Green Target CD_SD sub-schedule:", error);
       res.status(500).json({
         message: "Error fetching Green Target CD_SD sub-schedule",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /ledger-statement/:code?start_date&end_date - Customer-facing
+  // Statement of Account for one debtor subledger identity (e.g. CD-DCH),
+  // built from the same account-ledger engine as the Account Ledger page, so
+  // the statement always reconciles to the ledger — including the subledger
+  // opening anchor and receipts keyed straight into the journal. Transactions
+  // are re-sorted chronologically (the engine's legacy month/sequence print
+  // order reads oddly on a customer statement) and running balances are
+  // recomputed. Aging is a monthly FIFO from the latest subledger snapshot.
+  router.get("/ledger-statement/:code", async (req, res) => {
+    const { code } = req.params;
+    const startStr = req.query.start_date;
+    const endStr = req.query.end_date;
+    if (
+      !isDateString(startStr) ||
+      !isDateString(endStr) ||
+      startStr > endStr
+    ) {
+      return res.status(400).json({
+        message: "start_date and end_date are required valid yyyy-MM-dd dates",
+      });
+    }
+
+    try {
+      const ledger = await buildAccountLedger(pool, code, startStr, endStr);
+
+      // Engine order is (month, posting_sequence, display_order); a customer
+      // statement reads chronologically. Array.prototype.sort is stable, so
+      // rows sharing a date keep the engine's within-day order.
+      const chronological = ledger.transactions
+        .filter((tx) => tx.debit > 0 || tx.credit > 0)
+        .slice()
+        .sort((a, b) =>
+          a.entry_date < b.entry_date ? -1 : a.entry_date > b.entry_date ? 1 : 0
+        );
+      let running = ledger.opening_balance;
+      const transactions = chronological.map((tx) => {
+        running = money(running + tx.debit - tx.credit);
+        return {
+          date: tx.entry_date,
+          reference: tx.reference_no,
+          particulars: tx.particulars || "",
+          debit: tx.debit,
+          credit: tx.credit,
+          running_balance: running,
+        };
+      });
+
+      const periodYear = Number(endStr.slice(0, 4));
+      const periodMonth = Number(endStr.slice(5, 7));
+
+      // Subledger twin of computeAccountFifoAging: openings anchor on the
+      // debtor_subledger_snapshots monthly closes and movements match the
+      // independently-tagged debtor_subledger_code lines.
+      const anchorResult = await pool.query(
+        `SELECT to_char((as_of_month + INTERVAL '1 month')::date, 'YYYY-MM-DD') AS anchor_date,
+                to_char(as_of_month, 'YYYY-MM') AS anchor_month,
+                closing_balance AS amount
+           FROM greentarget.debtor_subledger_snapshots
+          WHERE account_code = $1
+            AND (as_of_month + INTERVAL '1 month')::date <= $2::date
+          ORDER BY as_of_month DESC
+          LIMIT 1`,
+        [code, endStr]
+      );
+      const anchor = anchorResult.rows[0] || null;
+      const movementStart = anchor?.anchor_date || LEGACY_LEDGER_START;
+      const monthlyResult = await pool.query(
+        `SELECT EXTRACT(YEAR FROM je.entry_date)::integer AS y,
+                EXTRACT(MONTH FROM je.entry_date)::integer AS m,
+                SUM(jel.debit_amount - jel.credit_amount) AS net
+           FROM greentarget.journal_entry_lines jel
+           JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+          WHERE je.status = 'posted'
+            AND (jel.debtor_subledger_code = $1 OR jel.account_code = $1)
+            AND je.entry_date >= $2::date
+            AND je.entry_date <= $3::date
+          GROUP BY EXTRACT(YEAR FROM je.entry_date),
+                   EXTRACT(MONTH FROM je.entry_date)`,
+        [code, movementStart, endStr]
+      );
+      const months = new Map();
+      if (anchor) {
+        months.set(anchor.anchor_month, cents(anchor.amount));
+      }
+      for (const row of monthlyResult.rows) {
+        const key = `${row.y}-${pad2(row.m)}`;
+        months.set(key, (months.get(key) || 0) + cents(row.net));
+      }
+      const aging = ageMonthlyCents(months, periodYear, periodMonth);
+
+      res.json({
+        customer: {
+          id: ledger.account.code,
+          name: ledger.account.description,
+        },
+        period_start: startStr,
+        period_end: endStr,
+        previous_balance: ledger.opening_balance,
+        transactions,
+        total_amount_due: running,
+        aging,
+      });
+    } catch (error) {
+      if (error.status === 404) {
+        return res.status(404).json({ message: "Debtor account not found" });
+      }
+      console.error("Error fetching Green Target ledger statement:", error);
+      res.status(500).json({
+        message: "Error fetching Green Target ledger statement",
         error: error.message,
       });
     }
