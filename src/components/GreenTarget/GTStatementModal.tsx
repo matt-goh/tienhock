@@ -438,10 +438,12 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           status: "active,overdue,paid,unpaid", // Explicitly include only valid statuses
         });
 
-        // Filter out any invoices that are part of consolidated invoices
+        // Consolidated e-Invoice wrappers (CON-...) are submission envelopes,
+        // not customer bills. Show the underlying child invoices on the
+        // statement instead, so consolidated bills and their payments are not
+        // hidden from the customer.
         const validInvoices = allInvoices.filter(
-          (invoice: { consolidated_part_of: any }) =>
-            !invoice.consolidated_part_of
+          (invoice: { is_consolidated: any }) => !invoice.is_consolidated
         );
 
         // Filter invoices to separate those before the period (for opening balance)

@@ -7,6 +7,9 @@ import React, {
 } from "react";
 import { format, parse } from "date-fns";
 import { useTranslation } from "react-i18next";
+import { IconPrinter } from "@tabler/icons-react";
+import toast from "react-hot-toast";
+import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import TimeNavigator, {
   TimeRange,
@@ -23,6 +26,11 @@ import {
   GreenTargetSalesReportRow,
   GreenTargetSalesReportTotals,
 } from "../../../types/greenTargetSalesReport";
+import {
+  printGTSalesSummaryPDF,
+  type GTSalesSummaryPdfColumn,
+  type GTSalesSummaryPdfRow,
+} from "../../../utils/greenTarget/PDF/GTSalesSummaryPDF";
 
 type ReportTab = "debtor" | "details";
 type CardTone = "sky" | "emerald" | "amber" | "slate";
@@ -392,6 +400,221 @@ const GTSalesSummaryPage: React.FC = () => {
     }));
   };
 
+  const handlePrint = useCallback(async (): Promise<void> => {
+    if (!report) return;
+    // The PDF stays English-only (project convention for document generators),
+    // so the period label and status/payment labels use their raw English form.
+    const englishPeriodLabel: string = getPeriodLabel(
+      filters.dateRange.start,
+      filters.dateRange.end,
+      "en"
+    );
+    const emptyCell: string = "—";
+
+    try {
+      if (filters.activeTab === "debtor") {
+        const columns: GTSalesSummaryPdfColumn[] = [
+          { key: "no", label: "No.", width: "3.5%", align: "right" },
+          { key: "date", label: "Date", width: "6%" },
+          { key: "customer", label: "Customer", width: "11%" },
+          { key: "location", label: "Location", width: "14%" },
+          { key: "phone", label: "Phone No.", width: "7.5%" },
+          { key: "invoice", label: "Invoice No.", width: "7.5%" },
+          { key: "rm", label: "RM", width: "6%", align: "right" },
+          { key: "total", label: "Total", width: "6.5%", align: "right" },
+          { key: "payment", label: "Payment / Cheque No.", width: "9%" },
+          { key: "ref", label: "Ref. No.", width: "7%" },
+          { key: "datePaid", label: "Date Paid", width: "6%" },
+          { key: "paid", label: "Paid (RM)", width: "6%", align: "right" },
+          { key: "balance", label: "Balance (RM)", width: "6.5%", align: "right" },
+          { key: "diff", label: "Diff.", width: "3.5%", align: "right" },
+        ];
+        const rows: GTSalesSummaryPdfRow[] = listingRows.map(
+          (listingRow: DebtorListingRow, index: number): GTSalesSummaryPdfRow => {
+            const invoice: GreenTargetSalesReportRow = listingRow.invoice;
+            const cancelled: boolean = isCancelledInvoice(invoice);
+            const paymentRows: GreenTargetSalesReportPayment[] =
+              invoice.payments || [];
+            const locationLabels: string[] = (invoice.locations || [])
+              .map(
+                (location: GreenTargetSalesReportLocation): string =>
+                  getLocationLabel(location)
+              )
+              .filter((label: string): boolean => label.length > 0);
+            const totalCell: string =
+              !cancelled &&
+              Math.abs(safeNumber(invoice.adjustment_effect)) > 0.005
+                ? `${formatAmount(invoice.total_amount)}\nAdj: ${formatDifference(
+                    invoice.adjustment_effect,
+                    emptyCell
+                  )}`
+                : formatAmount(invoice.total_amount);
+            return {
+              cancelled,
+              cells: [
+                String(index + 1),
+                formatReportDate(invoice.date_issued, "dd/MM/yy") || emptyCell,
+                getCustomerLabel(invoice) || emptyCell,
+                locationLabels.join("\n") || emptyCell,
+                getPhoneNumbers(invoice).join("\n") || emptyCell,
+                invoice.invoice_number,
+                formatAmount(invoice.amount_before_tax),
+                totalCell,
+                paymentRows.length > 0
+                  ? paymentRows
+                      .map(
+                        (payment: GreenTargetSalesReportPayment): string =>
+                          `${getPaymentMethodKey(payment.payment_method)}${
+                            payment.payment_reference
+                              ? `\n${payment.payment_reference}`
+                              : ""
+                          }`
+                      )
+                      .join("\n")
+                  : emptyCell,
+                paymentRows.length > 0
+                  ? paymentRows
+                      .map(
+                        (payment: GreenTargetSalesReportPayment): string =>
+                          payment.internal_reference || emptyCell
+                      )
+                      .join("\n")
+                  : emptyCell,
+                paymentRows.length > 0
+                  ? paymentRows
+                      .map(
+                        (payment: GreenTargetSalesReportPayment): string =>
+                          payment.status === "pending"
+                            ? "Pending"
+                            : formatReportDate(
+                                payment.posting_date || payment.payment_date,
+                                "dd/MM/yy"
+                              ) || emptyCell
+                      )
+                      .join("\n")
+                  : emptyCell,
+                paymentRows.length > 0
+                  ? paymentRows
+                      .map(
+                        (payment: GreenTargetSalesReportPayment): string =>
+                          payment.status === "pending"
+                            ? emptyCell
+                            : formatAmount(payment.amount_paid)
+                      )
+                      .join("\n")
+                  : safeNumber(invoice.amount_paid) > 0
+                  ? formatAmount(invoice.amount_paid)
+                  : emptyCell,
+                formatAmount(listingRow.runningBalance),
+                formatDifference(
+                  cancelled ? 0 : -getInvoiceMovement(invoice),
+                  emptyCell
+                ),
+              ],
+            };
+          }
+        );
+        await printGTSalesSummaryPDF({
+          companyName: "GREEN TARGET WASTE TREATMENT IND. SDN BHD",
+          title: `Listing debtor from ${englishPeriodLabel}`,
+          subtitle: "Debtor Listing",
+          columns,
+          rows,
+          totalsRow: [
+            "",
+            "",
+            `Total sales for ${englishPeriodLabel}`,
+            "",
+            "",
+            "",
+            formatAmount(activeAmountBeforeTax),
+            formatAmount(totals.total_sales),
+            "",
+            "",
+            "",
+            formatAmount(totals.total_paid),
+            formatAmount(finalRunningBalance),
+            formatDifference(-safeNumber(totals.total_outstanding), emptyCell),
+          ],
+          documentTitle: `GT Debtor Listing - ${englishPeriodLabel}`,
+        });
+      } else {
+        const columns: GTSalesSummaryPdfColumn[] = [
+          { key: "no", label: "No.", width: "4%", align: "right" },
+          { key: "date", label: "Date", width: "7%" },
+          { key: "invoice", label: "Invoice", width: "9%" },
+          { key: "customer", label: "Customer", width: "16%" },
+          { key: "location", label: "Location", width: "23%" },
+          { key: "status", label: "Status", width: "8%" },
+          { key: "sales", label: "Sales", width: "9%", align: "right" },
+          { key: "adjustments", label: "Adjustments", width: "7%", align: "right" },
+          { key: "paid", label: "Paid", width: "8%", align: "right" },
+          { key: "outstanding", label: "Outstanding", width: "9%", align: "right" },
+        ];
+        const rows: GTSalesSummaryPdfRow[] = sortedInvoices.map(
+          (invoice: GreenTargetSalesReportRow, index: number): GTSalesSummaryPdfRow => {
+            const locationLabels: string[] = invoice.locations
+              .map(
+                (location: GreenTargetSalesReportLocation): string =>
+                  getLocationLabel(location)
+              )
+              .filter((label: string): boolean => label.length > 0);
+            return {
+              cancelled: isCancelledInvoice(invoice),
+              cells: [
+                String(index + 1),
+                formatReportDate(invoice.date_issued, "dd/MM/yyyy") || emptyCell,
+                invoice.invoice_number,
+                getCustomerLabel(invoice) || emptyCell,
+                locationLabels.join("\n") || emptyCell,
+                getInvoiceStatusKey(invoice),
+                formatCurrency(invoice.total_amount),
+                formatCurrency(invoice.adjustment_effect),
+                formatCurrency(invoice.amount_paid),
+                formatCurrency(invoice.balance_due),
+              ],
+            };
+          }
+        );
+        await printGTSalesSummaryPDF({
+          companyName: "GREEN TARGET WASTE TREATMENT IND. SDN BHD",
+          title: `Listing debtor from ${englishPeriodLabel}`,
+          subtitle: "Sales Details",
+          columns,
+          rows,
+          totalsRow: [
+            "",
+            "",
+            "",
+            "",
+            "",
+            "Total",
+            formatCurrency(totals.total_sales),
+            formatCurrency(adjustmentTotal),
+            formatCurrency(totals.total_paid),
+            formatCurrency(totals.total_outstanding),
+          ],
+          documentTitle: `GT Sales Details - ${englishPeriodLabel}`,
+        });
+      }
+    } catch (printError: unknown) {
+      console.error("Failed to print sales summary:", printError);
+      toast.error(t("Failed to prepare the PDF for printing. Please try again."));
+    }
+  }, [
+    t,
+    report,
+    filters.activeTab,
+    filters.dateRange.start,
+    filters.dateRange.end,
+    listingRows,
+    sortedInvoices,
+    totals,
+    activeAmountBeforeTax,
+    adjustmentTotal,
+    finalRunningBalance,
+  ]);
+
   return (
     <div className="space-y-4">
       <section className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
@@ -405,13 +628,28 @@ const GTSalesSummaryPage: React.FC = () => {
                 {t("Listing debtor from {{period}}", { period: periodLabel })}
               </p>
             </div>
-            <TimeNavigator
-              range={filters.dateRange}
-              onChange={handleTimeChange}
-              modes={["day", "month", "range", "year"]}
-              pickerPlacement="bottom-right"
-              className="max-w-full"
-            />
+            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                color="sky"
+                icon={IconPrinter}
+                disabled={loading || error || !report}
+                onClick={(): void => {
+                  void handlePrint();
+                }}
+              >
+                {t("Print")}
+              </Button>
+              <TimeNavigator
+                range={filters.dateRange}
+                onChange={handleTimeChange}
+                modes={["day", "month", "range", "year"]}
+                pickerPlacement="bottom-right"
+                className="max-w-full"
+              />
+            </div>
           </div>
 
           <div className="mt-4 flex rounded-lg bg-default-100 p-0.5 dark:bg-gray-700 sm:w-fit">
@@ -519,6 +757,7 @@ const GTSalesSummaryPage: React.FC = () => {
                 <thead className="text-[11px] uppercase tracking-wide text-emerald-950 dark:text-emerald-100">
                   <tr>
                     {[
+                      "No.",
                       "Date",
                       "Customer",
                       "Location",
@@ -545,7 +784,10 @@ const GTSalesSummaryPage: React.FC = () => {
                 </thead>
                 <tbody>
                   {listingRows.map(
-                    (listingRow: DebtorListingRow): React.ReactElement => {
+                    (
+                      listingRow: DebtorListingRow,
+                      listingIndex: number
+                    ): React.ReactElement => {
                       const invoice: GreenTargetSalesReportRow =
                         listingRow.invoice;
                       const cancelled: boolean = isCancelledInvoice(invoice);
@@ -568,6 +810,9 @@ const GTSalesSummaryPage: React.FC = () => {
                               : "hover:bg-emerald-50/40 dark:hover:bg-emerald-950/15"
                           }
                         >
+                          <td className="whitespace-nowrap border-b border-r border-gray-200 px-2 py-2 text-right align-top tabular-nums text-default-500 dark:border-gray-700 dark:text-gray-400">
+                            {listingIndex + 1}
+                          </td>
                           <td className="whitespace-nowrap border-b border-r border-gray-200 px-2 py-2 align-top tabular-nums dark:border-gray-700">
                             {formatReportDate(invoice.date_issued, "dd.MM.yy") ||
                               emptyValue}
@@ -734,7 +979,7 @@ const GTSalesSummaryPage: React.FC = () => {
                 <tfoot className="font-bold text-emerald-950 dark:text-emerald-100 [&_td]:sticky [&_td]:bottom-0 [&_td]:z-10 [&_td]:bg-emerald-50 dark:[&_td]:bg-emerald-950">
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="border-r border-t border-gray-300 px-2 py-2.5 uppercase tracking-wide dark:border-gray-700"
                     >
                       {t("Total sales for {{period}}", {
@@ -777,6 +1022,7 @@ const GTSalesSummaryPage: React.FC = () => {
               <thead className="text-xs uppercase tracking-wide text-default-600 dark:text-gray-300">
                 <tr>
                   {[
+                    "No.",
                     "Date",
                     "Invoice",
                     "Customer",
@@ -799,7 +1045,10 @@ const GTSalesSummaryPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {sortedInvoices.map(
-                  (invoice: GreenTargetSalesReportRow): React.ReactElement => {
+                  (
+                    invoice: GreenTargetSalesReportRow,
+                    invoiceIndex: number
+                  ): React.ReactElement => {
                     const cancelled: boolean = isCancelledInvoice(invoice);
                     const statusKey: string = getInvoiceStatusKey(invoice);
                     const customerLabel: string = getCustomerLabel(invoice);
@@ -814,6 +1063,9 @@ const GTSalesSummaryPage: React.FC = () => {
                             : "text-default-800 hover:bg-default-50 dark:text-gray-200 dark:hover:bg-gray-700/40"
                         }
                       >
+                        <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-default-500 dark:text-gray-400">
+                          {invoiceIndex + 1}
+                        </td>
                         <td className="whitespace-nowrap px-4 py-3 tabular-nums">
                           {formatReportDate(invoice.date_issued, "dd.MM.yyyy") ||
                             emptyValue}
@@ -877,7 +1129,7 @@ const GTSalesSummaryPage: React.FC = () => {
                   not travel with a sticky cell. */}
               <tfoot className="font-bold text-default-900 dark:text-gray-100 [&_td]:sticky [&_td]:bottom-0 [&_td]:z-10 [&_td]:bg-default-50 [&_td]:shadow-[inset_0_2px_0_0_#d1d5db] dark:[&_td]:bg-gray-900 dark:[&_td]:shadow-[inset_0_2px_0_0_#4b5563]">
                 <tr>
-                  <td colSpan={5} className="px-4 py-3 text-right">
+                  <td colSpan={6} className="px-4 py-3 text-right">
                     {t("Total")}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums">
