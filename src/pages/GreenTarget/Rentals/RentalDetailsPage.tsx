@@ -32,6 +32,11 @@ import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
   GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
+import GTInvoiceLinesEditor, {
+  createGTInvoiceLineDraft,
+  gtInvoiceLinesTotal,
+  GTInvoiceLineDraft,
+} from "../../../components/GreenTarget/GTInvoiceLinesEditor";
 import GTReceiptJoinPanel, {
   type GTReceiptJoinConfirmation,
   type GTReceiptJoinLookupState,
@@ -45,11 +50,23 @@ import {
 } from "../../../utils/greenTarget/rentalBillingStatus";
 import { toCents } from "../../../utils/moneyUtils";
 import type {
+  GreenTargetInvoiceLineInput,
   GreenTargetPayment,
   GreenTargetPaymentMutationResponse,
   GreenTargetReceiptJoinCandidate,
   GreenTargetRevenueSplit,
 } from "../../../types/greenTargetTypes";
+
+// Default line description follows the revenue account selection (mirrors the
+// full invoice form and the server-side default).
+const gtInvoiceLineWording = (
+  accountCode: string | null | undefined
+): string =>
+  accountCode === "TGA"
+    ? "Rental Tong (A)"
+    : accountCode === "TGB"
+    ? "Rental Tong (B)"
+    : "Waste Management";
 
 interface PickupDestination {
   id: number;
@@ -246,6 +263,16 @@ const RentalDetailsPage: React.FC = () => {
   });
   const [invoiceDeliveryOrder, setInvoiceDeliveryOrder] = useState<string>("");
   const [invoiceAmount, setInvoiceAmount] = useState<string>("200.00");
+  // Editable invoice lines; the amount is derived from their total.
+  const [invoiceLines, setInvoiceLines] = useState<GTInvoiceLineDraft[]>([
+    createGTInvoiceLineDraft({
+      description: "Rental Tong (A)",
+      quantity: 1,
+      unit_price: 200,
+    }),
+  ]);
+  // The modal re-prefills the lines until the user keys anything into them.
+  const linesManuallyEditedRef = useRef(false);
   const [invoiceRevenueSplits, setInvoiceRevenueSplits] = useState<
     GreenTargetRevenueSplit[]
   >([
@@ -365,6 +392,14 @@ const RentalDetailsPage: React.FC = () => {
     });
     setInvoiceDeliveryOrder("");
     setInvoiceAmount("200.00");
+    setInvoiceLines([
+      createGTInvoiceLineDraft({
+        description: gtInvoiceLineWording(GT_DEFAULT_REVENUE_ACCOUNT),
+        quantity: 1,
+        unit_price: 200,
+      }),
+    ]);
+    linesManuallyEditedRef.current = false;
     setInvoiceRevenueSplits([
       {
         line_number: 1,
@@ -430,12 +465,41 @@ const RentalDetailsPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rental, routerLocation.state]);
 
-  // Amount follows the selected rental count until the user edits it next.
+  // The revenue account behind the current splits (null when mixed) decides
+  // the prefilled line description.
+  const currentRevenueAccount: string | null = (() => {
+    const codes = new Set(
+      invoiceRevenueSplits.map(
+        (split: GreenTargetRevenueSplit): string => split.account_code
+      )
+    );
+    return codes.size === 1 ? Array.from(codes)[0] : null;
+  })();
+
+  // Prefill one line from the revenue account wording and the selected rental
+  // count until the user edits the lines by hand.
   useEffect(() => {
-    if (isInvoiceModalOpen) {
-      setInvoiceAmount((selectedRentalIds.length * 200).toFixed(2));
-    }
-  }, [selectedRentalIds, isInvoiceModalOpen]);
+    if (!isInvoiceModalOpen || linesManuallyEditedRef.current) return;
+    setInvoiceLines([
+      createGTInvoiceLineDraft({
+        description: gtInvoiceLineWording(currentRevenueAccount),
+        quantity: selectedRentalIds.length,
+        unit_price: 200,
+      }),
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInvoiceModalOpen, currentRevenueAccount, selectedRentalIds.length]);
+
+  // The invoice amount is derived from the line items, never keyed directly.
+  useEffect(() => {
+    if (!isInvoiceModalOpen) return;
+    setInvoiceAmount(gtInvoiceLinesTotal(invoiceLines).toFixed(2));
+  }, [invoiceLines, isInvoiceModalOpen]);
+
+  const handleInvoiceLinesChange = (nextLines: GTInvoiceLineDraft[]): void => {
+    linesManuallyEditedRef.current = true;
+    setInvoiceLines(nextLines);
+  };
 
   // Debounced duplicate check, same rule as the full invoice form: a blank
   // number is valid because the server then generates one.
@@ -551,6 +615,22 @@ const RentalDetailsPage: React.FC = () => {
       toast.error("Revenue allocation must equal the invoice total.");
       return;
     }
+    const hasInvalidLine: boolean =
+      invoiceLines.length === 0 ||
+      invoiceLines.some(
+        (line: GTInvoiceLineDraft): boolean =>
+          !line.description.trim() ||
+          !Number.isFinite(Number(line.quantity)) ||
+          Number(line.quantity) <= 0 ||
+          !Number.isFinite(Number(line.unit_price)) ||
+          Number(line.unit_price) < 0
+      );
+    if (hasInvalidLine) {
+      toast.error(
+        "Every line item needs a description, a quantity above 0 and a unit price of 0 or more."
+      );
+      return;
+    }
     if (recordPayment && !paymentInternalReference.trim()) {
       toast.error(
         "Green Target Reference No. is required to record a payment."
@@ -626,6 +706,13 @@ const RentalDetailsPage: React.FC = () => {
         date_issued: dateIssued,
         debtor_account_code: debtorAccountCode,
         revenue_splits: invoiceRevenueSplits,
+        lines: invoiceLines.map(
+          (line: GTInvoiceLineDraft): GreenTargetInvoiceLineInput => ({
+            description: line.description.trim(),
+            quantity: Number(line.quantity) || 0,
+            unit_price: Number(line.unit_price) || 0,
+          })
+        ),
       });
       toast.success(`Invoice ${response.invoice.invoice_number} created`);
       if (recordPayment) {
@@ -1234,7 +1321,7 @@ const RentalDetailsPage: React.FC = () => {
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <Dialog.Panel className="w-full max-w-3xl transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
+                <Dialog.Panel className="w-full max-w-5xl transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title className="text-lg font-semibold text-default-900 dark:text-gray-100">
                       Create Invoice
@@ -1418,16 +1505,14 @@ const RentalDetailsPage: React.FC = () => {
                         Amount (RM) <span className="text-rose-500">*</span>
                       </label>
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={invoiceAmount}
-                        onChange={(e) => setInvoiceAmount(e.target.value)}
-                        className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400"
+                        type="text"
+                        value={(Number(invoiceAmount) || 0).toFixed(2)}
+                        className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-800 font-medium text-default-700 dark:text-gray-200 cursor-default"
+                        readOnly
+                        tabIndex={-1}
                       />
                       <p className="mt-1 text-xs text-default-400 dark:text-gray-500">
-                        Auto: {selectedRentalIds.length} rental
-                        {selectedRentalIds.length === 1 ? "" : "s"} × RM200.00
+                        Derived from the line items below.
                       </p>
                     </div>
                     <div>
@@ -1441,6 +1526,15 @@ const RentalDetailsPage: React.FC = () => {
                         className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400"
                       />
                     </div>
+                  </div>
+
+                  {/* Line Items */}
+                  <div className="mb-4">
+                    <GTInvoiceLinesEditor
+                      lines={invoiceLines}
+                      onChange={handleInvoiceLinesChange}
+                      disabled={isCreatingInvoice}
+                    />
                   </div>
 
                   <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-900 dark:bg-sky-950/20">

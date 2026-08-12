@@ -30,6 +30,14 @@ requires separate approval).
 
 ---
 
+## Present in `dev/migrations/` — 2026-08-11 (Green Target invoice line items)
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-11_greentarget_invoice_lines.sql` | Created `greentarget.invoice_lines` (invoice_id + line_number PK, FK invoices ON DELETE CASCADE; description / quantity / unit_price / amount numeric(14,2) with CHECKs) — stored, user-editable display lines for GT invoices. No backfill: invoices without rows keep rendering through the legacy PDF/e-Invoice description generators. Guarded and idempotent; dev re-run confirmed the `IF NOT EXISTS` skip. **Not yet removed** per the convention — it stays in `dev/migrations/` until the production rollout. | dev ✓ (2026-08-11), prod PENDING |
+
+---
+
 ## Removed 11 Aug 2026 — 1 file (bill C026524 duplicate removal + re-date)
 
 Applied to **production** in two passes on 2026-08-11 — Parts A and B first, then Part C after it was

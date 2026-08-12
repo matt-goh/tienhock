@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-11",
+    ms: "Invois Green Target: baris item pada bil kini boleh diubah semasa mencipta atau mengedit invois. Penerangan diisi awal mengikut akaun hasil — Rental Tong (A) untuk TGA, Rental Tong (B) untuk TGB, selainnya Waste Management (sebelum ini \"Waste Management Service\") — bersama kuantiti dan harga unit, dan baris tambahan seperti caj hari lebihan boleh ditambah. Amaun invois kini dikira sebagai jumlah baris item dan bukannya angka yang dimasukkan. Baris dikunci sebaik sahaja bil mempunyai bayaran, pelarasan atau e-Invois yang disahkan. Bil lama mengekalkan penerangan asalnya.",
+    en: "Green Target invoices: the line items on a bill are now editable when creating or editing an invoice. The description is prefilled from the revenue account — Rental Tong (A) for TGA, Rental Tong (B) for TGB, otherwise Waste Management (previously \"Waste Management Service\") — with quantity and unit price, and extra lines such as extra-days charges can be added. The invoice amount is now calculated as the sum of the line items instead of a keyed figure. Lines lock once the bill has a payment, adjustment or validated e-Invoice. Older bills keep their original wording.",
+  },
+  {
+    date: "2026-08-11",
     ms: "Stok Bahan: butang Cetak baharu pada tab MEE, BIHUN dan SHARED mencetak stok bulan yang dipilih sebagai PDF. Laporan mengikut pilihan Running Balance — tanpanya ia menjadi helaian kiraan stok (kos unit, kuantiti dan nilai), dan dengannya ia turut menunjukkan lajur pembukaan, belian dan penutup. Baris tanpa kiraan boleh disembunyikan daripada cetakan melalui kotak semak baris kosong yang sedia ada. Bahagian Stock Kilang dan Jumlah Keseluruhan turut disertakan.",
     en: "Material Stock: a new Print button on the MEE, BIHUN and SHARED tabs prints the selected month's stock as a PDF. The report follows the Running Balance toggle — off gives a stock count sheet (unit cost, quantity and value), on adds opening, purchases and closing columns. Rows with no count can be left out of the printout using the existing empty-rows checkbox. The Stock Kilang section and Grand Total are included.",
   },
