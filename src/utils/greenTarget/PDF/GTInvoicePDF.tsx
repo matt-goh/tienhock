@@ -9,6 +9,7 @@ import {
 } from "../../invoice/einvoice/consolidatedReceiptGrouping";
 import GreenTargetLogo from "../../GreenTargetLogo.png";
 import { formatLocationDisplay } from "../formatLocationDisplay";
+import { toCents, toDollars } from "../../moneyUtils";
 
 // Define styles
 const styles = StyleSheet.create({
@@ -337,6 +338,32 @@ const generateLineItems = (invoice: InvoiceGT): LineItem[] => {
       total: invoice.amount_before_tax,
       tax: invoice.tax_amount,
     }];
+  }
+
+  // Stored, keyed lines win for regular invoices; tax is prorated across the
+  // lines by amount share (rounding residue lands on the last line).
+  if (Array.isArray(invoice.invoice_lines) && invoice.invoice_lines.length > 0) {
+    const storedLines = invoice.invoice_lines;
+    const linesCents = storedLines.map((line) => toCents(toAmount(line.amount)));
+    const totalCents = linesCents.reduce((sum, cents) => sum + cents, 0);
+    const taxCentsTotal = toCents(toAmount(invoice.tax_amount));
+    let allocatedTaxCents = 0;
+    return storedLines.map((line, index) => {
+      const lineTaxCents =
+        index === storedLines.length - 1
+          ? taxCentsTotal - allocatedTaxCents
+          : totalCents > 0
+          ? Math.round((linesCents[index] * taxCentsTotal) / totalCents)
+          : 0;
+      allocatedTaxCents += lineTaxCents;
+      return {
+        description: line.description,
+        qty: toAmount(line.quantity),
+        price: toAmount(line.unit_price),
+        total: toAmount(line.amount),
+        tax: toDollars(lineTaxCents),
+      };
+    });
   }
 
   // For regular invoices with rental details
