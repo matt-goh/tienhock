@@ -427,9 +427,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const accountPath: string = hasCompanyAccounts
-        ? encodeURIComponent(selectedAccount)
-        : selectedAccount;
+      const accountPath: string = encodeURIComponent(selectedAccount);
       const endpoint: string = isJellyPolly
         ? `/jellypolly/api/account-ledger/${accountPath}/range/${toLocalIso(
             range.start
@@ -454,7 +452,6 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
   }, [
     isJellyPolly,
     isGreenTarget,
-    hasCompanyAccounts,
     recordRecentLedger,
     selectedAccount,
     range.start?.getTime(),
