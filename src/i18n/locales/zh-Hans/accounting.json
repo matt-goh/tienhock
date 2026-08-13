@@ -570,6 +570,8 @@
   "Open source document": "打开来源单据",
   "Open the document that created this journal": "打开创建此日记账的单据",
   "Open {{code}} ledger": "打开 {{code}} 分类账",
+  "Ledger": "分类账",
+  "Select a specific month to open ledger": "请选择一个月份以打开分类账",
   "Opening": "期初",
   "Opening Balance": "期初余额",
   "Opening Month": "期初月份",

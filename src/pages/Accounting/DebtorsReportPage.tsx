@@ -21,6 +21,7 @@ import {
   IconRefresh,
   IconPhone,
   IconFileText,
+  IconBook2,
   IconReceipt,
   IconCheck,
 } from "@tabler/icons-react";
@@ -72,6 +73,7 @@ interface Invoice {
 
 interface Customer {
   customer_id: string;
+  ledger_account_code?: string;
   customer_name: string;
   phone_number?: string;
   address?: string;
@@ -113,6 +115,7 @@ interface DebtorsTotals {
 // Row shape of the general-statement endpoint (also used by GeneralStatementPDF).
 interface CustomerListRow {
   account_no: string;
+  ledger_account_code?: string;
   particular: string;
   opening_amount?: number | null;
   opening_as_of_date?: string | null;
@@ -149,6 +152,7 @@ export interface DebtorsReportPageConfig {
     year: number
   ) => string;
   generalStatementEndpoint: (month: number, year: number) => string;
+  accountLedgerPath: string;
   openingBalancesEndpoint?: string;
   defaultHideZeroBalances?: boolean;
   // Drill paths are optional: a ledger-backed debtors source (e.g. Green
@@ -182,6 +186,7 @@ const DEFAULT_DEBTORS_REPORT_CONFIG: DebtorsReportPageConfig = {
     `/api/debtors/statement/${customerId}?month=${month}&year=${year}`,
   generalStatementEndpoint: (month: number, year: number): string =>
     `/api/debtors/general-statement?month=${month}&year=${year}`,
+  accountLedgerPath: "/accounting/reports/account-ledger",
   customerDetailsPath: (customerId: string): string =>
     `/catalogue/customer/${customerId}`,
   customerInvoicesPath: (customerId: string): string =>
@@ -207,6 +212,16 @@ const appendMonthYearParams = (
 
 const formatMonthStart = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+
+const formatMonthEnd = (date: Date): string => {
+  const year: number = date.getFullYear();
+  const month: number = date.getMonth() + 1;
+  const lastDay: number = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(
+    2,
+    "0"
+  )}`;
+};
 
 const formatBareDate = (date: string): string => {
   const parts: string[] = date.split("-");
@@ -1132,6 +1147,18 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     navigateWithOpeningDraftGuard(config.customerInvoicesPath(customerId));
   };
 
+  const handleLedgerClick = (accountCode: string): void => {
+    if (allTimeMode) return;
+    const params: URLSearchParams = new URLSearchParams({
+      account: accountCode,
+      start: formatMonthStart(selectedMonth),
+      end: formatMonthEnd(selectedMonth),
+    });
+    navigateWithOpeningDraftGuard(
+      `${config.accountLedgerPath}?${params.toString()}`
+    );
+  };
+
   const handlePrint = async (): Promise<void> => {
     if (!filteredData) return;
     try {
@@ -1758,7 +1785,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                             RM {formatCurrency(row.total_due)}
                           </td>
                           <td className="px-3 py-2">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1774,12 +1801,30 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </Button>
                               <Button
                                 size="sm"
+                                variant="outline"
+                                icon={IconBook2}
+                                title={t("Open {{code}} ledger", {
+                                  code:
+                                    row.ledger_account_code ?? row.account_no,
+                                })}
                                 onClick={() =>
-                                  handleCustomerClick(row.account_no)
+                                  handleLedgerClick(
+                                    row.ledger_account_code ?? row.account_no
+                                  )
                                 }
                               >
-                                {t("Invoices")}
+                                {t("Ledger")}
                               </Button>
+                              {config.customerInvoicesPath && (
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    handleCustomerClick(row.account_no)
+                                  }
+                                >
+                                  {t("Invoices")}
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1955,11 +2000,11 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                       >
                         {/* Customer Header */}
                         <div
-                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 transition-colors"
+                          className="flex flex-wrap items-center justify-between gap-3 p-3 cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 transition-colors"
                           onClick={() => toggleCustomer(customer.customer_id)}
                         >
-                          <div className="flex items-center gap-8">
-                            <div className="flex items-center gap-3">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-8 gap-y-2">
+                            <div className="flex min-w-0 items-center gap-3">
                               {expandedCustomers.has(customer.customer_id) ? (
                                 <IconChevronDown
                                   size={16}
@@ -1975,9 +2020,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                 size={16}
                                 className="text-sky-600 dark:text-sky-400"
                               />
-                              <div>
+                              <div className="min-w-0">
                                 <span
-                                  className="font-medium text-default-800 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline cursor-pointer"
+                                  className="block truncate font-medium text-default-800 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline cursor-pointer"
                                   title={
                                     customer.customer_name ||
                                     customer.customer_id
@@ -2018,7 +2063,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <div className="text-right">
                               <p className="text-xs text-default-500 dark:text-gray-400">{t("Balance")}</p>
                               <p className="font-semibold text-rose-600 dark:text-rose-400">
@@ -2046,13 +2091,39 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                             </Button>
                             <Button
                               size="sm"
+                              variant="outline"
+                              icon={IconBook2}
+                              disabled={allTimeMode}
+                              title={
+                                allTimeMode
+                                  ? t("Select a specific month to open ledger")
+                                  : t("Open {{code}} ledger", {
+                                      code:
+                                        customer.ledger_account_code ??
+                                        customer.customer_id,
+                                    })
+                              }
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleCustomerClick(customer.customer_id);
+                                handleLedgerClick(
+                                  customer.ledger_account_code ??
+                                    customer.customer_id
+                                );
                               }}
                             >
-                              {t("Invoices")}
+                              {t("Ledger")}
                             </Button>
+                            {config.customerInvoicesPath && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCustomerClick(customer.customer_id);
+                                }}
+                              >
+                                {t("Invoices")}
+                              </Button>
+                            )}
                           </div>
                         </div>
 

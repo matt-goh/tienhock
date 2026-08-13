@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-14",
+    ms: "Debtors: butang Ledger baharu di sebelah setiap pelanggan membuka ledger pelanggan itu terus. Bulan yang sedang dipilih turut dibawa ke halaman Ledger untuk Tien Hock, Jelly Polly dan Green Target. Bagi Green Target, butang ini menggantikan butang Invoices lama kerana rekod debitornya tidak mempunyai halaman invois berasingan.",
+    en: "Debtors: a new Ledger button beside each customer opens that customer's ledger directly. The selected month is also carried to the Ledger page for Tien Hock, Jelly Polly and Green Target. For Green Target, it replaces the old Invoices button because its debtor records do not have separate invoice pages.",
+  },
+  {
+    date: "2026-08-14",
     ms: "Jelly Polly Payroll: tarikh setiap baris kerja pada halaman butiran gaji pekerja kini betul. Sebelum ini baris yang direkodkan pada hari pertama bulan (contohnya 01/08/2026) dipaparkan sebagai hari terakhir bulan sebelumnya (31/07/2026), walaupun rekod sebenar disimpan pada tarikh yang betul — ini hanya masalah paparan, tiada data yang hilang atau salah.",
     en: "Jelly Polly Payroll: the date of each work line on an employee's payroll details page is now correct. Previously a line recorded on the first day of a month (e.g. 01/08/2026) was shown as the last day of the previous month (31/07/2026), even though the record itself was saved on the right date — this was a display issue only, no data was lost or wrong.",
   },
