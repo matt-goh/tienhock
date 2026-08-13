@@ -16,6 +16,27 @@ export interface GreenTargetRevenueSplit {
   amount: number;
 }
 
+/**
+ * One stored, user-editable display line on a Green Target invoice. The
+ * amount is always quantity × unit_price; the lines sum to the invoice
+ * amount_before_tax. Display + e-Invoice description data only — the journal
+ * posting comes from the revenue splits.
+ */
+export interface GreenTargetInvoiceLine {
+  line_number: number;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  amount: number;
+}
+
+/** Submitted shape: the server recomputes the amount per line. */
+export interface GreenTargetInvoiceLineInput {
+  description: string;
+  quantity: number;
+  unit_price: number;
+}
+
 export interface GreenTargetDebtorSubledgerIdentity {
   code: string;
   description: string;
@@ -54,6 +75,7 @@ export interface GreenTargetInvoice {
   receivable_account_code?: string | null;
   revenue_account_code?: GreenTargetRevenueSplitAccountCode | null;
   revenue_splits?: GreenTargetRevenueSplit[];
+  invoice_lines?: GreenTargetInvoiceLine[];
   edit_dependencies?: {
     has_receipts: boolean;
     has_adjustments: boolean;
@@ -166,6 +188,9 @@ export interface CreateGreenTargetPaymentInput {
   // owns the banking event, so the date, method and cheque/transaction
   // reference sent alongside are ignored by the server.
   receipt_id?: number;
+  // Advance payment: the user confirmed a received date earlier than the
+  // invoice date, so the server skips its not-before-invoice guard.
+  allow_advance_payment?: boolean;
 }
 
 export interface CreateGreenTargetPaymentBatchInput {
@@ -178,6 +203,9 @@ export interface CreateGreenTargetPaymentBatchInput {
   // owns the banking event, so the date, method and cheque/transaction
   // reference sent alongside are ignored by the server.
   receipt_id?: number;
+  // Advance payment: the user confirmed a received date earlier than a
+  // selected invoice's date, so the server skips its not-before-invoice guard.
+  allow_advance_payment?: boolean;
 }
 
 export interface UpdateGreenTargetPaymentReferencesInput {

@@ -22,7 +22,20 @@ export default function (pool, defaultConfig) {
     try {
       // 1. Get invoice details
       const invoiceQuery = `
-        SELECT i.*, 
+        SELECT i.*,
+              COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'line_number', il.line_number,
+                    'description', il.description,
+                    'quantity', il.quantity,
+                    'unit_price', il.unit_price,
+                    'amount', il.amount
+                  ) ORDER BY il.line_number
+                )
+                FROM greentarget.invoice_lines il
+                WHERE il.invoice_id = i.invoice_id
+              ), '[]'::json) AS invoice_lines,
               c.name as customer_name,
               c.phone_number as customer_phone_number,
               c.billing_address,

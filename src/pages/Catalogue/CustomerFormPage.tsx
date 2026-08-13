@@ -536,12 +536,20 @@ const CustomerFormPage: React.FC = () => {
         `Error ${isEditMode ? "updating" : "creating"} customer:`,
         error
       );
+      const errorMessage: string =
+        error?.data?.code === "JP_DEBTOR_OPENING_ID_CONFLICT"
+          ? t(
+              "Customer ID change is blocked because Jelly Polly debtor openings already exist under the new ID"
+            )
+          : error?.data?.message ||
+            error?.response?.data?.message ||
+            error.message;
       toast.error(
         t(
           isEditMode
             ? "Failed to update customer: {{message}}"
             : "Failed to create customer: {{message}}",
-          { message: error?.response?.data?.message || error.message }
+          { message: errorMessage }
         )
       );
     } finally {
@@ -915,7 +923,7 @@ const CustomerFormPage: React.FC = () => {
         onConfirm={handleConfirmDelete}
         title={t("Delete Customer")}
         message={t(
-          "Are you sure you want to permanently delete {{name}}? All associated custom pricing will also be removed. This action cannot be undone.",
+          "Are you sure you want to permanently delete {{name}}? Associated custom pricing and Jelly Polly debtor openings will also be removed. This action cannot be undone.",
           { name: formData.name || t("this customer") }
         )}
         confirmButtonText={t("delete", { ns: "common" })}

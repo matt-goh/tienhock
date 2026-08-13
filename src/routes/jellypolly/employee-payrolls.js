@@ -240,7 +240,8 @@ export default function (pool) {
             `SELECT pi.employee_payroll_id, pi.id, pi.pay_code_id, pi.description,
                     pi.rate, pi.rate_unit, pi.quantity, pi.foc_units, pi.amount,
                     pi.is_manual, pi.job_type, pi.source_employee_id,
-                    pi.source_date, pi.work_log_id, pi.work_log_type, pc.pay_type
+                    TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date,
+                    pi.work_log_id, pi.work_log_type, pc.pay_type
              FROM jellypolly.payroll_items pi
              LEFT JOIN jellypolly.pay_codes pc ON pi.pay_code_id = pc.id
              WHERE pi.employee_payroll_id = ANY($1)
@@ -412,7 +413,7 @@ export default function (pool) {
           pool.query(
             `SELECT pi.id, pi.pay_code_id, pi.description, pi.rate, pi.rate_unit,
                     pi.quantity, pi.foc_units, pi.amount, pi.is_manual, pi.job_type,
-                    pi.source_employee_id, pi.source_date, pi.work_log_id,
+                    pi.source_employee_id, TO_CHAR(pi.source_date, 'YYYY-MM-DD') AS source_date, pi.work_log_id,
                     pi.work_log_type,
                     pc.pay_type
              FROM jellypolly.payroll_items pi

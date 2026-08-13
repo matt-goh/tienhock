@@ -154,6 +154,208 @@ export async function replaceGTInvoiceRevenueSplits(client, invoiceId, splits) {
 }
 
 /**
+ * The default line description follows the revenue account selection.
+ *
+ * @param {string|null|undefined} revenueAccountCode
+ * @returns {string}
+ */
+export function gtInvoiceLineWording(revenueAccountCode) {
+  if (revenueAccountCode === "TGA") return "Rental Tong (A)";
+  if (revenueAccountCode === "TGB") return "Rental Tong (B)";
+  return "Waste Management";
+}
+
+/**
+ * Normalize and balance ordered invoice display lines in integer cents. The
+ * client-sent amount is ignored: it is recomputed server-side as
+ * round(quantity * unit_price) and the lines must sum to the invoice total
+ * exactly (same cents discipline as normalizeGTRevenueSplits).
+ *
+ * @param {unknown} rawLines
+ * @param {number|string} invoiceSubtotal The invoice amount_before_tax.
+ * @returns {Array<{line_number: number, description: string,
+ *   quantity: number, unit_price: number, amount: number}>}
+ */
+export function normalizeGTInvoiceLines(rawLines, invoiceSubtotal) {
+  if (!Array.isArray(rawLines) || rawLines.length === 0) {
+    throw Object.assign(
+      new Error("Add at least one Green Target invoice line"),
+      { statusCode: 400 }
+    );
+  }
+
+  const normalized = rawLines.map((rawLine, index) => {
+    const line =
+      rawLine && typeof rawLine === "object" && !Array.isArray(rawLine)
+        ? rawLine
+        : {};
+    const description = String(line.description || "").trim();
+    const numericQuantity = Number(line.quantity);
+    const numericUnitPrice = Number(line.unit_price);
+    if (!description) {
+      throw Object.assign(
+        new Error(`Invoice line ${index + 1} needs a description`),
+        { statusCode: 400 }
+      );
+    }
+    if (!Number.isFinite(numericQuantity) || numericQuantity <= 0) {
+      throw Object.assign(
+        new Error(`Invoice line ${index + 1} quantity must be greater than zero`),
+        { statusCode: 400 }
+      );
+    }
+    if (!Number.isFinite(numericUnitPrice) || numericUnitPrice < 0) {
+      throw Object.assign(
+        new Error(`Invoice line ${index + 1} unit price cannot be negative`),
+        { statusCode: 400 }
+      );
+    }
+    const quantity = Math.round(numericQuantity * 100) / 100;
+    const unitPrice = Math.round(numericUnitPrice * 100) / 100;
+    const amount = Math.round(quantity * 100 * unitPrice) / 100;
+    return {
+      line_number: index + 1,
+      description,
+      quantity,
+      unit_price: unitPrice,
+      amount,
+    };
+  });
+
+  const subtotalCents = Math.round(Number(invoiceSubtotal) * 100);
+  const linesCents = normalized.reduce(
+    (sum, line) => sum + Math.round(line.amount * 100),
+    0
+  );
+  if (!Number.isFinite(Number(invoiceSubtotal)) || linesCents !== subtotalCents) {
+    throw Object.assign(
+      new Error(
+        `Invoice lines must equal the invoice amount exactly (lines ${(linesCents / 100).toFixed(
+          2
+        )}, invoice ${(subtotalCents / 100).toFixed(2)})`
+      ),
+      { statusCode: 400 }
+    );
+  }
+  return normalized;
+}
+
+/**
+ * Server-side default lines when the client sends none: one line worded after
+ * the revenue account, quantity = rental count, priced so it equals the
+ * invoice subtotal exactly.
+ *
+ * @param {{revenue_account_code?: string|null}} invoiceLike
+ * @param {number} rentalCount
+ * @param {number|string} invoiceSubtotal The invoice amount_before_tax.
+ * @returns {Array<{line_number: number, description: string,
+ *   quantity: number, unit_price: number, amount: number}>}
+ */
+export function generateGTInvoiceLines(invoiceLike, rentalCount, invoiceSubtotal) {
+  const subtotal = Math.round(Number(invoiceSubtotal) * 100) / 100;
+  const quantity = rentalCount > 0 ? rentalCount : 1;
+  return [
+    {
+      line_number: 1,
+      description: gtInvoiceLineWording(invoiceLike.revenue_account_code),
+      quantity,
+      unit_price: Math.round((subtotal / quantity) * 100) / 100,
+      amount: subtotal,
+    },
+  ];
+}
+
+/**
+ * @param {import("pg").PoolClient} client
+ * @param {number} invoiceId
+ * @param {Array<{line_number: number, description: string,
+ *   quantity: number, unit_price: number, amount: number}>} lines
+ * @returns {Promise<void>}
+ */
+export async function replaceGTInvoiceLines(client, invoiceId, lines) {
+  await client.query(
+    "DELETE FROM greentarget.invoice_lines WHERE invoice_id = $1",
+    [invoiceId]
+  );
+  for (const line of lines) {
+    await client.query(
+      `INSERT INTO greentarget.invoice_lines (
+         invoice_id, line_number, description, quantity, unit_price, amount
+       ) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        invoiceId,
+        line.line_number,
+        line.description,
+        line.quantity.toFixed(2),
+        line.unit_price.toFixed(2),
+        line.amount.toFixed(2),
+      ]
+    );
+  }
+}
+
+/**
+ * @param {import("pg").PoolClient} client
+ * @param {number} invoiceId
+ * @returns {Promise<Array<{line_number: number, description: string,
+ *   quantity: number, unit_price: number, amount: number}>>}
+ */
+export async function fetchGTInvoiceLines(client, invoiceId) {
+  const result = await client.query(
+    `SELECT line_number, description, quantity, unit_price, amount
+       FROM greentarget.invoice_lines
+      WHERE invoice_id = $1
+      ORDER BY line_number`,
+    [invoiceId]
+  );
+  return result.rows.map((row) => ({
+    line_number: Number(row.line_number),
+    description: row.description,
+    quantity: Number(row.quantity),
+    unit_price: Number(row.unit_price),
+    amount: Number(row.amount),
+  }));
+}
+
+/**
+ * Re-price stored lines onto a new invoice subtotal when the amount changed
+ * without new lines being keyed (the details-page inline amount pencil). Each
+ * line keeps its share of the old total; any rounding residue lands on the
+ * last line so the sum stays exact.
+ *
+ * @param {Array<{line_number: number, description: string,
+ *   quantity: number, unit_price: number, amount: number}>} storedLines
+ * @param {number|string} newSubtotal
+ * @returns {Array<{line_number: number, description: string,
+ *   quantity: number, unit_price: number, amount: number}>}
+ */
+export function prorateGTInvoiceLines(storedLines, newSubtotal) {
+  const oldCents = storedLines.reduce(
+    (sum, line) => sum + Math.round(line.amount * 100),
+    0
+  );
+  const newCents = Math.round(Number(newSubtotal) * 100);
+  let allocatedCents = 0;
+  return storedLines.map((line, index) => {
+    const amountCents =
+      index === storedLines.length - 1
+        ? newCents - allocatedCents
+        : oldCents > 0
+        ? Math.round((Math.round(line.amount * 100) * newCents) / oldCents)
+        : 0;
+    allocatedCents += amountCents;
+    const quantity = line.quantity;
+    return {
+      line_number: index + 1,
+      description: line.description,
+      quantity,
+      unit_price: Math.round((amountCents / 100 / quantity) * 100) / 100,
+      amount: amountCents / 100,
+    };
+  });
+}
+
+/**
  * @param {import("pg").PoolClient} client
  * @param {number} invoiceId
  * @returns {Promise<Array<{line_number: number, account_code: string, amount: number}>>}

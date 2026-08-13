@@ -21,6 +21,7 @@ import {
   IconRefresh,
   IconPhone,
   IconFileText,
+  IconBook2,
   IconReceipt,
   IconCheck,
 } from "@tabler/icons-react";
@@ -72,6 +73,7 @@ interface Invoice {
 
 interface Customer {
   customer_id: string;
+  ledger_account_code?: string;
   customer_name: string;
   phone_number?: string;
   address?: string;
@@ -113,7 +115,10 @@ interface DebtorsTotals {
 // Row shape of the general-statement endpoint (also used by GeneralStatementPDF).
 interface CustomerListRow {
   account_no: string;
+  ledger_account_code?: string;
   particular: string;
+  opening_amount?: number | null;
+  opening_as_of_date?: string | null;
   bal_bf: number;
   current_invoices: number;
   payment: number;
@@ -147,6 +152,9 @@ export interface DebtorsReportPageConfig {
     year: number
   ) => string;
   generalStatementEndpoint: (month: number, year: number) => string;
+  accountLedgerPath: string;
+  openingBalancesEndpoint?: string;
+  defaultHideZeroBalances?: boolean;
   // Drill paths are optional: a ledger-backed debtors source (e.g. Green
   // Target's imported legacy ledger) has no operational customer/invoice
   // pages to drill into, so it omits them and the corresponding clicks
@@ -178,6 +186,7 @@ const DEFAULT_DEBTORS_REPORT_CONFIG: DebtorsReportPageConfig = {
     `/api/debtors/statement/${customerId}?month=${month}&year=${year}`,
   generalStatementEndpoint: (month: number, year: number): string =>
     `/api/debtors/general-statement?month=${month}&year=${year}`,
+  accountLedgerPath: "/accounting/reports/account-ledger",
   customerDetailsPath: (customerId: string): string =>
     `/catalogue/customer/${customerId}`,
   customerInvoicesPath: (customerId: string): string =>
@@ -199,6 +208,46 @@ const appendMonthYearParams = (
 ): string => {
   const separator = endpoint.includes("?") ? "&" : "?";
   return `${endpoint}${separator}month=${month}&year=${year}`;
+};
+
+const formatMonthStart = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
+
+const formatMonthEnd = (date: Date): string => {
+  const year: number = date.getFullYear();
+  const month: number = date.getMonth() + 1;
+  const lastDay: number = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(
+    2,
+    "0"
+  )}`;
+};
+
+const formatBareDate = (date: string): string => {
+  const parts: string[] = date.split("-");
+  return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : date;
+};
+
+const openingAmountToDraft = (amount?: number | null): string =>
+  amount === null || amount === undefined ? "" : String(amount);
+
+const isOpeningDraftValid = (draft: string): boolean => {
+  const value: string = draft.trim();
+  return value === "" || Number.isFinite(Number(value));
+};
+
+const isOpeningDraftDirty = (
+  row: CustomerListRow,
+  draft: string
+): boolean => {
+  const value: string = draft.trim();
+  if (value === "") return row.opening_amount !== null && row.opening_amount !== undefined;
+  if (!Number.isFinite(Number(value))) return true;
+  return (
+    row.opening_amount === null ||
+    row.opening_amount === undefined ||
+    Math.abs(Number(value) - Number(row.opening_amount)) > 0.000001
+  );
 };
 
 // Keyed by the endpoint so each company's report keeps its own last-viewed month.
@@ -300,17 +349,19 @@ const storeSearchTerm = (debtorsEndpoint: string, value: string): void => {
 const hideZeroBalancesStorageKey = (debtorsEndpoint: string): string =>
   `debtorsReport.hideZeroBalances:${debtorsEndpoint}`;
 
-const readStoredHideZeroBalances = (debtorsEndpoint: string): boolean => {
-  if (typeof window === "undefined") return true;
+const readStoredHideZeroBalances = (
+  debtorsEndpoint: string,
+  defaultValue: boolean
+): boolean => {
+  if (typeof window === "undefined") return defaultValue;
 
   try {
     const stored: string | null = window.localStorage.getItem(
       hideZeroBalancesStorageKey(debtorsEndpoint)
     );
-    // Zero balances are hidden by default until the user toggles them on.
-    return stored === null ? true : stored === "1";
+    return stored === null ? defaultValue : stored === "1";
   } catch (_error: unknown) {
-    return true;
+    return defaultValue;
   }
 };
 
@@ -478,14 +529,75 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     null
   );
   const [hideZeroBalances, setHideZeroBalances] = useState<boolean>(() =>
-    readStoredHideZeroBalances(config.debtorsEndpoint)
+    readStoredHideZeroBalances(
+      config.debtorsEndpoint,
+      config.defaultHideZeroBalances ?? true
+    )
   );
+  const [openingDrafts, setOpeningDrafts] = useState<Record<string, string>>(
+    {}
+  );
+  const [savingOpeningAccounts, setSavingOpeningAccounts] = useState<
+    Set<string>
+  >(new Set());
   const [customerPage, setCustomerPage] = useState<number>(() =>
     readStoredCustomerPage(config.debtorsEndpoint)
   );
   // Search only applies when the input loses focus (or Enter is pressed), so
   // typing does not fire the (ledger-heavy) customer-list fetch per keystroke.
   const [appliedSearch, setAppliedSearch] = useState<string>(searchTerm);
+
+  const hasUnsavedOpeningDrafts: boolean = Boolean(
+    config.openingBalancesEndpoint &&
+      customerListData?.customers.some((row: CustomerListRow): boolean =>
+        isOpeningDraftDirty(
+          row,
+          openingDrafts[row.account_no] ??
+            openingAmountToDraft(row.opening_amount)
+        )
+      )
+  );
+
+  const discardOpeningDrafts = useCallback((): void => {
+    if (!config.openingBalancesEndpoint || !customerListData) return;
+    const nextDrafts: Record<string, string> = {};
+    customerListData.customers.forEach((row: CustomerListRow): void => {
+      nextDrafts[row.account_no] = openingAmountToDraft(row.opening_amount);
+    });
+    setOpeningDrafts(nextDrafts);
+  }, [config.openingBalancesEndpoint, customerListData]);
+
+  const confirmDiscardOpeningDrafts = useCallback((): boolean => {
+    if (!hasUnsavedOpeningDrafts) return true;
+    if (
+      !window.confirm(
+        t("You have unsaved changes. Do you want to discard them?")
+      )
+    ) {
+      return false;
+    }
+    discardOpeningDrafts();
+    return true;
+  }, [discardOpeningDrafts, hasUnsavedOpeningDrafts, t]);
+
+  useEffect(() => {
+    if (!hasUnsavedOpeningDrafts) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent): void => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return (): void =>
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedOpeningDrafts]);
+
+  const navigateWithOpeningDraftGuard = useCallback(
+    (path: string): void => {
+      if (!confirmDiscardOpeningDrafts()) return;
+      navigate(path);
+    },
+    [confirmDiscardOpeningDrafts, navigate]
+  );
 
   // Sticky list header measurement so the customer-table column header can
   // stack directly beneath it while scrolling (same approach as
@@ -500,12 +612,14 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
 
   const commitSearch = (): void => {
     if (searchTerm === appliedSearch) return;
+    if (!confirmDiscardOpeningDrafts()) return;
     setAppliedSearch(searchTerm);
     setCustomerPage(1);
     storeCustomerPage(config.debtorsEndpoint, 1);
   };
 
   const handleClearSearch = (): void => {
+    if (appliedSearch !== "" && !confirmDiscardOpeningDrafts()) return;
     handleSearchChange("");
     if (appliedSearch !== "") {
       setAppliedSearch("");
@@ -515,6 +629,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   };
 
   const handleHideZeroBalancesToggle = (): void => {
+    if (!confirmDiscardOpeningDrafts()) return;
     setHideZeroBalances((prev: boolean): boolean => {
       const next: boolean = !prev;
       storeHideZeroBalances(config.debtorsEndpoint, next);
@@ -525,6 +640,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   };
 
   const handleCustomerPageChange = (page: number): void => {
+    if (!confirmDiscardOpeningDrafts()) return;
     setCustomerPage(page);
     storeCustomerPage(config.debtorsEndpoint, page);
   };
@@ -613,6 +729,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       page: number;
       search: string;
       hideZero: boolean;
+      openingDraftsToPreserve?: Record<string, string>;
     }): Promise<void> => {
       try {
         setCustomerListLoading(true);
@@ -623,8 +740,24 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
           `&includeZero=1&page=${params.page}&limit=${CUSTOMER_PAGE_LIMIT}` +
           `&search=${encodeURIComponent(params.search)}` +
           (params.hideZero ? "&hideZero=1" : "");
-        const data = await api.get(url);
+        const data: CustomerListData = await api.get<CustomerListData>(url);
         setCustomerListData(data);
+        if (config.openingBalancesEndpoint) {
+          const nextDrafts: Record<string, string> = {};
+          data.customers.forEach((row: CustomerListRow): void => {
+            nextDrafts[row.account_no] = openingAmountToDraft(
+              row.opening_amount
+            );
+          });
+          Object.entries(params.openingDraftsToPreserve ?? {}).forEach(
+            ([accountNo, draft]: [string, string]): void => {
+              if (Object.prototype.hasOwnProperty.call(nextDrafts, accountNo)) {
+                nextDrafts[accountNo] = draft;
+              }
+            }
+          );
+          setOpeningDrafts(nextDrafts);
+        }
       } catch (err) {
         setCustomerListError(
           t("Failed to fetch customer list. Please try again later.")
@@ -634,7 +767,97 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
         setCustomerListLoading(false);
       }
     },
-    [config.generalStatementEndpoint, t]
+    [config.generalStatementEndpoint, config.openingBalancesEndpoint, t]
+  );
+
+  const handleOpeningDraftChange = (
+    accountNo: string,
+    value: string
+  ): void => {
+    setOpeningDrafts((previous: Record<string, string>) => ({
+      ...previous,
+      [accountNo]: value,
+    }));
+  };
+
+  const handleSaveDebtorOpening = useCallback(
+    async (row: CustomerListRow): Promise<void> => {
+      if (!config.openingBalancesEndpoint) return;
+
+      const draft: string = openingDrafts[row.account_no] ?? "";
+      const trimmedDraft: string = draft.trim();
+      if (!isOpeningDraftValid(draft)) {
+        toast.error(t("Enter a valid debtor opening amount"));
+        return;
+      }
+
+      const asOfDate: string = formatMonthStart(selectedMonth);
+      const basePath: string = config.openingBalancesEndpoint.replace(/\/$/, "");
+      const customerPath: string = `${basePath}/${encodeURIComponent(
+        row.account_no
+      )}`;
+
+      setSavingOpeningAccounts((previous: Set<string>) => {
+        const next: Set<string> = new Set(previous);
+        next.add(row.account_no);
+        return next;
+      });
+
+      try {
+        const openingDraftsToPreserve: Record<string, string> = {};
+        customerListData?.customers.forEach(
+          (otherRow: CustomerListRow): void => {
+            if (otherRow.account_no === row.account_no) return;
+            const otherDraft: string =
+              openingDrafts[otherRow.account_no] ??
+              openingAmountToDraft(otherRow.opening_amount);
+            if (isOpeningDraftDirty(otherRow, otherDraft)) {
+              openingDraftsToPreserve[otherRow.account_no] = otherDraft;
+            }
+          }
+        );
+
+        if (trimmedDraft === "") {
+          await api.delete(`${customerPath}/${asOfDate}`);
+          toast.success(t("Debtor opening removed"));
+        } else {
+          await api.put(customerPath, {
+            as_of_date: asOfDate,
+            amount: Number(trimmedDraft),
+          });
+          toast.success(t("Debtor opening saved"));
+        }
+
+        await fetchCustomerList({
+          month: selectedMonth.getMonth() + 1,
+          year: selectedMonth.getFullYear(),
+          page: customerPage,
+          search: appliedSearch,
+          hideZero: hideZeroBalances,
+          openingDraftsToPreserve,
+        });
+      } catch (saveError: unknown) {
+        console.error("Error saving debtor opening:", saveError);
+        toast.error(t("Failed to save debtor opening"));
+      } finally {
+        setSavingOpeningAccounts((previous: Set<string>) => {
+          const next: Set<string> = new Set(previous);
+          next.delete(row.account_no);
+          return next;
+        });
+      }
+    },
+    [
+      appliedSearch,
+      config.openingBalancesEndpoint,
+      customerPage,
+      customerListData,
+      fetchCustomerList,
+      hideZeroBalances,
+      openingDrafts,
+      selectedMonth,
+      t,
+    ]
   );
 
   // Fetch the active view's dataset for the selected month
@@ -711,6 +934,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
   const handleViewModeChange = useCallback(
     (mode: DebtorsViewMode): void => {
       if (mode === viewMode) return;
+      if (!confirmDiscardOpeningDrafts()) return;
       if (mode === "customer") {
         // All Time has no meaning for the month-as-at customer list.
         setAllTimeMode(false);
@@ -721,17 +945,18 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
       setViewMode(mode);
       storeViewMode(config.debtorsEndpoint, mode);
     },
-    [viewMode, config.debtorsEndpoint]
+    [viewMode, config.debtorsEndpoint, confirmDiscardOpeningDrafts]
   );
 
   // Handle month selection change from MonthNavigator
   const handleMonthChange = useCallback(
-    (newDate: Date) => {
+    (newDate: Date): void => {
+      if (!confirmDiscardOpeningDrafts()) return;
       setAllTimeMode(false);
       setSelectedMonth(newDate);
       storeSelectedMonth(config.debtorsEndpoint, newDate);
     },
-    [config.debtorsEndpoint]
+    [config.debtorsEndpoint, confirmDiscardOpeningDrafts]
   );
 
   // Toggle all time mode
@@ -739,8 +964,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     setAllTimeMode((prev) => !prev);
   }, []);
 
-  const handleRefresh = () => {
+  const handleRefresh = (): void => {
     if (viewMode === "customer") {
+      if (!confirmDiscardOpeningDrafts()) return;
       fetchCustomerList({
         month: selectedMonth.getMonth() + 1,
         year: selectedMonth.getFullYear(),
@@ -918,7 +1144,19 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
 
   const handleCustomerClick = (customerId: string): void => {
     if (!config.customerInvoicesPath) return;
-    navigate(config.customerInvoicesPath(customerId));
+    navigateWithOpeningDraftGuard(config.customerInvoicesPath(customerId));
+  };
+
+  const handleLedgerClick = (accountCode: string): void => {
+    if (allTimeMode) return;
+    const params: URLSearchParams = new URLSearchParams({
+      account: accountCode,
+      start: formatMonthStart(selectedMonth),
+      end: formatMonthEnd(selectedMonth),
+    });
+    navigateWithOpeningDraftGuard(
+      `${config.accountLedgerPath}?${params.toString()}`
+    );
   };
 
   const handlePrint = async (): Promise<void> => {
@@ -1105,6 +1343,8 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
     month: "short",
     year: "numeric",
   });
+  const openingAsOfDate: string = formatMonthStart(selectedMonth);
+  const openingAsOfDateLabel: string = formatBareDate(openingAsOfDate);
   const allDebtorsExpanded =
     !isCustomerView &&
     filteredData !== null &&
@@ -1358,6 +1598,22 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                       >
                         {t("Customer")}
                       </th>
+                      {config.openingBalancesEndpoint && (
+                        <th
+                          style={{ top: listHeaderHeight }}
+                          title={t(
+                            "Positive amounts are DR (customer owes); negative amounts are CR (customer credit). Leave blank and save to remove this date's opening."
+                          )}
+                          className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-60 min-w-60"
+                        >
+                          <span className="block">{t("Debtor Opening")}</span>
+                          <span className="block text-[10px] font-normal normal-case whitespace-nowrap">
+                            {t("As at {{date}}", {
+                              date: openingAsOfDateLabel,
+                            })}
+                          </span>
+                        </th>
+                      )}
                       <th
                         style={{ top: listHeaderHeight }}
                         className="sticky z-20 bg-default-100 dark:bg-gray-800 px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase"
@@ -1394,6 +1650,17 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                     {customerRows.map((row: CustomerListRow) => {
                       const isZeroBalance: boolean =
                         Math.abs(row.total_due) <= 0.005;
+                      const openingDraft: string =
+                        openingDrafts[row.account_no] ??
+                        openingAmountToDraft(row.opening_amount);
+                      const openingIsSaving: boolean =
+                        savingOpeningAccounts.has(row.account_no);
+                      const openingIsDirty: boolean = isOpeningDraftDirty(
+                        row,
+                        openingDraft
+                      );
+                      const openingIsValid: boolean =
+                        isOpeningDraftValid(openingDraft);
                       return (
                         <tr
                           key={row.account_no}
@@ -1416,7 +1683,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               title={row.particular}
                               onClick={() => {
                                 if (!config.customerDetailsPath) return;
-                                navigate(
+                                navigateWithOpeningDraftGuard(
                                   config.customerDetailsPath(row.account_no)
                                 );
                               }}
@@ -1424,6 +1691,75 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               {row.particular}
                             </span>
                           </td>
+                          {config.openingBalancesEndpoint && (
+                            <td className="px-2 py-2 w-60 min-w-60">
+                              <div className="flex items-center justify-end gap-1.5">
+                                <input
+                                  type="number"
+                                  inputMode="decimal"
+                                  step="0.01"
+                                  value={openingDraft}
+                                  disabled={openingIsSaving}
+                                  aria-label={t(
+                                    "Debtor opening for {{customer}}",
+                                    { customer: row.particular }
+                                  )}
+                                  title={t(
+                                    "Positive amounts are DR (customer owes); negative amounts are CR (customer credit). Leave blank and save to remove this date's opening."
+                                  )}
+                                  placeholder={t("0.00")}
+                                  onChange={(
+                                    event: React.ChangeEvent<HTMLInputElement>
+                                  ): void =>
+                                    handleOpeningDraftChange(
+                                      row.account_no,
+                                      event.target.value
+                                    )
+                                  }
+                                  onKeyDown={(
+                                    event: React.KeyboardEvent<HTMLInputElement>
+                                  ): void => {
+                                    if (
+                                      event.key === "Enter" &&
+                                      openingIsDirty &&
+                                      !openingIsSaving
+                                    ) {
+                                      event.preventDefault();
+                                      void handleSaveDebtorOpening(row);
+                                    }
+                                  }}
+                                  className={`h-8 w-24 rounded border bg-white px-2 text-right text-sm text-default-900 focus:outline-none focus:ring-1 dark:bg-gray-900/50 dark:text-gray-100 ${
+                                    openingIsValid
+                                      ? openingIsDirty
+                                        ? "border-amber-400 focus:border-amber-500 focus:ring-amber-500 dark:border-amber-600"
+                                        : "border-default-300 focus:border-sky-500 focus:ring-sky-500 dark:border-gray-600"
+                                      : "border-rose-400 focus:border-rose-500 focus:ring-rose-500 dark:border-rose-500"
+                                  }`}
+                                />
+                                <button
+                                  type="button"
+                                  disabled={
+                                    openingIsSaving || !openingIsDirty
+                                  }
+                                  onClick={(): void => {
+                                    void handleSaveDebtorOpening(row);
+                                  }}
+                                  title={t(
+                                    "Save debtor opening for {{customer}}",
+                                    { customer: row.particular }
+                                  )}
+                                  className="h-8 rounded border border-sky-300 bg-sky-50 px-2 text-[11px] font-medium text-sky-700 transition-colors hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-sky-700 dark:bg-sky-900/30 dark:text-sky-300 dark:hover:bg-sky-900/50"
+                                >
+                                  {openingIsSaving
+                                    ? t("Saving...")
+                                    : t("Save")}
+                                </button>
+                              </div>
+                              <p className="mt-1 text-right text-[10px] text-default-400 dark:text-gray-500">
+                                {t("Positive = DR · Negative = CR · Blank = Remove")}
+                              </p>
+                            </td>
+                          )}
                           <td className="px-3 py-2 text-right whitespace-nowrap">
                             RM {formatCurrency(row.bal_bf)}
                           </td>
@@ -1449,7 +1785,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                             RM {formatCurrency(row.total_due)}
                           </td>
                           <td className="px-3 py-2">
-                            <div className="flex justify-end gap-2">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -1465,12 +1801,30 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </Button>
                               <Button
                                 size="sm"
+                                variant="outline"
+                                icon={IconBook2}
+                                title={t("Open {{code}} ledger", {
+                                  code:
+                                    row.ledger_account_code ?? row.account_no,
+                                })}
                                 onClick={() =>
-                                  handleCustomerClick(row.account_no)
+                                  handleLedgerClick(
+                                    row.ledger_account_code ?? row.account_no
+                                  )
                                 }
                               >
-                                {t("Invoices")}
+                                {t("Ledger")}
                               </Button>
+                              {config.customerInvoicesPath && (
+                                <Button
+                                  size="sm"
+                                  onClick={() =>
+                                    handleCustomerClick(row.account_no)
+                                  }
+                                >
+                                  {t("Invoices")}
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1646,11 +2000,11 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                       >
                         {/* Customer Header */}
                         <div
-                          className="flex items-center justify-between p-3 cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 transition-colors"
+                          className="flex flex-wrap items-center justify-between gap-3 p-3 cursor-pointer hover:bg-default-50 dark:hover:bg-gray-700 transition-colors"
                           onClick={() => toggleCustomer(customer.customer_id)}
                         >
-                          <div className="flex items-center gap-8">
-                            <div className="flex items-center gap-3">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-8 gap-y-2">
+                            <div className="flex min-w-0 items-center gap-3">
                               {expandedCustomers.has(customer.customer_id) ? (
                                 <IconChevronDown
                                   size={16}
@@ -1666,9 +2020,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                 size={16}
                                 className="text-sky-600 dark:text-sky-400"
                               />
-                              <div>
+                              <div className="min-w-0">
                                 <span
-                                  className="font-medium text-default-800 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline cursor-pointer"
+                                  className="block truncate font-medium text-default-800 dark:text-gray-100 hover:text-sky-600 dark:hover:text-sky-400 hover:underline cursor-pointer"
                                   title={
                                     customer.customer_name ||
                                     customer.customer_id
@@ -1676,7 +2030,11 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     if (!config.customerDetailsPath) return;
-                                    navigate(config.customerDetailsPath(customer.customer_id));
+                                    navigateWithOpeningDraftGuard(
+                                      config.customerDetailsPath(
+                                        customer.customer_id
+                                      )
+                                    );
                                   }}
                                 >
                                   {customer.customer_name ||
@@ -1705,7 +2063,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
                             <div className="text-right">
                               <p className="text-xs text-default-500 dark:text-gray-400">{t("Balance")}</p>
                               <p className="font-semibold text-rose-600 dark:text-rose-400">
@@ -1733,13 +2091,39 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                             </Button>
                             <Button
                               size="sm"
+                              variant="outline"
+                              icon={IconBook2}
+                              disabled={allTimeMode}
+                              title={
+                                allTimeMode
+                                  ? t("Select a specific month to open ledger")
+                                  : t("Open {{code}} ledger", {
+                                      code:
+                                        customer.ledger_account_code ??
+                                        customer.customer_id,
+                                    })
+                              }
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleCustomerClick(customer.customer_id);
+                                handleLedgerClick(
+                                  customer.ledger_account_code ??
+                                    customer.customer_id
+                                );
                               }}
                             >
-                              {t("Invoices")}
+                              {t("Ledger")}
                             </Button>
+                            {config.customerInvoicesPath && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCustomerClick(customer.customer_id);
+                                }}
+                              >
+                                {t("Invoices")}
+                              </Button>
+                            )}
                           </div>
                         </div>
 
@@ -1843,6 +2227,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                           className="hover:bg-default-50 dark:hover:bg-gray-700 cursor-pointer text-default-800 dark:text-gray-100"
                                           onClick={() => {
                                             if (!config.invoiceDetailsPath) return;
+                                            if (!confirmDiscardOpeningDrafts()) return;
                                             navigate(
                                               config.invoiceDetailsPath(
                                                 invoice.invoice_id
@@ -1898,6 +2283,9 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                                   invoice.balance !== 0 &&
                                                   config.invoiceDetailsPath
                                                 ) {
+                                                  if (!confirmDiscardOpeningDrafts()) {
+                                                    return;
+                                                  }
                                                   navigate(
                                                     config.invoiceDetailsPath(
                                                       invoice.invoice_id
@@ -2020,7 +2408,7 @@ const DebtorsReportPage: React.FC<DebtorsReportPageProps> = ({
                                                         type="button"
                                                         className="rounded-sm font-medium hover:text-sky-600 dark:hover:text-sky-400 hover:underline focus:outline-none focus:ring-2 focus:ring-sky-500"
                                                         onClick={() =>
-                                                          navigate(
+                                                          navigateWithOpeningDraftGuard(
                                                             adjustmentDocDetailsPath(
                                                               adjustment.id
                                                             )

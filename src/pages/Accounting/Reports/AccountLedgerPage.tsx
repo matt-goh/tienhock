@@ -427,9 +427,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
     try {
       setLoading(true);
       setError(null);
-      const accountPath: string = hasCompanyAccounts
-        ? encodeURIComponent(selectedAccount)
-        : selectedAccount;
+      const accountPath: string = encodeURIComponent(selectedAccount);
       const endpoint: string = isJellyPolly
         ? `/jellypolly/api/account-ledger/${accountPath}/range/${toLocalIso(
             range.start
@@ -454,7 +452,6 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
   }, [
     isJellyPolly,
     isGreenTarget,
-    hasCompanyAccounts,
     recordRecentLedger,
     selectedAccount,
     range.start?.getTime(),
@@ -498,7 +495,7 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
     [accountCodes, selectedAccount]
   );
   const canSetOpeningBalance: boolean =
-    !isJellyPolly && (!isGreenTarget || !selectedAccountIsSubledger);
+    !isGreenTarget || !selectedAccountIsSubledger;
 
   const accountDescriptionByCode = useMemo(() => {
     const map: Record<string, string> = {};
@@ -564,13 +561,18 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
   );
 
   const handleOpenOpeningModal = async (): Promise<void> => {
-    if (!canSetOpeningBalance) return;
+    if (!canSetOpeningBalance || (isJellyPolly && !range.start)) return;
     try {
-      const res = await api.get(
-        isGreenTarget
-          ? `/greentarget/api/opening-balances/${selectedAccount}`
-          : `/api/opening-balances/${selectedAccount}`
-      );
+      const accountPath: string = encodeURIComponent(selectedAccount);
+      const openingAsOfDate: string = range.start
+        ? toLocalIso(range.start)
+        : "";
+      const endpoint: string = isJellyPolly
+        ? `/jellypolly/api/account-ledger/opening-balances/${accountPath}?as_of=${openingAsOfDate}`
+        : isGreenTarget
+          ? `/greentarget/api/opening-balances/${accountPath}`
+          : `/api/opening-balances/${accountPath}`;
+      const res = await api.get(endpoint);
       setCurrentAnchor(res?.opening_balance || null);
     } catch (err) {
       console.error("Error fetching opening balance:", err);
@@ -1189,17 +1191,15 @@ const AccountLedgerPage: React.FC<AccountLedgerPageProps> = ({
         </div>
       )}
 
-      {company !== "jellypolly" && (
-        <OpeningBalanceModal
-          isOpen={showOpeningModal}
-          onClose={() => setShowOpeningModal(false)}
-          accountCode={selectedAccount}
-          accountDescription={selectedAccountDescription}
-          company={isGreenTarget ? "greentarget" : "tienhock"}
-          current={currentAnchor}
-          onSaved={fetchStatement}
-        />
-      )}
+      <OpeningBalanceModal
+        isOpen={showOpeningModal}
+        onClose={() => setShowOpeningModal(false)}
+        accountCode={selectedAccount}
+        accountDescription={selectedAccountDescription}
+        company={company}
+        current={currentAnchor}
+        onSaved={fetchStatement}
+      />
     </div>
   );
 };

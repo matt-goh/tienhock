@@ -1,7 +1,7 @@
 // src/pages/Stock/Reports/EstimatedReportPage.tsx
-// Monthly "Estimated P&L & Unit Cost" report (MEE & BIHUN), from 06/2026.
-// Rendered in two dedicated views via the `view` prop: "pl" (Estimated P&L page)
-// and "unitCost" (Estimated Unit Cost page). Every figure is rendered from
+// Monthly "Estimated Cost & Unit Cost" report (MEE & BIHUN), from 06/2026.
+// Rendered in two dedicated views via the `view` prop: "pl" (Estimated Cost
+// page) and "unitCost" (Estimated Unit Cost page). Every figure is rendered from
 // GET /api/estimated-report as computed by the backend engine - nothing is
 // hardcoded here. Doc: docs/Account/ESTIMATED_REPORT_HANDOVER.md
 import React, { useCallback, useEffect, useState } from "react";
@@ -306,7 +306,7 @@ const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({
   </div>
 );
 
-/** Full-bleed highlighted band for headline figures (USAGE, P/L, totals). */
+/** Full-bleed highlighted band for headline figures (USAGE, cost, totals). */
 const BandRow: React.FC<{
   label: React.ReactNode;
   value: React.ReactNode;
@@ -764,7 +764,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
         {lineReport && (
           <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm px-0.5">
             <span className="font-medium text-default-700 dark:text-gray-200">
-              {view === "pl" ? t("Estimated P&L") : t("Estimated Unit Cost")} —{" "}
+              {view === "pl" ? t("Estimated Cost") : t("Estimated Unit Cost")} —{" "}
               {productLine.toUpperCase()}
               <span className="ml-1.5 font-normal text-default-500 dark:text-gray-400">
                 {lineReport.period.label}
@@ -788,7 +788,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  {t("P/L")}{" "}
+                  {t("Estimate Cost")}{" "}
                   <span
                     className={clsx(
                       "font-semibold",
@@ -800,7 +800,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                 </span>
                 <StripDot />
                 <span className="text-default-600 dark:text-gray-300">
-                  {t("Final P/L")}{" "}
+                  {t("Final Estimate Cost")}{" "}
                   <span
                     className={clsx(
                       "font-semibold",
@@ -886,7 +886,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
         </div>
       )}
 
-      {/* ============================== Estimated P&L ============================== */}
+      {/* ============================= Estimated Cost ============================= */}
       {lineReport && view === "pl" && (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
           <div className="space-y-5 p-4">
@@ -1031,9 +1031,9 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
               </p>
             </div>
 
-            {/* P/L */}
+            {/* ESTIMATE COST */}
             <BandRow
-              label={t("PROFIT / (LOSS)")}
+              label={t("ESTIMATE COST")}
               value={
                 <span className={signedAmountClass(lineReport.pl.profitLoss)}>
                   {formatCurrency(lineReport.pl.profitLoss)}
@@ -1053,7 +1053,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
                   </label>
                   <p className="mt-0.5 text-xs text-default-500 dark:text-gray-400">
                     {t(
-                      "Key the month's Add Back here — it raises Final P/L and lowers the estimated unit cost.",
+                      "Key the month's Add Back here — it raises Final Estimate Cost and lowers the estimated unit cost.",
                     )}
                   </p>
                 </div>
@@ -1086,10 +1086,10 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
               </div>
             </div>
 
-            {/* FINAL P/L */}
+            {/* FINAL ESTIMATE COST */}
             <div className="flex items-center justify-between text-sm font-bold">
               <span className="text-gray-900 dark:text-white">
-                {t("FINAL PROFIT / (LOSS)")}
+                {t("FINAL ESTIMATE COST")}
               </span>
               <span
                 className={signedAmountClass(lineReport.pl.finalProfitLoss)}
@@ -1101,7 +1101,7 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
             {/* ACCUMULATIVE */}
             <BandRow
               accent
-              label={t("ACCUMULATIVE P/L")}
+              label={t("ACCUMULATIVE COST")}
               value={
                 <span className={signedAmountClass(lineReport.pl.accumulative)}>
                   RM {formatCurrency(lineReport.pl.accumulative)}
@@ -1211,9 +1211,9 @@ const EstimatedReportPage: React.FC<EstimatedReportPageProps> = ({ view }) => {
               </span>
             </div>
 
-            {/* ADD BACK (read-only; keyed on the Estimated P&L page) */}
+            {/* ADD BACK (read-only; keyed on the Estimated Cost page) */}
             <InfoRow
-              label={t("ADD BACK (keyed on the Estimated P&L page)")}
+              label={t("ADD BACK (keyed on the Estimated Cost page)")}
               value={
                 <>
                   {formatCurrency(lineReport.unitCost.addBack.amount)}

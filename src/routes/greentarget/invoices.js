@@ -2,8 +2,13 @@
 import { Router } from "express";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
 import {
+  fetchGTInvoiceLines,
   fetchGTInvoiceRevenueSplits,
+  generateGTInvoiceLines,
+  normalizeGTInvoiceLines,
   normalizeGTRevenueSplits,
+  prorateGTInvoiceLines,
+  replaceGTInvoiceLines,
   replaceGTInvoiceRevenueSplits,
   resolveGTDebtorAssignment,
   syncGTSalesJournalEntry,
@@ -370,6 +375,19 @@ export default function (pool, defaultConfig) {
                 FROM greentarget.invoice_revenue_splits split
                 WHERE split.invoice_id = i.invoice_id
               ), '[]'::json) AS revenue_splits,
+              COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'line_number', il.line_number,
+                    'description', il.description,
+                    'quantity', il.quantity,
+                    'unit_price', il.unit_price,
+                    'amount', il.amount
+                  ) ORDER BY il.line_number
+                )
+                FROM greentarget.invoice_lines il
+                WHERE il.invoice_id = i.invoice_id
+              ), '[]'::json) AS invoice_lines,
               json_build_object(
                 'has_receipts', EXISTS (
                   SELECT 1 FROM greentarget.payments dependency_payment
@@ -678,6 +696,19 @@ export default function (pool, defaultConfig) {
               FROM greentarget.invoice_revenue_splits split
               WHERE split.invoice_id = i.invoice_id
             ), '[]'::json) AS revenue_splits,
+            COALESCE((
+              SELECT json_agg(
+                json_build_object(
+                  'line_number', il.line_number,
+                  'description', il.description,
+                  'quantity', il.quantity,
+                  'unit_price', il.unit_price,
+                  'amount', il.amount
+                ) ORDER BY il.line_number
+              )
+              FROM greentarget.invoice_lines il
+              WHERE il.invoice_id = i.invoice_id
+            ), '[]'::json) AS invoice_lines,
             c.name as customer_name,
             c.phone_number as customer_phone_number,
               c.billing_address,
@@ -783,6 +814,19 @@ export default function (pool, defaultConfig) {
                 FROM greentarget.invoice_revenue_splits split
                 WHERE split.invoice_id = i.invoice_id
               ), '[]'::json) AS revenue_splits,
+              COALESCE((
+                SELECT json_agg(
+                  json_build_object(
+                    'line_number', il.line_number,
+                    'description', il.description,
+                    'quantity', il.quantity,
+                    'unit_price', il.unit_price,
+                    'amount', il.amount
+                  ) ORDER BY il.line_number
+                )
+                FROM greentarget.invoice_lines il
+                WHERE il.invoice_id = i.invoice_id
+              ), '[]'::json) AS invoice_lines,
               json_build_object(
                 'has_receipts', EXISTS (
                   SELECT 1 FROM greentarget.payments dependency_payment
@@ -942,6 +986,7 @@ export default function (pool, defaultConfig) {
       revenue_account_code,
       revenue_splits,
       delivery_order,
+      lines,
     } = req.body;
 
     const client = await pool.connect();
@@ -1006,6 +1051,16 @@ export default function (pool, defaultConfig) {
         distinctRevenueAccounts.size === 1
           ? normalizedRevenueSplits[0].account_code
           : null;
+      // Display lines: keyed lines win, else one default line worded after the
+      // revenue account (mixed splits fall back to the generic wording).
+      const normalizedInvoiceLines =
+        lines !== undefined
+          ? normalizeGTInvoiceLines(lines, numAmountBeforeTax)
+          : generateGTInvoiceLines(
+              { revenue_account_code: headerRevenueAccount },
+              Array.isArray(rental_ids) ? rental_ids.length : 0,
+              numAmountBeforeTax
+            );
       await client.query(
         `UPDATE greentarget.customers
             SET debtor_account_code = $1
@@ -1074,6 +1129,8 @@ export default function (pool, defaultConfig) {
         normalizedRevenueSplits
       );
       createdInvoice.revenue_splits = normalizedRevenueSplits;
+      await replaceGTInvoiceLines(client, invoiceId, normalizedInvoiceLines);
+      createdInvoice.invoice_lines = normalizedInvoiceLines;
 
       // Insert rental associations in junction table
       if (type === "regular" && rental_ids && Array.isArray(rental_ids) && rental_ids.length > 0) {
@@ -1175,6 +1232,7 @@ export default function (pool, defaultConfig) {
       revenue_account_code,
       revenue_splits,
       delivery_order,
+      lines,
     } = req.body;
 
     const numericInvoiceId = parseInt(invoice_id, 10);
@@ -1253,6 +1311,45 @@ export default function (pool, defaultConfig) {
           numericInvoiceId
         );
       }
+      const currentInvoiceLines = await fetchGTInvoiceLines(
+        client,
+        numericInvoiceId
+      );
+      // Presence-based like delivery_order: `lines` sent → normalize and
+      // rewrite; absent → keep stored lines (prorated below if the amount
+      // changed). A validated e-Invoice carries the descriptions in its XML,
+      // so its lines are locked.
+      let requestedInvoiceLines = null;
+      let linesChanged = false;
+      if (lines !== undefined) {
+        requestedInvoiceLines = normalizeGTInvoiceLines(
+          lines,
+          numAmountBeforeTax
+        );
+        const canonicalLines = (lineSet) =>
+          JSON.stringify(
+            lineSet.map((line) => [
+              line.description,
+              Math.round(Number(line.quantity) * 100),
+              Math.round(Number(line.unit_price) * 100),
+              Math.round(Number(line.amount) * 100),
+            ])
+          );
+        linesChanged =
+          canonicalLines(requestedInvoiceLines) !==
+          canonicalLines(currentInvoiceLines);
+        if (linesChanged && currentInvoice.einvoice_status === "valid") {
+          throw Object.assign(
+            new Error(
+              "Invoice lines are locked because a validated e-Invoice carries this invoice's descriptions."
+            ),
+            { statusCode: 409 }
+          );
+        }
+      }
+      const subtotalChanged =
+        Math.round(numAmountBeforeTax * 100) !==
+        Math.round(Number(currentInvoice.amount_before_tax) * 100);
       const customerChanged =
         Number(customer_id) !== Number(currentInvoice.customer_id);
       const debtorAssignment = await resolveGTDebtorAssignment(client, {
@@ -1421,7 +1518,7 @@ export default function (pool, defaultConfig) {
       const dependencies = dependentDocumentResult.rows[0];
       const documentIdentityChanged =
         invoiceNumberChanged || customerChanged || amountChanged || dateChanged ||
-        debtorChanged || rentalsChanged || typeChanged;
+        debtorChanged || rentalsChanged || typeChanged || linesChanged;
       if (dependencies.has_receipts && documentIdentityChanged) {
         throw Object.assign(
           new Error(
@@ -1547,6 +1644,26 @@ export default function (pool, defaultConfig) {
         normalizedRevenueSplits
       );
       updateResult.rows[0].revenue_splits = normalizedRevenueSplits;
+
+      if (requestedInvoiceLines !== null) {
+        await replaceGTInvoiceLines(
+          client,
+          numericInvoiceId,
+          requestedInvoiceLines
+        );
+        updateResult.rows[0].invoice_lines = requestedInvoiceLines;
+      } else if (subtotalChanged && currentInvoiceLines.length > 0) {
+        // Amount edited without re-keying lines (the details-page inline
+        // pencil): re-price the stored lines onto the new subtotal.
+        const proratedLines = prorateGTInvoiceLines(
+          currentInvoiceLines,
+          numAmountBeforeTax
+        );
+        await replaceGTInvoiceLines(client, numericInvoiceId, proratedLines);
+        updateResult.rows[0].invoice_lines = proratedLines;
+      } else {
+        updateResult.rows[0].invoice_lines = currentInvoiceLines;
+      }
 
       // Update rental associations in junction table
       if (type === "regular" && rental_ids && Array.isArray(rental_ids)) {
