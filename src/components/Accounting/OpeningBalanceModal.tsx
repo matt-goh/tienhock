@@ -14,8 +14,9 @@ import { format } from "date-fns";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import ListboxSelect from "../ListboxSelect";
-import TimeNavigator from "../TimeNavigator";
+import TimeNavigator, { type TimeRange } from "../TimeNavigator";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 
 // 'yyyy-MM-dd' -> local Date (never via new Date(string), which parses as UTC)
 const parseLocalDate = (s: string): Date | null => {
@@ -30,8 +31,8 @@ interface OpeningBalanceModalProps {
   accountCode: string;
   accountDescription?: string;
   // Which company's opening-balance anchor to read/write. TH uses the
-  // un-prefixed route; GT uses its schema-isolated /greentarget route.
-  company?: "tienhock" | "greentarget";
+  // un-prefixed route; GT and JP use their schema-isolated routes.
+  company?: "tienhock" | "greentarget" | "jellypolly";
   // Currently applicable anchor (or null). amount is signed (DR-positive).
   current: { as_of_date: string; amount: number; notes?: string | null } | null;
   onSaved: () => void;
@@ -45,15 +46,17 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
   company = "tienhock",
   current,
   onSaved,
-}) => {
+}: OpeningBalanceModalProps) => {
+  const { t } = useTranslation("accounting");
   const [asOfDate, setAsOfDate] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
   const [drcr, setDrcr] = useState<"DR" | "CR">("DR");
   const [notes, setNotes] = useState<string>("");
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const isJellyPolly: boolean = company === "jellypolly";
 
-  useEffect(() => {
+  useEffect((): void => {
     if (!isOpen) return;
     setError("");
     if (current) {
@@ -69,34 +72,38 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
     }
   }, [isOpen, current, accountCode]);
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     setError("");
     if (!asOfDate) {
-      setError("As-of date is required");
+      setError(t("As-of date is required"));
       return;
     }
-    const magnitude = parseFloat(amount);
+    const magnitude: number = parseFloat(amount);
     if (isNaN(magnitude)) {
-      setError("Amount must be a number");
+      setError(t("Amount must be a number"));
       return;
     }
-    const signed = drcr === "CR" ? -Math.abs(magnitude) : Math.abs(magnitude);
+    const signed: number =
+      drcr === "CR" ? -Math.abs(magnitude) : Math.abs(magnitude);
     setIsSaving(true);
     try {
       const basePath: string =
-        company === "greentarget"
-          ? "/greentarget/api/opening-balances"
-          : "/api/opening-balances";
-      await api.put(`${basePath}/${accountCode}`, {
+        company === "jellypolly"
+          ? "/jellypolly/api/account-ledger/opening-balances"
+          : company === "greentarget"
+            ? "/greentarget/api/opening-balances"
+            : "/api/opening-balances";
+      await api.put(`${basePath}/${encodeURIComponent(accountCode)}`, {
         as_of_date: asOfDate,
         amount: signed,
         notes: notes || null,
       });
-      toast.success("Opening balance saved");
+      toast.success(t("Opening balance saved"));
       onSaved();
       onClose();
-    } catch (err: any) {
-      setError(err?.message || "Failed to save opening balance");
+    } catch (saveError: unknown) {
+      console.error("Error saving opening balance:", saveError);
+      setError(t("Failed to save opening balance"));
     } finally {
       setIsSaving(false);
     }
@@ -107,7 +114,9 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
       <Dialog
         as="div"
         className="relative z-50"
-        onClose={() => !isSaving && onClose()}
+        onClose={(): void => {
+          if (!isSaving) onClose();
+        }}
       >
         <TransitionChild
           as={Fragment}
@@ -139,11 +148,13 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Opening Balance
+                    {t("Opening Balance")}
                   </DialogTitle>
                   <button
                     onClick={onClose}
                     disabled={isSaving}
+                    title={t("Close")}
+                    aria-label={t("Close")}
                     className="text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
                   >
                     <IconX size={20} />
@@ -157,68 +168,83 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      As of date
+                      {t("As of date")}
                     </label>
                     <TimeNavigator
                       range={{
                         start: asOfDate ? parseLocalDate(asOfDate) : null,
                         end: asOfDate ? parseLocalDate(asOfDate) : null,
                       }}
-                      onChange={({ start }) =>
+                      onChange={({ start }: TimeRange): void =>
                         setAsOfDate(format(start, "yyyy-MM-dd"))
                       }
                       modes={["day"]}
                       presets={false}
                       showArrows={false}
                       allowFuture
-                      placeholder="Pick a date"
+                      placeholder={t("Pick a date")}
                     />
                     <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                      The report seeds opening from this anchor and ignores every line before it.
+                      {t(
+                        "The report seeds opening from this anchor and ignores every line before it."
+                      )}
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      Amount
+                      {t("Amount")}
                     </label>
                     <div className="flex gap-2">
                       <input
                         type="number"
                         step="0.01"
                         value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="0.00"
+                        onChange={(
+                          event: React.ChangeEvent<HTMLInputElement>
+                        ): void => setAmount(event.target.value)}
+                        placeholder={t("0.00")}
                         disabled={isSaving}
                         className="flex-1 h-[40px] px-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 text-right hover:border-default-400 dark:hover:border-gray-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
                       />
                       <ListboxSelect
                         value={drcr}
-                        onChange={(v) => setDrcr(v as "DR" | "CR")}
+                        onChange={(value: string): void =>
+                          setDrcr(value as "DR" | "CR")
+                        }
                         disabled={isSaving}
                         className="w-24"
                         buttonClassName="h-[40px] flex items-center hover:border-default-400 dark:hover:border-gray-500 transition-colors"
                         options={[
-                          { value: "DR", label: "DR" },
-                          { value: "CR", label: "CR" },
+                          { value: "DR", label: t("DR") },
+                          { value: "CR", label: t("CR") },
                         ]}
                       />
                     </div>
                     <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                      DR for asset balances (money in the bank); CR for an overdrawn
-                      account.
+                      {isJellyPolly
+                        ? t(
+                            "DR means the customer owes Jelly Polly; CR means the customer has a credit balance."
+                          )
+                        : t(
+                            "DR for asset balances (money in the bank); CR for an overdrawn account."
+                          )}
                     </p>
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      Notes
+                      {t("Notes")}
                     </label>
                     <input
                       type="text"
                       value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      placeholder="e.g. Migration opening from legacy statement"
+                      onChange={(
+                        event: React.ChangeEvent<HTMLInputElement>
+                      ): void => setNotes(event.target.value)}
+                      placeholder={t(
+                        "e.g. Migration opening from legacy statement"
+                      )}
                       disabled={isSaving}
                       className="w-full h-[40px] px-3 rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 hover:border-default-400 dark:hover:border-gray-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-colors"
                     />
@@ -233,7 +259,7 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
 
                 <div className="mt-6 flex justify-end space-x-3">
                   <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>
-                    Cancel
+                    {t("Cancel")}
                   </Button>
                   <Button
                     type="button"
@@ -242,7 +268,7 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
                     onClick={handleSave}
                     disabled={isSaving}
                   >
-                    {isSaving ? "Saving..." : "Save"}
+                    {isSaving ? t("Saving...") : t("Save")}
                   </Button>
                 </div>
               </DialogPanel>

@@ -17,6 +17,9 @@ const JELLY_POLLY_DEBTORS_CONFIG: DebtorsReportPageConfig = {
     `/jellypolly/api/debtors/statement/${customerId}?month=${month}&year=${year}`,
   generalStatementEndpoint: (month: number, year: number): string =>
     `/jellypolly/api/debtors/general-statement?month=${month}&year=${year}`,
+  openingBalancesEndpoint:
+    "/jellypolly/api/account-ledger/opening-balances",
+  defaultHideZeroBalances: false,
   customerDetailsPath: (customerId: string): string =>
     `/catalogue/customer/${customerId}`,
   customerInvoicesPath: (customerId: string): string =>
