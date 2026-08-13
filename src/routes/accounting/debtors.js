@@ -4,6 +4,33 @@ import {
   fetchUnappliedOverpayments,
   fetchUnappliedOverpaymentAsOf,
 } from "./overpayments.js";
+import { resolveDebtorChildCode } from "./debtorSync.js";
+
+// Match the exact candidate order used by debtorSync: ID, ID-D, ID-D2 ...
+// ID-D50. Avoid a broad prefix match because one customer ID can be the
+// prefix of another customer's legitimate debtor code.
+const DEBTOR_CHILDREN_QUERY = `
+  SELECT candidate.code AS child_code,
+         customer.id AS customer_id,
+         customer.name AS customer_name
+    FROM customers customer
+    JOIN LATERAL (
+      SELECT account.code
+        FROM (
+          SELECT customer.id AS code, 0 AS candidate_order
+          UNION ALL
+          SELECT customer.id || '-D', 1
+          UNION ALL
+          SELECT customer.id || '-D' || suffix::text, suffix
+            FROM generate_series(2, 50) suffix
+        ) candidate_code
+        JOIN account_codes account
+          ON account.code = candidate_code.code
+         AND account.parent_code = 'DEBTOR'
+       ORDER BY candidate_code.candidate_order
+       LIMIT 1
+    ) candidate ON TRUE
+`;
 
 export default function (pool, config) {
   const router = Router();
@@ -32,7 +59,8 @@ export default function (pool, config) {
       }
 
       const query = `
-      WITH invoice_payments AS (
+      WITH debtor_children AS (${DEBTOR_CHILDREN_QUERY}),
+      invoice_payments AS (
         -- Calculate total payments per invoice
         SELECT
           p.invoice_id,
@@ -109,6 +137,7 @@ export default function (pool, config) {
         SELECT
           ui.salespersonid,
           ui.customerid,
+          dc.child_code as ledger_account_code,
           c.name as customer_name,
           c.phone_number,
           c.credit_limit,
@@ -132,7 +161,8 @@ export default function (pool, config) {
           SUM(ui.balance_due) as total_balance
         FROM unpaid_invoices ui
         JOIN customers c ON ui.customerid = c.id
-        GROUP BY ui.salespersonid, ui.customerid, c.name, c.phone_number, c.credit_limit, c.address, c.city, c.state
+        LEFT JOIN debtor_children dc ON dc.customer_id = ui.customerid
+        GROUP BY ui.salespersonid, ui.customerid, dc.child_code, c.name, c.phone_number, c.credit_limit, c.address, c.city, c.state
       )
       -- Final aggregation by salesman
       SELECT
@@ -141,6 +171,7 @@ export default function (pool, config) {
         json_agg(
           json_build_object(
             'customer_id', ca.customerid,
+            'ledger_account_code', ca.ledger_account_code,
             'customer_name', ca.customer_name,
             'phone_number', ca.phone_number,
             'address', ca.address,
@@ -240,14 +271,7 @@ export default function (pool, config) {
 
   const computeLegacyFifoAging = async (endStr, periodYear, periodMonth) => {
     const [childrenResult, anchorResult, monthlyResult] = await Promise.all([
-      pool.query(
-        `SELECT DISTINCT ON (ac.code)
-                ac.code AS child_code, c.id AS customer_id
-           FROM account_codes ac
-           JOIN customers c ON ac.code = c.id OR ac.code LIKE c.id || '-D%'
-          WHERE ac.parent_code = 'DEBTOR'
-          ORDER BY ac.code, (ac.code = c.id) DESC`
-      ),
+      pool.query(DEBTOR_CHILDREN_QUERY),
       pool.query(
         `SELECT account_code, SUM(amount) AS amount
            FROM account_opening_balances
@@ -378,15 +402,7 @@ export default function (pool, config) {
 
   /** Resolve a customer's debtor child account code (same rule as debtorSync). */
   const resolveChildCode = async (customerId) => {
-    const result = await pool.query(
-      `SELECT code FROM account_codes
-        WHERE parent_code = 'DEBTOR'
-          AND (code = $1 OR code LIKE $1 || '-D%')
-        ORDER BY (code = $1) DESC, code
-        LIMIT 1`,
-      [customerId]
-    );
-    return result.rows.length > 0 ? result.rows[0].code : null;
+    return resolveDebtorChildCode(pool, customerId);
   };
 
   /** Anchor-rule opening balance of one child account at startStr (yyyy-MM-dd). */
@@ -596,15 +612,7 @@ export default function (pool, config) {
       // moved, which is every month in the pinned Jan–May window.
       const query = `
         WITH children AS (
-          -- One customer per child: the exact id match wins over the -D
-          -- fallback pattern (customers literally named "X-D" exist).
-          SELECT DISTINCT ON (ac.code)
-                 ac.code AS child_code, c.id AS customer_id, c.name AS customer_name
-            FROM account_codes ac
-            JOIN customers c
-              ON ac.code = c.id OR ac.code LIKE c.id || '-D%'
-           WHERE ac.parent_code = 'DEBTOR'
-           ORDER BY ac.code, (ac.code = c.id) DESC
+          ${DEBTOR_CHILDREN_QUERY}
         ),
         anchors AS (
           SELECT DISTINCT ON (aob.account_code)
@@ -642,6 +650,7 @@ export default function (pool, config) {
            GROUP BY jel.account_code
         )
         SELECT ch.customer_id,
+               ch.child_code AS ledger_account_code,
                ch.customer_name,
                (COALESCE(a.amount, 0) + COALESCE(m.pre_movement, 0))::numeric(14,2) AS bal_bf,
                COALESCE(m.current_invoices, 0)::numeric(14,2) AS current_invoices,
@@ -681,6 +690,7 @@ export default function (pool, config) {
         };
         const customer = {
           account_no: row.customer_id,
+          ledger_account_code: row.ledger_account_code,
           particular: row.customer_name || "UNNAMED",
           bal_bf: parseFloat(row.bal_bf) || 0,
           current_invoices: parseFloat(row.current_invoices) || 0,

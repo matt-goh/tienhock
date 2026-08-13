@@ -1,5 +1,5 @@
 // src/components/Stock/EstimatedReportMappingModal.tsx
-// Maintenance surface for the Estimated P&L & Unit Cost report lines: each
+// Maintenance surface for the Estimated Cost & Unit Cost report lines: each
 // line's source members (material/kilang/account/product/product_type/line
 // references) are replaced atomically via PUT /api/estimated-report/mappings/:lineId.
 // Nothing is written until a line's Save is clicked.
@@ -161,7 +161,7 @@ const SOURCE_TYPE_OPTIONS: { id: SourceType; name: string }[] = [
 
 const PAGE_ORDER = ["pl", "unit_cost"];
 const PAGE_LABELS: Record<string, string> = {
-  pl: "Estimated P&L",
+  pl: "Estimated Cost",
   unit_cost: "Estimated Unit Cost",
 };
 const SECTION_ORDER = [

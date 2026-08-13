@@ -1,6 +1,6 @@
 // src/routes/stock/estimated-report.js
 //
-// API for the boss-only "Estimated P&L & Unit Cost" report (MEE & BIHUN).
+// API for the boss-only "Estimated Cost & Unit Cost" report (MEE & BIHUN).
 // The report itself is derived in ./estimated-report-engine.js; this router owns
 // request validation, the keyed Add Back input and the mapping maintenance
 // surface used by the Phase 4 mappings modal.

@@ -147,6 +147,17 @@ export async function GTEInvoiceTemplate(invoiceData, customerData) {
 
     // Generate description based on rental details
     const generateInvoiceDescription = (invoice) => {
+      // Stored, keyed lines win over every generated wording; their
+      // descriptions are joined into the single <cbc:Description> below.
+      if (Array.isArray(invoice.invoice_lines) && invoice.invoice_lines.length > 0) {
+        const storedDescription = invoice.invoice_lines
+          .map((line) => String(line.description || "").trim())
+          .filter(Boolean)
+          .join("; ");
+        if (storedDescription) {
+          return storedDescription;
+        }
+      }
       // Check if invoice has rental details for dynamic description
       if (invoice.rental_details && invoice.rental_details.length > 0) {
         const groupedByType = {};

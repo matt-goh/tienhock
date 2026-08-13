@@ -39,6 +39,11 @@ import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
   GTInvoiceAccountFieldsHandle,
 } from "../../../components/GreenTarget/GTInvoiceAccountFields";
+import GTInvoiceLinesEditor, {
+  createGTInvoiceLineDraft,
+  gtInvoiceLinesTotal,
+  GTInvoiceLineDraft,
+} from "../../../components/GreenTarget/GTInvoiceLinesEditor";
 import GTReceiptJoinPanel, {
   type GTReceiptJoinConfirmation,
   type GTReceiptJoinLookupState,
@@ -51,6 +56,8 @@ import SubmissionResultsModal from "../../../components/Invoice/SubmissionResult
 import { EInvoiceSubmissionResult } from "../../../types/types";
 import type {
   CreateGreenTargetPaymentInput,
+  GreenTargetInvoiceLine,
+  GreenTargetInvoiceLineInput,
   GreenTargetPayment,
   GreenTargetPaymentMutationResponse,
   GreenTargetReceiptJoinCandidate,
@@ -140,6 +147,23 @@ const fromLocalDateInputValue = (value: string): Date | null => {
   return new Date(year, month - 1, day);
 };
 
+// Default line description follows the revenue account selection (server-side
+// gtInvoiceLineWording in the GT sales-journal service mirrors this).
+const gtInvoiceLineWording = (
+  accountCode: string | null | undefined
+): string =>
+  accountCode === "TGA"
+    ? "Rental Tong (A)"
+    : accountCode === "TGB"
+    ? "Rental Tong (B)"
+    : "Waste Management";
+
+// Change detection compares line content, not the per-row React keys.
+const stripLineUids = (
+  lines: GTInvoiceLineDraft[]
+): Array<Omit<GTInvoiceLineDraft, "uid">> =>
+  lines.map(({ uid, ...rest }: GTInvoiceLineDraft) => rest);
+
 // Payment method options
 const paymentMethodOptions: SelectOption[] = [
   { id: "cash", name: "Cash" },
@@ -195,9 +219,30 @@ const InvoiceFormPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
+  // Advance payment: received date earlier than the invoice date needs an
+  // explicit confirmation; the ref carries the confirmation into the retry.
+  const [advancePaymentPrompt, setAdvancePaymentPrompt] = useState<{
+    paymentDate: string;
+  } | null>(null);
+  const advancePaymentConfirmedRef = useRef(false);
   const [loading, setLoading] = useState(true); // Start loading
   const [error, setError] = useState<string | null>(null);
-  const [isAmountManuallyChanged, setIsAmountManuallyChanged] = useState(false);
+
+  // Editable invoice lines; amount_before_tax is derived from their total.
+  const [invoiceLines, setInvoiceLines] = useState<GTInvoiceLineDraft[]>([
+    createGTInvoiceLineDraft({ unit_price: 200 }),
+  ]);
+  const [initialInvoiceLines, setInitialInvoiceLines] =
+    useState<GTInvoiceLineDraft[] | null>(null);
+  // Create mode re-prefills the lines until the user keys anything into them.
+  const linesManuallyEditedRef = useRef(false);
+  // Edit mode only: whether the loaded invoice stored lines of its own, and
+  // its e-Invoice status (a validated e-Invoice locks the lines).
+  const [invoiceHadStoredLines, setInvoiceHadStoredLines] =
+    useState<boolean>(false);
+  const [invoiceEinvoiceStatus, setInvoiceEinvoiceStatus] = useState<
+    string | null
+  >(null);
 
   // Payment/E-invoice State (only for create mode)
   const [isPaid, setIsPaid] = useState(false);
@@ -305,10 +350,12 @@ const InvoiceFormPage: React.FC = () => {
   useEffect(() => {
     if (initialFormData) {
       setIsFormChanged(
-        JSON.stringify(formData) !== JSON.stringify(initialFormData)
+        JSON.stringify(formData) !== JSON.stringify(initialFormData) ||
+          JSON.stringify(stripLineUids(invoiceLines)) !==
+            JSON.stringify(stripLineUids(initialInvoiceLines ?? []))
       );
     }
-  }, [formData, initialFormData]);
+  }, [formData, initialFormData, invoiceLines, initialInvoiceLines]);
 
   // Fetch customers on mount
   useEffect(() => {
@@ -368,45 +415,40 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [availableRentals, formData.rental_ids, selectedRentals]);
 
-  // Auto-calculate invoice amount based on selected rentals (RM 200 per rental)
-  useEffect(() => {
-    // Only auto-calculate if we're in create mode for regular invoices and amount hasn't been manually changed
-    if (
-      !isEditMode &&
-      formData.type === "regular" &&
-      selectedRentals.length > 0 &&
-      !isAmountManuallyChanged
-    ) {
-      const calculatedAmount = selectedRentals.length * 200;
+  // The revenue account behind the current splits (null when they are mixed)
+  // decides the prefilled line description.
+  const currentRevenueAccount: string | null = useMemo((): string | null => {
+    const codes = new Set(
+      formData.revenue_splits.map(
+        (split: GreenTargetRevenueSplit): string => split.account_code
+      )
+    );
+    return codes.size === 1 ? Array.from(codes)[0] : null;
+  }, [formData.revenue_splits]);
 
-      // Only update if the amount is different to prevent infinite loops
-      if (formData.amount_before_tax !== calculatedAmount) {
-        setFormData((prev) => ({
-          ...prev,
-          amount_before_tax: calculatedAmount,
-        }));
-      }
-    } else if (
-      !isEditMode &&
-      formData.type === "regular" &&
-      selectedRentals.length === 0 &&
-      !isAmountManuallyChanged
-    ) {
-      // Reset to default amount when no rentals selected
-      if (formData.amount_before_tax !== 200) {
-        setFormData((prev) => ({
-          ...prev,
-          amount_before_tax: 200,
-        }));
-      }
-    }
-  }, [
-    selectedRentals.length,
-    isEditMode,
-    formData.type,
-    formData.amount_before_tax,
-    isAmountManuallyChanged,
-  ]);
+  // Create mode: prefill one line from the revenue account wording and the
+  // selected rental count until the user edits the lines by hand. Adding,
+  // removing or editing a line sets linesManuallyEditedRef and stops this.
+  useEffect(() => {
+    if (isEditMode || linesManuallyEditedRef.current) return;
+    setInvoiceLines([
+      createGTInvoiceLineDraft({
+        description: gtInvoiceLineWording(currentRevenueAccount),
+        quantity: selectedRentals.length,
+        unit_price: 200,
+      }),
+    ]);
+  }, [isEditMode, currentRevenueAccount, selectedRentals.length]);
+
+  // Amount (Excl. Tax) is derived from the line items, never keyed directly.
+  useEffect(() => {
+    const derivedAmount: number = gtInvoiceLinesTotal(invoiceLines);
+    setFormData((prev: Invoice): Invoice =>
+      prev.amount_before_tax === derivedAmount
+        ? prev
+        : { ...prev, amount_before_tax: derivedAmount }
+    );
+  }, [invoiceLines]);
 
   // Group the loaded page by customer so the list stays readable and the
   // one-customer-per-invoice rule is obvious.
@@ -589,6 +631,36 @@ const InvoiceFormPage: React.FC = () => {
       };
       setFormData(parsed);
       setInitialFormData(parsed);
+      const storedLines: GreenTargetInvoiceLine[] = Array.isArray(
+        inv.invoice_lines
+      )
+        ? inv.invoice_lines
+        : [];
+      const lineDrafts: GTInvoiceLineDraft[] =
+        storedLines.length > 0
+          ? storedLines.map(
+              (line: GreenTargetInvoiceLine): GTInvoiceLineDraft =>
+                createGTInvoiceLineDraft({
+                  description: line.description,
+                  quantity: Number(line.quantity),
+                  unit_price: Number(line.unit_price),
+                })
+            )
+          : // Legacy invoice without stored lines: one exact line so the
+            // derived amount matches the invoice; nothing new is stored
+            // unless the user edits the lines by hand.
+            [
+              createGTInvoiceLineDraft({
+                description: gtInvoiceLineWording(inv.revenue_account_code),
+                quantity: 1,
+                unit_price: parseFloat(inv.amount_before_tax.toString()),
+              }),
+            ];
+      setInvoiceLines(lineDrafts);
+      setInitialInvoiceLines(lineDrafts);
+      setInvoiceHadStoredLines(storedLines.length > 0);
+      setInvoiceEinvoiceStatus(inv.einvoice_status ?? null);
+      linesManuallyEditedRef.current = false;
       setError(null);
     } catch (err: any) {
       setError(`Fetch error: ${err.message || "Unknown"}`);
@@ -713,29 +785,15 @@ const InvoiceFormPage: React.FC = () => {
   ) => {
     const { name, value, type } = e.target;
 
-    // If user is changing the amount_before_tax field, mark it as manually changed
-    if (name === "amount_before_tax") {
-      setIsAmountManuallyChanged(true);
-
-      // Allow any numeric input without applying the less-than-200 logic during typing
-      const numericValue =
-        type === "number" ? (value === "" ? 0 : parseFloat(value) || 0) : 0;
-
-      setFormData((p) => ({
-        ...p,
-        [name]: numericValue,
-      }));
-    } else {
-      setFormData((p) => ({
-        ...p,
-        [name]:
-          type === "number"
-            ? value === ""
-              ? 0
-              : parseFloat(value) || 0
-            : value,
-      }));
-    }
+    setFormData((p) => ({
+      ...p,
+      [name]:
+        type === "number"
+          ? value === ""
+            ? 0
+            : parseFloat(value) || 0
+          : value,
+    }));
   };
 
   const handleDateIssuedChange = (range: TimeRange): void => {
@@ -800,7 +858,22 @@ const InvoiceFormPage: React.FC = () => {
 
   const handleClearRentals = (): void => {
     applyRentalSelection([]);
-    setIsAmountManuallyChanged(false);
+    // Clearing the selection re-arms the line prefill.
+    linesManuallyEditedRef.current = false;
+    if (!isEditMode) {
+      setInvoiceLines([
+        createGTInvoiceLineDraft({
+          description: gtInvoiceLineWording(currentRevenueAccount),
+          quantity: 0,
+          unit_price: 200,
+        }),
+      ]);
+    }
+  };
+
+  const handleInvoiceLinesChange = (nextLines: GTInvoiceLineDraft[]): void => {
+    linesManuallyEditedRef.current = true;
+    setInvoiceLines(nextLines);
   };
   const handlePaymentMethodChange = (methodIdString: string): void => {
     const nextPaymentMethod =
@@ -868,6 +941,22 @@ const InvoiceFormPage: React.FC = () => {
       toast.error("Revenue allocation must equal the invoice total");
       return false;
     }
+    const hasInvalidLine: boolean =
+      invoiceLines.length === 0 ||
+      invoiceLines.some(
+        (line: GTInvoiceLineDraft): boolean =>
+          !line.description.trim() ||
+          !Number.isFinite(Number(line.quantity)) ||
+          Number(line.quantity) <= 0 ||
+          !Number.isFinite(Number(line.unit_price)) ||
+          Number(line.unit_price) < 0
+      );
+    if (hasInvalidLine) {
+      toast.error(
+        "Every line item needs a description, a quantity above 0 and a unit price of 0 or more"
+      );
+      return false;
+    }
     const selCust = customers.find(
       (c) => c.customer_id === formData.customer_id
     );
@@ -901,13 +990,17 @@ const InvoiceFormPage: React.FC = () => {
       const inheritedReceivedDate: string = toLocalDateInputValue(
         joinedPaymentReceipt.received_date
       );
+      if (!inheritedReceivedDate) {
+        toast.error("The existing receipt has no received date.");
+        return false;
+      }
       if (
-        !inheritedReceivedDate ||
-        (formData.date_issued && inheritedReceivedDate < formData.date_issued)
+        formData.date_issued &&
+        inheritedReceivedDate < formData.date_issued &&
+        !advancePaymentConfirmedRef.current
       ) {
-        toast.error(
-          "The existing receipt date cannot be before the invoice date."
-        );
+        // Advance payment: confirm before the server accepts the earlier date.
+        setAdvancePaymentPrompt({ paymentDate: inheritedReceivedDate });
         return false;
       }
     } else if (isPaid) {
@@ -919,8 +1012,13 @@ const InvoiceFormPage: React.FC = () => {
         toast.error("Enter the payment received date.");
         return false;
       }
-      if (formData.date_issued && paymentDate < formData.date_issued) {
-        toast.error("Payment received date cannot be before the invoice date.");
+      if (
+        formData.date_issued &&
+        paymentDate < formData.date_issued &&
+        !advancePaymentConfirmedRef.current
+      ) {
+        // Advance payment: confirm before the server accepts the earlier date.
+        setAdvancePaymentPrompt({ paymentDate });
         return false;
       }
       if (!paymentInternalReference.trim()) {
@@ -953,8 +1051,7 @@ const InvoiceFormPage: React.FC = () => {
     }
     return true;
   };
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitForm = async (): Promise<void> => {
     if (!validateForm()) return;
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
@@ -985,9 +1082,14 @@ const InvoiceFormPage: React.FC = () => {
         return;
       }
 
+      // A legacy invoice without stored lines keeps its generated wording
+      // unless the user actually edited the lines by hand.
+      const shouldSubmitLines: boolean =
+        !isEditMode || invoiceHadStoredLines || linesManuallyEditedRef.current;
       const invData: Omit<Invoice, "invoice_id"> & {
         total_amount: number;
         invoice_id?: number;
+        lines?: GreenTargetInvoiceLineInput[];
       } = {
         type: formData.type,
         customer_id: Number(formData.customer_id),
@@ -1000,6 +1102,15 @@ const InvoiceFormPage: React.FC = () => {
         debtor_account_code: debtorAccountCode,
         delivery_order: formData.delivery_order?.trim() || undefined,
         revenue_splits: formData.revenue_splits,
+        lines: shouldSubmitLines
+          ? invoiceLines.map(
+              (line: GTInvoiceLineDraft): GreenTargetInvoiceLineInput => ({
+                description: line.description.trim(),
+                quantity: Number(line.quantity) || 0,
+                unit_price: Number(line.unit_price) || 0,
+              })
+            )
+          : undefined,
       };
       if (isEditMode && formData.invoice_id)
         invData.invoice_id = formData.invoice_id;
@@ -1141,6 +1252,9 @@ const InvoiceFormPage: React.FC = () => {
                 ...(joinedPaymentReceipt
                   ? { receipt_id: joinedPaymentReceipt.receipt_id }
                   : {}),
+                ...(advancePaymentConfirmedRef.current
+                  ? { allow_advance_payment: true }
+                  : {}),
               };
               const paymentResponse: GreenTargetPaymentMutationResponse =
                 await greenTargetApi.createPayment(pData);
@@ -1173,7 +1287,14 @@ const InvoiceFormPage: React.FC = () => {
       toast.error(`Error: ${msg}`);
     } finally {
       setIsSaving(false);
+      // One-shot: a fresh advance needs a fresh confirmation.
+      advancePaymentConfirmedRef.current = false;
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    await submitForm();
   };
 
   // Calculate total amount for display
@@ -1191,6 +1312,10 @@ const InvoiceFormPage: React.FC = () => {
     isEditMode &&
       (editDependencies?.has_adjustments ||
         editDependencies?.journal_manual_override)
+  );
+  const linesLocked: boolean = Boolean(
+    documentIdentityLocked ||
+      (isEditMode && invoiceEinvoiceStatus === "valid")
   );
 
   // --- RENDER ---
@@ -1246,12 +1371,20 @@ const InvoiceFormPage: React.FC = () => {
         </div>
         {documentIdentityLocked && (
           <div className="mx-6 mt-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-            Invoice number, date, customer, amount, rentals, and debtor identity
-            are locked because receipt/adjustment history or a detached journal
-            depends on them. Revenue allocation remains editable only when no
-            adjustment or detached journal exists.
+            Invoice number, date, customer, amount, rentals, line items, and
+            debtor identity are locked because receipt/adjustment history or a
+            detached journal depends on them. Revenue allocation remains
+            editable only when no adjustment or detached journal exists.
           </div>
         )}
+        {!documentIdentityLocked &&
+          isEditMode &&
+          invoiceEinvoiceStatus === "valid" && (
+            <div className="mx-6 mt-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              Line items are locked because a validated e-Invoice carries this
+              invoice's descriptions.
+            </div>
+          )}
         <form onSubmit={handleSubmit} className="p-6">
           {/* First row with invoice number and customer */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -1732,6 +1865,15 @@ const InvoiceFormPage: React.FC = () => {
             />
           </div>
 
+          {/* Line Items */}
+          <div className="mt-6">
+            <GTInvoiceLinesEditor
+              lines={invoiceLines}
+              onChange={handleInvoiceLinesChange}
+              disabled={isSaving || linesLocked}
+            />
+          </div>
+
           {/* Amount and Tax Section */}
           <div className="mt-6 border-t dark:border-gray-700 pt-6">
             <h2 className="text-lg font-medium mb-4 dark:text-gray-100">Invoice Amount</h2>
@@ -1748,24 +1890,14 @@ const InvoiceFormPage: React.FC = () => {
                     RM
                   </span>
                   <input
-                    type="number"
+                    type="text"
                     id="amount_before_tax"
                     name="amount_before_tax"
-                    value={formData.amount_before_tax}
-                    onChange={handleInputChange}
-                    disabled={isSaving || documentIdentityLocked}
-                    min="0"
-                    step="1"
-                    required
-                    className={clsx(
-                      "block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
-                      "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
-                      !isEditMode &&
-                      formData.type === "regular" &&
-                      selectedRentals.length > 0
-                        ? "bg-sky-50 dark:bg-sky-900/30"
-                        : "bg-white dark:bg-gray-700"
-                    )}
+                    value={(Number(formData.amount_before_tax) || 0).toFixed(2)}
+                    className="w-full pl-10 pr-3 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 font-medium text-default-700 dark:text-gray-200 cursor-default"
+                    readOnly
+                    tabIndex={-1}
+                    title="Derived from the line items total"
                   />
                 </div>
               </div>
@@ -2184,6 +2316,23 @@ const InvoiceFormPage: React.FC = () => {
         message="Leave without saving?"
         confirmButtonText="Discard"
         variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={advancePaymentPrompt !== null}
+        onClose={(): void => setAdvancePaymentPrompt(null)}
+        onConfirm={(): void => {
+          advancePaymentConfirmedRef.current = true;
+          setAdvancePaymentPrompt(null);
+          void submitForm();
+        }}
+        title="Record Advance Payment?"
+        message={`The payment received date (${
+          advancePaymentPrompt?.paymentDate ?? ""
+        }) is before the invoice date (${
+          formData.date_issued
+        }). Record this as an advance payment?`}
+        confirmButtonText="Record Payment"
+        variant="default"
       />
     </div>
   );

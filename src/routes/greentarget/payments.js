@@ -177,6 +177,13 @@ const assertPaymentMutationDateAllowed = (invoices, paymentDate, operation) => {
 };
 
 /**
+ * Rejects a received date earlier than any selected invoice's date. Skipped
+ * when the caller passes `allow_advance_payment: true` (the UI collects an
+ * explicit advance-payment confirmation first) — a customer paying before
+ * their invoice is opened is legitimate; the receipt posts DR PBB_1 / CR
+ * debtor, leaving a credit balance on the debtor until the invoice's S
+ * journal catches up.
+ *
  * @param {Array<Record<string, unknown>>} invoices
  * @param {string} paymentDate
  * @returns {void}
@@ -917,7 +924,10 @@ export default function (pool) {
       }
 
       assertPaymentMutationDateAllowed(paidInvoiceRows, paymentDate, "Payment");
-      assertPaymentNotBeforeInvoices(paidInvoiceRows, paymentDate);
+      // Advance payment: the UI confirms before sending allow_advance_payment.
+      if (body.allow_advance_payment !== true) {
+        assertPaymentNotBeforeInvoices(paidInvoiceRows, paymentDate);
+      }
       await assertPostCutoverInvoicesHavePostedSalesJournals(
         client,
         paidInvoiceRows
@@ -1177,6 +1187,7 @@ export default function (pool) {
       payment_reference,
       internal_reference,
       receipt_id,
+      allow_advance_payment,
     } = req.body || {};
 
     const client = await pool.connect();
@@ -1360,7 +1371,10 @@ export default function (pool) {
         normalizedPaymentDate,
         "Payment"
       );
-      assertPaymentNotBeforeInvoices([invoice], normalizedPaymentDate);
+      // Advance payment: the UI confirms before sending allow_advance_payment.
+      if (allow_advance_payment !== true) {
+        assertPaymentNotBeforeInvoices([invoice], normalizedPaymentDate);
+      }
       await assertPostCutoverInvoicesHavePostedSalesJournals(client, [invoice]);
       const currentBalance = Number(invoice.balance_due);
       if (

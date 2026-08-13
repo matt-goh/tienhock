@@ -82,6 +82,7 @@ export async function nextGTPostingSequence(client, entryDate) {
  * @param {string} journal.entryType
  * @param {string} journal.entryDate yyyy-MM-dd
  * @param {string} journal.description
+ * @param {string|null} [journal.chequeNo] Header cheque number (C/B entries).
  * @param {string|null} [journal.displayReference]
  * @param {string|null} [journal.sourceType]
  * @param {string|null} [journal.sourceId]
@@ -113,10 +114,10 @@ export async function insertGTJournal(client, journal) {
   const headerResult = await client.query(
     `INSERT INTO greentarget.journal_entries (
        reference_no, entry_type, entry_date, description,
-       total_debit, total_credit, status,
+       total_debit, total_credit, status, cheque_no,
        display_reference, posting_sequence, source_type, source_id,
        manual_override, created_by, updated_by, posted_at, posted_by
-     ) VALUES ($1,$2,$3,$4,$5,$6,'posted',$7,$8,$9,$10,false,$11,$11,NOW(),$11)
+     ) VALUES ($1,$2,$3,$4,$5,$6,'posted',$7,$8,$9,$10,$11,false,$12,$12,NOW(),$12)
      RETURNING id`,
     [
       journal.referenceNo,
@@ -125,6 +126,7 @@ export async function insertGTJournal(client, journal) {
       journal.description,
       totalDebit.toFixed(2),
       totalCredit.toFixed(2),
+      journal.chequeNo ?? null,
       journal.displayReference ?? null,
       postingSequence,
       journal.sourceType ?? null,

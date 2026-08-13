@@ -535,7 +535,7 @@ const CustomerPage: React.FC = () => {
         onConfirm={handleConfirmDelete}
         title={t("Delete Customer")}
         message={t(
-          "Are you sure you want to remove {{name}} from the customer list? This action cannot be undone.",
+          "Are you sure you want to permanently delete {{name}}? Associated custom pricing and Jelly Polly debtor openings will also be removed. This action cannot be undone.",
           { name: customerToDelete?.name }
         )}
         confirmButtonText={t("delete", { ns: "common" })}

@@ -731,6 +731,15 @@ export interface InvoiceGT {
   cancellation_reason?: string;
   // Optional record-only Delivery Order (DO) reference keyed on the invoice.
   delivery_order?: string | null;
+  // Stored, user-editable display lines (empty/absent = legacy invoice, the
+  // PDF/e-Invoice generators fall back to fabricated descriptions).
+  invoice_lines?: Array<{
+    line_number: number;
+    description: string;
+    quantity: number;
+    unit_price: number;
+    amount: number;
+  }>;
   adjustmentDocs?: GTAdjDocSummary[];
 }
 

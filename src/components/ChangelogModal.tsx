@@ -20,6 +20,41 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-14",
+    ms: "Jurnal Green Target: ruangan Cheque No kini tersedia pada voucher Cash Payment (C) dan Bank Payment (B), sama seperti Tien Hock. Untuk Cash Payment, nombor cek seterusnya diisi secara automatik (bermula PB384453), dan untuk Bank Payment ia diisi awal dengan PBE. Sistem turut memberi amaran jika nombor cek yang sama telah digunakan pada voucher lain.",
+    en: "Green Target journals: the Cheque No field is now available on Cash Payment (C) and Bank Payment (B) vouchers, just like Tien Hock. Cash Payment prefills the next cheque number automatically (starting PB384453), and Bank Payment prefills PBE. A warning also appears if the same cheque number has already been used on another voucher.",
+  },
+  {
+    date: "2026-08-14",
+    ms: "Bayaran Green Target: bayaran pendahuluan kini boleh direkodkan. Sebelum ini, tarikh bayaran yang lebih awal daripada tarikh invois ditolak terus — sekarang satu pengesahan \"advance payment\" dipaparkan dan bayaran boleh disimpan. Ini terpakai di halaman Payments, blok Record Payment semasa mencipta invois, dan borang bayaran pada halaman butiran invois.",
+    en: "Green Target payments: advance payments can now be recorded. Previously a payment dated before its invoice was rejected outright — now an \"advance payment\" confirmation appears and the payment saves. This applies on the Payments page, the Record Payment block when creating an invoice, and the payment form on the invoice details page.",
+  },
+  {
+    date: "2026-08-14",
+    ms: "Debtors: butang Ledger baharu di sebelah setiap pelanggan membuka ledger pelanggan itu terus. Bulan yang sedang dipilih turut dibawa ke halaman Ledger untuk Tien Hock, Jelly Polly dan Green Target. Bagi Green Target, butang ini menggantikan butang Invoices lama kerana rekod debitornya tidak mempunyai halaman invois berasingan.",
+    en: "Debtors: a new Ledger button beside each customer opens that customer's ledger directly. The selected month is also carried to the Ledger page for Tien Hock, Jelly Polly and Green Target. For Green Target, it replaces the old Invoices button because its debtor records do not have separate invoice pages.",
+  },
+  {
+    date: "2026-08-14",
+    ms: "Jelly Polly Payroll: tarikh setiap baris kerja pada halaman butiran gaji pekerja kini betul. Sebelum ini baris yang direkodkan pada hari pertama bulan (contohnya 01/08/2026) dipaparkan sebagai hari terakhir bulan sebelumnya (31/07/2026), walaupun rekod sebenar disimpan pada tarikh yang betul — ini hanya masalah paparan, tiada data yang hilang atau salah.",
+    en: "Jelly Polly Payroll: the date of each work line on an employee's payroll details page is now correct. Previously a line recorded on the first day of a month (e.g. 01/08/2026) was shown as the last day of the previous month (31/07/2026), even though the record itself was saved on the right date — this was a display issue only, no data was lost or wrong.",
+  },
+  {
+    date: "2026-08-14",
+    ms: "Jelly Polly: paparan By Customer di halaman Debtors kini mempunyai ruangan Debtor Opening untuk memasukkan baki pembukaan setiap pelanggan pada hari pertama bulan yang dipilih. Amaun positif bermaksud pelanggan berhutang (DR), manakala amaun negatif ialah kredit pelanggan (CR); kosongkan ruangan dan simpan untuk membuang baki pembukaan pada tarikh itu. Bal B/F, jumlah tertunggak, penyata pelanggan dan Account Ledger kini menggunakan baki pembukaan ini bersama invois, bayaran dan pelarasan selepas tarikhnya. Baki pembukaan juga boleh ditetapkan terus dari Account Ledger. Jika ID pelanggan ditukar, baki pembukaan ini akan dipindahkan ke ID baharu; jika pelanggan dipadam secara kekal, baki pembukaannya turut dibuang selepas pengesahan.",
+    en: "Jelly Polly: the By Customer view on the Debtors page now has a Debtor Opening column for entering each customer's opening balance on the first day of the selected month. A positive amount means the customer owes money (DR), while a negative amount is customer credit (CR); clear the field and save to remove that date's opening. Bal B/F, outstanding totals, customer statements and Account Ledger now use this opening together with invoices, payments and adjustments after its date. The opening can also be set directly from Account Ledger. Changing a customer ID carries these openings to the new ID; permanently deleting a customer also removes their openings after confirmation.",
+  },
+  {
+    date: "2026-08-13",
+    ms: "Laporan Anggaran (MEE & BIHUN): perkataan untung/rugi dibuang mengikut kehendak bos. Laporan \"Anggaran P&L\" kini bernama \"Anggaran Kos\", dan baris-barisnya ditukar — PROFIT / (LOSS) menjadi ESTIMATE COST, FINAL PROFIT / (LOSS) menjadi FINAL ESTIMATE COST, dan ACCUMULATIVE P/L menjadi ACCUMULATIVE COST. Perubahan yang sama dibuat pada cetakan PDF. Semua angka dan cara pengiraan kekal sama.",
+    en: "Estimated Reports (MEE & BIHUN): the profit/loss wording has been removed as the boss requested. The \"Estimated P&L\" report is now called \"Estimated Cost\", and its rows have been renamed — PROFIT / (LOSS) becomes ESTIMATE COST, FINAL PROFIT / (LOSS) becomes FINAL ESTIMATE COST, and ACCUMULATIVE P/L becomes ACCUMULATIVE COST. The same wording is used on the printed PDF. All figures and calculations stay exactly the same.",
+  },
+  {
+    date: "2026-08-11",
+    ms: "Invois Green Target: baris item pada bil kini boleh diubah semasa mencipta atau mengedit invois. Penerangan diisi awal mengikut akaun hasil — Rental Tong (A) untuk TGA, Rental Tong (B) untuk TGB, selainnya Waste Management (sebelum ini \"Waste Management Service\") — bersama kuantiti dan harga unit, dan baris tambahan seperti caj hari lebihan boleh ditambah. Amaun invois kini dikira sebagai jumlah baris item dan bukannya angka yang dimasukkan. Baris dikunci sebaik sahaja bil mempunyai bayaran, pelarasan atau e-Invois yang disahkan. Bil lama mengekalkan penerangan asalnya.",
+    en: "Green Target invoices: the line items on a bill are now editable when creating or editing an invoice. The description is prefilled from the revenue account — Rental Tong (A) for TGA, Rental Tong (B) for TGB, otherwise Waste Management (previously \"Waste Management Service\") — with quantity and unit price, and extra lines such as extra-days charges can be added. The invoice amount is now calculated as the sum of the line items instead of a keyed figure. Lines lock once the bill has a payment, adjustment or validated e-Invoice. Older bills keep their original wording.",
+  },
+  {
     date: "2026-08-11",
     ms: "Stok Bahan: butang Cetak baharu pada tab MEE, BIHUN dan SHARED mencetak stok bulan yang dipilih sebagai PDF. Laporan mengikut pilihan Running Balance — tanpanya ia menjadi helaian kiraan stok (kos unit, kuantiti dan nilai), dan dengannya ia turut menunjukkan lajur pembukaan, belian dan penutup. Baris tanpa kiraan boleh disembunyikan daripada cetakan melalui kotak semak baris kosong yang sedia ada. Bahagian Stock Kilang dan Jumlah Keseluruhan turut disertakan.",
     en: "Material Stock: a new Print button on the MEE, BIHUN and SHARED tabs prints the selected month's stock as a PDF. The report follows the Running Balance toggle — off gives a stock count sheet (unit cost, quantity and value), on adds opening, purchases and closing columns. Rows with no count can be left out of the printout using the existing empty-rows checkbox. The Stock Kilang section and Grand Total are included.",

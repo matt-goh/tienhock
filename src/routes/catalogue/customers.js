@@ -7,6 +7,21 @@ import {
   removeDebtorAccount,
 } from "../accounting/debtorSync.js";
 
+/**
+ * @param {import("express").Request} req
+ * @returns {string | null}
+ */
+function getRequestActor(req) {
+  const actor =
+    req.staffId ||
+    req.session?.staff_id ||
+    req.session?.staff?.id ||
+    (req.apiKey ? "API_KEY" : null);
+  return actor === null || actor === undefined
+    ? null
+    : String(actor).slice(0, 50);
+}
+
 export default function (pool) {
   const router = Router();
 
@@ -529,6 +544,15 @@ export default function (pool) {
         [id]
       );
 
+      // A customer deletion is permanent, so remove its JP-specific debtor
+      // opening anchors in the same transaction instead of leaving financial
+      // rows under an identity that can no longer be selected or reported.
+      await client.query(
+        `DELETE FROM jellypolly.debtor_opening_balances
+          WHERE customer_id = $1`,
+        [id]
+      );
+
       // Then delete the customer
       const query = "DELETE FROM customers WHERE id = $1 RETURNING *";
       const result = await client.query(query, [id]);
@@ -632,6 +656,25 @@ export default function (pool) {
             throw new Error(`Customer with ID ${newId} already exists`);
           }
 
+          // The table deliberately has no customer FK, so an opening can
+          // survive an older customer deletion under the requested target ID.
+          // Never merge or overwrite dated financial anchors during a rename.
+          const openingConflictResult = await client.query(
+            `SELECT 1
+               FROM jellypolly.debtor_opening_balances
+              WHERE customer_id = $1
+              LIMIT 1`,
+            [newId]
+          );
+          if (openingConflictResult.rows.length > 0) {
+            await client.query("ROLLBACK");
+            return res.status(409).json({
+              code: "JP_DEBTOR_OPENING_ID_CONFLICT",
+              message:
+                "Customer ID change is blocked because Jelly Polly debtor openings already exist under the new ID",
+            });
+          }
+
           // 2. Insert new customer with new ID
           const insertQuery = `
             INSERT INTO customers (
@@ -668,6 +711,19 @@ export default function (pool) {
             WHERE customer_id = $2
           `;
           await client.query(updateProductsQuery, [newId, id]);
+
+          // Preserve every dated JP opening and its creation audit fields when
+          // the shared customer identity changes. The update is inside this
+          // transaction, before the old customer is removed, so a failure
+          // rolls back the complete rename.
+          await client.query(
+            `UPDATE jellypolly.debtor_opening_balances
+                SET customer_id = $1,
+                    updated_at = CURRENT_TIMESTAMP,
+                    updated_by = COALESCE($3, updated_by)
+              WHERE customer_id = $2`,
+            [newId, id, getRequestActor(req)]
+          );
 
           // 4. Delete old customer record
           await client.query("DELETE FROM customers WHERE id = $1", [id]);

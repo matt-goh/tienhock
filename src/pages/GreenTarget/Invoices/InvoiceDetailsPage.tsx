@@ -1,5 +1,5 @@
 // src/pages/GreenTarget/Invoices/InvoiceDetailsPage.tsx
-import React, { useState, useEffect, Fragment, useCallback } from "react"; // Added Fragment, useCallback
+import React, { useState, useEffect, Fragment, useCallback, useRef } from "react"; // Added Fragment, useCallback
 import { format } from "date-fns";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -271,6 +271,13 @@ const InvoiceDetailsPage: React.FC = () => {
     internal_reference: "",
   });
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  // Advance payment: received date earlier than the invoice date needs an
+  // explicit confirmation; the ref carries the confirmation into the retry.
+  const [advancePaymentPrompt, setAdvancePaymentPrompt] = useState<{
+    paymentDate: string;
+    invoiceDate: string;
+  } | null>(null);
+  const advancePaymentConfirmedRef = useRef(false);
   // Re-using a Green Target reference here means this invoice is being settled
   // by a receipt that already exists, so the same offer-to-join flow as the
   // invoice form applies. The invoice id also answers the "that receipt
@@ -1238,12 +1245,29 @@ const InvoiceDetailsPage: React.FC = () => {
     return true;
   };
 
-  const handleSubmitPayment = async (
-    e: React.FormEvent<HTMLFormElement>
-  ): Promise<void> => {
-    e.preventDefault();
-
+  const processPayment = async (): Promise<void> => {
     if (!validatePaymentForm() || !invoice) {
+      return;
+    }
+
+    // Advance payment: a received date earlier than the invoice date needs
+    // an explicit confirmation before the server accepts it.
+    const effectivePaymentDate: string = joinedPaymentReceipt
+      ? toLocalDateInputValue(joinedPaymentReceipt.received_date)
+      : paymentFormData.payment_date;
+    const invoiceDate: string = toLocalDateInputValue(
+      invoice.date_issued ? String(invoice.date_issued) : null
+    );
+    if (
+      effectivePaymentDate &&
+      invoiceDate &&
+      effectivePaymentDate < invoiceDate &&
+      !advancePaymentConfirmedRef.current
+    ) {
+      setAdvancePaymentPrompt({
+        paymentDate: effectivePaymentDate,
+        invoiceDate,
+      });
       return;
     }
 
@@ -1271,6 +1295,9 @@ const InvoiceDetailsPage: React.FC = () => {
         ...(joinedPaymentReceipt
           ? { receipt_id: joinedPaymentReceipt.receipt_id }
           : {}),
+        ...(advancePaymentConfirmedRef.current
+          ? { allow_advance_payment: true }
+          : {}),
       };
 
       await greenTargetApi.createPayment(paymentData);
@@ -1295,7 +1322,16 @@ const InvoiceDetailsPage: React.FC = () => {
       }
     } finally {
       setIsProcessingPayment(false);
+      // One-shot: a fresh advance needs a fresh confirmation.
+      advancePaymentConfirmedRef.current = false;
     }
+  };
+
+  const handleSubmitPayment = async (
+    e: React.FormEvent<HTMLFormElement>
+  ): Promise<void> => {
+    e.preventDefault();
+    await processPayment();
   };
 
   const handleCancelPayment = async (): Promise<void> => {
@@ -3562,6 +3598,25 @@ const InvoiceDetailsPage: React.FC = () => {
         title="Submit e-Invoice"
         message={`Are you sure you want to submit Invoice ${invoice?.invoice_number} as an e-Invoice to MyInvois?`}
         confirmButtonText="Submit"
+        variant="default"
+      />
+
+      {/* Advance Payment Confirmation Dialog */}
+      <ConfirmationDialog
+        isOpen={advancePaymentPrompt !== null}
+        onClose={(): void => setAdvancePaymentPrompt(null)}
+        onConfirm={(): void => {
+          advancePaymentConfirmedRef.current = true;
+          setAdvancePaymentPrompt(null);
+          void processPayment();
+        }}
+        title="Record Advance Payment?"
+        message={`The payment received date (${
+          advancePaymentPrompt?.paymentDate ?? ""
+        }) is before the invoice date (${
+          advancePaymentPrompt?.invoiceDate ?? ""
+        }). Record this as an advance payment?`}
+        confirmButtonText="Record Payment"
         variant="default"
       />
 
