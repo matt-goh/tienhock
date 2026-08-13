@@ -20,7 +20,7 @@ const REQUIRED_RESTORED_SCHEMAS = ['greentarget', 'jellypolly', 'public'];
 const MINIMUM_RESTORED_TABLE_COUNTS = {
   public: 90,
   greentarget: 30,
-  jellypolly: 34,
+  jellypolly: 35,
 };
 
 const REQUIRED_RESTORED_TABLES = [
@@ -52,6 +52,7 @@ const REQUIRED_RESTORED_TABLES = [
   'greentarget.payments',
   'greentarget.payroll_employees',
   'greentarget.rentals',
+  'jellypolly.debtor_opening_balances',
   'jellypolly.employee_payrolls',
   'jellypolly.invoices',
   'jellypolly.order_details',
@@ -92,6 +93,15 @@ const REQUIRED_RESTORED_COLUMNS = [
   'public.receipt_allocations.amount',
   'greentarget.invoices.invoice_id',
   'greentarget.payments.invoice_id',
+  'jellypolly.debtor_opening_balances.id',
+  'jellypolly.debtor_opening_balances.customer_id',
+  'jellypolly.debtor_opening_balances.as_of_date',
+  'jellypolly.debtor_opening_balances.amount',
+  'jellypolly.debtor_opening_balances.notes',
+  'jellypolly.debtor_opening_balances.created_at',
+  'jellypolly.debtor_opening_balances.updated_at',
+  'jellypolly.debtor_opening_balances.created_by',
+  'jellypolly.debtor_opening_balances.updated_by',
   'jellypolly.invoices.id',
   'jellypolly.payments.invoice_id',
 ];

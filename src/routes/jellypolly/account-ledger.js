@@ -7,7 +7,7 @@ const DATE_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 // Keep this movement definition shared by both endpoints so the browse counts,
 // brought-forward balance, period rows, and closing balance cannot drift apart.
-const MOVEMENTS_CTE = `
+export const JELLY_POLLY_DEBTOR_MOVEMENTS_CTE = `
   WITH movements AS (
     SELECT
       i.customerid::text AS customer_id,
@@ -125,6 +125,45 @@ const MOVEMENTS_CTE = `
       )
   )`;
 
+const MAX_OPENING_BALANCE = 9999999999999.99;
+
+/**
+ * @param {import("express").Request} req
+ * @returns {string | null}
+ */
+function getRequestActor(req) {
+  const actor =
+    req.staffId ||
+    req.session?.staff_id ||
+    req.session?.staff?.id ||
+    (req.apiKey ? "API_KEY" : null);
+  return actor === null || actor === undefined
+    ? null
+    : String(actor).slice(0, 50);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {{ valid: true, amount: number } | { valid: false }}
+ */
+function validateOpeningAmount(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "") ||
+    (typeof value !== "string" && typeof value !== "number")
+  ) {
+    return { valid: false };
+  }
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount) || Math.abs(amount) > MAX_OPENING_BALANCE) {
+    return { valid: false };
+  }
+
+  return { valid: true, amount: Math.round(amount * 100) / 100 };
+}
+
 /**
  * Validate a bare yyyy-MM-dd route parameter without a UTC conversion.
  *
@@ -156,15 +195,22 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
   const router = Router();
 
   // Virtual account-code-shaped customer list, limited to customers that have
-  // at least one movement in the exact projection used by the ledger route.
+  // at least one movement in the exact projection used by the ledger route or
+  // at least one JP debtor opening anchor. The latter keeps an opening-only
+  // customer selectable before their first JP invoice or receipt is entered.
   router.get("/accounts", async (_req, res) => {
     try {
       const result = await pool.query(`
-        ${MOVEMENTS_CTE},
+        ${JELLY_POLLY_DEBTOR_MOVEMENTS_CTE},
         customer_activity AS (
           SELECT customer_id, COUNT(*)::integer AS transaction_count
           FROM movements
           GROUP BY customer_id
+        ),
+        customer_scope AS (
+          SELECT customer_id FROM customer_activity
+          UNION
+          SELECT customer_id FROM jellypolly.debtor_opening_balances
         )
         SELECT
           c.id::text AS code,
@@ -177,9 +223,10 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
           ))::integer AS sort_order,
           true AS is_active,
           false AS is_system,
-          ca.transaction_count
-        FROM customer_activity ca
-        JOIN customers c ON c.id::text = ca.customer_id
+          COALESCE(ca.transaction_count, 0)::integer AS transaction_count
+        FROM customer_scope scope
+        JOIN customers c ON c.id::text = scope.customer_id
+        LEFT JOIN customer_activity ca ON ca.customer_id = scope.customer_id
         ORDER BY sort_order
       `);
 
@@ -193,8 +240,223 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
     }
   });
 
+  // GET /opening-balances/:customerId - latest applicable JP debtor anchor and
+  // full anchor history. Optional ?as_of=yyyy-MM-dd limits the applicable row
+  // to the latest anchor on or before that local calendar date.
+  router.get("/opening-balances/:customerId", async (req, res) => {
+    const { customerId } = req.params;
+    const asOf = req.query.as_of;
+
+    if (
+      asOf !== undefined &&
+      (typeof asOf !== "string" || !validateDateString(asOf).valid)
+    ) {
+      return res
+        .status(400)
+        .json({ message: "as_of must be a valid yyyy-MM-dd value" });
+    }
+
+    try {
+      const customerResult = await pool.query(
+        `SELECT 1 FROM customers WHERE id = $1`,
+        [customerId]
+      );
+      if (customerResult.rows.length === 0) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const applicableParams = [customerId];
+      let applicableWhere = "customer_id = $1";
+      if (asOf !== undefined) {
+        applicableParams.push(asOf);
+        applicableWhere += " AND as_of_date <= $2::date";
+      }
+
+      const [applicableResult, historyResult] = await Promise.all([
+        pool.query(
+          `SELECT id,
+                  customer_id,
+                  TO_CHAR(as_of_date, 'YYYY-MM-DD') AS as_of_date,
+                  amount,
+                  notes,
+                  created_at,
+                  updated_at,
+                  created_by,
+                  updated_by
+             FROM jellypolly.debtor_opening_balances
+            WHERE ${applicableWhere}
+            ORDER BY as_of_date DESC
+            LIMIT 1`,
+          applicableParams
+        ),
+        pool.query(
+          `SELECT id,
+                  customer_id,
+                  TO_CHAR(as_of_date, 'YYYY-MM-DD') AS as_of_date,
+                  amount,
+                  notes,
+                  created_at,
+                  updated_at,
+                  created_by,
+                  updated_by
+             FROM jellypolly.debtor_opening_balances
+            WHERE customer_id = $1
+            ORDER BY as_of_date DESC`,
+          [customerId]
+        ),
+      ]);
+
+      const parseAnchor = (row) => ({
+        ...row,
+        amount: Number(row.amount || 0),
+      });
+
+      res.json({
+        opening_balance:
+          applicableResult.rows.length > 0
+            ? parseAnchor(applicableResult.rows[0])
+            : null,
+        history: historyResult.rows.map(parseAnchor),
+      });
+    } catch (error) {
+      console.error("Error fetching Jelly Polly debtor opening balance:", error);
+      res.status(500).json({
+        message: "Error fetching Jelly Polly debtor opening balance",
+        error: error.message,
+      });
+    }
+  });
+
+  // PUT /opening-balances/:customerId - upsert one signed, debit-normal anchor.
+  // Omitted notes preserve an existing note (inline amount-only edits); an
+  // explicit string/null updates or clears it (the full modal workflow).
+  router.put("/opening-balances/:customerId", async (req, res) => {
+    const { customerId } = req.params;
+    const { as_of_date: asOfDate, amount } = req.body || {};
+    const hasNotes = Object.prototype.hasOwnProperty.call(req.body || {}, "notes");
+    const notes = hasNotes ? req.body.notes : null;
+
+    if (typeof asOfDate !== "string" || !validateDateString(asOfDate).valid) {
+      return res
+        .status(400)
+        .json({ message: "as_of_date must be a valid yyyy-MM-dd value" });
+    }
+
+    const amountValidation = validateOpeningAmount(amount);
+    if (!amountValidation.valid) {
+      return res.status(400).json({
+        message: `amount must be a finite number between -${MAX_OPENING_BALANCE} and ${MAX_OPENING_BALANCE}`,
+      });
+    }
+
+    if (hasNotes && notes !== null && typeof notes !== "string") {
+      return res
+        .status(400)
+        .json({ message: "notes must be a string or null when provided" });
+    }
+
+    try {
+      const customerResult = await pool.query(
+        `SELECT 1 FROM customers WHERE id = $1`,
+        [customerId]
+      );
+      if (customerResult.rows.length === 0) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const actor = getRequestActor(req);
+      const normalizedNotes =
+        notes === null || notes === undefined || notes.trim() === ""
+          ? null
+          : notes.trim();
+      const result = await pool.query(
+        `INSERT INTO jellypolly.debtor_opening_balances
+           (customer_id, as_of_date, amount, notes, created_by, updated_by)
+         VALUES ($1, $2::date, $3, $4, $5, $5)
+         ON CONFLICT (customer_id, as_of_date)
+         DO UPDATE SET amount = EXCLUDED.amount,
+                       notes = CASE
+                         WHEN $6::boolean THEN EXCLUDED.notes
+                         ELSE jellypolly.debtor_opening_balances.notes
+                       END,
+                       updated_at = CURRENT_TIMESTAMP,
+                       updated_by = EXCLUDED.updated_by
+         RETURNING id,
+                   customer_id,
+                   TO_CHAR(as_of_date, 'YYYY-MM-DD') AS as_of_date,
+                   amount,
+                   notes,
+                   created_at,
+                   updated_at,
+                   created_by,
+                   updated_by`,
+        [
+          customerId,
+          asOfDate,
+          amountValidation.amount,
+          normalizedNotes,
+          actor,
+          hasNotes,
+        ]
+      );
+
+      res.json({
+        message: "Opening balance saved",
+        opening_balance: {
+          ...result.rows[0],
+          amount: Number(result.rows[0].amount || 0),
+        },
+      });
+    } catch (error) {
+      console.error("Error saving Jelly Polly debtor opening balance:", error);
+      res.status(500).json({
+        message: "Error saving Jelly Polly debtor opening balance",
+        error: error.message,
+      });
+    }
+  });
+
+  // DELETE /opening-balances/:customerId/:asOfDate - remove one exact anchor.
+  router.delete("/opening-balances/:customerId/:asOfDate", async (req, res) => {
+    const { customerId, asOfDate } = req.params;
+    if (!validateDateString(asOfDate).valid) {
+      return res
+        .status(400)
+        .json({ message: "asOfDate must be a valid yyyy-MM-dd value" });
+    }
+
+    try {
+      const customerResult = await pool.query(
+        `SELECT 1 FROM customers WHERE id = $1`,
+        [customerId]
+      );
+      if (customerResult.rows.length === 0) {
+        return res.status(404).json({ message: "Customer not found" });
+      }
+
+      const result = await pool.query(
+        `DELETE FROM jellypolly.debtor_opening_balances
+          WHERE customer_id = $1
+            AND as_of_date = $2::date`,
+        [customerId, asOfDate]
+      );
+      if (result.rowCount === 0) {
+        return res.status(404).json({ message: "Opening balance not found" });
+      }
+
+      res.json({ message: "Opening balance deleted" });
+    } catch (error) {
+      console.error("Error deleting Jelly Polly debtor opening balance:", error);
+      res.status(500).json({
+        message: "Error deleting Jelly Polly debtor opening balance",
+        error: error.message,
+      });
+    }
+  });
+
   // Arbitrary inclusive period for one Jelly Polly customer. Opening is the
-  // net of the same virtual movements strictly before the requested start.
+  // latest applicable JP anchor plus the same virtual movements from that
+  // anchor to the requested start. Activity before an anchor is ignored.
   router.get("/:customerId/range/:start/:end", async (req, res) => {
     const { customerId, start, end } = req.params;
     const startValidation = validateDateString(start);
@@ -223,11 +485,26 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
       }
 
       const ledgerResult = await pool.query(
-        `${MOVEMENTS_CTE},
+        `${JELLY_POLLY_DEBTOR_MOVEMENTS_CTE},
+         anchor AS (
+           SELECT as_of_date, amount
+           FROM jellypolly.debtor_opening_balances
+           WHERE customer_id = $1
+             AND as_of_date <= $2::date
+           ORDER BY as_of_date DESC
+           LIMIT 1
+         ),
          opening AS (
-           SELECT COALESCE(SUM(debit_amount - credit_amount), 0) AS opening_balance
+           SELECT COALESCE((SELECT amount FROM anchor), 0)
+                  + COALESCE(SUM(debit_amount - credit_amount), 0)
+                    AS opening_balance
            FROM movements
-           WHERE customer_id = $1 AND entry_date < $2::date
+           WHERE customer_id = $1
+             AND entry_date < $2::date
+             AND (
+               NOT EXISTS (SELECT 1 FROM anchor)
+               OR entry_date >= (SELECT as_of_date FROM anchor)
+             )
          ),
          period_rows AS (
            SELECT *
@@ -238,6 +515,8 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
          )
          SELECT
            o.opening_balance,
+           TO_CHAR(a.as_of_date, 'YYYY-MM-DD') AS anchor_date,
+           a.amount AS anchor_amount,
            p.line_id,
            p.reference_no,
            p.internal_reference,
@@ -251,6 +530,7 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
            p.source_id,
            p.invoice_id
          FROM opening o
+         LEFT JOIN anchor a ON true
          LEFT JOIN period_rows p ON true
          ORDER BY p.entry_date ASC NULLS LAST,
                   p.same_day_order ASC NULLS LAST,
@@ -260,6 +540,8 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
       );
 
       const openingBalance = Number(ledgerResult.rows[0]?.opening_balance || 0);
+      const anchorDate = ledgerResult.rows[0]?.anchor_date || null;
+      const anchorAmount = Number(ledgerResult.rows[0]?.anchor_amount || 0);
       let runningBalance = openingBalance;
       let totalDebit = 0;
       let totalCredit = 0;
@@ -299,7 +581,13 @@ export default function createJellyPollyAccountLedgerRouter(pool) {
           ledger_type: "TD",
         },
         opening_balance: openingBalance,
-        opening_source: { type: "derived" },
+        opening_source: anchorDate
+          ? {
+              type: "anchored",
+              as_of_date: anchorDate,
+              amount: anchorAmount,
+            }
+          : { type: "derived" },
         transactions,
         closing_balance: runningBalance,
         totals: {
