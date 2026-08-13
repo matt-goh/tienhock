@@ -35,7 +35,19 @@ requires separate approval).
 | File | What it did | Status |
 |------|-------------|--------|
 | `2026-08-14_jellypolly_debtor_opening_balances.sql` | Creates `jellypolly.debtor_opening_balances`, one signed DR-positive `numeric(15,2)` opening anchor per customer and effective date, with notes and audit fields. `customer_id` is a logical reference to the shared customer catalogue (no FK), and the customer/date pair is unique. Zero anchors are meaningful fences. The migration is schema-local and idempotent. **Applied to dev and retained pending the production rollout.** | dev ✓ (2026-08-14), prod PENDING |
-| `2026-08-11_greentarget_invoice_lines.sql` | Created `greentarget.invoice_lines` (invoice_id + line_number PK, FK invoices ON DELETE CASCADE; description / quantity / unit_price / amount numeric(14,2) with CHECKs) — stored, user-editable display lines for GT invoices. No backfill: invoices without rows keep rendering through the legacy PDF/e-Invoice description generators. Guarded and idempotent; dev re-run confirmed the `IF NOT EXISTS` skip. **Not yet removed** per the convention — it stays in `dev/migrations/` until the production rollout. | dev ✓ (2026-08-11), prod PENDING |
+
+---
+
+## Removed 14 Aug 2026 — 1 file (Green Target stored invoice lines)
+
+Applied to production on 2026-08-11 and to dev on 2026-08-14, then removed per the project
+convention. The dev run created the table with zero rows; no historical invoice lines were backfilled.
+
+Recover with `git show d0bef31a:dev/migrations/2026-08-11_greentarget_invoice_lines.sql`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-11_greentarget_invoice_lines.sql` | Created `greentarget.invoice_lines` (invoice_id + line_number PK, FK invoices ON DELETE CASCADE; description / quantity / unit_price / amount numeric(14,2) with CHECKs) — stored, user-editable display lines for GT invoices. No backfill: invoices without rows keep rendering through the legacy PDF/e-Invoice description generators. Guarded and idempotent. | dev ✓ (2026-08-14), prod ✓ (2026-08-11) |
 
 ---
 
