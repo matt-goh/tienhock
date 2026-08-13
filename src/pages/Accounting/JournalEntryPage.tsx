@@ -909,11 +909,13 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     lines: [emptyLine(1), emptyLine(2)],
   });
 
-  // Header cheque number machinery is Tien Hock-only; Green Target keeps
-  // cheque/transaction references per line, so its form never shows the field
-  // or calls the TH cheque endpoints even for C/B entries.
-  const showChequeNo: boolean =
-    !isGreenTarget && CHEQUE_NO_ENTRY_TYPES.includes(formData.entry_type);
+  // Header cheque number for Cash Payment (C) and Bank Payment (B) entries.
+  // Green Target shows the same field since 2026-08-14 (PB-seeded prefill,
+  // duplicate warning from 8 chars); its per-line cheque/transaction
+  // references remain available alongside it.
+  const showChequeNo: boolean = CHEQUE_NO_ENTRY_TYPES.includes(
+    formData.entry_type
+  );
 
   // Entry status for edit mode
   const [entryStatus, setEntryStatus] = useState<string>("active");
@@ -1022,13 +1024,15 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
   // Fetch next sequential cheque number (Cash Payment / C entries only)
   const fetchNextChequeNo = useCallback(async () => {
     try {
-      const response = await api.get("/api/journal-entries/next-cheque-no");
+      const response = await api.get(
+        `${apiBase}/journal-entries/next-cheque-no`
+      );
       const data = response as { cheque_no: string };
       setFormData((prev) => ({ ...prev, cheque_no: data.cheque_no }));
     } catch (err: unknown) {
       console.error("Error fetching next cheque number:", err);
     }
-  }, []);
+  }, [apiBase]);
 
   // Warn while the cheque number is being keyed when it is already issued on
   // another Cash/Bank Payment entry - the legacy programme's
@@ -1050,7 +1054,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         const params = new URLSearchParams({ cheque_no: chequeNo });
         if (id) params.append("exclude_id", id);
         const response = await api.get(
-          `/api/journal-entries/cheque-usage?${params.toString()}`
+          `${apiBase}/journal-entries/cheque-usage?${params.toString()}`
         );
         if (!cancelled) {
           setChequeDuplicates(
@@ -1143,9 +1147,9 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         if (isCreateMode) {
           await fetchNextReference(formData.entry_type);
           // Cached last type may already use a cheque number - pre-fill it too
-          if (!isGreenTarget && formData.entry_type === "C") {
+          if (formData.entry_type === "C") {
             await fetchNextChequeNo();
-          } else if (!isGreenTarget && formData.entry_type === "B") {
+          } else if (formData.entry_type === "B") {
             setFormData((prev) => ({
               ...prev,
               cheque_no: BANK_PAYMENT_CHEQUE_PREFILL,
@@ -1183,9 +1187,8 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     setFormData((prev) => ({
       ...prev,
       entry_type: newType,
-      cheque_no: isGreenTarget
-        ? ""
-        : newType === "C"
+      cheque_no:
+        newType === "C"
           ? prev.cheque_no
           : newType === "B"
             ? BANK_PAYMENT_CHEQUE_PREFILL
@@ -1196,7 +1199,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     if (isCreateMode) {
       await fetchNextReference(newType);
       // Pre-fill the next sequential cheque number for Cash Payment entries
-      if (!isGreenTarget && newType === "C") {
+      if (newType === "C") {
         await fetchNextChequeNo();
       }
     }

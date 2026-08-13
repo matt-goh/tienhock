@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-14",
+    ms: "Jurnal Green Target: ruangan Cheque No kini tersedia pada voucher Cash Payment (C) dan Bank Payment (B), sama seperti Tien Hock. Untuk Cash Payment, nombor cek seterusnya diisi secara automatik (bermula PB384453), dan untuk Bank Payment ia diisi awal dengan PBE. Sistem turut memberi amaran jika nombor cek yang sama telah digunakan pada voucher lain.",
+    en: "Green Target journals: the Cheque No field is now available on Cash Payment (C) and Bank Payment (B) vouchers, just like Tien Hock. Cash Payment prefills the next cheque number automatically (starting PB384453), and Bank Payment prefills PBE. A warning also appears if the same cheque number has already been used on another voucher.",
+  },
+  {
+    date: "2026-08-14",
     ms: "Bayaran Green Target: bayaran pendahuluan kini boleh direkodkan. Sebelum ini, tarikh bayaran yang lebih awal daripada tarikh invois ditolak terus — sekarang satu pengesahan \"advance payment\" dipaparkan dan bayaran boleh disimpan. Ini terpakai di halaman Payments, blok Record Payment semasa mencipta invois, dan borang bayaran pada halaman butiran invois.",
     en: "Green Target payments: advance payments can now be recorded. Previously a payment dated before its invoice was rejected outright — now an \"advance payment\" confirmation appears and the payment saves. This applies on the Payments page, the Record Payment block when creating an invoice, and the payment form on the invoice details page.",
   },

@@ -8,9 +8,14 @@
 // G6 shipped the read-only half (GET / and GET /:id). G7 adds the mutation
 // half: GET /types, GET /next-reference/:type, POST /, PUT /:id,
 // POST /:id/cancel and POST /:id/restore — all behind the R8 posting lock
-// (GT's open date is 2026-07-01). GT deliberately has no next-cheque-no /
-// cheque-usage / receipt-voucher endpoints (GT cheque references are
-// per-LINE and the voucher is TH-only), and no DELETE (GT journals are
+// (GT's open date is 2026-07-01). Since 2026-08-14 GT also has the TH-style
+// header Cheque No machinery for manual C/B journals: GET /next-cheque-no
+// (PB-seeded sequential physical cheque prefill for C entries), GET
+// /cheque-usage (re-use warning, tracked from 8 chars because GT physical
+// cheques are PB######), cheque_no persistence on POST/PUT, and
+// cheque_duplicate_count on the list. Per-LINE cheque_reference remains
+// available alongside it (ledgers read COALESCE(line, header)). GT still has
+// no receipt-voucher endpoints (TH-only) and no DELETE (GT journals are
 // posted-on-create; there is no draft state to delete). GET /:id resolves the
 // owning document of an organic journal into a "View Source" link, like Tien
 // Hock; imported (legacy_import) journals have no source page.
@@ -57,6 +62,7 @@ const GT_ADJUSTMENT_DOC_TYPE_LABELS = {
  * @property {string} entry_type
  * @property {string} entry_date
  * @property {GTManualJournalLinePayload[]} lines
+ * @property {string|null} [cheque_no] Header cheque number (C/B entries only).
  */
 
 /**
@@ -153,6 +159,74 @@ const DISPLAY_ENTRY_TYPE_SQL =
   "THEN COALESCE(je.legacy_entry_type, je.entry_type) " +
   "ELSE je.entry_type END";
 
+// Header cheque number machinery (2026-08-14), mirroring Tien Hock: Cash
+// Payment (C) draws on the physical PB cheque book; Bank Payment (B) keys the
+// bank's transaction id (PBE…/PBEB…) into the same column.
+const CHEQUE_NO_ENTRY_TYPES = ["C", "B"];
+const PHYSICAL_CHEQUE_ENTRY_TYPE = "C";
+// GT physical cheques are 8 chars (PB350431), so GT tracks from 8 where Tien
+// Hock's PBB###### book needs 9. Shorter values (bare "PBE" prefill) are
+// ignored rather than flagging prefills as re-use.
+const MIN_TRACKED_CHEQUE_LENGTH = 8;
+const TRACKED_CHEQUE_SQL =
+  `je.cheque_no IS NOT NULL AND ` +
+  `LENGTH(TRIM(je.cheque_no)) >= ${MIN_TRACKED_CHEQUE_LENGTH}`;
+// Journals sharing one cheque number, joined so the list can flag re-use
+// without a subquery in the SELECT list (the count query rewrites that list).
+const CHEQUE_DUPLICATE_JOIN_SQL = `
+        LEFT JOIN (
+          SELECT UPPER(TRIM(je.cheque_no)) AS cheque_key, COUNT(*) - 1 AS other_count
+          FROM greentarget.journal_entries je
+          WHERE ${TRACKED_CHEQUE_SQL}
+          GROUP BY 1
+          HAVING COUNT(*) > 1
+        ) chq ON chq.cheque_key = UPPER(TRIM(je.cheque_no))`;
+
+/**
+ * Normalise a cheque number for re-use matching, or return null when it is
+ * blank or too short to be a real instrument reference.
+ *
+ * @param {string | null | undefined} chequeNo
+ * @returns {string | null}
+ */
+function normaliseChequeNo(chequeNo) {
+  const trimmed = String(chequeNo ?? "").trim().toUpperCase();
+  return trimmed.length >= MIN_TRACKED_CHEQUE_LENGTH ? trimmed : null;
+}
+
+/**
+ * Other Cash Payment (C) / Bank Payment (B) journals already carrying this
+ * cheque number — the legacy programme's "CHEQUE … ALREADY ISSUED ON …" check.
+ * Cancelled journals are included and carry their status, so a cheque that was
+ * legitimately voided and re-issued reads as such instead of as a clash.
+ *
+ * @param {import("pg").Pool} pool
+ * @param {string | null | undefined} chequeNo
+ * @param {number | null} excludeId Journal being viewed/edited, excluded from its own match
+ * @returns {Promise<Array<object>>}
+ */
+async function fetchChequeDuplicates(pool, chequeNo, excludeId) {
+  const chequeKey = normaliseChequeNo(chequeNo);
+  if (!chequeKey) return [];
+
+  const result = await pool.query(
+    `SELECT
+       je.id,
+       ${VISIBLE_REFERENCE_SQL} AS reference_no,
+       ${DISPLAY_ENTRY_TYPE_SQL} AS entry_type,
+       je.entry_date,
+       je.description,
+       je.status,
+       je.cheque_no
+     FROM greentarget.journal_entries je
+     WHERE UPPER(TRIM(je.cheque_no)) = $1
+       AND ($2::integer IS NULL OR je.id <> $2::integer)
+     ORDER BY je.entry_date, ${VISIBLE_REFERENCE_SQL}`,
+    [chequeKey, excludeId ?? null]
+  );
+  return result.rows;
+}
+
 /**
  * @param {import("pg").Pool} pool
  * @returns {import("express").Router}
@@ -161,8 +235,8 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
   const router = Router();
 
   // GET / - Journal entries with filters. Envelope and row shape mirror Tien
-  // Hock's list exactly (minus cheque_duplicate_count: GT cheque_no is always
-  // NULL, so the re-use scan has nothing to count).
+  // Hock's list exactly, including cheque_duplicate_count for the re-used
+  // badge (tracked from 8 chars — GT physical cheques are PB######).
   router.get("/", async (req, res) => {
     try {
       const {
@@ -189,9 +263,11 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
           je.entry_date,
           je.description, je.total_debit, je.total_credit, je.status,
           je.cheque_no, je.created_at, je.updated_at, je.posted_at,
+          COALESCE(chq.other_count, 0)::int AS cheque_duplicate_count,
           jet.name as entry_type_name
         FROM greentarget.journal_entries je
         LEFT JOIN greentarget.journal_entry_types jet ON ${DISPLAY_ENTRY_TYPE_SQL} = jet.code
+        ${CHEQUE_DUPLICATE_JOIN_SQL}
         WHERE 1=1
       `;
       const params = [];
@@ -365,6 +441,73 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
     }
   });
 
+  // GET /next-cheque-no - Next sequential physical cheque number for Cash
+  // Payment (C) entries. Seeded at PB384453 (one past the highest legacy GT
+  // cheque, PB384452). Only C entries are scanned: B entries store the bank's
+  // transaction ids (PBE260102023574785) in the same column, whose numeric
+  // suffix dwarfs the cheque book and would otherwise win this scan.
+  router.get("/next-cheque-no", async (req, res) => {
+    const SEED_CHEQUE_NO = "PB384453";
+    try {
+      const result = await pool.query(
+        `SELECT cheque_no FROM greentarget.journal_entries
+          WHERE entry_type = $1 AND cheque_no IS NOT NULL AND cheque_no <> ''`,
+        [PHYSICAL_CHEQUE_ENTRY_TYPE]
+      );
+
+      let best = null; // { prefix, num, width }
+      for (const row of result.rows) {
+        const match = String(row.cheque_no).match(/^(.*?)(\d+)$/);
+        if (!match) continue;
+        const prefix = match[1];
+        const num = parseInt(match[2], 10);
+        const width = match[2].length;
+        if (!best || num > best.num) {
+          best = { prefix, num, width };
+        }
+      }
+
+      let nextChequeNo;
+      if (!best) {
+        nextChequeNo = SEED_CHEQUE_NO;
+      } else {
+        const nextNum = best.num + 1;
+        nextChequeNo = `${best.prefix}${String(nextNum).padStart(best.width, "0")}`;
+      }
+
+      res.json({ cheque_no: nextChequeNo });
+    } catch (error) {
+      console.error("Error generating next cheque number:", error);
+      res.status(500).json({
+        message: "Error generating next cheque number",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /cheque-usage - Report other Cash/Bank Payment journals already using
+  // a cheque number, so the entry form can warn while it is being keyed.
+  // Warning only: the legacy programme allowed the save and so does this.
+  // Declared before /:id so the literal path is not swallowed by the id route.
+  router.get("/cheque-usage", async (req, res) => {
+    try {
+      const { cheque_no, exclude_id } = req.query;
+      const parsedExcludeId = Number.parseInt(exclude_id, 10);
+      const duplicates = await fetchChequeDuplicates(
+        pool,
+        cheque_no,
+        Number.isNaN(parsedExcludeId) ? null : parsedExcludeId
+      );
+      res.json({ duplicates });
+    } catch (error) {
+      console.error("Error checking cheque usage:", error);
+      res.status(500).json({
+        message: "Error checking cheque usage",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /:id - Single journal entry with its lines. `source` deep-links an
   // organic journal back to its owning invoice/payment/adjustment page
   // (null for manual journals and legacy imports).
@@ -426,11 +569,17 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
       const linesResult = await pool.query(linesQuery, [id]);
 
       const source = await resolveGTJournalSource(pool, entryResult.rows[0]);
+      const cheque_duplicates = await fetchChequeDuplicates(
+        pool,
+        entryResult.rows[0].cheque_no,
+        Number(id)
+      );
 
       res.json({
         ...entryResult.rows[0],
         lines: linesResult.rows,
         source,
+        cheque_duplicates,
       });
     } catch (error) {
       console.error("Error fetching Green Target journal entry:", error);
@@ -458,6 +607,14 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
    */
   const validateJournalPayload = (body, res) => {
     const { reference_no, entry_type, entry_date, lines } = body;
+    // Header cheque number is only meaningful on Cash/Bank Payment entries;
+    // force-null it for every other type (same rule as Tien Hock).
+    const cheque_no =
+      CHEQUE_NO_ENTRY_TYPES.includes(entry_type) &&
+      body.cheque_no &&
+      String(body.cheque_no).trim()
+        ? String(body.cheque_no).trim()
+        : null;
     if (entry_type === LEGACY_IMPORT_ENTRY_TYPE) {
       res.status(400).json({
         message:
@@ -509,7 +666,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
       });
       return null;
     }
-    return { reference_no, entry_type, entry_date, lines };
+    return { reference_no, entry_type, entry_date, lines, cheque_no };
   };
 
   /**
@@ -596,7 +753,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
   router.post("/", async (req, res) => {
     const payload = validateJournalPayload(req.body, res);
     if (!payload) return;
-    const { reference_no, entry_type, entry_date, lines } = payload;
+    const { reference_no, entry_type, entry_date, lines, cheque_no } = payload;
     const description = req.body.description;
 
     const client = await pool.connect();
@@ -643,6 +800,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
         entryType: entry_type,
         entryDate,
         description: description?.trim() || null,
+        chequeNo: cheque_no,
         createdBy: req.staffId || null,
         lines: lines.map((line) => ({
           accountCode: line.account_code,
@@ -682,7 +840,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
     const { id } = req.params;
     const payload = validateJournalPayload(req.body, res);
     if (!payload) return;
-    const { reference_no, entry_type, entry_date, lines } = payload;
+    const { reference_no, entry_type, entry_date, lines, cheque_no } = payload;
     const description = req.body.description;
 
     const client = await pool.connect();
@@ -763,6 +921,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
             SET reference_no = $2, entry_type = $3, entry_date = $4,
                 description = $5, total_debit = $6, total_credit = $7,
                 posting_sequence = $8, manual_override = $9,
+                cheque_no = $11,
                 updated_at = NOW(), updated_by = $10
           WHERE id = $1`,
         [
@@ -776,6 +935,7 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
           postingSequence,
           isSystemOwned ? true : existing.manual_override,
           req.staffId || null,
+          cheque_no,
         ]
       );
 
