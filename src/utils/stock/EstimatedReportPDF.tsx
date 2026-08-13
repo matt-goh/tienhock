@@ -1,7 +1,7 @@
 // src/utils/stock/EstimatedReportPDF.tsx
-// PDF printout of the monthly "Estimated P&L & Unit Cost" report (MEE & BIHUN).
-// Each report page prints its OWN view for both product lines: the P&L page
-// prints MEE P&L + BIHUN P&L, the Unit Cost page prints MEE + BIHUN Unit Cost.
+// PDF printout of the monthly "Estimated Cost & Unit Cost" report (MEE & BIHUN).
+// Each report page prints its OWN view for both product lines: the Estimated
+// Cost page prints MEE + BIHUN cost, the Unit Cost page prints MEE + BIHUN Unit Cost.
 // Content is 1:1 with the live report response, never hardcoded.
 // Doc: docs/Account/ESTIMATED_REPORT_HANDOVER.md (Phase 5)
 import React from "react";
@@ -541,7 +541,7 @@ const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
   const pl = line.pl;
   return (
     <Page size="A4" style={styles.page}>
-      <ReportHeader title="ESTIMATED P&L" line={line} />
+      <ReportHeader title="ESTIMATED COST" line={line} />
 
       {/* PRODUCT */}
       <View style={styles.section}>
@@ -691,9 +691,9 @@ const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
         </View>
       </View>
 
-      {/* P/L */}
+      {/* ESTIMATE COST */}
       <View style={styles.majorTotal}>
-        <Text style={styles.majorTotalLabel}>PROFIT / (LOSS)</Text>
+        <Text style={styles.majorTotalLabel}>ESTIMATE COST</Text>
         <Text
           style={[
             styles.majorTotalAmount,
@@ -710,9 +710,9 @@ const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
         <Text style={styles.boldRowAmount}>{formatCurrency(pl.addBack)}</Text>
       </View>
 
-      {/* FINAL P/L */}
+      {/* FINAL ESTIMATE COST */}
       <View style={styles.finalTotal}>
-        <Text style={styles.finalTotalLabel}>FINAL PROFIT / (LOSS)</Text>
+        <Text style={styles.finalTotalLabel}>FINAL ESTIMATE COST</Text>
         <Text
           style={[
             styles.finalTotalAmount,
@@ -725,7 +725,7 @@ const EstimatedPLPDFPage: React.FC<{ line: ProductLineReport }> = ({
 
       {/* ACCUMULATIVE */}
       <View style={styles.finalTotal}>
-        <Text style={styles.finalTotalLabel}>ACCUMULATIVE P/L</Text>
+        <Text style={styles.finalTotalLabel}>ACCUMULATIVE COST</Text>
         <Text
           style={[
             styles.finalTotalAmount,
@@ -866,10 +866,10 @@ const EstimatedUnitCostPDFPage: React.FC<{ line: ProductLineReport }> = ({
         </Text>
       </View>
 
-      {/* ADD BACK (keyed on the Estimated P&L page) */}
+      {/* ADD BACK (keyed on the Estimated Cost page) */}
       <View style={styles.addBackRow}>
         <Text style={styles.boldRowLabel}>
-          ADD BACK (keyed on the Estimated P&amp;L page)
+          ADD BACK (keyed on the Estimated Cost page)
         </Text>
         <Text style={styles.boldRowAmount}>
           {formatCurrency(uc.addBack.amount)}
@@ -906,7 +906,7 @@ const EstimatedReportPDFDocument: React.FC<EstimatedReportPDFDocumentProps> = ({
   productLines,
 }) => (
   <Document
-    title={`${view === "pl" ? "Estimated P&L" : "Estimated Unit Cost"} ${
+    title={`${view === "pl" ? "Estimated Cost" : "Estimated Unit Cost"} ${
       data.period.label
     } - ${TIENHOCK_INFO.name}`}
   >
@@ -937,7 +937,7 @@ export const generateEstimatedReportPDF = async (
 
   printPdfBlob(
     blob,
-    `${view === "pl" ? "Estimated P&L" : "Estimated Unit Cost"} ${
+    `${view === "pl" ? "Estimated Cost" : "Estimated Unit Cost"} ${
       data.period.label
     } - ${TIENHOCK_INFO.name}`
   );
