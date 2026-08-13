@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-13",
+    ms: "Laporan Anggaran (MEE & BIHUN): perkataan untung/rugi dibuang mengikut kehendak bos. Laporan \"Anggaran P&L\" kini bernama \"Anggaran Kos\", dan baris-barisnya ditukar — PROFIT / (LOSS) menjadi ESTIMATE COST, FINAL PROFIT / (LOSS) menjadi FINAL ESTIMATE COST, dan ACCUMULATIVE P/L menjadi ACCUMULATIVE COST. Perubahan yang sama dibuat pada cetakan PDF. Semua angka dan cara pengiraan kekal sama.",
+    en: "Estimated Reports (MEE & BIHUN): the profit/loss wording has been removed as the boss requested. The \"Estimated P&L\" report is now called \"Estimated Cost\", and its rows have been renamed — PROFIT / (LOSS) becomes ESTIMATE COST, FINAL PROFIT / (LOSS) becomes FINAL ESTIMATE COST, and ACCUMULATIVE P/L becomes ACCUMULATIVE COST. The same wording is used on the printed PDF. All figures and calculations stay exactly the same.",
+  },
+  {
     date: "2026-08-11",
     ms: "Invois Green Target: baris item pada bil kini boleh diubah semasa mencipta atau mengedit invois. Penerangan diisi awal mengikut akaun hasil — Rental Tong (A) untuk TGA, Rental Tong (B) untuk TGB, selainnya Waste Management (sebelum ini \"Waste Management Service\") — bersama kuantiti dan harga unit, dan baris tambahan seperti caj hari lebihan boleh ditambah. Amaun invois kini dikira sebagai jumlah baris item dan bukannya angka yang dimasukkan. Baris dikunci sebaik sahaja bil mempunyai bayaran, pelarasan atau e-Invois yang disahkan. Bil lama mengekalkan penerangan asalnya.",
     en: "Green Target invoices: the line items on a bill are now editable when creating or editing an invoice. The description is prefilled from the revenue account — Rental Tong (A) for TGA, Rental Tong (B) for TGB, otherwise Waste Management (previously \"Waste Management Service\") — with quantity and unit price, and extra lines such as extra-days charges can be added. The invoice amount is now calculated as the sum of the line items instead of a keyed figure. Lines lock once the bill has a payment, adjustment or validated e-Invoice. Older bills keep their original wording.",

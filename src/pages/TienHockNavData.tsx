@@ -504,7 +504,7 @@ export const TienHockNavData: SidebarItem[] = [
         dropdownColumnOrder: ACCOUNTING_DROPDOWN_COLUMNS.setup.order,
       },
       {
-        name: "Estimated P&L",
+        name: "Estimated Cost",
         path: "/stock/reports/estimated-pl",
         component: EstimatedPLPage,
         group: "Estimated Reports",

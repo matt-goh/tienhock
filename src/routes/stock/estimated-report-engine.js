@@ -1,6 +1,6 @@
 // src/routes/stock/estimated-report-engine.js
 //
-// Computation engine for the boss-only "Estimated P&L & Unit Cost" report
+// Computation engine for the boss-only "Estimated Cost & Unit Cost" report
 // (legacy printouts: "MEE/BIHUN ESTIMATED" + "ESTIMATED/COST"), from 06/2026.
 //
 // Everything is DERIVED at report time from sales, material stock, kilang stock,
@@ -805,7 +805,7 @@ export async function computeEstimatedReport(db, { year, month, productLines }) 
     let firstIndex = targetIndex;
     if (!anchor) {
       warnings.push(
-        `No accumulative anchor on or before ${start} for ${productLine.toUpperCase()} - ACCUMULATIVE shows this month's P/L only.`
+        `No accumulative anchor on or before ${start} for ${productLine.toUpperCase()} - ACCUMULATIVE shows this month's Estimate Cost only.`
       );
     } else {
       firstIndex = monthIndex(anchor.year, anchor.month);
