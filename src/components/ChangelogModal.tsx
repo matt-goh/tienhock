@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-14",
+    ms: "Bayaran Green Target: bayaran pendahuluan kini boleh direkodkan. Sebelum ini, tarikh bayaran yang lebih awal daripada tarikh invois ditolak terus — sekarang satu pengesahan \"advance payment\" dipaparkan dan bayaran boleh disimpan. Ini terpakai di halaman Payments, blok Record Payment semasa mencipta invois, dan borang bayaran pada halaman butiran invois.",
+    en: "Green Target payments: advance payments can now be recorded. Previously a payment dated before its invoice was rejected outright — now an \"advance payment\" confirmation appears and the payment saves. This applies on the Payments page, the Record Payment block when creating an invoice, and the payment form on the invoice details page.",
+  },
+  {
+    date: "2026-08-14",
     ms: "Debtors: butang Ledger baharu di sebelah setiap pelanggan membuka ledger pelanggan itu terus. Bulan yang sedang dipilih turut dibawa ke halaman Ledger untuk Tien Hock, Jelly Polly dan Green Target. Bagi Green Target, butang ini menggantikan butang Invoices lama kerana rekod debitornya tidak mempunyai halaman invois berasingan.",
     en: "Debtors: a new Ledger button beside each customer opens that customer's ledger directly. The selected month is also carried to the Ledger page for Tien Hock, Jelly Polly and Green Target. For Green Target, it replaces the old Invoices button because its debtor records do not have separate invoice pages.",
   },

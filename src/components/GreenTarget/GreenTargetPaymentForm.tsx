@@ -9,6 +9,7 @@ import {
   GreenTargetPayment,
 } from "../../types/greenTargetTypes";
 import Button from "../Button";
+import ConfirmationDialog from "../ConfirmationDialog";
 import { FormInput } from "../FormComponents";
 import PillSelect, { PillSelectOption } from "../PillSelect";
 import TimeNavigator, { type TimeRange } from "../TimeNavigator";
@@ -153,6 +154,14 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
   const effectivePaymentMethod: GreenTargetPayment["payment_method"] =
     joinedReceipt ? joinedReceipt.payment_method : formData.payment_method;
 
+  // Advance payment prompt: the received date is earlier than a selected
+  // invoice's date and the user must confirm before the server allows it.
+  const [advancePaymentPrompt, setAdvancePaymentPrompt] = useState<{
+    invoiceNumber: string;
+    invoiceDate: string;
+    paymentDate: string;
+  } | null>(null);
+
   const fetchUnpaidInvoices = useCallback(async (): Promise<void> => {
     const requestId: number = invoiceRequestIdRef.current + 1;
     invoiceRequestIdRef.current = requestId;
@@ -222,7 +231,9 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
       amountToPay > Number(invoice.current_balance)
   );
 
-  const processPayments = async (): Promise<void> => {
+  const processPayments = async (
+    allowAdvancePayment: boolean = false
+  ): Promise<void> => {
     setIsSubmitting(true);
     const toastId: string = toast.loading("Processing payment...");
 
@@ -249,6 +260,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
           })
         ),
         ...(joinedReceipt ? { receipt_id: joinedReceipt.receipt_id } : {}),
+        ...(allowAdvancePayment ? { allow_advance_payment: true } : {}),
       };
       await greenTargetApi.createPaymentBatch(paymentData);
 
@@ -335,6 +347,33 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
           ? "Confirm that these payments belong to the existing receipt"
           : "This Green Target reference cannot accept another payment"
       );
+      return;
+    }
+
+    // Advance payment: a received date earlier than a selected invoice's
+    // date needs an explicit confirmation before the server accepts it.
+    const effectivePaymentDate: string = joinedReceipt
+      ? toLocalDateInputValue(joinedReceipt.received_date)
+      : formData.payment_date;
+    const advanceInvoice: GreenTargetInvoice | undefined = effectivePaymentDate
+      ? selectedInvoices
+          .map(
+            (item: InvoicePaymentAllocation): GreenTargetInvoice =>
+              item.invoice
+          )
+          .find((invoice: GreenTargetInvoice): boolean => {
+            const invoiceDate: string = toLocalDateInputValue(
+              invoice.date_issued
+            );
+            return Boolean(invoiceDate) && effectivePaymentDate < invoiceDate;
+          })
+      : undefined;
+    if (advanceInvoice) {
+      setAdvancePaymentPrompt({
+        invoiceNumber: advanceInvoice.invoice_number,
+        invoiceDate: toLocalDateInputValue(advanceInvoice.date_issued),
+        paymentDate: effectivePaymentDate,
+      });
       return;
     }
 
@@ -758,6 +797,22 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
             </div>
           </div>
         </form>
+        <ConfirmationDialog
+          isOpen={advancePaymentPrompt !== null}
+          onClose={(): void => setAdvancePaymentPrompt(null)}
+          onConfirm={(): void => {
+            setAdvancePaymentPrompt(null);
+            void processPayments(true);
+          }}
+          title="Record Advance Payment?"
+          message={
+            advancePaymentPrompt
+              ? `The payment received date (${advancePaymentPrompt.paymentDate}) is before invoice ${advancePaymentPrompt.invoiceNumber}'s date (${advancePaymentPrompt.invoiceDate}). Record this as an advance payment?`
+              : ""
+          }
+          confirmButtonText="Record Payment"
+          variant="default"
+        />
       </div>
     </div>
   );
