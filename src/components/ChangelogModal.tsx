@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-14",
+    ms: "Jelly Polly Payroll: tarikh setiap baris kerja pada halaman butiran gaji pekerja kini betul. Sebelum ini baris yang direkodkan pada hari pertama bulan (contohnya 01/08/2026) dipaparkan sebagai hari terakhir bulan sebelumnya (31/07/2026), walaupun rekod sebenar disimpan pada tarikh yang betul — ini hanya masalah paparan, tiada data yang hilang atau salah.",
+    en: "Jelly Polly Payroll: the date of each work line on an employee's payroll details page is now correct. Previously a line recorded on the first day of a month (e.g. 01/08/2026) was shown as the last day of the previous month (31/07/2026), even though the record itself was saved on the right date — this was a display issue only, no data was lost or wrong.",
+  },
+  {
+    date: "2026-08-14",
     ms: "Jelly Polly: paparan By Customer di halaman Debtors kini mempunyai ruangan Debtor Opening untuk memasukkan baki pembukaan setiap pelanggan pada hari pertama bulan yang dipilih. Amaun positif bermaksud pelanggan berhutang (DR), manakala amaun negatif ialah kredit pelanggan (CR); kosongkan ruangan dan simpan untuk membuang baki pembukaan pada tarikh itu. Bal B/F, jumlah tertunggak, penyata pelanggan dan Account Ledger kini menggunakan baki pembukaan ini bersama invois, bayaran dan pelarasan selepas tarikhnya. Baki pembukaan juga boleh ditetapkan terus dari Account Ledger. Jika ID pelanggan ditukar, baki pembukaan ini akan dipindahkan ke ID baharu; jika pelanggan dipadam secara kekal, baki pembukaannya turut dibuang selepas pengesahan.",
     en: "Jelly Polly: the By Customer view on the Debtors page now has a Debtor Opening column for entering each customer's opening balance on the first day of the selected month. A positive amount means the customer owes money (DR), while a negative amount is customer credit (CR); clear the field and save to remove that date's opening. Bal B/F, outstanding totals, customer statements and Account Ledger now use this opening together with invoices, payments and adjustments after its date. The opening can also be set directly from Account Ledger. Changing a customer ID carries these openings to the new ID; permanently deleting a customer also removes their openings after confirmation.",
   },
