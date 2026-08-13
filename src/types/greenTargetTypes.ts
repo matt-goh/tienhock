@@ -188,6 +188,9 @@ export interface CreateGreenTargetPaymentInput {
   // owns the banking event, so the date, method and cheque/transaction
   // reference sent alongside are ignored by the server.
   receipt_id?: number;
+  // Advance payment: the user confirmed a received date earlier than the
+  // invoice date, so the server skips its not-before-invoice guard.
+  allow_advance_payment?: boolean;
 }
 
 export interface CreateGreenTargetPaymentBatchInput {
@@ -200,6 +203,9 @@ export interface CreateGreenTargetPaymentBatchInput {
   // owns the banking event, so the date, method and cheque/transaction
   // reference sent alongside are ignored by the server.
   receipt_id?: number;
+  // Advance payment: the user confirmed a received date earlier than a
+  // selected invoice's date, so the server skips its not-before-invoice guard.
+  allow_advance_payment?: boolean;
 }
 
 export interface UpdateGreenTargetPaymentReferencesInput {

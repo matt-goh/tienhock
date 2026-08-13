@@ -219,6 +219,12 @@ const InvoiceFormPage: React.FC = () => {
   const [isFormChanged, setIsFormChanged] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showBackConfirmation, setShowBackConfirmation] = useState(false);
+  // Advance payment: received date earlier than the invoice date needs an
+  // explicit confirmation; the ref carries the confirmation into the retry.
+  const [advancePaymentPrompt, setAdvancePaymentPrompt] = useState<{
+    paymentDate: string;
+  } | null>(null);
+  const advancePaymentConfirmedRef = useRef(false);
   const [loading, setLoading] = useState(true); // Start loading
   const [error, setError] = useState<string | null>(null);
 
@@ -984,13 +990,17 @@ const InvoiceFormPage: React.FC = () => {
       const inheritedReceivedDate: string = toLocalDateInputValue(
         joinedPaymentReceipt.received_date
       );
+      if (!inheritedReceivedDate) {
+        toast.error("The existing receipt has no received date.");
+        return false;
+      }
       if (
-        !inheritedReceivedDate ||
-        (formData.date_issued && inheritedReceivedDate < formData.date_issued)
+        formData.date_issued &&
+        inheritedReceivedDate < formData.date_issued &&
+        !advancePaymentConfirmedRef.current
       ) {
-        toast.error(
-          "The existing receipt date cannot be before the invoice date."
-        );
+        // Advance payment: confirm before the server accepts the earlier date.
+        setAdvancePaymentPrompt({ paymentDate: inheritedReceivedDate });
         return false;
       }
     } else if (isPaid) {
@@ -1002,8 +1012,13 @@ const InvoiceFormPage: React.FC = () => {
         toast.error("Enter the payment received date.");
         return false;
       }
-      if (formData.date_issued && paymentDate < formData.date_issued) {
-        toast.error("Payment received date cannot be before the invoice date.");
+      if (
+        formData.date_issued &&
+        paymentDate < formData.date_issued &&
+        !advancePaymentConfirmedRef.current
+      ) {
+        // Advance payment: confirm before the server accepts the earlier date.
+        setAdvancePaymentPrompt({ paymentDate });
         return false;
       }
       if (!paymentInternalReference.trim()) {
@@ -1036,8 +1051,7 @@ const InvoiceFormPage: React.FC = () => {
     }
     return true;
   };
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitForm = async (): Promise<void> => {
     if (!validateForm()) return;
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
@@ -1238,6 +1252,9 @@ const InvoiceFormPage: React.FC = () => {
                 ...(joinedPaymentReceipt
                   ? { receipt_id: joinedPaymentReceipt.receipt_id }
                   : {}),
+                ...(advancePaymentConfirmedRef.current
+                  ? { allow_advance_payment: true }
+                  : {}),
               };
               const paymentResponse: GreenTargetPaymentMutationResponse =
                 await greenTargetApi.createPayment(pData);
@@ -1270,7 +1287,14 @@ const InvoiceFormPage: React.FC = () => {
       toast.error(`Error: ${msg}`);
     } finally {
       setIsSaving(false);
+      // One-shot: a fresh advance needs a fresh confirmation.
+      advancePaymentConfirmedRef.current = false;
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    await submitForm();
   };
 
   // Calculate total amount for display
@@ -2292,6 +2316,23 @@ const InvoiceFormPage: React.FC = () => {
         message="Leave without saving?"
         confirmButtonText="Discard"
         variant="danger"
+      />
+      <ConfirmationDialog
+        isOpen={advancePaymentPrompt !== null}
+        onClose={(): void => setAdvancePaymentPrompt(null)}
+        onConfirm={(): void => {
+          advancePaymentConfirmedRef.current = true;
+          setAdvancePaymentPrompt(null);
+          void submitForm();
+        }}
+        title="Record Advance Payment?"
+        message={`The payment received date (${
+          advancePaymentPrompt?.paymentDate ?? ""
+        }) is before the invoice date (${
+          formData.date_issued
+        }). Record this as an advance payment?`}
+        confirmButtonText="Record Payment"
+        variant="default"
       />
     </div>
   );

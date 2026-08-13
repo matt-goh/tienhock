@@ -273,6 +273,12 @@ const RentalDetailsPage: React.FC = () => {
   ]);
   // The modal re-prefills the lines until the user keys anything into them.
   const linesManuallyEditedRef = useRef(false);
+  // Advance payment: received date earlier than the invoice date needs an
+  // explicit confirmation; the ref carries the confirmation into the retry.
+  const [advancePaymentPrompt, setAdvancePaymentPrompt] = useState<{
+    paymentDate: string;
+  } | null>(null);
+  const advancePaymentConfirmedRef = useRef(false);
   const [invoiceRevenueSplits, setInvoiceRevenueSplits] = useState<
     GreenTargetRevenueSplit[]
   >([
@@ -659,10 +665,16 @@ const RentalDetailsPage: React.FC = () => {
       const inheritedReceivedDate: string = toLocalDateString(
         confirmedPaymentReceipt.received_date
       );
-      if (!inheritedReceivedDate || inheritedReceivedDate < dateIssued) {
-        toast.error(
-          "The existing receipt date cannot be before the invoice date."
-        );
+      if (!inheritedReceivedDate) {
+        toast.error("The existing receipt has no received date.");
+        return;
+      }
+      if (
+        inheritedReceivedDate < dateIssued &&
+        !advancePaymentConfirmedRef.current
+      ) {
+        // Advance payment: confirm before the server accepts the earlier date.
+        setAdvancePaymentPrompt({ paymentDate: inheritedReceivedDate });
         return;
       }
     } else if (recordPayment) {
@@ -670,8 +682,9 @@ const RentalDetailsPage: React.FC = () => {
         toast.error("Payment received date is required.");
         return;
       }
-      if (paymentDate < dateIssued) {
-        toast.error("Payment received date cannot be before the invoice date.");
+      if (paymentDate < dateIssued && !advancePaymentConfirmedRef.current) {
+        // Advance payment: confirm before the server accepts the earlier date.
+        setAdvancePaymentPrompt({ paymentDate });
         return;
       }
     }
@@ -736,6 +749,9 @@ const RentalDetailsPage: React.FC = () => {
               ...(confirmedPaymentReceipt
                 ? { receipt_id: confirmedPaymentReceipt.receipt_id }
                 : {}),
+              ...(advancePaymentConfirmedRef.current
+                ? { allow_advance_payment: true }
+                : {}),
             });
           toast.success(
             paymentResponse.receipt?.joined
@@ -761,6 +777,8 @@ const RentalDetailsPage: React.FC = () => {
       toast.error(message);
     } finally {
       setIsCreatingInvoice(false);
+      // One-shot: a fresh advance needs a fresh confirmation.
+      advancePaymentConfirmedRef.current = false;
     }
   };
 
@@ -1144,6 +1162,23 @@ const RentalDetailsPage: React.FC = () => {
         confirmButtonText="Delete"
         variant="danger"
         isConfirming={isDeleting}
+      />
+
+      {/* Advance payment confirmation */}
+      <ConfirmationDialog
+        isOpen={advancePaymentPrompt !== null}
+        onClose={(): void => setAdvancePaymentPrompt(null)}
+        onConfirm={(): void => {
+          advancePaymentConfirmedRef.current = true;
+          setAdvancePaymentPrompt(null);
+          void handleCreateInvoice();
+        }}
+        title="Record Advance Payment?"
+        message={`The payment received date (${
+          advancePaymentPrompt?.paymentDate ?? ""
+        }) is before the invoice date (${dateIssued}). Record this as an advance payment?`}
+        confirmButtonText="Record Payment"
+        variant="default"
       />
 
       {/* Pickup Modal */}
