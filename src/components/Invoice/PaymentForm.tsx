@@ -871,7 +871,16 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         results.push(result);
       } else {
         // Create payment for each selected invoice
-        for (const { invoice, amountToPay } of selectedInvoices) {
+        // A multi-invoice Jelly Polly payment is one reference across several
+        // invoices. The first request creates the first usage of a fresh
+        // reference, so the subsequent requests would otherwise be rejected as
+        // duplicates unless we confirm the batch up front.
+        const confirmBatchReference: boolean =
+          selectedInvoices.length > 1 && Boolean(paymentReference);
+        for (const [
+          invoiceIndex,
+          { invoice, amountToPay },
+        ] of selectedInvoices.entries()) {
           const result = await api.post(apiEndpoint, {
             invoice_id: invoice.id,
             payment_date: formData.payment_date,
@@ -882,7 +891,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             notes: notes || undefined,
             // The user has seen which other invoices carry this reference and
             // confirmed it is the same transfer.
-            confirm_duplicate_reference: isDuplicateReferenceConfirmed
+            confirm_duplicate_reference: isDuplicateReferenceConfirmed ||
+              (confirmBatchReference && invoiceIndex > 0)
               ? true
               : undefined,
           });
