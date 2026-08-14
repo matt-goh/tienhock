@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-14",
+    ms: "Bayaran Jelly Polly: merekod bayaran untuk beberapa invois dengan satu rujukan kini berjaya disimpan. Sebelum ini, invois kedua dan seterusnya gagal kerana sistem menganggap rujukan yang baru digunakan pada invois pertama sebagai pendua. Rujukan daripada cek yang masih belum dijelaskan juga tidak lagi menyekat bayaran baharu. Mesej ralat kini menunjukkan sebab sebenar (contohnya invois sudah berbayar atau jumlah melebihi baki) dan bukannya hanya \"Error creating payment\".",
+    en: "Jelly Polly payments: recording one payment against several invoices with a single reference now saves successfully. Previously the second and later invoices failed because the system treated the reference just used on the first invoice as a duplicate. References from uncleared pending cheques no longer block a new payment. Error messages now show the real reason (for example an invoice is already paid or the amount exceeds the balance) instead of only \"Error creating payment\".",
+  },
+  {
+    date: "2026-08-14",
     ms: "Jurnal Green Target: ruangan Cheque No kini tersedia pada voucher Cash Payment (C) dan Bank Payment (B), sama seperti Tien Hock. Untuk Cash Payment, nombor cek seterusnya diisi secara automatik (bermula PB384453), dan untuk Bank Payment ia diisi awal dengan PBE. Sistem turut memberi amaran jika nombor cek yang sama telah digunakan pada voucher lain.",
     en: "Green Target journals: the Cheque No field is now available on Cash Payment (C) and Bank Payment (B) vouchers, just like Tien Hock. Cash Payment prefills the next cheque number automatically (starting PB384453), and Bank Payment prefills PBE. A warning also appears if the same cheque number has already been used on another voucher.",
   },

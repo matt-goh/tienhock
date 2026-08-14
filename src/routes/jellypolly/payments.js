@@ -24,6 +24,13 @@ const updateCustomerCredit = async (client, customerId, amount) => {
   }
 };
 
+const createPaymentError = (status, message, code) => {
+  const error = new Error(message);
+  error.status = status;
+  if (code) error.code = code;
+  return error;
+};
+
 // Accepts only an explicit yyyy-MM-dd from the client so an edited date can
 // never be reinterpreted through UTC on its way into the payment row.
 const normalizeEditableDate = (value, label) => {
@@ -225,11 +232,11 @@ export default function (pool) {
         `SELECT p.payment_id, p.invoice_id, p.payment_date, p.amount_paid,
                 p.payment_method, p.payment_reference, p.status,
                 i.customerid
-           FROM jellypolly.payments p
-           LEFT JOIN jellypolly.invoices i ON i.id = p.invoice_id
+          FROM jellypolly.payments p
+          LEFT JOIN jellypolly.invoices i ON i.id = p.invoice_id
           WHERE UPPER(TRIM(p.payment_reference)) = UPPER($1)
             AND ($2::varchar IS NULL OR p.invoice_id <> $2)
-            AND (p.status IS NULL OR p.status <> 'cancelled')
+            AND (p.status IS NULL OR p.status NOT IN ('cancelled', 'pending'))
           ORDER BY p.payment_date DESC, p.payment_id DESC
           LIMIT 20`,
         [reference, excludeInvoiceId]
@@ -304,7 +311,7 @@ export default function (pool) {
              FROM jellypolly.payments p
             WHERE UPPER(TRIM(p.payment_reference)) = UPPER($1)
               AND p.invoice_id <> $2
-              AND (p.status IS NULL OR p.status <> 'cancelled')
+              AND (p.status IS NULL OR p.status NOT IN ('cancelled', 'pending'))
             ORDER BY p.payment_date DESC, p.payment_id DESC
             LIMIT 20`,
           [payment_reference.trim(), invoice_id]
@@ -339,19 +346,21 @@ export default function (pool) {
       const invoiceResult = await client.query(invoiceQuery, [invoice_id]);
 
       if (invoiceResult.rows.length === 0) {
-        throw new Error(`Invoice ${invoice_id} not found.`);
+        throw createPaymentError(404, `Invoice ${invoice_id} not found.`);
       }
       const invoice = invoiceResult.rows[0];
       const currentBalance = parseFloat(invoice.balance_due || 0);
 
       // 2. Check invoice status and payment amount
       if (invoice.invoice_status === "cancelled") {
-        throw new Error(
+        throw createPaymentError(
+          409,
           `Invoice ${invoice_id} is cancelled and cannot receive payments.`
         );
       }
       if (parseFloat(amount_paid) > currentBalance) {
-        throw new Error(
+        throw createPaymentError(
+          400,
           `Payment amount (${parseFloat(amount_paid).toFixed(
             2
           )}) exceeds balance due (${currentBalance.toFixed(2)}).`
@@ -443,9 +452,16 @@ export default function (pool) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error("Error creating payment:", error);
+      const status = error.status || 500;
       res
-        .status(500)
-        .json({ message: "Error creating payment", error: error.message });
+        .status(status)
+        .json({
+          code: error.code,
+          message: status < 500 ? error.message : "Error creating payment",
+          error: status < 500 ? undefined : error.message,
+          requires_confirmation: error.requires_confirmation || undefined,
+          candidate: error.candidate || undefined,
+        });
     } finally {
       client.release();
     }

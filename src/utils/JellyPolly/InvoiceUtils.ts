@@ -420,11 +420,14 @@ export const createPayment = async (
 ): Promise<Payment[]> => {
   try {
     const response = await api.post("/jellypolly/api/payments", paymentData);
-    if (!response || !response.payments || response.payments.length === 0) {
+    // The Jelly Polly payments endpoint returns a single `payment` object,
+    // not the `payments` array returned by the Tien Hock grouped-receipt path.
+    if (!response || !response.payment) {
       throw new Error("Invalid response received after creating payment.");
     }
-    // The backend now returns an array of payments created.
-    return response.payments;
+    // Keep the historical callers' array-return contract by wrapping the one
+    // created row; callers ignore the return value today.
+    return [response.payment];
   } catch (error: any) {
     console.error("Error creating payment:", error);
     const errorMessage =
