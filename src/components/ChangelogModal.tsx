@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-15",
+    ms: "Pembayaran Jelly Polly: kumpulan bayaran yang berkongsi rujukan, tarikh dan kaedah kini boleh dibatalkan sekaligus melalui butang Cancel Group. Semua invois dan jumlah dalam kumpulan dipaparkan untuk pengesahan, dan baki invois serta kredit pelanggan dipulihkan bersama. Butang Add Payment pada kumpulan turut membuka borang baharu dengan rujukan, tarikh dan kaedah kumpulan yang telah ditetapkan. Rujukan berulang yang disahkan sebagai pemindahan sama akan menyertai kumpulan sedia ada dan bukannya menjadi kumpulan berasingan.",
+    en: "Jelly Polly payments: a group of payments sharing the same reference, date and method can now be cancelled together with a Cancel Group button. Every invoice and amount in the group is shown for confirmation, and the invoice balances and customer credit are restored together. An Add Payment button on the group opens a new form prefilled with that group's reference, date and method. A repeated reference confirmed as the same transfer now joins the existing group instead of becoming a separate group.",
+  },
+  {
     date: "2026-08-14",
     ms: "Bayaran Jelly Polly: merekod bayaran untuk beberapa invois dengan satu rujukan kini berjaya disimpan. Sebelum ini, invois kedua dan seterusnya gagal kerana sistem menganggap rujukan yang baru digunakan pada invois pertama sebagai pendua. Rujukan daripada cek yang masih belum dijelaskan juga tidak lagi menyekat bayaran baharu. Mesej ralat kini menunjukkan sebab sebenar (contohnya invois sudah berbayar atau jumlah melebihi baki) dan bukannya hanya \"Error creating payment\".",
     en: "Jelly Polly payments: recording one payment against several invoices with a single reference now saves successfully. Previously the second and later invoices failed because the system treated the reference just used on the first invoice as a duplicate. References from uncleared pending cheques no longer block a new payment. Error messages now show the real reason (for example an invoice is already paid or the amount exceeds the balance) instead of only \"Error creating payment\".",
