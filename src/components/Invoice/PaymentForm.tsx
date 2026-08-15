@@ -433,18 +433,34 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       : null;
   const joinedReceiptGroup: ReceiptReferenceUsageRow | null =
     isDuplicateReferenceConfirmed ? joinableReceipt : null;
+  // Jelly Polly has no receipt header, but the Payment page still renders one
+  // reference/date/method group. When a repeated reference is confirmed as the
+  // same transfer, use that existing group's date and method so the new rows
+  // join it instead of becoming a separate visible group.
+  const joinableJellyPollyPayment: PaymentReferenceUsageRow | null =
+    !useGroupedReceipt && referenceUsage?.payments?.length
+      ? referenceUsage.payments[0] || null
+      : null;
+  const joinedJellyPollyGroup: PaymentReferenceUsageRow | null =
+    isDuplicateReferenceConfirmed ? joinableJellyPollyPayment : null;
   const groupPaymentDate: string = joinedReceiptGroup
     ? format(new Date(joinedReceiptGroup.received_date), "yyyy-MM-dd")
+    : joinedJellyPollyGroup
+      ? format(new Date(joinedJellyPollyGroup.payment_date), "yyyy-MM-dd")
     : formData.payment_date;
   const groupPaymentMethod: RecordablePaymentMethod = joinedReceiptGroup
     ? (joinedReceiptGroup.payment_method as RecordablePaymentMethod)
+    : joinedJellyPollyGroup
+      ? (joinedJellyPollyGroup.payment_method as RecordablePaymentMethod)
     : formData.payment_method;
   const groupBankAccount: string =
     joinedReceiptGroup && joinedReceiptGroup.payment_method !== "cash"
       ? joinedReceiptGroup.debit_account
       : formData.bank_account;
   const bankingFieldsLocked: boolean =
-    Boolean(referenceGroup) || joinedReceiptGroup !== null;
+    Boolean(referenceGroup) ||
+    joinedReceiptGroup !== null ||
+    joinedJellyPollyGroup !== null;
 
   // Auto-tick the moment a match appears, so the common case is a no-op for the
   // user. Keyed per reference, so unticking sticks and a new reference decides
@@ -883,11 +899,11 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         ] of selectedInvoices.entries()) {
           const result = await api.post(apiEndpoint, {
             invoice_id: invoice.id,
-            payment_date: formData.payment_date,
+            payment_date: groupPaymentDate,
             amount_paid: amountToPay,
-            payment_method: formData.payment_method,
+            payment_method: groupPaymentMethod,
             payment_reference: paymentReference || undefined,
-            bank_account: formData.payment_method === 'cash' ? 'CASH' : formData.bank_account,
+            bank_account: groupPaymentMethod === 'cash' ? 'CASH' : formData.bank_account,
             notes: notes || undefined,
             // The user has seen which other invoices carry this reference and
             // confirmed it is the same transfer.
@@ -1156,7 +1172,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                     </label>
                     <TimeNavigator
                       range={
-                        joinedReceiptGroup
+                        joinedReceiptGroup || joinedJellyPollyGroup
                           ? getPaymentDateRange(groupPaymentDate)
                           : paymentDateRange
                       }
@@ -1399,9 +1415,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                   : t(
                                       "Unticked: this is recorded as its own payment with its own date and method, sharing only the reference number."
                                     )
-                              : t(
-                                  "Each invoice keeps its own payment record; they are only linked by this reference."
-                                )}
+                              : joinedJellyPollyGroup
+                                ? t(
+                                    "The existing group's date and payment method are used, so this payment appears under {{reference}} alongside the payments above. Nothing already recorded is changed.",
+                                    { reference: referenceUsage.reference }
+                                  )
+                                : t(
+                                    "Each invoice keeps its own payment record; they are only linked by this reference."
+                                  )}
                           </p>
                         </div>
                       </div>

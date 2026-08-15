@@ -1,6 +1,7 @@
 // src/pages/JellyPolly/PaymentPage.tsx
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 import {
   IconCash,
   IconPlus,
@@ -11,11 +12,15 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import TimeNavigator from "../../components/TimeNavigator";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { Payment } from "../../types/types";
 import PaymentTable from "../../components/Invoice/PaymentTable";
-import PaymentForm from "../../components/Invoice/PaymentForm";
+import PaymentForm, {
+  type PaymentFormInitialValues,
+} from "../../components/Invoice/PaymentForm";
 import StyledListbox from "../../components/StyledListbox";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import { refreshCreditsCache } from "../../utils/catalogue/useCustomerCache";
 import {
   usePersistedFilters,
   reviveDate,
@@ -64,11 +69,14 @@ const reviveFilters = (cached: any): PaymentFilters | null => {
 
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("payments");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [sortedPayments, setSortedPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [paymentFormInitialValues, setPaymentFormInitialValues] =
+    useState<PaymentFormInitialValues | null>(null);
 
   // Filters persist across navigation so returning from an invoice lands on
   // the same month, method and status the user was looking at.
@@ -186,12 +194,63 @@ const PaymentPage: React.FC = () => {
 
   const handleNewPayment = () => {
     setSelectedPayment(null);
+    setPaymentFormInitialValues(null);
     setShowPaymentForm(true);
   };
 
   const handlePaymentCreated = () => {
     setShowPaymentForm(false);
+    setPaymentFormInitialValues(null);
     fetchPayments();
+  };
+
+  const handleAddPaymentToGroup = (payment: Payment) => {
+    if (
+      payment.payment_method === "contra" ||
+      payment.payment_method === "overpayment"
+    ) {
+      toast.error(
+        t("Contra and overpayment credits cannot be reused as payment groups.")
+      );
+      return;
+    }
+
+    const groupReference: string | null =
+      payment.payment_reference || null;
+    if (!groupReference) {
+      toast.error(
+        t("This payment group does not have a reference to reuse.")
+      );
+      return;
+    }
+
+    setSelectedPayment(null);
+    setPaymentFormInitialValues({
+      payment_date: payment.payment_date,
+      payment_method:
+        payment.payment_method as PaymentFormInitialValues["payment_method"],
+      payment_reference: groupReference,
+      bank_account: payment.bank_account,
+    });
+    setShowPaymentForm(true);
+  };
+
+  const handleCancelPaymentGroup = async (
+    paymentGroup: Payment[]
+  ): Promise<void> => {
+    const livePayments = paymentGroup.filter(
+      (payment) => payment.status !== "cancelled"
+    );
+    if (livePayments.length === 0) return;
+
+    const anchor = livePayments[0];
+    await api.put("/jellypolly/api/payments/group/cancel", {
+      payment_reference: anchor.payment_reference,
+      payment_date: format(new Date(anchor.payment_date), "yyyy-MM-dd"),
+      payment_method: anchor.payment_method,
+      expected_payment_ids: livePayments.map((payment) => payment.payment_id),
+    });
+    await refreshCreditsCache();
   };
 
   const handleViewPayment = (payment: Payment) => {
@@ -282,6 +341,8 @@ const PaymentPage: React.FC = () => {
           payments={sortedPayments}
           onViewPayment={handleViewPayment}
           onRefresh={fetchPayments}
+          onAddPaymentToGroup={handleAddPaymentToGroup}
+          onCancelPaymentGroup={handleCancelPaymentGroup}
           requiresClearanceDate
           paymentApiEndpoint="/jellypolly/api/payments"
         />
@@ -291,11 +352,16 @@ const PaymentPage: React.FC = () => {
       {showPaymentForm && (
         <PaymentForm
           payment={selectedPayment}
-          onClose={() => setShowPaymentForm(false)}
+          onClose={() => {
+            setShowPaymentForm(false);
+            setPaymentFormInitialValues(null);
+          }}
           onSuccess={handlePaymentCreated}
           dateRange={filters.dateRange}
           apiEndpoint="/jellypolly/api/payments"
           invoicesEndpoint="/jellypolly/api/invoices"
+          initialValues={paymentFormInitialValues ?? undefined}
+          referenceGroup={paymentFormInitialValues?.payment_reference}
         />
       )}
     </div>
