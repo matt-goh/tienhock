@@ -11,6 +11,10 @@
 // their openings come from greentarget.debtor_subledger_snapshots (see
 // report-engine.js buildAccountLedger), never from account_opening_balances.
 import { Router } from "express";
+import {
+  assertGreenTargetAccountingDateUnlocked,
+  isAccountingPeriodLockedError,
+} from "./posting-lock.js";
 
 // Resolves each account's EFFECTIVE fs_note (its own, else the nearest ancestor
 // carrying one) exactly like Tien Hock's route, so the bulk sheet groups GT
@@ -33,6 +37,60 @@ const EFFECTIVE_FS_NOTES_CTE = `
   )`;
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// Accounts whose protection is a load-bearing ABSENCE of anchors in the pinned
+// legacy import: DEBTOR is a control parent whose children carry the balances
+// (an anchor here double-counts), and BTFS is the one account the six legacy
+// Trial Balances print with genuinely blank debit AND credit — the report
+// engines only surface accounts with an anchor or a posted line, so anchoring
+// BTFS breaks that printing.
+const ANCHOR_FORBIDDEN_ACCOUNTS = new Set(["DEBTOR", "BTFS"]);
+
+/**
+ * Guards one anchor write: the R8 period lock (an anchor ignores every posted
+ * line before it, so a pre-open-date anchor silently rewrites the pinned
+ * Jan-Jun legacy history) plus the forbidden accounts above.
+ *
+ * @param {string} accountCode
+ * @param {string} asOfDate  yyyy-MM-dd
+ * @param {{ deletion?: boolean }} [options]
+ * @throws {Error & {status: number, code?: string}}
+ */
+function assertAnchorWriteAllowed(accountCode, asOfDate, options = {}) {
+  // Removing a forbidden anchor is always safe (and the single DELETE path
+  // allows it); only a write that CREATES/REPLACES one is blocked.
+  if (!options.deletion && ANCHOR_FORBIDDEN_ACCOUNTS.has(accountCode)) {
+    throw Object.assign(
+      new Error(
+        `Account ${accountCode} cannot carry an opening-balance anchor (its balance comes from its children / its legacy blank printing).`
+      ),
+      { status: 400 }
+    );
+  }
+  assertGreenTargetAccountingDateUnlocked(asOfDate, "Opening balance anchor");
+}
+
+/**
+ * Shared write-path error surface: period-lock 409s and validation 400s keep
+ * their status and message instead of falling into the generic 500.
+ *
+ * @param {import("express").Response} res
+ * @param {unknown} error
+ * @returns {boolean} true when the error was handled here
+ */
+function handleAnchorWriteError(res, error) {
+  if (isAccountingPeriodLockedError(error)) {
+    res
+      .status(error.status)
+      .json({ code: error.code, message: error.message });
+    return true;
+  }
+  if (error && error.status === 400) {
+    res.status(400).json({ message: error.message });
+    return true;
+  }
+  return false;
+}
 
 /**
  * Resolve the authenticated actor into the VARCHAR(50) audit column, following
@@ -234,6 +292,9 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
       }
 
       for (const entry of entries) {
+        assertAnchorWriteAllowed(entry.account_code, asOfDate, {
+          deletion: entry.amount === null || entry.amount === undefined,
+        });
         if (entry.amount !== null && entry.amount !== undefined) {
           const amountNum = parseFloat(entry.amount);
           if (isNaN(amountNum)) {
@@ -279,6 +340,7 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
       res.json({ message: "Opening balances saved", saved, deleted });
     } catch (error) {
       await client.query("ROLLBACK").catch(() => {});
+      if (handleAnchorWriteError(res, error)) return;
       console.error("Error saving Green Target opening balances in bulk:", error);
       res.status(500).json({
         message: "Error saving Green Target opening balances",
@@ -341,10 +403,17 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
       if (!as_of_date) {
         return res.status(400).json({ message: "as_of_date is required" });
       }
+      if (!ISO_DATE_RE.test(as_of_date)) {
+        return res
+          .status(400)
+          .json({ message: "as_of_date must be YYYY-MM-DD" });
+      }
       const amountNum = parseFloat(amount);
       if (isNaN(amountNum)) {
         return res.status(400).json({ message: "amount must be a number" });
       }
+
+      assertAnchorWriteAllowed(accountCode, as_of_date);
 
       // Account must exist
       const acResult = await pool.query(
@@ -375,6 +444,7 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
         opening_balance: result.rows[0],
       });
     } catch (error) {
+      if (handleAnchorWriteError(res, error)) return;
       console.error("Error saving Green Target opening balance:", error);
       res.status(500).json({
         message: "Error saving Green Target opening balance",
@@ -387,6 +457,16 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
   router.delete("/:accountCode/:asOfDate", async (req, res) => {
     try {
       const { accountCode, asOfDate } = req.params;
+      if (!ISO_DATE_RE.test(asOfDate)) {
+        return res.status(400).json({ message: "asOfDate must be YYYY-MM-DD" });
+      }
+      // Removing a pre-open-date anchor rewrites the pinned legacy history
+      // just as adding one does; the forbidden-account set does not apply
+      // (deleting one of those anchors is always safe).
+      assertGreenTargetAccountingDateUnlocked(
+        asOfDate,
+        "Opening balance anchor"
+      );
       const result = await pool.query(
         `DELETE FROM greentarget.account_opening_balances
           WHERE account_code = $1 AND as_of_date = $2`,
@@ -397,6 +477,7 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
       }
       res.json({ message: "Opening balance deleted" });
     } catch (error) {
+      if (handleAnchorWriteError(res, error)) return;
       console.error("Error deleting Green Target opening balance:", error);
       res.status(500).json({
         message: "Error deleting Green Target opening balance",

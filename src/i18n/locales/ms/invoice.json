@@ -743,6 +743,7 @@
   "Add any additional notes about this payment": "Tambah sebarang nota tambahan tentang bayaran ini",
   "Cash collected: {{amount}} — record the part received by transfer or online instead": "Tunai dikutip: {{amount}} — rekod bahagian yang diterima melalui transfer atau online sebaliknya",
   "Outstanding Balance: {{amount}}": "Outstanding Balance: {{amount}}",
+  "Uncleared cheque(s) already cover {{amount}} of this bill": "Cek yang belum dijelaskan sudah meliputi {{amount}} bagi bil ini",
   "E-Invoice Details": "Butiran E-Invois",
   "View in MyInvois Portal": "Lihat di MyInvois Portal",
   "View Consolidated Invoice in MyInvois Portal": "Lihat Invois Konsolidasi di MyInvois Portal",
@@ -821,5 +822,13 @@
   "Confirm Split Payment": "Sahkan Split Payment",
   "This bill only records returned products and carries no sales value, so it does not need its own e-Invoice.": "Bil ini hanya merekodkan produk yang dipulangkan dan tiada nilai jualan, jadi ia tidak memerlukan e-Invois sendiri.",
   "This bill only records goods given away free and carries no sales value, so it does not need its own e-Invoice.": "Bil ini hanya merekodkan barang yang diberi percuma dan tiada nilai jualan, jadi ia tidak memerlukan e-Invois sendiri.",
-  "This bill totals RM0.00 and carries no sales value, so it does not need its own e-Invoice.": "Bil ini berjumlah RM0.00 dan tiada nilai jualan, jadi ia tidak memerlukan e-Invois sendiri."
+  "This bill totals RM0.00 and carries no sales value, so it does not need its own e-Invoice.": "Bil ini berjumlah RM0.00 dan tiada nilai jualan, jadi ia tidak memerlukan e-Invois sendiri.",
+  "Cancel Group": "Batalkan Kumpulan",
+  "Payment group cancelled successfully.": "Kumpulan bayaran berjaya dibatalkan.",
+  "Cancel payment group?": "Batalkan kumpulan bayaran?",
+  "Cancel every active and pending payment under {{reference}}": "Batalkan semua bayaran aktif dan pending di bawah {{reference}}",
+  "Cancel every active and pending payment under {{reference}}? This restores each invoice's balance and customer credit and cannot be undone.": "Batalkan semua bayaran aktif dan pending di bawah {{reference}}? Ini akan memulihkan baki setiap invois dan kredit pelanggan, dan tidak boleh dibuat asal.",
+  "{{total}} payments, {{amount}} in total": "{{total}} bayaran, jumlah {{amount}}",
+  "Method: {{method}}": "Kaedah: {{method}}",
+  "The existing group's date and payment method are used, so this payment appears under {{reference}} alongside the payments above. Nothing already recorded is changed.": "Tarikh dan kaedah bayaran kumpulan sedia ada digunakan, supaya bayaran ini muncul di bawah {{reference}} bersama bayaran di atas. Tiada yang telah direkodkan diubah."
 }
