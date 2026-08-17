@@ -40,6 +40,11 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     en: "Green Target accounting safeguards: opening balances can no longer be saved or deleted with a date before 1 July 2026 (protecting the locked imported records), the DEBTOR and BTFS accounts can no longer carry an opening balance, and a journal dated before 1 July 2026 can no longer be edited. For Tien Hock, correcting a payment's date is now refused if its journal was manually edited before — re-date that journal from the Journal Entries page instead.",
   },
   {
+    date: "2026-08-18",
+    ms: "Mengedit jurnal: baris yang tidak diubah kini mengekalkan rujukan resit dan cek setiap baris yang asal. Sebelum ini menyimpan jurnal yang dimiliki dokumen sumber akan membuang rujukan tersebut pada semua baris.",
+    en: "Editing a journal: unchanged lines now keep their original per-line receipt and cheque references. Previously saving a source-owned journal would drop those references on every line.",
+  },
+  {
     date: "2026-08-15",
     ms: "Pembayaran Jelly Polly: kumpulan bayaran yang berkongsi rujukan, tarikh dan kaedah kini boleh dibatalkan sekaligus melalui butang Cancel Group. Semua invois dan jumlah dalam kumpulan dipaparkan untuk pengesahan, dan baki invois serta kredit pelanggan dipulihkan bersama. Butang Add Payment pada kumpulan turut membuka borang baharu dengan rujukan, tarikh dan kaedah kumpulan yang telah ditetapkan. Rujukan berulang yang disahkan sebagai pemindahan sama akan menyertai kumpulan sedia ada dan bukannya menjadi kumpulan berasingan.",
     en: "Jelly Polly payments: a group of payments sharing the same reference, date and method can now be cancelled together with a Cancel Group button. Every invoice and amount in the group is shown for confirmation, and the invoice balances and customer credit are restored together. An Add Payment button on the group opens a new form prefilled with that group's reference, date and method. A repeated reference confirmed as the same transfer now joins the existing group instead of becoming a separate group.",

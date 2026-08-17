@@ -1410,9 +1410,10 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     if (!validateForm()) return;
 
     // Saving a source-owned Tien Hock journal by hand DETACHES it from its
-    // source document: the source stops re-syncing it, and the re-inserted
-    // lines lose their per-line receipt/cheque references. Warn once — an
-    // already-detached (manual_override) journal saves without asking again.
+    // source document: the source stops re-syncing it. Unchanged lines keep
+    // their per-line receipt/cheque references; changed lines lose them. Warn
+    // once — an already-detached (manual_override) journal saves without
+    // asking again.
     if (
       !isGreenTarget &&
       isEditMode &&
@@ -1439,6 +1440,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
               parseFloat(line.credit_amount) > 0)
         )
         .map((line, index): JournalEntryLineInput => ({
+          ...(line.id !== undefined ? { id: line.id } : {}),
           line_number: index + 1,
           account_code: line.account_code,
           debit_amount: parseFloat(line.debit_amount) || 0,
@@ -2135,7 +2137,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
         }}
         title={t("Detach Journal from Its Document?")}
         message={t(
-          'This journal was created by its source document, which keeps it up to date automatically. Saving entry "{{reference}}" by hand detaches it: the source document will stop updating it, and the per-line receipt and cheque references on its lines will be lost. This cannot be undone.',
+          'This journal was created by its source document, which keeps it up to date automatically. Saving entry "{{reference}}" by hand detaches it: the source document will stop updating it. Any line you changed loses its per-line receipt and cheque references; unchanged lines keep them. This cannot be undone.',
           { reference: formData.reference_no }
         )}
         confirmButtonText={t("Save & Detach")}

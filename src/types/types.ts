@@ -1297,6 +1297,7 @@ export interface JournalEntryInput {
 }
 
 export interface JournalEntryLineInput {
+  id?: number;
   line_number: number;
   account_code: string;
   debit_amount: number;
