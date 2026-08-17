@@ -286,11 +286,36 @@ export default function setupRoutes(app, pool) {
   app.use("/api/estimated-report", estimatedReportRouter(pool));
 
   // Green Target routes
-  app.use("/greentarget/api/dashboard", greenTargetDashboardRouter(pool));
-  app.use("/greentarget/api/customers", greenTargetCustomerRouter(pool));
-  app.use("/greentarget/api/locations", greenTargetLocationRouter(pool));
-  app.use("/greentarget/api/dumpsters", greenTargetDumpsterRouter(pool));
-  app.use("/greentarget/api/rentals", greenTargetRentalRouter(pool));
+  app.use(
+    "/greentarget/api/dashboard",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetDashboardRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/customers",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetCustomerRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/locations",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetLocationRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/dumpsters",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetDumpsterRouter(pool)
+  );
+  app.use(
+    "/greentarget/api/rentals",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetRentalRouter(pool)
+  );
   app.use(
     "/greentarget/api/invoices",
     authMiddleware(pool),
@@ -310,42 +335,62 @@ export default function setupRoutes(app, pool) {
   );
   app.use(
     "/greentarget/api/einvoice",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetEInvoiceRouter(pool, myInvoisGTConfig)
   );
   app.use(
     "/greentarget/api/payroll-employees",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetPayrollEmployeesRouter(pool)
   );
   app.use(
     "/greentarget/api/employee-pay-codes",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetEmployeePayCodesRouter(pool)
   );
   app.use(
     "/greentarget/api/monthly-payrolls",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetMonthlyPayrollsRouter(pool)
   );
   app.use(
     "/greentarget/api/monthly-work-logs",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetMonthlyWorkLogsRouter(pool)
   );
   app.use(
     "/greentarget/api/employee-payrolls",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetEmployeePayrollsRouter(pool)
   );
   app.use(
     "/greentarget/api/pickup-destinations",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetPickupDestinationsRouter(pool)
   );
   app.use(
     "/greentarget/api/payroll-rules",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetPayrollRulesRouter(pool)
   );
   app.use(
     "/greentarget/api/pinjam-records",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetPinjamRecordsRouter(pool)
   );
   app.use(
     "/greentarget/api/mid-month-payrolls",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetMidMonthPayrollsRouter(pool)
   );
   app.use(
@@ -354,24 +399,42 @@ export default function setupRoutes(app, pool) {
     checkRestoreState,
     greenTargetAdjustmentDocsRouter(pool, myInvoisGTConfig)
   );
-  app.use("/greentarget/api/incentives", greenTargetIncentivesRouter(pool));
+  app.use(
+    "/greentarget/api/incentives",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetIncentivesRouter(pool)
+  );
   app.use(
     "/greentarget/api/others-records",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetOthersRecordsRouter(pool)
   );
   app.use(
     "/greentarget/api/daily-lori-habuk",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetDailyLoriHabukRouter(pool)
   );
   app.use(
     "/greentarget/api/salary-report",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetSalaryReportRouter(pool)
   );
   app.use(
     "/greentarget/api/leave-management",
+    authMiddleware(pool),
+    checkRestoreState,
     greenTargetLeaveManagementRouter(pool)
   );
-  app.use("/greentarget/api/e-caruman", greenTargetECarumanRouter(pool));
+  app.use(
+    "/greentarget/api/e-caruman",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetECarumanRouter(pool)
+  );
   app.use(
     "/greentarget/api/customer-signups",
     greenTargetCustomerSignupsRouter(pool, myInvoisGTConfig)
@@ -420,6 +483,8 @@ export default function setupRoutes(app, pool) {
   );
   app.use(
     "/greentarget/api/ledger-types",
+    authMiddleware(pool),
+    checkRestoreState,
     createGreenTargetLedgerTypesRouter(pool)
   );
   app.use(
@@ -439,14 +504,28 @@ export default function setupRoutes(app, pool) {
   // Jellypolly routes
   app.use(
     "/jellypolly/api/invoices",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyInvoiceRouter(pool, myInvoisJPConfig)
   );
-  app.use("/jellypolly/api/payments", jellypollyPaymentRouter(pool));
+  app.use(
+    "/jellypolly/api/payments",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyPaymentRouter(pool)
+  );
   app.use(
     "/jellypolly/api/einvoice",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyEInvoiceRouter(pool, myInvoisJPConfig)
   );
-  app.use("/jellypolly/api/debtors", jellypollyDebtorsRouter(pool));
+  app.use(
+    "/jellypolly/api/debtors",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyDebtorsRouter(pool)
+  );
   app.use(
     "/jellypolly/api/account-ledger",
     authMiddleware(pool),
@@ -455,73 +534,140 @@ export default function setupRoutes(app, pool) {
   );
   app.use(
     "/jellypolly/api/adjustment-docs",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyAdjustmentDocsRouter(pool, myInvoisJPConfig)
   );
   app.use(
     "/jellypolly/api/monthly-payrolls",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyMonthlyPayrollsRouter(pool)
   );
   app.use(
     "/jellypolly/api/employee-payrolls",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyEmployeePayrollsRouter(pool)
   );
   app.use(
     "/jellypolly/api/monthly-work-logs",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyMonthlyWorkLogsRouter(pool)
   );
   app.use(
     "/jellypolly/api/daily-work-logs",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyDailyWorkLogsRouter(pool)
   );
   app.use(
     "/jellypolly/api/daily-plastic",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyDailyPlasticRouter(pool)
   );
   app.use(
     "/jellypolly/api/pinjam-records",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyPinjamRecordsRouter(pool)
   );
   app.use(
     "/jellypolly/api/mid-month-payrolls",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyMidMonthPayrollsRouter(pool)
   );
-  app.use("/jellypolly/api/incentives", jellypollyIncentivesRouter(pool));
+  app.use(
+    "/jellypolly/api/incentives",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyIncentivesRouter(pool)
+  );
   app.use(
     "/jellypolly/api/others-records",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyOthersRecordsRouter(pool)
   );
   app.use(
     "/jellypolly/api/salary-report",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollySalaryReportRouter(pool)
   );
-  app.use("/jellypolly/api/e-caruman", jellypollyECarumanRouter(pool));
-  app.use("/jellypolly/api/staffs", jellypollyStaffsRouter(pool));
-  app.use("/jellypolly/api/jobs", jellypollyJobsRouter(pool));
-  app.use("/jellypolly/api/pay-codes", jellypollyPayCodesRouter(pool));
-  app.use("/jellypolly/api/job-pay-codes", jellypollyJobPayCodesRouter(pool));
-  app.use("/jellypolly/api/locations", jellypollyLocationsRouter(pool));
+  app.use(
+    "/jellypolly/api/e-caruman",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyECarumanRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/staffs",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyStaffsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/jobs",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyJobsRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/pay-codes",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyPayCodesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/job-pay-codes",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyJobPayCodesRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/locations",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyLocationsRouter(pool)
+  );
   app.use(
     "/jellypolly/api/job-location-mappings",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyJobLocationMappingsRouter(pool)
   );
   app.use(
     "/jellypolly/api/employee-pay-codes",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyEmployeePayCodesRouter(pool)
   );
   app.use(
     "/jellypolly/api/pay-rate-schedules",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyPayRateSchedulesRouter(pool)
   );
   app.use(
     "/jellypolly/api/product-pay-codes",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyProductPayCodesRouter(pool)
   );
   app.use(
     "/jellypolly/api/leave-management",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyLeaveManagementRouter(pool)
   );
   app.use(
     "/jellypolly/api/production-entries",
+    authMiddleware(pool),
+    checkRestoreState,
     jellypollyProductionEntriesRouter(pool)
   );
 

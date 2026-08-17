@@ -779,6 +779,226 @@ export default function (pool) {
     }
   });
 
+  // --- PUT /api/payments/group/cancel ---
+  // Cancels every active/pending Jelly Polly payment in one visible reference
+  // group atomically. JP has no receipt header, so the group identity is the
+  // exact tuple the Payment page renders: payment_reference + local payment
+  // date + payment_method. The client must send the payment IDs it saw; a
+  // mismatch fails closed with 409 instead of cancelling rows that appeared
+  // since the page was opened.
+  router.put("/group/cancel", async (req, res) => {
+    const {
+      payment_reference,
+      payment_date,
+      payment_method,
+      expected_payment_ids,
+      reason,
+    } = req.body || {};
+
+    const reference =
+      typeof payment_reference === "string" ? payment_reference.trim() : "";
+    const method = String(payment_method || "").trim();
+
+    if (!reference || !method) {
+      return res.status(400).json({
+        message: "Payment reference and payment method are required.",
+      });
+    }
+    if (!["cash", "cheque", "bank_transfer", "online"].includes(method)) {
+      return res.status(400).json({
+        message: "Invalid payment method.",
+      });
+    }
+
+    const expectedIds = Array.isArray(expected_payment_ids)
+      ? [
+          ...new Set(
+            expected_payment_ids
+              .map((value) => Number(value))
+              .filter((value) => Number.isInteger(value) && value > 0)
+          ),
+        ].sort((first, second) => first - second)
+      : [];
+    const normalizedDate = normalizeEditableDate(payment_date, "Payment date");
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const groupResult = await client.query(
+        `SELECT p.*, i.customerid, i.paymenttype,
+                i.invoice_status, i.balance_due, i.totalamountpayable
+           FROM jellypolly.payments p
+           JOIN jellypolly.invoices i ON i.id = p.invoice_id
+          WHERE p.payment_reference = $1
+            AND p.payment_date::date = $2::date
+            AND p.payment_method = $3
+            AND (p.status IS NULL OR p.status IN ('active', 'pending'))
+          ORDER BY p.payment_id
+          FOR UPDATE OF p, i`,
+        [reference, normalizedDate, method]
+      );
+      const rows = groupResult.rows;
+      if (rows.length === 0) {
+        const error = new Error("Payment group not found.");
+        error.status = 404;
+        throw error;
+      }
+
+      const currentIds = rows
+        .map((row) => Number(row.payment_id))
+        .sort((first, second) => first - second);
+      if (
+        currentIds.length !== expectedIds.length ||
+        currentIds.some((id, index) => id !== expectedIds[index])
+      ) {
+        const error = new Error(
+          "This payment group changed after you opened it. Reload and try again."
+        );
+        error.status = 409;
+        error.code = "PAYMENT_GROUP_CHANGED";
+        throw error;
+      }
+
+      const cancelledInvoice = rows.find(
+        (row) => row.invoice_status === "cancelled"
+      );
+      if (cancelledInvoice) {
+        throw createPaymentError(
+          409,
+          `Cannot cancel the group because invoice ${cancelledInvoice.invoice_id} is cancelled.`
+        );
+      }
+
+      const invoiceIds = [...new Set(rows.map((row) => row.invoice_id))];
+      for (const invoiceId of invoiceIds) {
+        const existingAdjustment = await fetchActiveAdjustmentForInvoice(
+          client,
+          invoiceId
+        );
+        if (existingAdjustment) {
+          throw createPaymentError(
+            409,
+            `Cannot cancel the group because invoice ${invoiceId} has active adjustment document ${existingAdjustment.id}. Cancel the adjustment document first.`
+          );
+        }
+      }
+
+      const cancellationReason =
+        reason || `Payment group ${reference} cancelled`;
+      await client.query(
+        `UPDATE jellypolly.payments
+            SET status = 'cancelled',
+                cancellation_date = NOW(),
+                cancellation_reason = $1
+          WHERE payment_id = ANY($2::int[])`,
+        [cancellationReason, currentIds]
+      );
+
+      const activeRows = rows.filter((row) => row.status === "active");
+      const activeByInvoice = {};
+      for (const row of activeRows) {
+        const invoiceId = String(row.invoice_id);
+        if (!activeByInvoice[invoiceId]) activeByInvoice[invoiceId] = [];
+        activeByInvoice[invoiceId].push(row);
+      }
+
+      for (const [invoiceId, invoiceRows] of Object.entries(activeByInvoice)) {
+        const state = invoiceRows[0];
+        const currentBalance = parseFloat(state.balance_due || 0);
+        const currentStatus = state.invoice_status;
+        const totalPayable = parseFloat(state.totalamountpayable || 0);
+        const activeGroupPaid = invoiceRows.reduce(
+          (total, row) => total + parseFloat(row.amount_paid || 0),
+          0
+        );
+        const groupIds = rows
+          .filter((row) => String(row.invoice_id) === invoiceId)
+          .map((row) => Number(row.payment_id));
+
+        const otherActiveResult = await client.query(
+          `SELECT COALESCE(SUM(amount_paid), 0) AS active_paid
+             FROM jellypolly.payments
+            WHERE invoice_id = $1
+              AND NOT (payment_id = ANY($2::int[]))
+              AND (status IS NULL OR status = 'active')`,
+          [invoiceId, groupIds]
+        );
+        const otherActivePaid = parseFloat(
+          otherActiveResult.rows[0].active_paid || 0
+        );
+        const maxBalance = Math.max(0, totalPayable - otherActivePaid);
+        const newBalance = Math.min(
+          currentBalance + activeGroupPaid,
+          maxBalance
+        );
+        const finalNewBalance = parseFloat(newBalance.toFixed(2));
+
+        let newStatus;
+        if (finalNewBalance <= 0) {
+          newStatus = "paid";
+        } else if (currentStatus === "Overdue") {
+          newStatus = "Overdue";
+        } else {
+          newStatus = "Unpaid";
+        }
+
+        await client.query(
+          `UPDATE jellypolly.invoices
+              SET balance_due = $1, invoice_status = $2
+            WHERE id = $3`,
+          [finalNewBalance, newStatus, invoiceId]
+        );
+
+        if (state.paymenttype === "INVOICE") {
+          const balanceRestored = parseFloat(
+            (finalNewBalance - currentBalance).toFixed(2)
+          );
+          if (balanceRestored > 0) {
+            await updateCustomerCredit(
+              client,
+              state.customerid,
+              balanceRestored
+            );
+          }
+        }
+      }
+
+      const cancelledResult = await client.query(
+        `SELECT payment_id, invoice_id, payment_date, posting_date,
+                amount_paid, payment_method, payment_reference, status,
+                cancellation_date, cancellation_reason
+           FROM jellypolly.payments
+          WHERE payment_id = ANY($1::int[])
+          ORDER BY payment_id`,
+        [currentIds]
+      );
+
+      await client.query("COMMIT");
+
+      res.json({
+        message:
+          currentIds.length === 1
+            ? "Payment cancelled successfully."
+            : `Cancelled ${currentIds.length} payments under reference ${reference}.`,
+        cancelled_payment_count: currentIds.length,
+        payments: cancelledResult.rows.map((row) => ({
+          ...row,
+          amount_paid: parseFloat(row.amount_paid || 0),
+        })),
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error cancelling Jelly Polly payment group:", error);
+      res.status(error.status || 500).json({
+        code: error.code,
+        message: error.message || "Error cancelling payment group",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // --- PUT /api/payments/:payment_id/cancel (Cancel Payment) ---
   router.put("/:payment_id/cancel", async (req, res) => {
     const { payment_id } = req.params;

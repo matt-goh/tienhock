@@ -400,7 +400,9 @@ export default function (pool) {
       // a bank/online receipt re-classifies as banked money.
       const currentBalance = isCashBill
         ? parseFloat(invoice.settleable_amount || 0)
-        : parseFloat(invoice.balance_due || 0);
+        : parseFloat(
+            invoice.settleable_amount ?? invoice.balance_due ?? 0
+          );
       const paymentAmount = parseFloat(amount_paid);
 
       // 2. Check invoice status

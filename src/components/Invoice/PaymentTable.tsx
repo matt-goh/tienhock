@@ -47,6 +47,7 @@ interface PaymentTableProps {
   onCancellationError?: (error: PaymentCancellationErrorData) => void;
   onAddPaymentToGroup?: (payment: Payment) => void;
   onViewPaymentGroup?: (receiptId: number) => void;
+  onCancelPaymentGroup?: (payments: Payment[]) => Promise<void>;
   requiresClearanceDate?: boolean;
   paymentApiEndpoint?: string;
 }
@@ -112,6 +113,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   onCancellationError,
   onAddPaymentToGroup,
   onViewPaymentGroup,
+  onCancelPaymentGroup,
   requiresClearanceDate = false,
   paymentApiEndpoint = "/api/payments",
 }) => {
@@ -141,6 +143,11 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const [dateEditGroupSize, setDateEditGroupSize] = useState<number>(1);
   const [savingPaymentDate, setSavingPaymentDate] = useState<boolean>(false);
   const [paymentDateError, setPaymentDateError] = useState<string | null>(null);
+  const [showCancelGroupDialog, setShowCancelGroupDialog] =
+    useState<boolean>(false);
+  const [cancelGroupPayments, setCancelGroupPayments] = useState<Payment[]>([]);
+  const [cancellingPaymentGroup, setCancellingPaymentGroup] =
+    useState<boolean>(false);
   const { customers } = useCustomersCache();
   const usesTienHockReceiptAccounting: boolean =
     paymentApiEndpoint === "/api/payments";
@@ -354,6 +361,36 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
     }
   };
 
+  const handleCancelPaymentGroupClick = (paymentGroup: Payment[]): void => {
+    const livePayments = paymentGroup.filter(
+      (payment: Payment): boolean => payment.status !== "cancelled"
+    );
+    if (livePayments.length === 0) return;
+    setCancelGroupPayments(livePayments);
+    setShowCancelGroupDialog(true);
+  };
+
+  const handleCancelPaymentGroupConfirm = async (): Promise<void> => {
+    if (!onCancelPaymentGroup || cancellingPaymentGroup) return;
+
+    setCancellingPaymentGroup(true);
+    try {
+      await onCancelPaymentGroup(cancelGroupPayments);
+      toast.success(t("Payment group cancelled successfully."));
+      onRefresh();
+    } catch (error: unknown) {
+      console.error("Error cancelling payment group:", error);
+      const errorMessage =
+        (error as Error & { message?: string }).message ||
+        t("We could not cancel this payment group. No payments were changed.");
+      toast.error(errorMessage);
+    } finally {
+      setCancellingPaymentGroup(false);
+      setShowCancelGroupDialog(false);
+      setCancelGroupPayments([]);
+    }
+  };
+
   const handlePrintVoucher = async (payment: Payment) => {
     // Receipt-backed rows print through the owning receipt's journal;
     // legacy rows fall back to their own journal.
@@ -489,6 +526,18 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
   const clearanceMinDate: Date | undefined = selectedPayment?.payment_date
     ? new Date(selectedPayment.payment_date)
     : undefined;
+  const cancelGroupReference: string | null =
+    cancelGroupPayments.length > 0
+      ? resolveGroupReference(cancelGroupPayments[0])
+      : null;
+  const cancelGroupTotal: number = cancelGroupPayments.reduce(
+    (sum, payment) => sum + (payment.amount_paid || 0),
+    0
+  );
+  const cancelGroupMethod: Payment["payment_method"] | null =
+    cancelGroupPayments.length > 0
+      ? cancelGroupPayments[0].payment_method
+      : null;
   if (payments.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
@@ -565,6 +614,14 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                     groupReference &&
                     groupTemplate.payment_method !== "contra"
                 );
+                const liveGroupPayments: Payment[] = paymentGroup.filter(
+                  (payment: Payment): boolean => payment.status !== "cancelled"
+                );
+                const canCancelGroup: boolean = Boolean(
+                  onCancelPaymentGroup && liveGroupPayments.length > 1
+                );
+                const canCancelGroupMemberIndividually: boolean =
+                  !onCancelPaymentGroup || liveGroupPayments.length <= 1;
                 const totalAmount = paymentGroup.reduce(
                   (sum, p) => sum + (p.amount_paid || 0),
                   0
@@ -655,6 +712,23 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                         </td>
                         <td className="px-3 py-3 text-center">
                           <div className="flex flex-wrap justify-center gap-1.5">
+                            {canCancelGroup && onCancelPaymentGroup && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                color="rose"
+                                icon={IconBan}
+                                onClick={() =>
+                                  handleCancelPaymentGroupClick(paymentGroup)
+                                }
+                                title={t(
+                                  "Cancel every active and pending payment under {{reference}}",
+                                  { reference: groupReference || "" }
+                                )}
+                              >
+                                {t("Cancel Group")}
+                              </Button>
+                            )}
                             {canAddToGroup &&
                               onAddPaymentToGroup &&
                               groupReference && (
@@ -674,7 +748,7 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   {t("Add Payment")}
                                 </Button>
                               )}
-                            {!canAddToGroup && "-"}
+                            {!canAddToGroup && !canCancelGroup && "-"}
                           </div>
                         </td>
                       </tr>
@@ -763,7 +837,8 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
                                   <IconCircleCheck size={16} />
                                 </Button>
                               )}
-                              {payment.status !== "cancelled" &&
+                              {canCancelGroupMemberIndividually &&
+                                payment.status !== "cancelled" &&
                                 payment.payment_method !== "contra" && (
                                 <Button
                                   size="sm"
@@ -1181,6 +1256,64 @@ const PaymentTable: React.FC<PaymentTableProps> = ({
         )}
         confirmButtonText={t("Cancel Payment")}
         variant="danger"
+      />
+
+      <ConfirmationDialog
+        isOpen={showCancelGroupDialog}
+        onClose={() => {
+          if (!cancellingPaymentGroup) {
+            setShowCancelGroupDialog(false);
+            setCancelGroupPayments([]);
+          }
+        }}
+        onConfirm={() => void handleCancelPaymentGroupConfirm()}
+        title={
+          cancelGroupReference
+            ? t("Cancel payment group {{reference}}?", {
+                reference: cancelGroupReference,
+              })
+            : t("Cancel payment group?")
+        }
+        message={
+          <div className="space-y-3">
+            <p>
+              {t(
+                "Cancel every active and pending payment under {{reference}}? This restores each invoice's balance and customer credit and cannot be undone.",
+                {
+                  reference: cancelGroupReference || "",
+                  total: cancelGroupPayments.length,
+                }
+              )}
+            </p>
+            <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-800 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-200">
+              <p className="text-sm font-medium">
+                {t("{{total}} payments, {{amount}} in total", {
+                  total: cancelGroupPayments.length,
+                  amount: formatCurrency(cancelGroupTotal),
+                })}
+              </p>
+              {cancelGroupMethod && (
+                <p className="mt-1 text-xs">
+                  {t("Method: {{method}}", {
+                    method: formatPaymentMethodLabel(cancelGroupMethod, t),
+                  })}
+                </p>
+              )}
+              <ul className="mt-2 space-y-1 text-xs">
+                {cancelGroupPayments.map((payment: Payment) => (
+                  <li key={payment.payment_id}>
+                    {payment.invoice_id} - {formatCurrency(payment.amount_paid)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        }
+        confirmButtonText={
+          cancellingPaymentGroup ? t("Cancelling...") : t("Cancel Group")
+        }
+        variant="danger"
+        isConfirming={cancellingPaymentGroup}
       />
 
     </>

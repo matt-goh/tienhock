@@ -1059,7 +1059,14 @@ const InvoiceFormPage: React.FC = () => {
                             payment_method: value as Payment["payment_method"],
                           })
                         }
-                        options={PAYMENT_METHOD_OPTIONS.map((option) => ({
+                        // A cash bill can never hold an uncleared cheque
+                        // (createReceipt refuses it), so don't offer one.
+                        options={(invoiceData?.paymenttype === "CASH"
+                          ? PAYMENT_METHOD_OPTIONS.filter(
+                              (option) => option.value !== "cheque"
+                            )
+                          : PAYMENT_METHOD_OPTIONS
+                        ).map((option) => ({
                           ...option,
                           label: t(option.label),
                         }))}

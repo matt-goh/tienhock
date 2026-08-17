@@ -52,6 +52,30 @@ import { resolveCashHoldingAccount } from "./cash-holding-account.js";
 const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
 
 /**
+ * SQL for the money on an invoice already spoken for by uncleared cheques:
+ * pending receipt allocations plus legacy standalone pending payment rows
+ * (pending rows owned by a receipt are excluded via receipt_allocation_id so
+ * the same money is never counted twice).
+ *
+ * Alias note: expects `invoices` aliased as `i`, like SETTLEABLE_AMOUNT_SQL.
+ */
+export const PENDING_SETTLEMENT_SQL = `
+  COALESCE((
+         SELECT SUM(ra.amount) FROM receipt_allocations ra
+          JOIN receipts r ON r.id = ra.receipt_id
+         WHERE ra.invoice_id = i.id
+           AND ra.allocation_type = 'invoice'
+           AND r.status = 'pending'
+       ), 0)
+  + COALESCE((
+         SELECT SUM(p2.amount_paid) FROM payments p2
+          WHERE p2.invoice_id = i.id
+            AND p2.status = 'pending'
+            AND p2.receipt_allocation_id IS NULL
+            AND p2.is_auto_collection = false
+       ), 0)`;
+
+/**
  * SQL for the amount of an invoice a receipt may still settle.
  *
  * A credit INVOICE simply exposes its outstanding balance. A settled CASH bill
@@ -64,22 +88,36 @@ const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
  * always in its settled state: while it is being created its balance is still
  * its full total and no auto-collection row exists yet, which is exactly when
  * the split-tender receipts are written.
+ *
+ * Money an uncleared cheque already covers is SUBTRACTED (M6): a pending
+ * cheque does not reduce balance_due until it clears, so without this the same
+ * amount could be paid a second time and the cheque confirmation would then
+ * hard-fail, leaving a stuck pending receipt.
  */
 export const SETTLEABLE_AMOUNT_SQL = `
-  CASE WHEN i.paymenttype = 'CASH' THEN COALESCE(i.balance_due, 0) + COALESCE((
-         SELECT SUM(p.amount_paid) FROM payments p
-          WHERE p.invoice_id = i.id
-            AND p.is_auto_collection = true
-            AND (p.status IS NULL OR p.status = 'active')
-       ), 0)
-       ELSE COALESCE(i.balance_due, 0) END`;
+  GREATEST(0,
+    CASE WHEN i.paymenttype = 'CASH' THEN COALESCE(i.balance_due, 0) + COALESCE((
+           SELECT SUM(p.amount_paid) FROM payments p
+            WHERE p.invoice_id = i.id
+              AND p.is_auto_collection = true
+              AND (p.status IS NULL OR p.status = 'active')
+         ), 0)
+         ELSE COALESCE(i.balance_due, 0) END
+    - (${PENDING_SETTLEMENT_SQL})
+  )`;
 
 /**
  * The settleable amount of already-locked invoice rows, keyed by invoice id.
  * `rows` must carry id, paymenttype and balance_due.
+ *
+ * Mirrors SETTLEABLE_AMOUNT_SQL (which cannot express an exclusion): money an
+ * uncleared cheque already covers is subtracted, EXCLUDING the receipt being
+ * confirmed (`excludeReceiptId`) so a pending receipt never vetoes itself.
+ * Returns { settleable, pending } maps so callers can explain a refusal.
  */
-async function getSettleableAmounts(client, rows) {
+async function getSettleableAmounts(client, rows, excludeReceiptId = null) {
   const map = {};
+  const pending = {};
   const cashIds = [];
   for (const row of rows) {
     map[row.id] = round2(row.balance_due);
@@ -101,7 +139,36 @@ async function getSettleableAmounts(client, rows) {
       );
     }
   }
-  return map;
+  const ids = rows.map((row) => row.id);
+  if (ids.length > 0) {
+    const pendingResult = await client.query(
+      `SELECT invoice_id, SUM(amount) AS pending_amount FROM (
+         SELECT ra.invoice_id, ra.amount
+           FROM receipt_allocations ra
+           JOIN receipts r ON r.id = ra.receipt_id
+          WHERE ra.allocation_type = 'invoice'
+            AND ra.invoice_id = ANY($1::varchar[])
+            AND r.status = 'pending'
+            AND ($2::int IS NULL OR r.id <> $2)
+         UNION ALL
+         SELECT p.invoice_id, p.amount_paid
+           FROM payments p
+          WHERE p.invoice_id = ANY($1::varchar[])
+            AND p.status = 'pending'
+            AND p.receipt_allocation_id IS NULL
+            AND p.is_auto_collection = false
+       ) spoken_for
+       GROUP BY invoice_id`,
+      [ids, excludeReceiptId]
+    );
+    for (const row of pendingResult.rows) {
+      pending[row.invoice_id] = round2(row.pending_amount);
+      map[row.invoice_id] = round2(
+        Math.max(0, (map[row.invoice_id] || 0) - pending[row.invoice_id])
+      );
+    }
+  }
+  return { settleable: map, pending };
 }
 
 /**
@@ -301,7 +368,7 @@ function defaultDescription(allocs) {
  * Locks and validates the allocated invoices inside the current transaction.
  * Returns a map invoice_id -> { balance_due, paymenttype, customerid, invoice_status }.
  */
-async function lockInvoices(client, allocs) {
+async function lockInvoices(client, allocs, excludeReceiptId = null) {
   const ids = [...new Set(allocs.filter((a) => a.type === "invoice").map((a) => a.invoice_id))].sort();
   const map = {};
   if (ids.length === 0) return map;
@@ -321,8 +388,13 @@ async function lockInvoices(client, allocs) {
   }
   // Per-invoice over-settlement check (sum of this receipt's allocations per
   // invoice), measured against the settleable amount: the outstanding balance
-  // for a credit invoice, the automatic CH_REV1 collection for a cash bill.
-  const settleable = await getSettleableAmounts(client, result.rows);
+  // for a credit invoice, the automatic CH_REV1 collection for a cash bill —
+  // both net of money an uncleared cheque already covers.
+  const { settleable, pending } = await getSettleableAmounts(
+    client,
+    result.rows,
+    excludeReceiptId
+  );
   for (const id of ids) map[id].settleable_amount = settleable[id] || 0;
   const perInvoice = {};
   for (const a of allocs) {
@@ -332,10 +404,14 @@ async function lockInvoices(client, allocs) {
   for (const [id, amt] of Object.entries(perInvoice)) {
     const limit = round2(map[id].settleable_amount);
     if (amt > limit + 0.005) {
+      const pendingNote =
+        round2(pending[id] || 0) > 0
+          ? ` RM${round2(pending[id]).toFixed(2)} is already covered by an uncleared cheque — confirm or cancel that cheque first.`
+          : "";
       throw new Error(
         map[id].paymenttype === "CASH"
-          ? `Cash bill ${id}: allocation ${amt.toFixed(2)} exceeds the ${limit.toFixed(2)} still recorded as counter cash. A cash bill can only re-classify money it has already collected.`
-          : `Invoice ${id}: allocation ${amt.toFixed(2)} exceeds balance due ${limit.toFixed(2)}. Record the excess as an overpayment allocation instead.`
+          ? `Cash bill ${id}: allocation ${amt.toFixed(2)} exceeds the ${limit.toFixed(2)} still recorded as counter cash.${pendingNote} A cash bill can only re-classify money it has already collected.`
+          : `Invoice ${id}: allocation ${amt.toFixed(2)} exceeds the RM${limit.toFixed(2)} still settleable.${pendingNote} Record any genuine excess as an overpayment allocation instead.`
       );
     }
   }
@@ -603,13 +679,19 @@ export async function createReceipt(client, payload, userId) {
   const cashBillIds = invoiceIds.filter((id) => invoiceMap[id]?.paymenttype === "CASH");
   if (cashBillIds.length > 0) {
     if (method === "cash") {
-      throw new Error(
-        `Cash bill ${cashBillIds[0]} already records its cash collection. Only a bank transfer, online payment or cleared cheque can be recorded against a cash bill.`
+      throw Object.assign(
+        new Error(
+          `Cash bill ${cashBillIds[0]} already records its cash collection. Only a bank transfer, online payment or cleared cheque can be recorded against a cash bill.`
+        ),
+        { status: 400 }
       );
     }
     if (isPending) {
-      throw new Error(
-        `Cash bill ${cashBillIds[0]} cannot hold an uncleared cheque. Enter the cheque's bank clearance date to record it, or key the sale as a credit invoice instead.`
+      throw Object.assign(
+        new Error(
+          `Cash bill ${cashBillIds[0]} cannot hold an uncleared cheque. Enter the cheque's bank clearance date to record it, or key the sale as a credit invoice instead.`
+        ),
+        { status: 400 }
       );
     }
   }
@@ -1005,6 +1087,30 @@ export async function updateReceiptDate(
       updated_receipt_count: 0,
       updated_payment_count: 0,
     };
+  }
+
+  // A hand-edited (manual_override) journal is detached: its source stops
+  // rebuilding it. The journal rewrite below would silently re-date (and for
+  // cash re-account) exactly such a journal, so refuse and let the user move
+  // the journal by hand from the Journal page.
+  if (!isCheque) {
+    const journalIds = groupResult.rows
+      .filter((row) => row.status === "posted" && row.journal_entry_id)
+      .map((row) => row.journal_entry_id);
+    if (journalIds.length > 0) {
+      const detachedResult = await client.query(
+        `SELECT id FROM journal_entries
+          WHERE id = ANY($1::int[]) AND manual_override = TRUE`,
+        [journalIds]
+      );
+      if (detachedResult.rows.length > 0) {
+        const error = new Error(
+          `Journal ${detachedResult.rows[0].id} for this payment group was manually edited and detached from the payment. Correct the journal's date from the Journal Entries page instead.`
+        );
+        error.status = 409;
+        throw error;
+      }
+    }
   }
 
   // Load allocations once for cash holding-account resolution.
@@ -1586,7 +1692,9 @@ export async function confirmReceipt(client, receiptId, options, userId) {
     receipt.cheque_reference = options.cheque_reference;
   }
 
-  const invoiceMap = await lockInvoices(client, allocs);
+  // The pending receipt being confirmed must not veto itself: its own
+  // allocations are excluded from the pending-settlement netting.
+  const invoiceMap = await lockInvoices(client, allocs, receiptId);
   const journalEntryId = await postReceiptJournal(client, receipt, allocs, invoiceMap, userId);
 
   await client.query(

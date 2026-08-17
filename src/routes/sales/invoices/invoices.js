@@ -18,6 +18,7 @@ import {
 import {
   createReceipt,
   SETTLEABLE_AMOUNT_SQL,
+  PENDING_SETTLEMENT_SQL,
 } from "../../accounting/receipt-service.js";
 import { normalizeSaleTenders } from "./saleTenders.js";
 import {
@@ -2282,6 +2283,7 @@ export default function (pool, config) {
           i.invoice_status, i.einvoice_status, i.balance_due,
           i.journal_entry_id,
           ${SETTLEABLE_AMOUNT_SQL} as settleable_amount,
+          ${PENDING_SETTLEMENT_SQL} as pending_settlement,
           i.uuid, i.submission_uid, i.long_id, i.datetime_validated,
           i.is_consolidated, i.consolidated_invoices,
           c.name as customerName, c.tin_number, c.id_number, c.phone_number,
@@ -3686,7 +3688,7 @@ export default function (pool, config) {
 
       // 1. Get the current invoice to check status
       const invoiceCheckQuery = `
-      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable, createddate, is_consolidated, journal_entry_id
+      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable, rounding, createddate, is_consolidated, journal_entry_id
       FROM invoices
       WHERE id = $1
       FOR UPDATE
@@ -3827,10 +3829,15 @@ export default function (pool, config) {
         }
       }
 
-      // 7. Calculate new totals using sen-based arithmetic
+      // 7. Calculate new totals using sen-based arithmetic. The keyed rounding
+      // carries over so the stored total still adds up to
+      // subtotal + tax + rounding exactly like the create path.
       const subtotal = sumMoney(subtotalAmounts);
       const taxTotal = sumMoney(taxAmounts);
-      const totalPayable = addMoney(subtotal, taxTotal);
+      const totalPayable = addMoney(
+        addMoney(subtotal, taxTotal),
+        parseFloat(invoice.rounding || 0)
+      );
       const newTotal = roundMoney(totalPayable);
 
       // Get current payments breakdown. Genuine figures exclude the automatic

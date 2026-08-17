@@ -1278,6 +1278,21 @@ export default function (pool) {
         id,
       ]);
 
+      // Load the current lines before deleting them so an unchanged line can
+      // keep its per-line receipt/cheque metadata (receipt journals are
+      // create-once and nothing rebuilds these refs after a hand edit).
+      const existingLinesResult = await client.query(
+        `SELECT id, line_number, account_code, debit_amount, credit_amount,
+                reference, particulars, cheque_reference, display_reference,
+                display_order
+           FROM journal_entry_lines
+          WHERE journal_entry_id = $1`,
+        [id]
+      );
+      const existingLinesById = new Map(
+        existingLinesResult.rows.map((row) => [Number(row.id), row])
+      );
+
       // Delete existing lines and re-insert
       await client.query(
         "DELETE FROM journal_entry_lines WHERE journal_entry_id = $1",
@@ -1287,11 +1302,24 @@ export default function (pool) {
       const insertLineQuery = `
         INSERT INTO journal_entry_lines (
           journal_entry_id, line_number, account_code,
-          debit_amount, credit_amount, reference, particulars
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+          debit_amount, credit_amount, reference, particulars,
+          cheque_reference, display_reference, display_order
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
       `;
 
       for (const line of lines) {
+        const existingLine =
+          line.id === undefined ? null : existingLinesById.get(Number(line.id));
+        const lineIsUnchanged =
+          existingLine !== null &&
+          existingLine.account_code === line.account_code &&
+          parseFloat(existingLine.debit_amount) ===
+            (parseFloat(line.debit_amount) || 0) &&
+          parseFloat(existingLine.credit_amount) ===
+            (parseFloat(line.credit_amount) || 0) &&
+          (existingLine.reference ?? null) === (line.reference || null) &&
+          (existingLine.particulars ?? null) === (line.particulars || null);
+
         await client.query(insertLineQuery, [
           id,
           line.line_number,
@@ -1300,6 +1328,9 @@ export default function (pool) {
           parseFloat(line.credit_amount) || 0,
           line.reference || null,
           line.particulars || null,
+          lineIsUnchanged ? existingLine.cheque_reference : null,
+          lineIsUnchanged ? existingLine.display_reference : null,
+          lineIsUnchanged ? existingLine.display_order : null,
         ]);
       }
 

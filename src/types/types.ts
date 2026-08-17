@@ -308,9 +308,12 @@ export interface InvoiceData {
    * How much a payment may still be recorded against this invoice.
    * A credit INVOICE exposes its outstanding balance. A CASH bill is always
    * fully settled, so this is the counter cash still held in CH_REV1 that a
-   * bank/online receipt can re-classify as banked money.
+   * bank/online receipt can re-classify as banked money. Both are net of
+   * `pending_settlement` — money an uncleared cheque already covers.
    */
   settleable_amount?: number;
+  /** Money on this invoice already covered by uncleared cheques. */
+  pending_settlement?: number;
 
   // E-invoice fields
   uuid: string | null; // UUID from e-invoice system
@@ -1294,6 +1297,7 @@ export interface JournalEntryInput {
 }
 
 export interface JournalEntryLineInput {
+  id?: number;
   line_number: number;
   account_code: string;
   debit_amount: number;

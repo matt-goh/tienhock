@@ -1865,9 +1865,15 @@ const InvoiceDetailsPage: React.FC = () => {
   // A cash bill is settled the moment it is issued, but the counter cash it
   // collected can still be re-classified as banked money (part paid online /
   // by transfer on the same day), so it can accept a payment while "Paid".
-  const settleableAmount: number = isCashBill
-    ? Number(invoiceData.settleable_amount ?? invoiceData.totalamountpayable)
-    : Number(invoiceData.balance_due);
+  // The server's settleable_amount is net of money an uncleared cheque already
+  // covers, so a pending cheque's amount cannot be paid a second time.
+  const settleableAmount: number = Number(
+    invoiceData.settleable_amount ??
+      (isCashBill ? invoiceData.totalamountpayable : invoiceData.balance_due)
+  );
+  const pendingSettlement: number = Number(
+    invoiceData.pending_settlement ?? 0
+  );
   const canRecordPayment: boolean = !isCancelled && settleableAmount > 0;
   const hasActiveAdjustmentDocs: boolean = adjustmentDocs.some(
     (doc: AdjustmentDocument) =>
@@ -2350,6 +2356,14 @@ const InvoiceDetailsPage: React.FC = () => {
                           amount: formatCurrency(settleableAmount),
                         })}
                   </p>
+                  {pendingSettlement > 0 && (
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                      {t(
+                        "Uncleared cheque(s) already cover {{amount}} of this bill",
+                        { amount: formatCurrency(pendingSettlement) }
+                      )}
+                    </p>
+                  )}
                 </div>
                 <button
                   type="button"

@@ -847,7 +847,7 @@
   "This journal is owned by its source document - cancel that document instead.": "此日记账由其来源单据拥有 - 请改为取消该单据。",
   "This journal is owned by its source document - edit that document instead.": "此日记账由其来源单据拥有 - 请改为编辑该单据。",
   "This journal is owned by its source document - remove or cancel that document instead.": "此日记账由其来源单据拥有 - 请改为移除或取消该单据。",
-  "This journal was created by its source document, which keeps it up to date automatically. Saving entry \"{{reference}}\" by hand detaches it: the source document will stop updating it, and the per-line receipt and cheque references on its lines will be lost. This cannot be undone.": "此日记账由其来源单据创建，来源单据会自动保持其更新。手动保存分录“{{reference}}”会将其分离：来源单据将停止更新，各行上的收据和支票参考号将丢失。此操作无法撤销。",
+  "This journal was created by its source document, which keeps it up to date automatically. Saving entry \"{{reference}}\" by hand detaches it: the source document will stop updating it. Any line you changed loses its per-line receipt and cheque references; unchanged lines keep them. This cannot be undone.": "此日记账由其来源单据创建，来源单据会自动保持其更新。手动保存分录“{{reference}}”会将其分离：来源单据将停止更新。您更改的行会丢失其收据和支票参考号；未更改的行会保留它们。此操作无法撤销。",
   "This month": "本月",
   "This purchase is fully paid and cannot be edited. Cancel the linked payment first if a correction is needed.": "此采购已全额付款，无法编辑。如需更正，请先取消关联的付款。",
   "This reverses the bank-in journal and returns the cash to its pools/receipts. The RV number {{rv}} stays reserved and cannot be reused.": "这将冲销银行入账日记账，并将现金退回其资金池/收据。RV 编号 {{rv}} 保持预留，不能重复使用。",
