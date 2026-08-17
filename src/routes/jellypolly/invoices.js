@@ -1490,7 +1490,7 @@ export default function (pool, config) {
 
       // 1. Get the current invoice to check status
       const invoiceCheckQuery = `
-      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable, createddate
+      SELECT id, einvoice_status, invoice_status, uuid, submission_uid, datetime_validated, customerid, paymenttype, totalamountpayable, rounding, createddate
       FROM jellypolly.invoices 
       WHERE id = $1
     `;
@@ -1595,8 +1595,10 @@ export default function (pool, config) {
         }
       }
 
-      // 7. Calculate new totals
-      const totalPayable = subtotal + taxTotal;
+      // 7. Calculate new totals. The keyed rounding carries over so the stored
+      // total still adds up to subtotal + tax + rounding like the create path.
+      const totalPayable =
+        subtotal + taxTotal + parseFloat(invoice.rounding || 0);
       const newTotal = parseFloat(totalPayable.toFixed(2));
 
       // Get current payments breakdown

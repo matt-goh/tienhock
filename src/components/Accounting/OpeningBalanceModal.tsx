@@ -103,7 +103,11 @@ const OpeningBalanceModal: React.FC<OpeningBalanceModalProps> = ({
       onClose();
     } catch (saveError: unknown) {
       console.error("Error saving opening balance:", saveError);
-      setError(t("Failed to save opening balance"));
+      setError(
+        saveError instanceof Error && saveError.message
+          ? saveError.message
+          : t("Failed to save opening balance")
+      );
     } finally {
       setIsSaving(false);
     }

@@ -743,6 +743,7 @@
   "Add any additional notes about this payment": "Tambah sebarang nota tambahan tentang bayaran ini",
   "Cash collected: {{amount}} — record the part received by transfer or online instead": "Tunai dikutip: {{amount}} — rekod bahagian yang diterima melalui transfer atau online sebaliknya",
   "Outstanding Balance: {{amount}}": "Outstanding Balance: {{amount}}",
+  "Uncleared cheque(s) already cover {{amount}} of this bill": "Cek yang belum dijelaskan sudah meliputi {{amount}} bagi bil ini",
   "E-Invoice Details": "Butiran E-Invois",
   "View in MyInvois Portal": "Lihat di MyInvois Portal",
   "View Consolidated Invoice in MyInvois Portal": "Lihat Invois Konsolidasi di MyInvois Portal",

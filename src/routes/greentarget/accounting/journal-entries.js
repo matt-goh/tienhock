@@ -874,6 +874,12 @@ export default function createGreenTargetJournalEntriesRouter(pool) {
           .json({ message: "Cannot edit a cancelled journal entry" });
       }
 
+      // Both dates are checked: the entry may be neither rewritten where it
+      // already sits in locked history nor moved into it from the open period.
+      assertGreenTargetAccountingDateUnlocked(
+        existing.entry_date,
+        `Journal entry ${reference_no}`
+      );
       const entryDate = assertGreenTargetAccountingDateUnlocked(
         entry_date,
         `Journal entry ${reference_no}`

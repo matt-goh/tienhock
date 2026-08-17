@@ -20,6 +20,26 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-18",
+    ms: "Bayaran invois: wang yang telah diliputi oleh cek yang belum dijelaskan kini dianggap telah diperuntukkan — borang Record Payment memaparkan jumlah yang diliputi cek tersebut dan jumlah yang sama tidak boleh dikutip dua kali. Sebelum ini, bayaran penuh kedua masih boleh direkodkan, menyebabkan cek tersangkut yang tidak dapat disahkan kemudian.",
+    en: "Invoice payments: money already covered by an uncleared cheque now counts as spoken for — the Record Payment form shows how much uncleared cheque(s) cover and the same amount cannot be collected twice. Previously a second full payment could still be recorded, leaving a stuck cheque that could never be confirmed.",
+  },
+  {
+    date: "2026-08-18",
+    ms: "Bil tunai baharu: 'Cheque' tidak lagi ditawarkan sebagai kaedah bayaran, kerana bil tunai tidak boleh memegang cek yang belum dijelaskan. Sebelum ini pilihan itu masih muncul dan penyimpanan gagal dengan ralat umum; kini mesej yang jelas dipaparkan jika ia berlaku melalui laluan lain.",
+    en: "New cash bill: 'Cheque' is no longer offered as a payment method, since a cash bill cannot hold an uncleared cheque. Previously the option was still shown and saving failed with a generic error; a clear message now appears if it ever happens through another route.",
+  },
+  {
+    date: "2026-08-18",
+    ms: "Mengedit item invois kini mengekalkan pembundaran invois, supaya jumlahnya masih berkira sebagai subjumlah + cukai + pembundaran. Sebelum ini pembundaran digugurkan secara senyap selepas edit dan jumlah tidak lagi sepadan. Terpakai untuk Tien Hock dan Jelly Polly.",
+    en: "Editing an invoice's items now keeps the invoice's rounding, so its total still adds up to subtotal + tax + rounding. Previously the rounding was silently dropped after an edit and the totals no longer matched. Applies to Tien Hock and Jelly Polly.",
+  },
+  {
+    date: "2026-08-18",
+    ms: "Perlindungan perakaunan Green Target: opening balance tidak lagi boleh disimpan atau dipadam dengan tarikh sebelum 1 Julai 2026 (melindungi rekod import yang dikunci), akaun DEBTOR dan BTFS tidak boleh memegang opening balance, dan jurnal bertarikh sebelum 1 Julai 2026 tidak boleh lagi diedit. Untuk Tien Hock, pembetulan tarikh bayaran kini ditolak jika jurnalnya pernah diedit secara manual — ubah tarikh jurnal itu dari halaman Journal Entries sebaliknya.",
+    en: "Green Target accounting safeguards: opening balances can no longer be saved or deleted with a date before 1 July 2026 (protecting the locked imported records), the DEBTOR and BTFS accounts can no longer carry an opening balance, and a journal dated before 1 July 2026 can no longer be edited. For Tien Hock, correcting a payment's date is now refused if its journal was manually edited before — re-date that journal from the Journal Entries page instead.",
+  },
+  {
     date: "2026-08-15",
     ms: "Pembayaran Jelly Polly: kumpulan bayaran yang berkongsi rujukan, tarikh dan kaedah kini boleh dibatalkan sekaligus melalui butang Cancel Group. Semua invois dan jumlah dalam kumpulan dipaparkan untuk pengesahan, dan baki invois serta kredit pelanggan dipulihkan bersama. Butang Add Payment pada kumpulan turut membuka borang baharu dengan rujukan, tarikh dan kaedah kumpulan yang telah ditetapkan. Rujukan berulang yang disahkan sebagai pemindahan sama akan menyertai kumpulan sedia ada dan bukannya menjadi kumpulan berasingan.",
     en: "Jelly Polly payments: a group of payments sharing the same reference, date and method can now be cancelled together with a Cancel Group button. Every invoice and amount in the group is shown for confirmation, and the invoice balances and customer credit are restored together. An Add Payment button on the group opens a new form prefilled with that group's reference, date and method. A repeated reference confirmed as the same transfer now joins the existing group instead of becoming a separate group.",
