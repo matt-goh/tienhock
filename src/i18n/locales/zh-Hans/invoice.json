@@ -743,6 +743,7 @@
   "Add any additional notes about this payment": "添加有关此付款的任何附加备注",
   "Cash collected: {{amount}} — record the part received by transfer or online instead": "已收现金：{{amount}} — 请改为记录通过转账或在线收到的部分",
   "Outstanding Balance: {{amount}}": "未结余额：{{amount}}",
+  "Uncleared cheque(s) already cover {{amount}} of this bill": "未兑现支票已涵盖此账单的 {{amount}}",
   "E-Invoice Details": "e-Invoice 详情",
   "View in MyInvois Portal": "在 MyInvois 门户中查看",
   "View Consolidated Invoice in MyInvois Portal": "在 MyInvois 门户中查看合并发票",
