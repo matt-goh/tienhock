@@ -53,10 +53,13 @@ const ANCHOR_FORBIDDEN_ACCOUNTS = new Set(["DEBTOR", "BTFS"]);
  *
  * @param {string} accountCode
  * @param {string} asOfDate  yyyy-MM-dd
+ * @param {{ deletion?: boolean }} [options]
  * @throws {Error & {status: number, code?: string}}
  */
-function assertAnchorWriteAllowed(accountCode, asOfDate) {
-  if (ANCHOR_FORBIDDEN_ACCOUNTS.has(accountCode)) {
+function assertAnchorWriteAllowed(accountCode, asOfDate, options = {}) {
+  // Removing a forbidden anchor is always safe (and the single DELETE path
+  // allows it); only a write that CREATES/REPLACES one is blocked.
+  if (!options.deletion && ANCHOR_FORBIDDEN_ACCOUNTS.has(accountCode)) {
     throw Object.assign(
       new Error(
         `Account ${accountCode} cannot carry an opening-balance anchor (its balance comes from its children / its legacy blank printing).`
@@ -289,7 +292,9 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
       }
 
       for (const entry of entries) {
-        assertAnchorWriteAllowed(entry.account_code, asOfDate);
+        assertAnchorWriteAllowed(entry.account_code, asOfDate, {
+          deletion: entry.amount === null || entry.amount === undefined,
+        });
         if (entry.amount !== null && entry.amount !== undefined) {
           const amountNum = parseFloat(entry.amount);
           if (isNaN(amountNum)) {
