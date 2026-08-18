@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/DebtorsReportPage.tsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { IconHierarchy } from "@tabler/icons-react";
 import AccountingDebtorsReportPage, {
   type DebtorsReportPageConfig,
@@ -56,18 +57,30 @@ const GREEN_TARGET_DEBTORS_CONFIG: DebtorsReportPageConfig = {
 };
 
 const DebtorsReportPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
+  const config: DebtorsReportPageConfig = {
+    ...GREEN_TARGET_DEBTORS_CONFIG,
+    hideZeroLabel: t(
+      GREEN_TARGET_DEBTORS_CONFIG.hideZeroLabel ?? "Hide all-zero customers"
+    ),
+    hideZeroActiveLabel: t(
+      GREEN_TARGET_DEBTORS_CONFIG.hideZeroActiveLabel ??
+        "All-zero customers hidden"
+    ),
+  };
 
   return (
     <div>
       <div className="mb-3 flex flex-col gap-2 rounded-lg border border-emerald-200 bg-emerald-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-emerald-800 dark:bg-emerald-900/20">
         <div>
           <p className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
-            CD/SD debtor sub-schedule
+            {t("CD/SD debtor sub-schedule")}
           </p>
           <p className="text-xs text-emerald-700 dark:text-emerald-400">
-            Open the named sundry-debtor schedule reconciled to the CD_SD
-            control account.
+            {t(
+              "Open the named sundry-debtor schedule reconciled to the CD_SD control account."
+            )}
           </p>
         </div>
         <Button
@@ -78,10 +91,10 @@ const DebtorsReportPage: React.FC = () => {
           icon={IconHierarchy}
           onClick={() => navigate("/greentarget/debtors/cd-sd")}
         >
-          Open CD/SD Schedule
+          {t("Open CD/SD Schedule")}
         </Button>
       </div>
-      <AccountingDebtorsReportPage config={GREEN_TARGET_DEBTORS_CONFIG} />
+      <AccountingDebtorsReportPage config={config} />
     </div>
   );
 };

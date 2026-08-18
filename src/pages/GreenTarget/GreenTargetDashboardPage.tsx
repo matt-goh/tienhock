@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/DashboardPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconTruck,
   IconFileInvoice,
@@ -39,6 +40,7 @@ interface RecentActivity {
 }
 
 const DashboardPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [recentActivities, setRecentActivities] = useState<RecentActivity[]>(
@@ -64,7 +66,7 @@ const DashboardPage: React.FC = () => {
       setError(null);
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
-      setError("Failed to load dashboard data");
+      setError(t("Failed to load dashboard data"));
     } finally {
       setLoading(false);
     }
@@ -102,7 +104,7 @@ const DashboardPage: React.FC = () => {
         <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-300 p-4 rounded-lg">
           <p>{error}</p>
           <Button onClick={() => fetchDashboardData()} className="mt-4">
-            Retry
+            {t("Retry")}
           </Button>
         </div>
       </div>
@@ -117,7 +119,9 @@ const DashboardPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 dark:text-gray-400 text-xs">Revenue (This Month)</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">
+                {t("Revenue (This Month)")}
+              </p>
               <h3 className="text-xl font-bold mt-0.5">
                 {formatCurrency(metrics?.revenueThisMonth || 0)}
               </h3>
@@ -133,7 +137,9 @@ const DashboardPage: React.FC = () => {
                 ) : (
                   <IconArrowDownRight size={14} className="mr-0.5" />
                 )}
-                {Math.abs(metrics?.percentageChange || 0)}% from last month
+                {t("{{percent}}% from last month", {
+                  percent: Math.abs(metrics?.percentageChange || 0),
+                })}
               </div>
             </div>
             <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-full">
@@ -146,12 +152,16 @@ const DashboardPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 dark:text-gray-400 text-xs">Active Rentals</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">
+                {t("Active Rentals")}
+              </p>
               <h3 className="text-xl font-bold mt-0.5">
                 {metrics?.activeRentals || 0}
               </h3>
               <p className="text-default-500 dark:text-gray-400 text-xs mt-1">
-                Out of {metrics?.totalRentals || 0} total
+                {t("Out of {{count}} total", {
+                  count: metrics?.totalRentals || 0,
+                })}
               </p>
             </div>
             <div className="bg-sky-100 dark:bg-sky-900/30 p-2 rounded-full">
@@ -164,12 +174,16 @@ const DashboardPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 dark:text-gray-400 text-xs">Outstanding Invoices</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">
+                {t("Outstanding Invoices")}
+              </p>
               <h3 className="text-xl font-bold mt-0.5">
                 {metrics?.outstandingInvoices || 0}
               </h3>
               <p className="text-default-500 dark:text-gray-400 text-xs mt-1">
-                Out of {metrics?.totalInvoices || 0} total
+                {t("Out of {{count}} total", {
+                  count: metrics?.totalInvoices || 0,
+                })}
               </p>
             </div>
             <div className="bg-amber-100 dark:bg-amber-900/30 p-2 rounded-full">
@@ -182,12 +196,16 @@ const DashboardPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
           <div className="flex justify-between items-start">
             <div>
-              <p className="text-default-500 dark:text-gray-400 text-xs">Available Dumpsters</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">
+                {t("Available Dumpsters")}
+              </p>
               <h3 className="text-xl font-bold mt-0.5">
                 {metrics?.availableDumpsters || 0}
               </h3>
               <p className="text-default-500 dark:text-gray-400 text-xs mt-1">
-                Out of {metrics?.totalDumpsters || 0} total
+                {t("Out of {{count}} total", {
+                  count: metrics?.totalDumpsters || 0,
+                })}
               </p>
             </div>
             <div className="bg-indigo-100 dark:bg-indigo-900/30 p-2 rounded-full">
@@ -201,7 +219,9 @@ const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Quick Links Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
-          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100 mb-2">Quick Actions</h3>
+          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100 mb-2">
+            {t("Quick Actions")}
+          </h3>
           <div className="grid grid-cols-1 gap-2">
             <Button
               onClick={() => navigate("/greentarget/rentals/new")}
@@ -210,7 +230,7 @@ const DashboardPage: React.FC = () => {
               variant="outline"
               size="sm"
             >
-              Create New Rental
+              {t("Create New Rental")}
             </Button>
 
             <Button
@@ -220,7 +240,7 @@ const DashboardPage: React.FC = () => {
               variant="outline"
               size="sm"
             >
-              Create New Invoice
+              {t("Create New Invoice")}
             </Button>
 
             <Button
@@ -230,7 +250,7 @@ const DashboardPage: React.FC = () => {
               variant="outline"
               size="sm"
             >
-              Add New Customer
+              {t("Add New Customer")}
             </Button>
 
             <Button
@@ -240,7 +260,7 @@ const DashboardPage: React.FC = () => {
               variant="outline"
               size="sm"
             >
-              Add New Dumpster
+              {t("Add New Dumpster")}
             </Button>
 
             <Button
@@ -250,31 +270,39 @@ const DashboardPage: React.FC = () => {
               variant="outline"
               size="sm"
             >
-              View Debtors Report
+              {t("View Debtors Report")}
             </Button>
           </div>
         </div>
 
         {/* Secondary Metrics */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm lg:col-span-2">
-          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100 mb-2">Business Overview</h3>
+          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100 mb-2">
+            {t("Business Overview")}
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg">
-              <p className="text-default-500 dark:text-gray-400 text-xs">Total Customers</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">
+                {t("Total Customers")}
+              </p>
               <p className="text-xl font-bold">
                 {metrics?.totalCustomers || 0}
               </p>
             </div>
 
             <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg">
-              <p className="text-default-500 dark:text-gray-400 text-xs">Total Revenue</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">
+                {t("Total Revenue")}
+              </p>
               <p className="text-xl font-bold">
                 {formatCurrency(metrics?.totalRevenue || 0)}
               </p>
             </div>
 
             <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg">
-              <p className="text-default-500 dark:text-gray-400 text-xs">This Month</p>
+              <p className="text-default-500 dark:text-gray-400 text-xs">
+                {t("This Month")}
+              </p>
               <p className="text-xl font-bold">
                 {formatCurrency(metrics?.revenueThisMonth || 0)}
               </p>
@@ -283,11 +311,11 @@ const DashboardPage: React.FC = () => {
 
           <div className="mt-3">
             <h4 className="text-default-700 dark:text-gray-200 text-sm font-medium mb-2">
-              Rental Activity
+              {t("Rental Activity")}
             </h4>
             <div className="h-32 bg-default-50 dark:bg-gray-900/50 rounded-lg flex items-center justify-center">
               <p className="text-default-500 dark:text-gray-400 text-sm">
-                Chart placeholder
+                {t("Chart placeholder")}
               </p>
             </div>
           </div>
@@ -297,20 +325,22 @@ const DashboardPage: React.FC = () => {
       {/* Recent Activity */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4 shadow-sm">
         <div className="flex justify-between items-center mb-2">
-          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100">Recent Activity</h3>
+          <h3 className="text-sm font-medium text-default-900 dark:text-gray-100">
+            {t("Recent Activity")}
+          </h3>
           <Button
             onClick={() => navigate("/greentarget/rentals")}
             variant="outline"
             size="sm"
           >
-            View All
+            {t("View All")}
           </Button>
         </div>
 
         <div className="overflow-hidden">
           {recentActivities.length === 0 ? (
             <p className="text-default-500 dark:text-gray-400 text-center py-4">
-              No recent activity
+              {t("No recent activity")}
             </p>
           ) : (
             <div className="divide-y divide-default-100 dark:divide-gray-700">

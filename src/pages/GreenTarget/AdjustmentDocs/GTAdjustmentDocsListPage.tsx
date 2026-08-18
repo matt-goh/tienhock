@@ -7,6 +7,7 @@
 // "New Refund Note" action button is omitted.
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconFileText,
   IconSearch,
@@ -141,6 +142,7 @@ function formatDisplay(d: Date | null): string {
 }
 
 const GTAdjustmentDocsListPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const [docs, setDocs] = useState<GTAdjDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
     async (id: string) => {
       if (downloadingId) return;
       setDownloadingId(id);
-      const toastId = toast.loading("Generating PDF...");
+      const toastId = toast.loading(t("Generating PDF..."));
       try {
         const fullDoc = (await api.get(
           `${API_BASE}/${id}`
@@ -165,12 +167,12 @@ const GTAdjustmentDocsListPage: React.FC = () => {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(pdfUrl);
-        toast.success("PDF downloaded", { id: toastId });
+        toast.success(t("PDF downloaded"), { id: toastId });
       } catch (error) {
         toast.error(
-          `Failed to generate PDF: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
+          t("Failed to generate PDF: {{message}}", {
+            message: error instanceof Error ? error.message : t("Unknown error"),
+          }),
           { id: toastId }
         );
       } finally {
@@ -215,7 +217,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
       setDocs(Array.isArray(response) ? response : []);
     } catch (error: any) {
       console.error("Error fetching GT adjustment documents:", error);
-      toast.error("Failed to fetch adjustment documents");
+      toast.error(t("Failed to fetch adjustment documents"));
       setDocs([]);
     } finally {
       setLoading(false);
@@ -263,7 +265,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <IconFileText size={28} className="text-gray-700 dark:text-gray-200" />
-            Adjustment Docs
+            {t("Adjustment Docs")}
           </h1>
           <span className="hidden sm:inline text-default-300 dark:text-gray-600 text-2xl font-light">
             |
@@ -286,7 +288,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                   }`}
                 >
                   <Icon size={16} />
-                  {tab.label}
+                  {tab.id === "all" ? t(tab.label) : tab.label}
                   {count > 0 && (
                     <span
                       className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${
@@ -310,7 +312,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
             variant="outline"
             size="md"
           >
-            New Debit Note
+            {t("New Debit Note")}
           </Button>
           <Button
             onClick={() => navigate(`${UI_BASE}/new?type=credit`)}
@@ -318,7 +320,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
             variant="outline"
             size="md"
           >
-            New Credit Note
+            {t("New Credit Note")}
           </Button>
         </div>
       </div>
@@ -334,7 +336,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
               />
               <input
                 type="text"
-                placeholder="Search by ID, invoice number, or customer"
+                placeholder={t("Search by ID, invoice number, or customer")}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent h-[40px]"
                 value={filters.searchTerm}
                 onChange={(e) =>
@@ -358,14 +360,14 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                   }))
                 }
                 options={[
-                  { id: "", name: "All e-Status" },
-                  { id: "null", name: "Not Submitted" },
-                  { id: "pending", name: "Pending" },
-                  { id: "valid", name: "Valid" },
-                  { id: "invalid", name: "Invalid" },
-                  { id: "cancelled", name: "Cancelled" },
+                  { id: "", name: t("All e-Status") },
+                  { id: "null", name: t("Not Submitted") },
+                  { id: "pending", name: t("Pending") },
+                  { id: "valid", name: t("Valid") },
+                  { id: "invalid", name: t("Invalid") },
+                  { id: "cancelled", name: t("Cancelled") },
                 ]}
-                placeholder="All e-Status"
+                placeholder={t("All e-Status")}
                 rounded="lg"
               />
             </div>
@@ -380,11 +382,11 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                   }))
                 }
                 options={[
-                  { id: "", name: "All" },
-                  { id: "active", name: "Active" },
-                  { id: "cancelled", name: "Cancelled" },
+                  { id: "", name: t("All") },
+                  { id: "active", name: t("Active") },
+                  { id: "cancelled", name: t("Cancelled") },
                 ]}
-                placeholder="All"
+                placeholder={t("All")}
                 rounded="lg"
               />
             </div>
@@ -396,7 +398,7 @@ const GTAdjustmentDocsListPage: React.FC = () => {
               size="md"
               disabled={loading}
             >
-              Refresh
+              {t("Refresh")}
             </Button>
           </div>
         </div>
@@ -414,11 +416,12 @@ const GTAdjustmentDocsListPage: React.FC = () => {
             className="text-default-300 dark:text-gray-600 mx-auto mb-3"
           />
           <p className="text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-            No adjustment documents found
+            {t("No adjustment documents found")}
           </p>
           <p className="text-xs text-default-500 dark:text-gray-400">
-            Try changing your filters, or create one from an invoice's details
-            page.
+            {t(
+              "Try changing your filters, or create one from an invoice's details page."
+            )}
           </p>
         </div>
       ) : (
@@ -428,31 +431,31 @@ const GTAdjustmentDocsListPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Document ID
+                    {t("Document ID")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Original Invoice
+                    {t("Original Invoice")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Original e-Invoice
+                    {t("Original e-Invoice")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Customer
+                    {t("Customer")}
                   </th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Adj. e-Invoice
+                    {t("Adj. e-Invoice")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider">
-                    Date Issued
+                    {t("Date Issued")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase tracking-wider w-16">
-                    PDF
+                    {t("PDF")}
                   </th>
                 </tr>
               </thead>
@@ -468,9 +471,9 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                       {doc.paired_doc_id && (
                         <span
                           className="block text-xs text-default-500 dark:text-gray-400"
-                          title={`Paired with ${formatAdjustmentDocId(
-                            doc.paired_doc_id
-                          )}`}
+                          title={t("Paired with {{doc}}", {
+                            doc: formatAdjustmentDocId(doc.paired_doc_id),
+                          })}
                         >
                           ↔ {formatAdjustmentDocId(doc.paired_doc_id)}
                         </span>
@@ -517,8 +520,10 @@ const GTAdjustmentDocsListPage: React.FC = () => {
                         }}
                         disabled={downloadingId === doc.id}
                         className="inline-flex items-center justify-center p-1.5 rounded text-default-500 hover:text-sky-600 hover:bg-sky-50 dark:text-gray-400 dark:hover:text-sky-400 dark:hover:bg-sky-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Download PDF"
-                        aria-label={`Download PDF for ${doc.id}`}
+                        title={t("Download PDF")}
+                        aria-label={t("Download PDF for {{doc}}", {
+                          doc: doc.id,
+                        })}
                       >
                         <IconDownload size={16} stroke={2} />
                       </button>

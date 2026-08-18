@@ -16,6 +16,7 @@ import msCatalogue from "./locales/ms/catalogue.json";
 import msPayroll from "./locales/ms/payroll.json";
 import msStock from "./locales/ms/stock.json";
 import msAccounting from "./locales/ms/accounting.json";
+import msGreenTarget from "./locales/ms/greentarget.json";
 import zhHansCommon from "./locales/zh-Hans/common.json";
 import zhHansNav from "./locales/zh-Hans/nav.json";
 import zhHansHome from "./locales/zh-Hans/home.json";
@@ -28,6 +29,7 @@ import zhHansCatalogue from "./locales/zh-Hans/catalogue.json";
 import zhHansPayroll from "./locales/zh-Hans/payroll.json";
 import zhHansStock from "./locales/zh-Hans/stock.json";
 import zhHansAccounting from "./locales/zh-Hans/accounting.json";
+import zhHansGreenTarget from "./locales/zh-Hans/greentarget.json";
 
 export const SUPPORTED_LANGUAGES = ["en", "ms", "zh-Hans"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -76,6 +78,7 @@ void i18n
         payroll: msPayroll,
         stock: msStock,
         accounting: msAccounting,
+        greentarget: msGreenTarget,
       },
       "zh-Hans": {
         common: zhHansCommon,
@@ -90,6 +93,7 @@ void i18n
         payroll: zhHansPayroll,
         stock: zhHansStock,
         accounting: zhHansAccounting,
+        greentarget: zhHansGreenTarget,
       },
     },
     defaultNS: "common",
