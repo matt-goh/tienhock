@@ -77,6 +77,7 @@ import midMonthPayrollsRouter from "./payroll/mid-month-payrolls.js";
 import pinjamRecordsRouter from "./payroll/pinjam-records.js";
 import salaryReportRouter from "./payroll/salary-report.js";
 import eCarumanRouter from "./payroll/e-caruman.js";
+import cp8dRouter from "./payroll/cp8d.js";
 
 // Stock routes
 import productionEntriesRouter from "./stock/production-entries.js";
@@ -279,6 +280,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/pinjam-records", pinjamRecordsRouter(pool));
   app.use("/api/salary-report", salaryReportRouter(pool));
   app.use("/api/e-caruman", eCarumanRouter(pool));
+  app.use("/api/cp8d", cp8dRouter(pool));
 
   // Stock routes
   app.use("/api/production-entries", productionEntriesRouter(pool));

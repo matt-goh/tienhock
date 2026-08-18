@@ -30,6 +30,18 @@ requires separate approval).
 
 ---
 
+## Removed 18 Aug 2026 — 1 file (CP8D yearly employee particulars)
+
+Applied to dev on 2026-08-18, then removed per the project convention. Recover via git history
+(`git log -- dev/migrations/2026-08-18_cp8d_records.sql`). Design + layout transcription +
+GT/JP plan: `docs/CP8D_HANDOVER.md`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-18_cp8d_records.sql` | Created `public.cp8d_records` — the Tien Hock CP8D yearly per-employee dataset (unique year+employee; editable snapshot of staff particulars, CP8D category/status codes, and 14 money columns, of which gross/EPF/SOCSO/MTD are payroll-derived at prefill time). Guarded and idempotent; no data seeded. | dev ✓ (2026-08-18), prod PENDING |
+
+---
+
 ## Removed 14 Aug 2026 — 1 file (Green Target stored invoice lines)
 
 Applied to production on 2026-08-11 and to dev on 2026-08-14, then removed per the project
