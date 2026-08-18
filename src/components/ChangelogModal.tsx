@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-18",
+    ms: "Payroll: halaman CP8D baharu untuk fail tahunan pekerja LHDN — pra-isi setahun daripada payroll, laraskan butiran cukai setiap pekerja, kemudian muat turun fail TXT (contohnya P9112779708_2026.TXT) untuk hantaran e-CP8D.",
+    en: "Payroll: new CP8D page for the yearly LHDN employee file — prefill a year from payroll, adjust each employee's tax particulars, then download the TXT file (e.g. P9112779708_2026.TXT) for e-CP8D submission.",
+  },
+  {
+    date: "2026-08-18",
     ms: "Bayaran invois: wang yang telah diliputi oleh cek yang belum dijelaskan kini dianggap telah diperuntukkan — borang Record Payment memaparkan jumlah yang diliputi cek tersebut dan jumlah yang sama tidak boleh dikutip dua kali. Sebelum ini, bayaran penuh kedua masih boleh direkodkan, menyebabkan cek tersangkut yang tidak dapat disahkan kemudian.",
     en: "Invoice payments: money already covered by an uncleared cheque now counts as spoken for — the Record Payment form shows how much uncleared cheque(s) cover and the same amount cannot be collected twice. Previously a second full payment could still be recorded, leaving a stuck cheque that could never be confirmed.",
   },
