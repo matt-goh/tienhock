@@ -4,6 +4,7 @@
 // total column names (amount_before_tax / total_amount).
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import {
   IconExternalLink,
   IconBan,
@@ -93,6 +94,7 @@ const formatIsoDate = (s: string | null | undefined): string => {
 };
 
 const GTAdjustmentDocsDetailsPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [doc, setDoc] = useState<GTAdjDoc | null>(null);
@@ -131,7 +133,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         );
       }
     } catch (error: any) {
-      toast.error(error?.message || "Failed to load document");
+      toast.error(error?.message || t("Failed to load document"));
       navigate(UI_BASE, { replace: true });
     } finally {
       setLoading(false);
@@ -145,17 +147,17 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
   const handleCancel = async () => {
     if (!doc) return;
     setIsCancelling(true);
-    const toastId = toast.loading(`Cancelling ${doc.id}...`);
+    const toastId = toast.loading(t("Cancelling {{doc}}...", { doc: doc.id }));
     try {
       const response = await api.post(`${API_BASE}/${doc.id}/cancel`, {
         reason: cancelReason || null,
       });
-      toast.success(response.message || "Cancelled", { id: toastId });
+      toast.success(response.message || t("Cancelled"), { id: toastId });
       setShowCancelDialog(false);
       setCancelReason("");
       fetchDoc();
     } catch (error: any) {
-      toast.error(error?.message || "Failed to cancel", { id: toastId });
+      toast.error(error?.message || t("Failed to cancel"), { id: toastId });
     } finally {
       setIsCancelling(false);
     }
@@ -164,18 +166,20 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
   const handleSubmitEinvoice = async () => {
     if (!doc) return;
     setIsSubmittingEinvoice(true);
-    const toastId = toast.loading(`Submitting ${doc.id} to MyInvois...`);
+    const toastId = toast.loading(
+      t("Submitting {{doc}} to MyInvois...", { doc: doc.id })
+    );
     try {
       const response = await api.post(
         `${API_BASE}/${doc.id}/submit-einvoice`
       );
-      toast.success(response.message || "Submitted", {
+      toast.success(response.message || t("Submitted"), {
         id: toastId,
         duration: 5000,
       });
       fetchDoc();
     } catch (error: any) {
-      toast.error(error?.message || "Submission failed", {
+      toast.error(error?.message || t("Submission failed"), {
         id: toastId,
         duration: 6000,
       });
@@ -188,18 +192,20 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
   const handleUpdateStatus = async () => {
     if (!doc) return;
     setIsUpdatingStatus(true);
-    const toastId = toast.loading(`Checking MyInvois status for ${doc.id}...`);
+    const toastId = toast.loading(
+      t("Checking MyInvois status for {{doc}}...", { doc: doc.id })
+    );
     try {
       const response = await api.post(`${API_BASE}/${doc.id}/update-status`);
       toast.success(
         response.updated
-          ? `Status updated to ${response.status}`
-          : "No change since last check",
+          ? t("Status updated to {{status}}", { status: response.status })
+          : t("No change since last check"),
         { id: toastId }
       );
       fetchDoc();
     } catch (error: any) {
-      toast.error(error?.message || "Status check failed", { id: toastId });
+      toast.error(error?.message || t("Status check failed"), { id: toastId });
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -208,14 +214,18 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
   const handleCancelEinvoice = async () => {
     if (!doc) return;
     setIsCancellingEinvoice(true);
-    const toastId = toast.loading(`Cancelling e-invoice for ${doc.id}...`);
+    const toastId = toast.loading(
+      t("Cancelling e-invoice for {{doc}}...", { doc: doc.id })
+    );
     try {
       const response = await api.post(`${API_BASE}/${doc.id}/cancel-einvoice`, {
         reason: einvoiceCancelReason || null,
       });
       toast.success(
         response.message ||
-          "E-invoice cancelled. Use Cancel Document next to reverse the adjustment.",
+          t(
+            "E-invoice cancelled. Use Cancel Document next to reverse the adjustment."
+          ),
         {
           id: toastId,
           duration: 6000,
@@ -225,7 +235,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
       setEinvoiceCancelReason("");
       fetchDoc();
     } catch (error: any) {
-      toast.error(error?.message || "Failed to cancel e-invoice", {
+      toast.error(error?.message || t("Failed to cancel e-invoice"), {
         id: toastId,
       });
     } finally {
@@ -235,13 +245,17 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
 
   const handleClearStatus = async () => {
     if (!doc) return;
-    const toastId = toast.loading("Clearing e-invoice status...");
+    const toastId = toast.loading(t("Clearing e-invoice status..."));
     try {
       await api.post(`${API_BASE}/${doc.id}/clear-einvoice-status`);
-      toast.success("Cleared — you can retry submission", { id: toastId });
+      toast.success(t("Cleared — you can retry submission"), {
+        id: toastId,
+      });
       fetchDoc();
     } catch (error: any) {
-      toast.error(error?.message || "Failed to clear status", { id: toastId });
+      toast.error(error?.message || t("Failed to clear status"), {
+        id: toastId,
+      });
     }
   };
 
@@ -282,7 +296,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
     <>
       <div className="mb-2 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100">
-          e-Invoice
+          {t("e-Invoice")}
         </h3>
         {eInvoicePortalHref && (
           <span className="inline-flex items-center gap-1 text-xs font-medium text-sky-600 transition-colors group-hover:text-sky-700 dark:text-sky-300 dark:group-hover:text-sky-200">
@@ -293,7 +307,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
       </div>
       <dl className="text-sm space-y-1">
         <div className="flex justify-between">
-          <dt className="text-default-500 dark:text-gray-400">Status</dt>
+          <dt className="text-default-500 dark:text-gray-400">{t("Status")}</dt>
           <dd>
             <AdjustmentDocStatusBadge
               status={doc.status}
@@ -303,7 +317,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         </div>
         {doc.uuid && (
           <div className="flex justify-between gap-2">
-            <dt className="text-default-500 dark:text-gray-400">UUID</dt>
+            <dt className="text-default-500 dark:text-gray-400">{t("UUID")}</dt>
             <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
               {doc.uuid}
             </dd>
@@ -311,7 +325,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         )}
         {doc.long_id && (
           <div className="flex justify-between gap-2">
-            <dt className="text-default-500 dark:text-gray-400">Long ID</dt>
+            <dt className="text-default-500 dark:text-gray-400">{t("Long ID")}</dt>
             <dd className="font-mono text-xs truncate text-default-900 dark:text-gray-100 max-w-[260px]">
               {doc.long_id}
             </dd>
@@ -319,7 +333,9 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         )}
         {doc.datetime_validated && (
           <div className="flex justify-between">
-            <dt className="text-default-500 dark:text-gray-400">Validated</dt>
+            <dt className="text-default-500 dark:text-gray-400">
+              {t("Validated")}
+            </dt>
             <dd className="text-default-900 dark:text-gray-100">
               {new Date(doc.datetime_validated).toLocaleString()}
             </dd>
@@ -327,7 +343,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         )}
         {!doc.einvoice_status && (
           <div className="text-xs text-default-500 dark:text-gray-400 pt-2">
-            Not yet submitted to MyInvois. Use the action bar to submit.
+            {t("Not yet submitted to MyInvois. Use the action bar to submit.")}
           </div>
         )}
       </dl>
@@ -343,7 +359,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             <BackButton fallbackPath={UI_BASE} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
-              {meta.label} {formatAdjustmentDocId(doc.id)}
+              {t(meta.label)} {formatAdjustmentDocId(doc.id)}
               <AdjustmentDocTypeBadge type={doc.type} />
               <AdjustmentDocStatusBadge
                 status={doc.status}
@@ -359,9 +375,9 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                 variant="outline"
                 size="md"
                 disabled={loading || isPrinting}
-                title="Print this document"
+                title={t("Print this document")}
               >
-                {isPrinting ? "Printing..." : "Print"}
+                {isPrinting ? t("Printing...") : t("Print")}
               </Button>
               <GTAdjustmentDocPDFHandler docs={[doc]} disabled={loading} />
               {doc.status === "active" && !doc.einvoice_status && (
@@ -372,9 +388,11 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                   color="sky"
                   size="md"
                   disabled={isSubmittingEinvoice}
-                  title="Submit this document to MyInvois"
+                  title={t("Submit this document to MyInvois")}
                 >
-                  {isSubmittingEinvoice ? "Submitting..." : "Submit e-Invoice"}
+                  {isSubmittingEinvoice
+                    ? t("Submitting...")
+                    : t("Submit e-Invoice")}
                 </Button>
               )}
               {doc.status === "active" && doc.einvoice_status === "invalid" && (
@@ -384,9 +402,9 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                     icon={IconRefresh}
                     variant="outline"
                     size="md"
-                    title="Clear invalid status to retry"
+                    title={t("Clear invalid status to retry")}
                   >
-                    Clear & Retry
+                    {t("Clear & Retry")}
                   </Button>
                   <Button
                     onClick={handleSubmitEinvoice}
@@ -396,7 +414,9 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                     size="md"
                     disabled={isSubmittingEinvoice}
                   >
-                    {isSubmittingEinvoice ? "Submitting..." : "Re-submit"}
+                    {isSubmittingEinvoice
+                      ? t("Submitting...")
+                      : t("Re-submit")}
                   </Button>
                 </>
               )}
@@ -408,7 +428,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                   size="md"
                   disabled={isUpdatingStatus}
                 >
-                  {isUpdatingStatus ? "Checking..." : "Update Status"}
+                  {isUpdatingStatus ? t("Checking...") : t("Update Status")}
                 </Button>
               )}
               {doc.status === "active" &&
@@ -421,9 +441,9 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                     color="rose"
                     size="md"
                     disabled={isCancellingEinvoice}
-                    title="Cancel only the MyInvois e-Invoice first"
+                    title={t("Cancel only the MyInvois e-Invoice first")}
                   >
-                    Cancel e-Invoice Only
+                    {t("Cancel e-Invoice Only")}
                   </Button>
                 )}
 
@@ -437,11 +457,13 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                   disabled={cnBlockedByPaired}
                   title={
                     cnBlockedByPaired
-                      ? `Cancel paired Refund Note ${pairedDoc?.id} first`
-                      : "Cancel this document"
+                      ? t("Cancel paired Refund Note {{doc}} first", {
+                          doc: pairedDoc?.id,
+                        })
+                      : t("Cancel this document")
                   }
                 >
-                  Cancel Document
+                  {t("Cancel Document")}
                 </Button>
               )}
               {canIssuePairedRefund && (
@@ -455,9 +477,13 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                   variant="outline"
                   color="sky"
                   size="md"
-                  title={`Create a new Refund Note for Credit Note ${doc.id}`}
+                  title={t("Create a new Refund Note for Credit Note {{doc}}", {
+                    doc: doc.id,
+                  })}
                 >
-                  {pairedDoc ? "Reissue Refund Note" : "Issue Refund Note"}
+                  {pairedDoc
+                    ? t("Reissue Refund Note")
+                    : t("Issue Refund Note")}
                 </Button>
               )}
             </div>
@@ -469,9 +495,9 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                   className="mt-0.5 flex-shrink-0"
                 />
                 <span>
-                  To reverse this document, cancel the e-Invoice first. After
-                  MyInvois marks it cancelled, use Cancel Document to reverse
-                  the invoice balance.
+                  {t(
+                    "To reverse this document, cancel the e-Invoice first. After MyInvois marks it cancelled, use Cancel Document to reverse the invoice balance."
+                  )}
                 </span>
               </div>
             )}
@@ -490,12 +516,12 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             }
           }}
           className="p-4 sm:p-5 border-b border-default-200 dark:border-gray-700 cursor-pointer transition hover:bg-default-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-sky-500 dark:hover:bg-gray-700/50"
-          title="Open invoice"
+          title={t("Open invoice")}
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-3 sm:gap-4 text-sm">
             <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Original Invoice
+                {t("Original Invoice")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100 flex min-w-0 items-center gap-1.5">
                 <span className="min-w-0 break-all">
@@ -510,7 +536,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             </div>
             <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Customer
+                {t("Customer")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100 break-words">
                 {doc.customer_name ||
@@ -519,7 +545,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             </div>
             <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Date Issued
+                {t("Date Issued")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 {formatIsoDate(doc.date_issued)}
@@ -527,7 +553,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             </div>
             <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Total Amount
+                {t("Total Amount")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 {formatCurrency(doc.total_amount)}
@@ -535,7 +561,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             </div>
             <div className="min-w-0">
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Invoice e-Status
+                {t("Invoice e-Status")}
               </div>
               <div className="mt-0.5">
                 <AdjustmentDocStatusBadge
@@ -552,7 +578,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             {doc.references_consolidated_id && (
               <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                  Referenced Consolidated Invoice
+                  {t("Referenced Consolidated Invoice")}
                 </div>
                 <div className="font-mono text-sm text-default-900 dark:text-gray-100 break-all">
                   #{doc.references_consolidated_id}
@@ -562,7 +588,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             {doc.reason && (
               <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                  Reason
+                  {t("Reason")}
                 </div>
                 <div className="text-default-900 dark:text-gray-100 whitespace-pre-wrap">
                   {doc.reason}
@@ -579,7 +605,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
               <div className="flex items-center gap-2 text-sm">
                 <IconReceipt size={18} className="text-default-500" />
                 <span className="text-default-600 dark:text-gray-400">
-                  Paired with
+                  {t("Paired with")}
                 </span>
                 <AdjustmentDocTypeBadge type={pairedDoc.type} />
                 <span className="font-medium text-default-900 dark:text-gray-100">
@@ -599,7 +625,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                 variant="outline"
                 size="sm"
               >
-                Open
+                {t("Open")}
               </Button>
             </div>
           </div>
@@ -609,12 +635,12 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         {doc.type === "refund_note" && (
           <div className="p-4 border-b border-default-200 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">
-              Refund Details
+              {t("Refund Details")}
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
               <div>
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase">
-                  Method
+                  {t("Method")}
                 </div>
                 <div className="font-medium text-default-900 dark:text-gray-100 capitalize">
                   {doc.refund_method?.replace("_", " ") || "—"}
@@ -622,7 +648,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
               </div>
               <div>
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase">
-                  Bank Account
+                  {t("Bank Account")}
                 </div>
                 <div className="font-medium text-default-900 dark:text-gray-100">
                   {doc.bank_account || "—"}
@@ -630,7 +656,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
               </div>
               <div>
                 <div className="text-default-500 dark:text-gray-400 text-xs uppercase">
-                  Reference
+                  {t("Reference")}
                 </div>
                 <div className="font-medium text-default-900 dark:text-gray-100">
                   {doc.refund_reference || "—"}
@@ -643,26 +669,26 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         {/* Line items */}
         <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">
-            Line Items
+            {t("Line Items")}
           </h3>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 border border-default-200 dark:border-gray-700 rounded-lg">
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Qty
+                    {t("Qty")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Price
+                    {t("Price")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Tax
+                    {t("Tax")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Total
+                    {t("Total")}
                   </th>
                 </tr>
               </thead>
@@ -702,10 +728,12 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
             <div className="p-4 border-b border-default-200 dark:border-gray-700">
               <div className="mb-2">
                 <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100">
-                  Revenue Posting
+                  {t("Revenue Posting")}
                 </h3>
                 <p className="text-xs text-default-500 dark:text-gray-400">
-                  Saved ordered allocation used by this adjustment journal.
+                  {t(
+                    "Saved ordered allocation used by this adjustment journal."
+                  )}
                 </p>
               </div>
               <div className="overflow-x-auto">
@@ -713,13 +741,13 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                   <thead className="bg-default-50 dark:bg-gray-900/50">
                     <tr>
                       <th className="w-16 px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-300">
-                        #
+                        {t("#")}
                       </th>
                       <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-300">
-                        Revenue Account
+                        {t("Revenue Account")}
                       </th>
                       <th className="px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-300">
-                        Amount
+                        {t("Amount")}
                       </th>
                     </tr>
                   </thead>
@@ -737,7 +765,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
                             {split.account_code}
                             {split.account_code === "WS_OTH4" && (
                               <span className="ml-2 text-xs font-normal text-default-500 dark:text-gray-400">
-                                inherited legacy account
+                                {t("inherited legacy account")}
                               </span>
                             )}
                           </td>
@@ -761,7 +789,7 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
               target="_blank"
               rel="noopener noreferrer"
               className={eInvoiceCardClassName}
-              title="View in MyInvois Portal"
+              title={t("View in MyInvois Portal")}
             >
               {eInvoiceCardContent}
             </a>
@@ -771,26 +799,28 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
 
           <div className="bg-default-50 dark:bg-gray-900/30 rounded-lg p-4 border border-default-200 dark:border-gray-700">
             <h3 className="text-sm font-semibold text-default-900 dark:text-gray-100 mb-2">
-              Totals
+              {t("Totals")}
             </h3>
             <div className="text-sm space-y-1">
               <div className="flex justify-between">
                 <span className="text-default-600 dark:text-gray-400">
-                  Amount Before Tax
+                  {t("Amount Before Tax")}
                 </span>
                 <span className="font-medium text-default-900 dark:text-gray-100">
                   {formatCurrency(doc.amount_before_tax)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-default-600 dark:text-gray-400">Tax</span>
+                <span className="text-default-600 dark:text-gray-400">
+                  {t("Tax")}
+                </span>
                 <span className="font-medium text-default-900 dark:text-gray-100">
                   {formatCurrency(doc.tax_amount)}
                 </span>
               </div>
               <div className="border-t border-default-200 dark:border-gray-700 pt-2 mt-2 flex justify-between">
                 <span className="font-semibold text-default-900 dark:text-gray-100">
-                  Total
+                  {t("Total")}
                 </span>
                 <span className="font-bold text-lg text-default-900 dark:text-gray-100">
                   {formatCurrency(doc.total_amount)}
@@ -803,8 +833,14 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
         {doc.cancellation_date && (
           <div className="p-4 border-t border-default-200 dark:border-gray-700 bg-rose-50/50 dark:bg-rose-900/10">
             <div className="text-sm text-rose-800 dark:text-rose-300">
-              <span className="font-medium">Cancelled</span>
-              {" "}on {new Date(doc.cancellation_date).toLocaleString()}
+              <Trans
+                t={t}
+                i18nKey="<strong>Cancelled</strong> on {{date}}"
+                values={{
+                  date: new Date(doc.cancellation_date).toLocaleString(),
+                }}
+                components={{ strong: <span className="font-medium" /> }}
+              />
               {doc.cancellation_reason && <span>: {doc.cancellation_reason}</span>}
             </div>
           </div>
@@ -820,15 +856,23 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
           }
         }}
         onConfirm={handleCancel}
-        title={`Cancel ${doc.id}?`}
-        message={`This will reverse the balance impact on the original invoice${
+        title={t("Cancel {{doc}}?", { doc: doc.id })}
+        message={
           doc.type === "credit_note"
-            ? " (adds the credit back to the outstanding balance)"
+            ? t(
+                "This will reverse the balance impact on the original invoice (adds the credit back to the outstanding balance). This action cannot be undone."
+              )
             : doc.type === "debit_note"
-            ? " (removes the debit from the outstanding balance)"
-            : ""
-        }. This action cannot be undone.`}
-        confirmButtonText={isCancelling ? "Cancelling..." : "Confirm Cancellation"}
+            ? t(
+                "This will reverse the balance impact on the original invoice (removes the debit from the outstanding balance). This action cannot be undone."
+              )
+            : t(
+                "This will reverse the balance impact on the original invoice. This action cannot be undone."
+              )
+        }
+        confirmButtonText={
+          isCancelling ? t("Cancelling...") : t("Confirm Cancellation")
+        }
         variant="danger"
       />
 
@@ -841,10 +885,14 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
           }
         }}
         onConfirm={handleCancelEinvoice}
-        title={`Cancel e-Invoice only for ${doc.id}?`}
-        message="This only cancels the MyInvois e-Invoice. The adjustment document will remain active and the invoice balance will not be reversed yet. After MyInvois marks it cancelled, use Cancel Document if you also want to reverse the adjustment."
+        title={t("Cancel e-Invoice only for {{doc}}?", { doc: doc.id })}
+        message={t(
+          "This only cancels the MyInvois e-Invoice. The adjustment document will remain active and the invoice balance will not be reversed yet. After MyInvois marks it cancelled, use Cancel Document if you also want to reverse the adjustment."
+        )}
         confirmButtonText={
-          isCancellingEinvoice ? "Cancelling..." : "Cancel e-Invoice Only"
+          isCancellingEinvoice
+            ? t("Cancelling...")
+            : t("Cancel e-Invoice Only")
         }
         variant="danger"
       />
