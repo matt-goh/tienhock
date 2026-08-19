@@ -2,6 +2,7 @@
 // Green Target Salary Report (Phase 5). Monthly + annual views grouped by job
 // (OFFICE / DRIVER) — GT has no locations. Reuses the shared TH PDF generator.
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconRefresh,
   IconPrinter,
@@ -223,6 +224,7 @@ const getPinjamStaffKey = (
 ): string => (staffName || staffId || "").trim().toUpperCase();
 
 const GTSalaryReportPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const [activeTab, setActiveTab] = usePersistedFilters<TabType>(
     "gtSalaryReportTab",
     () => "monthly",
@@ -385,7 +387,7 @@ const GTSalaryReportPage: React.FC = () => {
     } catch (error) {
       console.error("Error loading GT salary report:", error);
       if (isMonthlyTab(activeTab)) setPinjamSummary([]);
-      toast.error("Failed to load salary report");
+      toast.error(t("Failed to load salary report"));
     } finally {
       setIsLoading(false);
     }
@@ -407,7 +409,7 @@ const GTSalaryReportPage: React.FC = () => {
     } catch (error) {
       console.error("Error loading GT yearly salary report:", error);
       setYearly(null);
-      toast.error("Failed to load yearly salary report");
+      toast.error(t("Failed to load yearly salary report"));
     } finally {
       setIsLoadingYearly(false);
     }
@@ -512,9 +514,9 @@ const GTSalaryReportPage: React.FC = () => {
     [activePinjamData]
   );
   const activePinjamGajiLabel: string =
-    pinjamViewMode === "mid_month" ? "1/2 Bulan" : "Gaji/Genap";
+    pinjamViewMode === "mid_month" ? t("1/2 Bulan") : t("Gaji/Genap");
   const activePinjamReportLabel: string =
-    pinjamViewMode === "mid_month" ? "Mid-Month Pinjam" : "Pinjam";
+    pinjamViewMode === "mid_month" ? t("Mid-Month Pinjam") : t("Pinjam");
 
   // Employee and Location can show a whole year; every other tab is month-bound.
   const isYearlyView: boolean =
@@ -589,17 +591,17 @@ const GTSalaryReportPage: React.FC = () => {
     navigator.clipboard
       .writeText(url)
       .then(() => {
-        toast.success("Export URL copied to clipboard!");
+        toast.success(t("Export URL copied to clipboard!"));
         setShowExportDialog(false);
       })
       .catch(() => {
-        toast.error("Failed to copy URL to clipboard");
+        toast.error(t("Failed to copy URL to clipboard"));
       });
   };
 
   const generateTextExport = async () => {
     if (bankExportRows.length === 0) {
-      toast.error("No bank payment data available to export");
+      toast.error(t("No bank payment data available to export"));
       return;
     }
 
@@ -778,10 +780,10 @@ const GTSalaryReportPage: React.FC = () => {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
 
-      toast.success("Payment export file downloaded successfully");
+      toast.success(t("Payment export file downloaded successfully"));
     } catch (error) {
       console.error("Error generating text export:", error);
-      toast.error("Failed to generate text export");
+      toast.error(t("Failed to generate text export"));
     } finally {
       setIsGeneratingExport(false);
     }
@@ -791,7 +793,7 @@ const GTSalaryReportPage: React.FC = () => {
     action: "download" | "print"
   ): Promise<void> => {
     if (!monthly || activePinjamData.length === 0) {
-      toast.error("No data available to generate PDF");
+      toast.error(t("No data available to generate PDF"));
       return;
     }
     setIsGenerating(true);
@@ -811,11 +813,13 @@ const GTSalaryReportPage: React.FC = () => {
         action
       );
       toast.success(
-        `Pinjam breakdown ${action === "download" ? "downloaded" : "generated for printing"}`
+        action === "download"
+          ? t("Pinjam breakdown downloaded")
+          : t("Pinjam breakdown generated for printing")
       );
     } catch (error) {
       console.error("Error generating pinjam breakdown PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGenerating(false);
     }
@@ -828,7 +832,7 @@ const GTSalaryReportPage: React.FC = () => {
     try {
       if (activeTab === "employee" && employeeView === "location") {
         if (!activeData || employeeLocations.length === 0) {
-          toast.error(`No data to print for ${periodLabel}`);
+          toast.error(t("No data to print for {{period}}", { period: periodLabel }));
           return;
         }
         await generateSalaryReportPDF(
@@ -848,7 +852,7 @@ const GTSalaryReportPage: React.FC = () => {
         );
       } else if (activeTab === "employee") {
         if (!activeData || activeData.employees.length === 0) {
-          toast.error(`No data to print for ${periodLabel}`);
+          toast.error(t("No data to print for {{period}}", { period: periodLabel }));
           return;
         }
         await generateSalaryReportPDF(
@@ -867,7 +871,7 @@ const GTSalaryReportPage: React.FC = () => {
         );
       } else if (activeTab === "bank") {
         if (!monthly || monthly.bank_data.length === 0) {
-          toast.error("No data to print for this month");
+          toast.error(t("No data to print for this month"));
           return;
         }
         await generateBankReportPDF(
@@ -884,7 +888,7 @@ const GTSalaryReportPage: React.FC = () => {
         );
       } else if (activeTab === "pinjam") {
         if (!monthly || activePinjamData.length === 0) {
-          toast.error("No data to print for this month");
+          toast.error(t("No data to print for this month"));
           return;
         }
         await generatePinjamReportPDF(
@@ -903,7 +907,7 @@ const GTSalaryReportPage: React.FC = () => {
         );
       } else if (activeTab === "cuti") {
         if (cutiEmployees.length === 0 || !cutiSummary) {
-          toast.error("No leave data to print for this year");
+          toast.error(t("No leave data to print for this year"));
           return;
         }
         await generateBatchCutiReportPDF(
@@ -918,7 +922,7 @@ const GTSalaryReportPage: React.FC = () => {
         );
       } else if (activeTab === "monthly") {
         if (!activeData || activeData.locations.length === 0) {
-          toast.error(`No data to print for ${periodLabel}`);
+          toast.error(t("No data to print for {{period}}", { period: periodLabel }));
           return;
         }
         await generateSalaryReportPDF(
@@ -937,7 +941,7 @@ const GTSalaryReportPage: React.FC = () => {
         );
       } else if (annualView === "summary") {
         if (!annual || annual.monthly.length === 0) {
-          toast.error("No data to print for this year");
+          toast.error(t("No data to print for this year"));
           return;
         }
         await generateSalaryReportPDF(
@@ -954,7 +958,7 @@ const GTSalaryReportPage: React.FC = () => {
         );
       } else {
         if (!breakdown || breakdown.locations.length === 0) {
-          toast.error("No data to print for this year");
+          toast.error(t("No data to print for this year"));
           return;
         }
         await generateSalaryReportPDF(
@@ -970,10 +974,12 @@ const GTSalaryReportPage: React.FC = () => {
           action
         );
       }
-      toast.success(`Report ${action === "download" ? "downloaded" : "generated"}`);
+      toast.success(
+        action === "download" ? t("Report downloaded") : t("Report generated")
+      );
     } catch (error) {
       console.error("Error generating salary report PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGenerating(false);
     }
@@ -1081,8 +1087,8 @@ const GTSalaryReportPage: React.FC = () => {
       className={`${sticky ? "sticky top-0 z-20 " : ""}bg-default-50 dark:bg-gray-900`}
     >
       <tr>
-        <th className={headCellClass} title="Bilangan">
-          BIL
+        <th className={headCellClass} title={t("Number")}>
+          {t("BIL")}
         </th>
         <th
           className={`${headCellClass} text-left max-w-[140px] truncate`}
@@ -1090,23 +1096,26 @@ const GTSalaryReportPage: React.FC = () => {
         >
           {firstLabel}
         </th>
-        <th className={headCellClass} title="Gaji">
-          GAJI
+        <th className={headCellClass} title={t("Salary")}>
+          {t("SALARY")}
         </th>
-        <th className={headCellClass} title="Overtime">
-          OT
+        <th className={headCellClass} title={t("Overtime")}>
+          {t("OT")}
         </th>
-        <th className={headCellClass} title="Bonus">
-          BONUS
+        <th className={headCellClass} title={t("Bonus")}>
+          {t("BONUS")}
         </th>
-        <th className={headCellClass} title="Commission / Insentif / Lain-lain">
-          C/I/O
+        <th
+          className={headCellClass}
+          title={t("Commission / Incentive / Others")}
+        >
+          {t("C/I/O")}
         </th>
-        <th className={headCellClass} title="Cuti">
-          CUTI
+        <th className={headCellClass} title={t("Leave (all types)")}>
+          {t("LEAVE")}
         </th>
-        <th className={headCellClass} title="Gaji Kasar">
-          GAJI KASAR
+        <th className={headCellClass} title={t("Gross Pay")}>
+          {t("GROSS PAY")}
         </th>
         <th className={headGroupClass} colSpan={2} title="EPF">
           EPF
@@ -1123,32 +1132,32 @@ const GTSalaryReportPage: React.FC = () => {
         >
           PCB
         </th>
-        <th className={headCellClass} title="Gaji Bersih">
-          GAJI BERSIH
+        <th className={headCellClass} title={t("Net Pay")}>
+          {t("NET PAY")}
         </th>
-        <th className={headCellClass} title="Setengah Bulan">
-          1/2 BULAN
+        <th className={headCellClass} title={t("Mid-month Pay")}>
+          {t("1/2 MONTH")}
         </th>
-        <th className={headCellClass} title="Jumlah">
-          JUMLAH
+        <th className={headCellClass} title={t("Total")}>
+          {t("TOTAL")}
         </th>
-        <th className={headCellClass} title="Digenapkan">
-          DIGENAPKAN
+        <th className={headCellClass} title={t("Rounding")}>
+          {t("ROUNDING")}
         </th>
-        <th className={headCellClass} title="Setelah Digenapkan">
-          SETELAH DIGENAPKAN
+        <th className={headCellClass} title={t("After Rounding")}>
+          {t("AFTER ROUNDING")}
         </th>
       </tr>
       <tr>
         {Array.from({ length: 8 }).map((_, index: number) => (
           <th key={`blank-leading-${index}`} className={headBlankClass} />
         ))}
-        <th className={headSubClass}>MAJ</th>
-        <th className={headSubClass}>PKJ</th>
-        <th className={headSubClass}>MAJ</th>
-        <th className={headSubClass}>PKJ</th>
-        <th className={headSubClass}>MAJ</th>
-        <th className={headSubClass}>PKJ</th>
+        <th className={headSubClass}>{t("MAJ")}</th>
+        <th className={headSubClass}>{t("PKJ")}</th>
+        <th className={headSubClass}>{t("MAJ")}</th>
+        <th className={headSubClass}>{t("PKJ")}</th>
+        <th className={headSubClass}>{t("MAJ")}</th>
+        <th className={headSubClass}>{t("PKJ")}</th>
         {Array.from({ length: 6 }).map((_, index: number) => (
           <th key={`blank-trailing-${index}`} className={headBlankClass} />
         ))}
@@ -1204,19 +1213,19 @@ const GTSalaryReportPage: React.FC = () => {
                 as="h3"
                 className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100"
               >
-                Export Link Generator
+                {t("Export Link Generator")}
               </DialogTitle>
               <div className="mt-4 space-y-4">
                 <FormListbox
                   name="exportYear"
-                  label="Year"
+                  label={t("Year")}
                   value={exportYear.toString()}
                   onChange={(value) => setExportYear(Number(value))}
                   options={yearOptions}
                 />
                 <FormListbox
                   name="exportMonth"
-                  label="Month"
+                  label={t("Month")}
                   value={exportMonth.toString()}
                   onChange={(value) => setExportMonth(Number(value))}
                   options={monthOptions}
@@ -1228,10 +1237,10 @@ const GTSalaryReportPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button onClick={generateExportURL} color="blue" size="sm">
-                  Copy URL
+                  {t("Copy URL")}
                 </Button>
               </div>
             </DialogPanel>
@@ -1259,7 +1268,7 @@ const GTSalaryReportPage: React.FC = () => {
                         : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                     } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
                   >
-                    {TAB_LABELS[tab]}
+                    {t(TAB_LABELS[tab])}
                   </button>
                 ))}
               </div>
@@ -1277,7 +1286,7 @@ const GTSalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       }`}
                     >
-                      Individual
+                      {t("Individual")}
                     </button>
                     <button
                       type="button"
@@ -1288,7 +1297,7 @@ const GTSalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       }`}
                     >
-                      Location
+                      {t("Location")}
                     </button>
                   </div>
                 </>
@@ -1306,7 +1315,7 @@ const GTSalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       }`}
                     >
-                      Month-End
+                      {t("Month-End")}
                     </button>
                     <button
                       type="button"
@@ -1317,7 +1326,7 @@ const GTSalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       }`}
                     >
-                      Mid-Month
+                      {t("Mid-Month")}
                     </button>
                   </div>
                 </>
@@ -1338,7 +1347,7 @@ const GTSalaryReportPage: React.FC = () => {
                               : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                           } ${index > 0 ? "border-l border-default-200 dark:border-gray-600" : ""}`}
                         >
-                          {v}
+                          {t(v)}
                         </button>
                       )
                     )}
@@ -1359,7 +1368,7 @@ const GTSalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       }`}
                     >
-                      Monthly
+                      {t("Monthly")}
                     </button>
                     <button
                       type="button"
@@ -1370,7 +1379,7 @@ const GTSalaryReportPage: React.FC = () => {
                           : "bg-white dark:bg-gray-800 text-default-600 dark:text-gray-300 hover:bg-default-50 dark:hover:bg-gray-700"
                       }`}
                     >
-                      Yearly
+                      {t("Yearly")}
                     </button>
                   </div>
                 </>
@@ -1398,9 +1407,12 @@ const GTSalaryReportPage: React.FC = () => {
                   <span className="text-default-300 dark:text-gray-600">|</span>
                   <div className="text-sm text-default-600 dark:text-gray-300">
                     <span className="block font-medium">
-                      {activeTab === "pinjam"
-                        ? activePinjamData.length
-                        : activeData.total_records} employees
+                      {t("{{count}} employees", {
+                        count:
+                          activeTab === "pinjam"
+                            ? activePinjamData.length
+                            : activeData.total_records,
+                      })}
                     </span>
                     <span className="block font-medium">
                       {fmtCurrency(headerTotal)}
@@ -1428,7 +1440,7 @@ const GTSalaryReportPage: React.FC = () => {
                 disabled={activeLoading}
                 size="sm"
               >
-                Refresh
+                {t("Refresh")}
               </Button>
               <Button
                 onClick={() => handleGenerate("print")}
@@ -1437,7 +1449,7 @@ const GTSalaryReportPage: React.FC = () => {
                 disabled={isGenerating || activeLoading}
                 size="sm"
               >
-                Print
+                {t("Print")}
               </Button>
               <Button
                 onClick={() => handleGenerate("download")}
@@ -1446,7 +1458,7 @@ const GTSalaryReportPage: React.FC = () => {
                 disabled={isGenerating || activeLoading}
                 size="sm"
               >
-                Download
+                {t("Download")}
               </Button>
               {activeTab === "bank" && (
                 <>
@@ -1462,7 +1474,7 @@ const GTSalaryReportPage: React.FC = () => {
                     }
                     size="sm"
                   >
-                    Export
+                    {t("Export")}
                   </Button>
                   <Button
                     onClick={() => setShowExportDialog(true)}
@@ -1471,7 +1483,7 @@ const GTSalaryReportPage: React.FC = () => {
                     variant="outline"
                     size="sm"
                   >
-                    Export Link
+                    {t("Export Link")}
                   </Button>
                 </>
               )}
@@ -1497,12 +1509,14 @@ const GTSalaryReportPage: React.FC = () => {
             employeeView === "individual" &&
             (!activeData || activeData.employees.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll for {periodLabel}.
+                {t("No processed payroll for {{period}}.", {
+                  period: periodLabel,
+                })}
               </div>
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
-                {renderSalaryHeader("NAMA PEKERJA")}
+                {renderSalaryHeader(t("STAFF NAME"))}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {activeData.employees.map((emp, index: number) => (
                     <tr
@@ -1535,7 +1549,7 @@ const GTSalaryReportPage: React.FC = () => {
                       colSpan={2}
                       className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
                     >
-                      GRAND TOTAL
+                      {t("GRAND TOTAL")}
                     </td>
                     {renderAmountCells(activeData.employees_grand_totals, true)}
                   </tr>
@@ -1548,7 +1562,9 @@ const GTSalaryReportPage: React.FC = () => {
             employeeView === "location" &&
             (!activeData || employeeLocations.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll for {periodLabel}.
+                {t("No processed payroll for {{period}}.", {
+                  period: periodLabel,
+                })}
               </div>
             ) : (
               <div className="px-6 pt-2 pb-2 space-y-3">
@@ -1567,7 +1583,7 @@ const GTSalaryReportPage: React.FC = () => {
                     </div>
                     <table className="w-full table-fixed">
                       {renderTableColGroup()}
-                      {renderSalaryHeader("NAMA PEKERJA", false)}
+                      {renderSalaryHeader(t("STAFF NAME"), false)}
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                         {loc.employees.map((emp: EmpRow, index: number) => (
                           <tr
@@ -1600,7 +1616,7 @@ const GTSalaryReportPage: React.FC = () => {
                             colSpan={2}
                             className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
                           >
-                            SUBTOTAL
+                            {t("SUBTOTAL")}
                           </td>
                           {renderAmountCells(loc.totals, true)}
                         </tr>
@@ -1619,7 +1635,7 @@ const GTSalaryReportPage: React.FC = () => {
                           colSpan={2}
                           className="px-2 py-3 text-sm font-bold text-white text-center bg-sky-600 dark:bg-sky-700"
                         >
-                          GRAND TOTAL
+                          {t("GRAND TOTAL")}
                         </td>
                         {renderGrandTotalCells(activeData.employees_grand_totals)}
                       </tr>
@@ -1633,7 +1649,10 @@ const GTSalaryReportPage: React.FC = () => {
           {activeTab === "bank" &&
             (!monthly || monthly.bank_data.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No payments for {getMonthName(currentMonth)} {currentYear}.
+                {t("No payments for {{month}} {{year}}.", {
+                  month: getMonthName(currentMonth),
+                  year: currentYear,
+                })}
               </div>
             ) : (
               <div className="px-6 pt-2 pb-2">
@@ -1646,8 +1665,14 @@ const GTSalaryReportPage: React.FC = () => {
             (!monthly || activePinjamData.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
                 {pinjamViewMode === "mid_month"
-                  ? `No mid-month data for ${getMonthName(currentMonth)} ${currentYear}.`
-                  : `No processed payroll for ${getMonthName(currentMonth)} ${currentYear}.`}
+                  ? t("No mid-month data for {{month}} {{year}}.", {
+                      month: getMonthName(currentMonth),
+                      year: currentYear,
+                    })
+                  : t("No processed payroll for {{month}} {{year}}.", {
+                      month: getMonthName(currentMonth),
+                      year: currentYear,
+                    })}
               </div>
             ) : (
               <div className="px-6 pt-2 pb-2">
@@ -1663,7 +1688,7 @@ const GTSalaryReportPage: React.FC = () => {
           {activeTab === "cuti" &&
             (cutiEmployees.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No leave records in {currentYear}.
+                {t("No leave records in {{year}}.", { year: currentYear })}
               </div>
             ) : (
               <div className="px-6 pt-2 pb-2">
@@ -1675,12 +1700,14 @@ const GTSalaryReportPage: React.FC = () => {
           {activeTab === "monthly" &&
             (!activeData || activeData.locations.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll for {periodLabel}.
+                {t("No processed payroll for {{period}}.", {
+                  period: periodLabel,
+                })}
               </div>
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
-                {renderSalaryHeader("BAHAGIAN KERJA")}
+                {renderSalaryHeader(t("WORK SECTION"))}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {activeData.locations.map((loc, index: number) => (
                     <tr
@@ -1711,7 +1738,7 @@ const GTSalaryReportPage: React.FC = () => {
                       colSpan={2}
                       className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
                     >
-                      GRAND TOTAL
+                      {t("GRAND TOTAL")}
                     </td>
                     {renderAmountCells(activeData.grand_totals, true)}
                   </tr>
@@ -1724,12 +1751,14 @@ const GTSalaryReportPage: React.FC = () => {
             annualView === "summary" &&
             (!annual || annual.monthly.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll in {currentYear}.
+                {t("No processed payroll in {{year}}.", {
+                  year: currentYear,
+                })}
               </div>
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
-                {renderSalaryHeader("MONTH / LOCATION")}
+                {renderSalaryHeader(t("MONTH / LOCATION"))}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {annual.monthly.map((m, index: number) => (
                     <tr
@@ -1758,7 +1787,9 @@ const GTSalaryReportPage: React.FC = () => {
                         colSpan={2}
                         className="px-3 py-2 text-xs font-semibold text-sky-800 dark:text-sky-300 text-left"
                       >
-                        {locationMap[loc.location] || loc.location} (YEAR)
+                        {t("{{location}} (YEAR)", {
+                          location: locationMap[loc.location] || loc.location,
+                        })}
                       </td>
                       {renderAmountCells(loc.totals, true)}
                     </tr>
@@ -1770,7 +1801,7 @@ const GTSalaryReportPage: React.FC = () => {
                       colSpan={2}
                       className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
                     >
-                      GRAND TOTAL
+                      {t("GRAND TOTAL")}
                     </td>
                     {renderAmountCells(annual.grand_totals, true)}
                   </tr>
@@ -1783,12 +1814,14 @@ const GTSalaryReportPage: React.FC = () => {
             annualView === "breakdown" &&
             (!breakdown || breakdown.locations.length === 0 ? (
               <div className="text-center py-12 text-default-500 dark:text-gray-400">
-                No processed payroll in {currentYear}.
+                {t("No processed payroll in {{year}}.", {
+                  year: currentYear,
+                })}
               </div>
             ) : (
               <table className="w-full table-fixed">
                 {renderTableColGroup()}
-                {renderSalaryHeader("NAMA PEKERJA / MONTH")}
+                {renderSalaryHeader(t("STAFF NAME / MONTH"))}
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-default-200 dark:divide-gray-700">
                   {breakdown.locations.map((loc) => (
                     <React.Fragment key={loc.location}>
@@ -1834,7 +1867,9 @@ const GTSalaryReportPage: React.FC = () => {
                               colSpan={2}
                               className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
                             >
-                              {emp.staff_name} Total
+                              {t("{{name}} Total", {
+                                name: emp.staff_name,
+                              })}
                             </td>
                             {renderAmountCells(emp.total, true)}
                           </tr>
@@ -1845,7 +1880,10 @@ const GTSalaryReportPage: React.FC = () => {
                           colSpan={2}
                           className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t border-default-300 dark:border-gray-600"
                         >
-                          {locationMap[loc.location] || loc.location} Total
+                          {t("{{location}} Total", {
+                            location:
+                              locationMap[loc.location] || loc.location,
+                          })}
                         </td>
                         {renderAmountCells(loc.totals, true)}
                       </tr>
@@ -1858,7 +1896,7 @@ const GTSalaryReportPage: React.FC = () => {
                       colSpan={2}
                       className="px-2 py-2 text-xs font-bold text-default-700 dark:text-gray-200 text-center bg-default-100 dark:bg-gray-800 border-t-2 border-default-300 dark:border-gray-600"
                     >
-                      GRAND TOTAL
+                      {t("GRAND TOTAL")}
                     </td>
                     {renderAmountCells(breakdown.grand_totals, true)}
                   </tr>

@@ -1,5 +1,6 @@
 import React, { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -133,6 +134,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
   const [clearanceDate, setClearanceDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
   );
+  const { t } = useTranslation("greentarget");
   const detailsRequestIdRef = useRef<number>(0);
 
   useEffect((): (() => void) => {
@@ -169,7 +171,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         }
         console.error("Error loading Green Target receipt group:", error);
         setLoadError(
-          getErrorMessage(error, "Failed to load this Green Target receipt.")
+          getErrorMessage(error, t("Failed to load this Green Target receipt."))
         );
       } finally {
         if (
@@ -276,7 +278,9 @@ const GreenTargetReceiptDetailsDialog: React.FC<
       await reloadDetails();
     } catch (error: unknown) {
       console.error("Error reloading Green Target receipt details:", error);
-      toast.error("The receipt changed, but its refreshed details could not be loaded.");
+      toast.error(
+        t("The receipt changed, but its refreshed details could not be loaded.")
+      );
     }
   };
 
@@ -303,7 +307,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
 
     const nextReference: string = referenceValue.trim();
     if (!nextReference) {
-      setReferenceError("Green Target reference number is required.");
+      setReferenceError(t("Green Target reference number is required."));
       return;
     }
     if (nextReference === details.receipt.display_reference) {
@@ -334,12 +338,15 @@ const GreenTargetReceiptDetailsDialog: React.FC<
             : current
       );
       setEditingReference(false);
-      toast.success("Green Target reference updated for the whole receipt.");
+      toast.success(t("Green Target reference updated for the whole receipt."));
       await refreshAfterMutation();
     } catch (error: unknown) {
       console.error("Error updating Green Target receipt reference:", error);
       setReferenceError(
-        getErrorMessage(error, "Failed to update the Green Target reference.")
+        getErrorMessage(
+          error,
+          t("Failed to update the Green Target reference.")
+        )
       );
     } finally {
       setMutation(null);
@@ -356,7 +363,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
       return;
     }
     if (!clearanceDate) {
-      toast.error("Actual bank clearance / posting date is required.");
+      toast.error(t("Actual bank clearance / posting date is required."));
       return;
     }
 
@@ -367,11 +374,13 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         representativePaymentId,
         clearanceDate
       );
-      toast.success("Receipt confirmed with its bank clearance date.");
+      toast.success(t("Receipt confirmed with its bank clearance date."));
       await refreshAfterMutation();
     } catch (error: unknown) {
       console.error("Error confirming Green Target receipt:", error);
-      toast.error(getErrorMessage(error, "Failed to confirm this receipt."));
+      toast.error(
+        getErrorMessage(error, t("Failed to confirm this receipt."))
+      );
     } finally {
       setMutation(null);
     }
@@ -411,11 +420,13 @@ const GreenTargetReceiptDetailsDialog: React.FC<
             : current
       );
       setCancelReason("");
-      toast.success("Receipt and all of its allocations were cancelled.");
+      toast.success(t("Receipt and all of its allocations were cancelled."));
       await refreshAfterMutation();
     } catch (error: unknown) {
       console.error("Error cancelling Green Target receipt:", error);
-      toast.error(getErrorMessage(error, "Failed to cancel this receipt."));
+      toast.error(
+        getErrorMessage(error, t("Failed to cancel this receipt."))
+      );
     } finally {
       setMutation(null);
     }
@@ -464,12 +475,15 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                           className="break-all text-base font-semibold text-default-800 dark:text-gray-100"
                         >
                           {details?.receipt.display_reference
-                            ? `Receipt ${details.receipt.display_reference}`
-                            : "Receipt Details"}
+                            ? t("Receipt {{reference}}", {
+                                reference: details.receipt.display_reference,
+                              })
+                            : t("Receipt Details")}
                         </DialogTitle>
                         <p className="text-xs text-default-500 dark:text-gray-400">
-                          See every invoice paid under this Green Target
-                          reference.
+                          {t(
+                            "See every invoice paid under this Green Target reference."
+                          )}
                         </p>
                       </div>
                     </div>
@@ -478,7 +492,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                       onClick={handleClose}
                       disabled={isBusy}
                       className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
-                      aria-label="Close receipt details"
+                      aria-label={t("Close receipt details")}
                     >
                       <IconX size={18} />
                     </button>
@@ -538,7 +552,9 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                 setLoadError(
                                   getErrorMessage(
                                     error,
-                                    "Failed to load this Green Target receipt."
+                                    t(
+                                      "Failed to load this Green Target receipt."
+                                    )
                                   )
                                 );
                               })
@@ -551,7 +567,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                               });
                           }}
                         >
-                          Try Again
+                          {t("Try Again")}
                         </Button>
                       </div>
                     ) : details ? (
@@ -565,12 +581,12 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                               />
                               <div>
                                 <p className="text-sm font-semibold">
-                                  This receipt covers more than one invoice
+                                  {t("This receipt covers more than one invoice")}
                                 </p>
                                 <p className="mt-1 text-sm leading-5">
-                                  To keep every invoice correct, the reference,
-                                  confirmation and cancellation apply to all of
-                                  the invoices below together.
+                                  {t(
+                                    "To keep every invoice correct, the reference, confirmation and cancellation apply to all of the invoices below together."
+                                  )}
                                 </p>
                               </div>
                             </div>
@@ -584,15 +600,18 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                             />
                             <div>
                               <p className="text-sm font-semibold">
-                                This receipt has already been cancelled
+                                {t("This receipt has already been cancelled")}
                               </p>
                               <p className="mt-1 text-sm leading-5">
-                                Every invoice allocation below was reversed
-                                together.
+                                {t(
+                                  "Every invoice allocation below was reversed together."
+                                )}
                               </p>
                               {details.receipt.cancellation_reason && (
                                 <p className="mt-1 text-xs opacity-80">
-                                  Reason: {details.receipt.cancellation_reason}
+                                  {t("Reason: {{reason}}", {
+                                    reason: details.receipt.cancellation_reason,
+                                  })}
                                 </p>
                               )}
                             </div>
@@ -602,19 +621,19 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">
-                              Status
+                              {t("Status")}
                             </p>
                             <span
                               className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${getStatusClassName(
                                 details.receipt.status
                               )}`}
                             >
-                              {getStatusLabel(details.receipt.status)}
+                              {t(getStatusLabel(details.receipt.status))}
                             </span>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">
-                              Total received
+                              {t("Total received")}
                             </p>
                             <p className="mt-1 text-sm font-semibold text-default-800 dark:text-gray-100">
                               {formatCurrency(details.receipt.total_amount)}
@@ -622,19 +641,21 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">
-                              Received date
+                              {t("Received date")}
                             </p>
                             <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
-                              {formatReceiptDate(details.receipt.received_date)}
+                              {t(formatReceiptDate(details.receipt.received_date))}
                             </p>
                           </div>
                           <div className="rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
                             <p className="text-xs text-default-500 dark:text-gray-400">
-                              Method
+                              {t("Method")}
                             </p>
                             <p className="mt-1 text-sm font-medium text-default-800 dark:text-gray-100">
-                              {formatPaymentMethod(
-                                details.receipt.payment_method
+                              {t(
+                                formatPaymentMethod(
+                                  details.receipt.payment_method
+                                )
                               )}
                             </p>
                           </div>
@@ -643,7 +664,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
                           <div className="sm:col-span-2">
                             <dt className="text-xs text-default-500 dark:text-gray-400">
-                              Green Target reference no.
+                              {t("Green Target reference no.")}
                             </dt>
                             <dd className="mt-1 text-default-800 dark:text-gray-100">
                               {editingReference ? (
@@ -669,7 +690,9 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                       }}
                                       disabled={isBusy}
                                       className="h-9 min-w-0 flex-1 rounded-lg border border-default-300 bg-white px-3 font-mono text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-                                      aria-label="New Green Target reference number"
+                                      aria-label={t(
+                                        "New Green Target reference number"
+                                      )}
                                     />
                                     <div className="flex gap-2">
                                       <Button
@@ -683,7 +706,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                         disabled={isBusy}
                                         className="flex-1 sm:flex-none"
                                       >
-                                        Cancel
+                                        {t("Cancel")}
                                       </Button>
                                       <Button
                                         type="submit"
@@ -693,15 +716,15 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                         className="flex-1 sm:flex-none"
                                       >
                                         {mutation === "reference"
-                                          ? "Saving..."
-                                          : "Save Reference"}
+                                          ? t("Saving...")
+                                          : t("Save Reference")}
                                       </Button>
                                     </div>
                                   </div>
                                   <p className="text-xs text-default-500 dark:text-gray-400">
-                                    This updates every invoice under this
-                                    receipt. Amounts and payment status will not
-                                    change.
+                                    {t(
+                                      "This updates every invoice under this receipt. Amounts and payment status will not change."
+                                    )}
                                   </p>
                                   {referenceError && (
                                     <p className="text-xs text-rose-600 dark:text-rose-300">
@@ -720,8 +743,12 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                       onClick={handleStartReferenceEdit}
                                       disabled={isBusy}
                                       className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-sky-600 hover:bg-sky-50 hover:text-sky-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
-                                      title="Edit the reference for this whole receipt"
-                                      aria-label="Edit Green Target receipt reference"
+                                      title={t(
+                                        "Edit the reference for this whole receipt"
+                                      )}
+                                      aria-label={t(
+                                        "Edit Green Target receipt reference"
+                                      )}
                                     >
                                       <IconPencil size={14} />
                                     </button>
@@ -732,15 +759,15 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                           </div>
                           <div>
                             <dt className="text-xs text-default-500 dark:text-gray-400">
-                              Posting / clearance date
+                              {t("Posting / clearance date")}
                             </dt>
                             <dd className="mt-0.5 text-default-800 dark:text-gray-100">
-                              {formatReceiptDate(details.receipt.posting_date)}
+                              {t(formatReceiptDate(details.receipt.posting_date))}
                             </dd>
                           </div>
                           <div>
                             <dt className="text-xs text-default-500 dark:text-gray-400">
-                              Bank account
+                              {t("Bank account")}
                             </dt>
                             <dd className="mt-0.5 font-mono text-default-800 dark:text-gray-100">
                               {details.receipt.bank_account}
@@ -748,7 +775,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                           </div>
                           <div className="sm:col-span-2">
                             <dt className="text-xs text-default-500 dark:text-gray-400">
-                              Cheque / transaction reference
+                              {t("Cheque / transaction reference")}
                             </dt>
                             <dd className="mt-0.5 break-all font-mono text-default-800 dark:text-gray-100">
                               {details.receipt.payment_reference || "-"}
@@ -757,8 +784,8 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                           <div className="sm:col-span-2">
                             <dt className="text-xs text-default-500 dark:text-gray-400">
                               {details.journal || importedJournals.length === 0
-                                ? "Consolidated receipt journal"
-                                : "Imported ledger journal"}
+                                ? t("Consolidated receipt journal")
+                                : t("Imported ledger journal")}
                             </dt>
                             <dd className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                               {details.journal ? (
@@ -783,7 +810,9 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                       to={`/greentarget/accounting/journal-entries/${importedJournal.journal_entry_id}`}
                                       onClick={handleClose}
                                       className="inline-flex items-center gap-1 font-medium text-sky-600 hover:underline dark:text-sky-400"
-                                      title="Collected inside the imported ledger, in this entry's counter-cash line"
+                                      title={t(
+                                        "Collected inside the imported ledger, in this entry's counter-cash line"
+                                      )}
                                     >
                                       <IconReceipt size={15} />
                                       <span>{importedJournal.reference_no}</span>
@@ -794,8 +823,8 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                               ) : (
                                 <span className="text-default-500 dark:text-gray-400">
                                   {details.receipt.status === "pending"
-                                    ? "Created after the cheque clears"
-                                    : "None"}
+                                    ? t("Created after the cheque clears")
+                                    : t("None")}
                                 </span>
                               )}
                             </dd>
@@ -808,12 +837,10 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                               Invoices in this receipt
                             </h4>
                             <span className="text-xs text-default-500 dark:text-gray-400">
-                              {details.allocations.length}{" "}
-                              {details.allocations.length === 1
-                                ? "invoice"
-                                : "invoices"}
-                              {" · "}
-                              {formatCurrency(allocationTotal)}
+                              {t("{{count}} invoice/invoices · {{amount}}", {
+                                count: details.allocations.length,
+                                amount: formatCurrency(allocationTotal),
+                              })}
                             </span>
                           </div>
                           <ul className="divide-y divide-default-200 overflow-hidden rounded-xl border border-default-200 dark:divide-gray-700 dark:border-gray-700">
@@ -844,8 +871,10 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                           />
                                         </Link>
                                         <p className="truncate text-xs text-default-500 dark:text-gray-400">
-                                          {allocation.customer_name} · Customer{" "}
-                                          {allocation.customer_id}
+                                          {t("{{name}} · Customer {{id}}", {
+                                            name: allocation.customer_name,
+                                            id: allocation.customer_id,
+                                          })}
                                         </p>
                                       </div>
                                     </div>
@@ -857,8 +886,10 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                               allocation.status
                                             )}`}
                                           >
-                                            {getAllocationStatusLabel(
-                                              allocation.status
+                                            {t(
+                                              getAllocationStatusLabel(
+                                                allocation.status
+                                              )
                                             )}
                                           </span>
                                         )}
@@ -881,12 +912,18 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                                             title={
                                               rental.location_site ||
                                               rental.location_address ||
-                                              `Rental ${rental.rental_id}`
+                                              t("Rental #{{id}}", {
+                                                id: rental.rental_id,
+                                              })
                                             }
                                           >
                                             {rental.tong_no
-                                              ? `Tong ${rental.tong_no}`
-                                              : `Rental #${rental.rental_id}`}
+                                              ? t("Tong {{tong}}", {
+                                                  tong: rental.tong_no,
+                                                })
+                                              : t("Rental #{{id}}", {
+                                                  id: rental.rental_id,
+                                                })}
                                           </Link>
                                         )
                                       )}
@@ -897,7 +934,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                             )}
                             {details.allocations.length === 0 && (
                               <li className="px-4 py-8 text-center text-sm text-default-500 dark:text-gray-400">
-                                This receipt has no payment allocations.
+                                {t("This receipt has no payment allocations.")}
                               </li>
                             )}
                           </ul>
@@ -905,7 +942,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                       </div>
                     ) : (
                       <div className="flex min-h-52 items-center justify-center text-sm text-default-500 dark:text-gray-400">
-                        Select a receipt to view its details.
+                        {t("Select a receipt to view its details.")}
                       </div>
                     )}
                   </div>
@@ -913,17 +950,19 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                   <div className="flex flex-col gap-3 border-t border-default-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-gray-700">
                     <p className="text-xs text-default-500 dark:text-gray-400">
                       {details?.receipt.status === "cancelled"
-                        ? "This receipt can no longer be changed."
+                        ? t("This receipt can no longer be changed.")
                         : details?.receipt.status === "pending"
-                        ? "Confirming applies every invoice in this receipt together."
+                        ? t(
+                            "Confirming applies every invoice in this receipt together."
+                          )
                         : details && details.allocations.length > 1
-                        ? "Cancelling reverses every invoice shown above."
-                        : "Cancelling reverses this payment."}
+                        ? t("Cancelling reverses every invoice shown above.")
+                        : t("Cancelling reverses this payment.")}
                       {details && (
                         <span className="opacity-80">
                           {details.receipt.origin === "legacy_operational"
-                            ? " Legacy operational receipt."
-                            : " ERP receipt."}
+                            ? t(" Legacy operational receipt.")
+                            : t(" ERP receipt.")}
                         </span>
                       )}
                     </p>
@@ -936,7 +975,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                         disabled={isBusy}
                         className="flex-1 sm:flex-none"
                       >
-                        Close
+                        {t("Close")}
                       </Button>
                       {details?.receipt.status === "pending" && (
                         <Button
@@ -954,8 +993,8 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                           className="flex-1 sm:flex-none"
                         >
                           {mutation === "confirm"
-                            ? "Confirming..."
-                            : "Confirm Receipt"}
+                            ? t("Confirming...")
+                            : t("Confirm Receipt")}
                         </Button>
                       )}
                       <Button
@@ -975,8 +1014,8 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                         className="flex-1 sm:flex-none"
                       >
                         {mutation === "cancel"
-                          ? "Cancelling..."
-                          : "Cancel Receipt"}
+                          ? t("Cancelling...")
+                          : t("Cancel Receipt")}
                       </Button>
                     </div>
                   </div>
@@ -991,24 +1030,26 @@ const GreenTargetReceiptDetailsDialog: React.FC<
         isOpen={showConfirmDialog}
         onClose={(): void => setShowConfirmDialog(false)}
         onConfirm={(): void => void handleConfirmReceipt()}
-        title="Confirm pending receipt?"
+        title={t("Confirm pending receipt?")}
         message={
           <div className="space-y-3">
             <p>
-              Every invoice under reference{" "}
-              {details?.receipt.display_reference || "this receipt"} will be
-              confirmed together.
+              {t("Every invoice under reference {{reference}} will be confirmed together.", {
+                reference:
+                  details?.receipt.display_reference || t("this receipt"),
+              })}
             </p>
             <p>
-              The related invoice balances will be updated and one consolidated
-              PBB_1 journal will be created using the clearance date below.
+              {t(
+                "The related invoice balances will be updated and one consolidated PBB_1 journal will be created using the clearance date below."
+              )}
             </p>
             <div>
               <label
                 htmlFor="gt-receipt-clearance-date"
                 className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300"
               >
-                Cheque Clearance Date
+                {t("Cheque Clearance Date")}
               </label>
               <input
                 id="gt-receipt-clearance-date"
@@ -1023,13 +1064,14 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                 className="h-9 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
               />
               <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                Use the date the bank statement shows the cheque as cleared.
-                This date controls the bank and account-ledger reports.
+                {t(
+                  "Use the date the bank statement shows the cheque as cleared. This date controls the bank and account-ledger reports."
+                )}
               </p>
             </div>
           </div>
         }
-        confirmButtonText="Confirm Receipt"
+        confirmButtonText={t("Confirm Receipt")}
         variant="success"
         isConfirming={mutation === "confirm"}
       />
@@ -1041,17 +1083,26 @@ const GreenTargetReceiptDetailsDialog: React.FC<
           setCancelReason("");
         }}
         onConfirm={(): void => void handleCancelReceipt()}
-        title="Cancel whole receipt?"
+        title={t("Cancel whole receipt?")}
         message={
           <div className="space-y-3">
             <p>
-              Reference {details?.receipt.display_reference || "this receipt"}{" "}
-              covers{" "}
               {details?.allocations.length === 1
-                ? "one invoice"
-                : `${details?.allocations.length ?? 0} invoices`}
-              . Cancelling reverses every one of them together; you cannot
-              cancel only one.
+                ? t(
+                    "Reference {{reference}} covers one invoice. Cancelling reverses every one of them together; you cannot cancel only one.",
+                    {
+                      reference:
+                        details?.receipt.display_reference || t("this receipt"),
+                    }
+                  )
+                : t(
+                    "Reference {{reference}} covers {{count}} invoices. Cancelling reverses every one of them together; you cannot cancel only one.",
+                    {
+                      reference:
+                        details?.receipt.display_reference || t("this receipt"),
+                      count: details?.allocations.length ?? 0,
+                    }
+                  )}
             </p>
             {details && details.allocations.length > 0 && (
               <ul className="space-y-1.5 rounded-lg bg-default-50 p-3 dark:bg-gray-900/50">
@@ -1079,7 +1130,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
                 htmlFor="gt-receipt-cancellation-reason"
                 className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300"
               >
-                Cancellation reason (optional)
+                {t("Cancellation reason (optional)")}
               </label>
               <textarea
                 id="gt-receipt-cancellation-reason"
@@ -1094,7 +1145,7 @@ const GreenTargetReceiptDetailsDialog: React.FC<
             </div>
           </div>
         }
-        confirmButtonText="Cancel Receipt"
+        confirmButtonText={t("Cancel Receipt")}
         variant="danger"
         isConfirming={mutation === "cancel"}
       />

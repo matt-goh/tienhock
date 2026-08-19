@@ -7,6 +7,7 @@ import {
   useCallback,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconSearch,
   IconPlus,
@@ -114,6 +115,7 @@ const SIGNUP_TABS: { key: StatusTab; label: string }[] = [
 ];
 
 const CustomerListPage = (): JSX.Element => {
+  const { t } = useTranslation("greentarget");
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -156,7 +158,7 @@ const CustomerListPage = (): JSX.Element => {
       setSignups(data);
     } catch (err: unknown) {
       console.error("Error fetching signups:", err);
-      toast.error("Failed to fetch signups. Please try again later.");
+      toast.error(t("Failed to fetch signups. Please try again later."));
     } finally {
       setSignupsLoading(false);
     }
@@ -180,7 +182,7 @@ const CustomerListPage = (): JSX.Element => {
       setCustomers(data);
       setError(null);
     } catch (err) {
-      setError("Failed to fetch customers. Please try again later.");
+      setError(t("Failed to fetch customers. Please try again later."));
       console.error("Error fetching customers:", err);
     } finally {
       setLoading(false);
@@ -196,7 +198,7 @@ const CustomerListPage = (): JSX.Element => {
         signupToConvert.signup_id,
         user?.id
       );
-      toast.success("Customer created successfully");
+      toast.success(t("Customer created successfully"));
       setSignupToConvert(null);
       navigate(`/greentarget/customers/${response.customer.customer_id}`);
     } catch (err: unknown) {
@@ -205,11 +207,11 @@ const CustomerListPage = (): JSX.Element => {
         toast.error(
           apiError.data?.message ||
             apiError.message ||
-            "This signup cannot be converted. Refresh and review its status."
+            t("This signup cannot be converted. Refresh and review its status.")
         );
         fetchSignups();
       } else {
-        toast.error("Failed to create customer. Please try again.");
+        toast.error(t("Failed to create customer. Please try again."));
       }
     } finally {
       setProcessingSignup(false);
@@ -225,12 +227,12 @@ const CustomerListPage = (): JSX.Element => {
         signupToReject.signup_id,
         "rejected"
       );
-      toast.success("Signup rejected");
+      toast.success(t("Signup rejected"));
       setSignupToReject(null);
       fetchSignups();
     } catch (err: unknown) {
       console.error("Error rejecting signup:", err);
-      toast.error("Failed to reject signup. Please try again.");
+      toast.error(t("Failed to reject signup. Please try again."));
     } finally {
       setProcessingSignup(false);
     }
@@ -242,11 +244,11 @@ const CustomerListPage = (): JSX.Element => {
         signup.signup_id,
         "pending"
       );
-      toast.success("Signup restored to pending");
+      toast.success(t("Signup restored to pending"));
       fetchSignups();
     } catch (err: unknown) {
       console.error("Error restoring signup:", err);
-      toast.error("Failed to restore signup. Please try again.");
+      toast.error(t("Failed to restore signup. Please try again."));
     }
   };
 
@@ -258,17 +260,17 @@ const CustomerListPage = (): JSX.Element => {
       await greenTargetApi.deleteRejectedCustomerSignup(
         signupToDelete.signup_id
       );
-      toast.success("Rejected signup deleted");
+      toast.success(t("Rejected signup deleted"));
       setSignupToDelete(null);
       fetchSignups();
     } catch (err: unknown) {
       const apiError: ApiError = err as ApiError;
       console.error("Error deleting rejected signup:", err);
       toast.error(
-        apiError.data?.message ||
+          apiError.data?.message ||
           apiError.message ||
-          "Failed to delete rejected signup. Please try again."
-      );
+          t("Failed to delete rejected signup. Please try again.")
+        );
       fetchSignups();
     } finally {
       setProcessingSignup(false);
@@ -290,7 +292,8 @@ const CustomerListPage = (): JSX.Element => {
         ) {
           // Show error toast with the server's message
           toast.error(
-            response.message || "Cannot delete customer: unknown error occurred"
+            response.message ||
+              t("Cannot delete customer: unknown error occurred")
           );
         } else {
           // Only show success and update state if there's no error
@@ -299,21 +302,21 @@ const CustomerListPage = (): JSX.Element => {
               (c) => c.customer_id !== customerToDelete.customer_id
             )
           );
-          toast.success("Customer deleted successfully");
+          toast.success(t("Customer deleted successfully"));
         }
 
         setShowDeleteDialog(false);
         setCustomerToDelete(null);
       } catch (err) {
         console.error("Error deleting customer:", err);
-        toast.error("Failed to delete customer. Please try again.");
+        toast.error(t("Failed to delete customer. Please try again."));
       }
     }
   };
 
   // Format date for display
   const formatDate = (dateString: string | null): string => {
-    if (!dateString) return "Not set";
+    if (!dateString) return t("Not set");
     const date = new Date(dateString);
     // Format as DD/MM/YYYY
     return `${date.getDate().toString().padStart(2, "0")}/${(
@@ -368,6 +371,10 @@ const CustomerListPage = (): JSX.Element => {
       : [];
   };
 
+  const activeTabLabel: string =
+    SIGNUP_TABS.find((tab) => tab.key === activeSignupTab)?.label ??
+    activeSignupTab;
+
   return (
     <div className="space-y-5 pb-6">
       <header className="rounded-xl border border-default-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800 sm:p-5">
@@ -378,10 +385,10 @@ const CustomerListPage = (): JSX.Element => {
             </span>
             <div>
               <h1 className="text-xl font-bold text-default-900 dark:text-gray-100">
-                Green Target Customers
+                {t("Green Target Customers")}
               </h1>
               <p className="text-sm text-default-500 dark:text-gray-400">
-                Review signup requests and manage customer service sites.
+                {t("Review signup requests and manage customer service sites.")}
               </p>
             </div>
           </div>
@@ -391,7 +398,7 @@ const CustomerListPage = (): JSX.Element => {
             variant="outline"
             color="sky"
           >
-            Add Customer
+            {t("Add Customer")}
           </Button>
         </div>
       </header>
@@ -401,14 +408,14 @@ const CustomerListPage = (): JSX.Element => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="font-semibold text-default-900 dark:text-gray-100">
-                Signup requests
+                {t("Signup requests")}
               </h2>
               <p className="text-sm text-default-500 dark:text-gray-400">
-                Customer-submitted registrations awaiting staff review.
+                {t("Customer-submitted registrations awaiting staff review.")}
               </p>
             </div>
             <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300">
-              {signups.length} {activeSignupTab}
+              {signups.length} {t(activeTabLabel)}
             </span>
           </div>
           <div className="flex gap-1 overflow-x-auto overflow-y-hidden pb-px">
@@ -423,7 +430,7 @@ const CustomerListPage = (): JSX.Element => {
                     : "border-transparent text-default-500 hover:text-default-800 dark:text-gray-400 dark:hover:text-gray-200"
                 }`}
               >
-                {tab.label}
+                {t(tab.label)}
               </button>
             ))}
           </div>
@@ -438,7 +445,9 @@ const CustomerListPage = (): JSX.Element => {
             <div className="rounded-xl border-2 border-dashed border-default-200 py-10 text-center dark:border-gray-700">
               <IconUserPlus size={28} className="mx-auto text-default-400" />
               <p className="mt-2 text-sm text-default-500 dark:text-gray-400">
-                No {activeSignupTab} signup requests.
+                {t("No {{status}} signup requests.", {
+                  status: t(activeTabLabel),
+                })}
               </p>
             </div>
           ) : (
@@ -459,7 +468,8 @@ const CustomerListPage = (): JSX.Element => {
                           </h3>
                           {signup.einvoice_requested && (
                             <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                              <IconFileInvoice size={13} /> e-Invoice verified
+                              <IconFileInvoice size={13} />{" "}
+                              {t("e-Invoice verified")}
                             </span>
                           )}
                         </div>
@@ -506,7 +516,7 @@ const CustomerListPage = (): JSX.Element => {
                         </div>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-300">
-                            {PAYMENT_LABELS[signup.payment_method]}
+                            {t(PAYMENT_LABELS[signup.payment_method])}
                           </span>
                           <span className="text-xs text-default-400">
                             {formatSignupDate(signup.submitted_at)}
@@ -524,7 +534,7 @@ const CustomerListPage = (): JSX.Element => {
                               color="sky"
                               size="sm"
                             >
-                              Create
+                              {t("Create")}
                             </Button>
                             <Button
                               onClick={(): void => setSignupToReject(signup)}
@@ -533,7 +543,7 @@ const CustomerListPage = (): JSX.Element => {
                               color="rose"
                               size="sm"
                             >
-                              Reject
+                              {t("Reject")}
                             </Button>
                           </>
                         )}
@@ -547,7 +557,7 @@ const CustomerListPage = (): JSX.Element => {
                             variant="outline"
                             size="sm"
                           >
-                            View Customer
+                            {t("View Customer")}
                           </Button>
                         )}
                         {signup.status === "rejected" && (
@@ -560,7 +570,7 @@ const CustomerListPage = (): JSX.Element => {
                               variant="outline"
                               size="sm"
                             >
-                              Restore
+                              {t("Restore")}
                             </Button>
                             <Button
                               onClick={(): void => setSignupToDelete(signup)}
@@ -569,7 +579,7 @@ const CustomerListPage = (): JSX.Element => {
                               color="rose"
                               size="sm"
                             >
-                              Delete
+                              {t("Delete")}
                             </Button>
                           </>
                         )}
@@ -588,17 +598,17 @@ const CustomerListPage = (): JSX.Element => {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <h2 className="font-semibold text-default-900 dark:text-gray-100">
-                Customers ({filteredCustomers.length})
+                {t("Customers ({{count}})", { count: filteredCustomers.length })}
               </h2>
               <p className="text-sm text-default-500 dark:text-gray-400">
-                Search by customer, phone, site or address.
+                {t("Search by customer, phone, site or address.")}
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Checkbox
                 checked={showInactive}
                 onChange={setShowInactive}
-                label="Show inactive"
+                label={t("Show inactive")}
                 checkedColor="text-emerald-600 dark:text-emerald-400"
               />
               <div className="relative min-w-0 sm:w-80">
@@ -608,7 +618,7 @@ const CustomerListPage = (): JSX.Element => {
                 />
                 <input
                   type="search"
-                  placeholder="Search customers or sites"
+                  placeholder={t("Search customers or sites")}
                   className="h-10 w-full rounded-lg border border-default-300 bg-white pl-10 pr-3 text-sm text-default-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
                   value={searchTerm}
                   onChange={(event): void => setSearchTerm(event.target.value)}
@@ -630,7 +640,7 @@ const CustomerListPage = (): JSX.Element => {
           <div className="rounded-xl border-2 border-dashed border-default-200 bg-white py-12 text-center dark:border-gray-700 dark:bg-gray-800">
             <IconUsers size={30} className="mx-auto text-default-400" />
             <p className="mt-2 text-sm text-default-500 dark:text-gray-400">
-              No customers match these filters.
+              {t("No customers match these filters.")}
             </p>
           </div>
         ) : (
@@ -640,22 +650,22 @@ const CustomerListPage = (): JSX.Element => {
                 <thead className="sticky top-0 z-10 bg-default-50 dark:bg-gray-900">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                      Customer
+                      {t("Customer")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                      Sites
+                      {t("Sites")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                      Phone
+                      {t("Phone")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                      Last Activity
+                      {t("Last Activity")}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                      Status
+                      {t("Status")}
                     </th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                      Action
+                      {t("Action")}
                     </th>
                   </tr>
                 </thead>
@@ -673,7 +683,9 @@ const CustomerListPage = (): JSX.Element => {
                           {customer.name}
                         </div>
                         <div className="text-xs text-default-400">
-                          Customer #{customer.customer_id}
+                          {t("Customer #{{id}}", {
+                            id: customer.customer_id,
+                          })}
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -685,7 +697,7 @@ const CustomerListPage = (): JSX.Element => {
                                 title={location.address}
                                 className="max-w-[150px] truncate rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
                               >
-                                {location.site || "Site not set"}
+                                {location.site || t("Site not set")}
                               </span>
                             )
                           )}
@@ -695,7 +707,9 @@ const CustomerListPage = (): JSX.Element => {
                             </span>
                           )}
                           {(customer.locations || []).length === 0 && (
-                            <span className="text-xs text-default-400">No locations</span>
+                            <span className="text-xs text-default-400">
+                              {t("No locations")}
+                            </span>
                           )}
                         </div>
                       </td>
@@ -713,7 +727,9 @@ const CustomerListPage = (): JSX.Element => {
                               : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
                           }`}
                         >
-                          {customer.has_active_rental ? "Active" : "Inactive"}
+                          {customer.has_active_rental
+                            ? t("Active")
+                            : t("Inactive")}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -728,7 +744,7 @@ const CustomerListPage = (): JSX.Element => {
                           size="sm"
                           icon={IconTrash}
                         >
-                          Delete
+                          {t("Delete")}
                         </Button>
                       </td>
                     </tr>
@@ -744,9 +760,12 @@ const CustomerListPage = (): JSX.Element => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Customer"
-        message={`Are you sure you want to remove ${customerToDelete?.name} from the system? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Customer")}
+        message={t(
+          "Are you sure you want to remove {{name}} from the system? This action cannot be undone.",
+          { name: customerToDelete?.name }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
 
@@ -754,12 +773,18 @@ const CustomerListPage = (): JSX.Element => {
         isOpen={!!signupToConvert}
         onClose={() => setSignupToConvert(null)}
         onConfirm={handleConfirmConvert}
-        title="Create Customer"
-        message={`Create a new Green Target customer from "${signupToConvert?.name}" with ${
-          signupToConvert ? getSignupLocations(signupToConvert).length : 0
-        } service location(s)?`}
+        title={t("Create Customer")}
+        message={t(
+          'Create a new Green Target customer from "{{name}}" with {{count}} service location(s)?',
+          {
+            name: signupToConvert?.name,
+            count: signupToConvert
+              ? getSignupLocations(signupToConvert).length
+              : 0,
+          }
+        )}
         confirmButtonText={
-          processingSignup ? "Creating..." : "Create Customer"
+          processingSignup ? t("Creating...") : t("Create Customer")
         }
         variant="default"
       />
@@ -768,9 +793,12 @@ const CustomerListPage = (): JSX.Element => {
         isOpen={!!signupToReject}
         onClose={() => setSignupToReject(null)}
         onConfirm={handleConfirmReject}
-        title="Reject Signup"
-        message={`Reject the signup from "${signupToReject?.name}"? You can restore it later from the Rejected tab.`}
-        confirmButtonText={processingSignup ? "Rejecting..." : "Reject"}
+        title={t("Reject Signup")}
+        message={t(
+          'Reject the signup from "{{name}}"? You can restore it later from the Rejected tab.',
+          { name: signupToReject?.name }
+        )}
+        confirmButtonText={processingSignup ? t("Rejecting...") : t("Reject")}
         variant="danger"
       />
 
@@ -778,9 +806,12 @@ const CustomerListPage = (): JSX.Element => {
         isOpen={!!signupToDelete}
         onClose={(): void => setSignupToDelete(null)}
         onConfirm={handleConfirmSignupDelete}
-        title="Delete Rejected Signup"
-        message={`Permanently delete the rejected signup from "${signupToDelete?.name}"? This action cannot be undone.`}
-        confirmButtonText={processingSignup ? "Deleting..." : "Delete"}
+        title={t("Delete Rejected Signup")}
+        message={t(
+          'Permanently delete the rejected signup from "{{name}}"? This action cannot be undone.',
+          { name: signupToDelete?.name }
+        )}
+        confirmButtonText={processingSignup ? t("Deleting...") : t("Delete")}
         variant="danger"
       />
     </div>

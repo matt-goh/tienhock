@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { endOfDay, format, startOfDay, subDays } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconSearch,
   IconChevronLeft,
@@ -86,6 +87,7 @@ const RentalCard = ({
   onPickupRental: (rental: Rental) => void;
 }) => {
   const navigate = useNavigate();
+  const { t } = useTranslation("greentarget");
   const [isCardHovered, setIsCardHovered] = useState(false);
 
   const handleClick = () => {
@@ -158,7 +160,7 @@ const RentalCard = ({
               <>
                 <span className="text-default-300 dark:text-gray-600">•</span>
                 <span className="font-medium text-default-800 dark:text-gray-100 text-base">
-                  Tong {rental.tong_no}
+                  {t("Dumpster")} {rental.tong_no}
                 </span>
               </>
             )}
@@ -166,7 +168,7 @@ const RentalCard = ({
           <span
             className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${billingStatus.badgeClassName}`}
           >
-            {billingStatus.label}
+            {t(billingStatus.label)}
           </span>
         </div>
       </div>
@@ -204,25 +206,33 @@ const RentalCard = ({
         {/* Info Row - Uniform boxes */}
         <div className="grid grid-cols-4 gap-2 mb-3">
           <div className="text-center p-2.5 bg-default-50 dark:bg-gray-900/50 rounded-md border border-default-200 dark:border-gray-700">
-            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Driver</p>
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
+              {t("Driver")}
+            </p>
             <p className="text-sm font-medium text-default-800 dark:text-gray-200 truncate" title={rental.driver}>
               {rental.driver.split(" ")[0]}
             </p>
           </div>
           <div className="text-center p-2.5 bg-default-50 dark:bg-gray-900/50 rounded-md border border-default-200 dark:border-gray-700">
-            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Placed</p>
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
+              {t("Placed")}
+            </p>
             <p className="text-sm font-medium text-default-800 dark:text-gray-200">
               {formatDateShort(rental.date_placed)}
             </p>
           </div>
           <div className="text-center p-2.5 bg-default-50 dark:bg-gray-900/50 rounded-md border border-default-200 dark:border-gray-700">
-            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Pickup</p>
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
+              {t("Pickup")}
+            </p>
             <p className={`text-sm font-medium ${!rental.date_picked ? "text-amber-600 dark:text-amber-400" : "text-default-800 dark:text-gray-200"}`}>
               {formatDateShort(rental.date_picked)}
             </p>
           </div>
           <div className={`text-center p-2.5 rounded-md border ${duration !== null && activeStatus ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800" : "bg-default-50 dark:bg-gray-900/50 border-default-200 dark:border-gray-700"}`}>
-            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">Days</p>
+            <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
+              {t("Days")}
+            </p>
             <p className={`text-sm font-medium ${duration !== null && activeStatus ? "text-emerald-700 dark:text-emerald-400" : "text-default-800 dark:text-gray-200"}`}>
               {duration ?? "-"}
             </p>
@@ -233,7 +243,10 @@ const RentalCard = ({
         {rental.remarks && (
           <div className="mb-3 px-3 py-2 bg-default-50 dark:bg-gray-900/50 rounded-md">
             <p className="text-sm text-default-600 dark:text-gray-400 truncate" title={rental.remarks}>
-              <span className="text-default-400 dark:text-gray-500">Note:</span> {rental.remarks}
+              <span className="text-default-400 dark:text-gray-500">
+                {t("Note:")}
+              </span>{" "}
+              {rental.remarks}
             </p>
           </div>
         )}
@@ -267,7 +280,10 @@ const RentalCard = ({
             >
               <IconFileInvoice size={14} className="flex-shrink-0" />
               <span className="text-xs font-medium">
-                {hasInvoice && rental.invoice_info ? (rental.invoice_info.invoice_number || `#${rental.invoice_info.invoice_id}`) : "No Invoice"}
+                {hasInvoice && rental.invoice_info
+                  ? rental.invoice_info.invoice_number ||
+                    `#${rental.invoice_info.invoice_id}`
+                  : t("No Invoice")}
               </span>
             </button>
           </div>
@@ -282,7 +298,7 @@ const RentalCard = ({
                   onPickupRental(rental);
                 }}
                 className="p-1.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-600 dark:text-amber-400 rounded transition-colors"
-                title="Mark as Picked Up"
+                title={t("Mark as Picked Up")}
               >
                 <IconTruck size={16} stroke={1.5} />
               </button>
@@ -293,7 +309,7 @@ const RentalCard = ({
                 navigate(`/greentarget/rentals/${rental.rental_id}/edit`);
               }}
               className="p-1.5 hover:bg-default-100 dark:hover:bg-gray-700 text-default-500 dark:text-gray-400 rounded transition-colors"
-              title="Edit Rental"
+              title={t("Edit Rental")}
             >
               <IconPencil size={16} stroke={1.5} />
             </button>
@@ -303,7 +319,7 @@ const RentalCard = ({
                 onDeleteRental(rental);
               }}
               className="p-1.5 hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-500 dark:text-rose-400 rounded transition-colors"
-              title="Delete"
+              title={t("Delete")}
             >
               <IconTrash size={16} stroke={1.5} />
             </button>
@@ -375,6 +391,7 @@ const loadCachedFilters = (): CachedRentalFilters => {
 };
 
 const RentalListPage = () => {
+  const { t } = useTranslation("greentarget");
   const [rentals, setRentals] = useState<Rental[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -453,7 +470,7 @@ const RentalListPage = () => {
       setTotalPages(response.pagination.totalPages);
       setError(null);
     } catch (err) {
-      setError("Failed to fetch rentals. Please try again later.");
+      setError(t("Failed to fetch rentals. Please try again later."));
       console.error("Error fetching rentals:", err);
     } finally {
       setLoading(false);
@@ -542,11 +559,11 @@ const RentalListPage = () => {
       ) {
         // Show error toast with the server's message
         toast.error(
-          response.message || "Cannot delete rental: unknown error occurred"
+          response.message || t("Cannot delete rental: unknown error occurred")
         );
       } else {
         // Only show success and update state if there's no error
-        toast.success("Rental deleted successfully");
+        toast.success(t("Rental deleted successfully"));
 
         // Refetch so the page, total and pagination stay in sync with the server
         fetchRentals();
@@ -554,9 +571,9 @@ const RentalListPage = () => {
     } catch (error: any) {
       // This will catch network errors or other exceptions
       if (error.message && error.message.includes("associated invoices")) {
-        toast.error("Cannot delete rental: it has associated invoices");
+        toast.error(t("Cannot delete rental: it has associated invoices"));
       } else {
-        toast.error("Failed to delete rental");
+        toast.error(t("Failed to delete rental"));
         console.error("Error deleting rental:", error);
       }
     } finally {
@@ -578,7 +595,7 @@ const RentalListPage = () => {
 
     // Require destination selection
     if (!selectedDestination) {
-      toast.error("Please select a pickup destination");
+      toast.error(t("Please select a pickup destination"));
       return;
     }
 
@@ -592,7 +609,7 @@ const RentalListPage = () => {
       const todayDate = new Date(today);
 
       if (todayDate < placementDate) {
-        toast.error("Pickup date cannot be earlier than placement date");
+        toast.error(t("Pickup date cannot be earlier than placement date"));
         setIsPickupDialogOpen(false);
         setRentalToPickup(null);
         return;
@@ -607,13 +624,13 @@ const RentalListPage = () => {
         pickup_destination: selectedDestination,
       });
 
-      toast.success("Rental marked as picked up");
+      toast.success(t("Rental marked as picked up"));
 
       // Refetch so the card reflects its new pickup date and destination
       fetchRentals();
     } catch (error) {
       console.error("Error updating rental:", error);
-      toast.error("Failed to mark rental as picked up");
+      toast.error(t("Failed to mark rental as picked up"));
     } finally {
       setIsPickingUp(false);
       setIsPickupDialogOpen(false);
@@ -722,14 +739,14 @@ const RentalListPage = () => {
   };
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return <div>{t("Error: {{message}}", { message: error })}</div>;
   }
 
   return (
     <div className="space-y-3">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold truncate overflow-hidden overflow-ellipsis max-w-[300px]">
-          Rentals ({totalItems})
+          {t("Rentals ({{count}})", { count: totalItems })}
         </h1>
         <div className="flex flex-col sm:flex-row gap-3 items-center justify-end ml-auto">
           <div className="flex items-center">
@@ -752,7 +769,7 @@ const RentalListPage = () => {
                 />
               )}
               <span className="ml-2 font-medium whitespace-nowrap">
-                No Invoice Only
+                {t("No Invoice Only")}
               </span>
             </button>
           </div>
@@ -760,15 +777,15 @@ const RentalListPage = () => {
             <TimeNavigator
               range={dateRange}
               onChange={handleTimeNavigatorChange}
-              placeholder="All dates"
+              placeholder={t("All dates")}
             />
             {dateRange.start && (
               <button
                 type="button"
                 onClick={clearDateRange}
                 className="h-[40px] w-[40px] flex items-center justify-center rounded-lg border border-default-300 dark:border-gray-600 text-default-500 dark:text-gray-400 hover:bg-default-50 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-                title="Clear date filter"
-                aria-label="Clear date filter"
+                title={t("Clear date filter")}
+                aria-label={t("Clear date filter")}
               >
                 <IconX size={18} />
               </button>
@@ -781,7 +798,7 @@ const RentalListPage = () => {
             />
             <input
               type="text"
-              placeholder="Search"
+              placeholder={t("Search")}
               className="w-full pl-11 pr-10 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
@@ -797,8 +814,8 @@ const RentalListPage = () => {
                 type="button"
                 onClick={clearSearch}
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
-                title="Clear search"
-                aria-label="Clear search"
+                title={t("Clear search")}
+                aria-label={t("Clear search")}
               >
                 <IconX size={16} />
               </button>
@@ -811,7 +828,7 @@ const RentalListPage = () => {
               variant="outline"
               className="w-full sm:w-auto"
             >
-              New Rental
+              {t("New Rental")}
             </Button>
           </div>
         </div>
@@ -823,7 +840,9 @@ const RentalListPage = () => {
         </div>
       ) : rentals.length === 0 ? (
         <div className="text-center py-8">
-          <p className="text-default-500 dark:text-gray-400">No rentals found.</p>
+          <p className="text-default-500 dark:text-gray-400">
+            {t("No rentals found.")}
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6">
@@ -846,7 +865,7 @@ const RentalListPage = () => {
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
-            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
+            <IconChevronLeft className="w-5 h-5 mr-2" /> {t("Previous")}
           </button>
           <div className="flex space-x-2">{renderPaginationButtons()}</div>
           <button
@@ -854,7 +873,7 @@ const RentalListPage = () => {
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
-            Next <IconChevronRight className="w-5 h-5 ml-2" />
+            {t("Next")} <IconChevronRight className="w-5 h-5 ml-2" />
           </button>
         </div>
       )}
@@ -862,11 +881,15 @@ const RentalListPage = () => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={confirmDeleteRental}
-        title="Delete Rental"
-        message={`Are you sure you want to delete the rental for ${
-          rentalToDelete?.customer_name || "this customer"
-        }? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Rental")}
+        message={t(
+          "Are you sure you want to delete the rental for {{customer}}? This action cannot be undone.",
+          {
+            customer:
+              rentalToDelete?.customer_name || t("this customer"),
+          }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
       {/* Pickup Modal with Destination Selection */}
@@ -902,7 +925,7 @@ const RentalListPage = () => {
                 <Dialog.Panel className="w-full max-w-md transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                      Mark Rental as Picked Up
+                      {t("Mark Rental as Picked Up")}
                     </Dialog.Title>
                     <button
                       onClick={() => setIsPickupDialogOpen(false)}
@@ -913,24 +936,24 @@ const RentalListPage = () => {
                   </div>
 
                   <p className="text-sm text-default-600 dark:text-gray-400 mb-4">
-                    Mark the rental for{" "}
-                    <span className="font-medium text-default-800 dark:text-gray-200">
-                      {rentalToPickup?.customer_name || "this customer"}
-                    </span>{" "}
-                    as picked up today.
+                    {t("Mark the rental for {{customer}} as picked up today.", {
+                      customer:
+                        rentalToPickup?.customer_name || t("this customer"),
+                    })}
                   </p>
 
                   {/* Destination Selection */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                      Pickup Destination <span className="text-rose-500">*</span>
+                      {t("Pickup Destination")}{" "}
+                      <span className="text-rose-500">*</span>
                     </label>
                     <Listbox value={selectedDestination} onChange={setSelectedDestination}>
                       <div className="relative">
                         <Listbox.Button className="relative w-full cursor-pointer rounded-lg bg-white dark:bg-gray-900/50 py-2.5 pl-3 pr-10 text-left border border-default-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400">
                           <span className="block truncate text-default-800 dark:text-gray-200">
                             {pickupDestinations.find((d) => d.code === selectedDestination)?.name ||
-                              "Select destination..."}
+                              t("Select destination...")}
                           </span>
                           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -968,7 +991,7 @@ const RentalListPage = () => {
                                       {dest.name}
                                       {dest.is_default && (
                                         <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
-                                          (Default)
+                                          {t("(Default)")}
                                         </span>
                                       )}
                                     </span>
@@ -993,7 +1016,7 @@ const RentalListPage = () => {
                       onClick={() => setIsPickupDialogOpen(false)}
                       disabled={isPickingUp}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       variant="filled"
@@ -1001,7 +1024,9 @@ const RentalListPage = () => {
                       onClick={confirmPickupRental}
                       disabled={isPickingUp || !selectedDestination}
                     >
-                      {isPickingUp ? "Processing..." : "Confirm Pickup"}
+                      {isPickingUp
+                        ? t("Processing...")
+                        : t("Confirm Pickup")}
                     </Button>
                   </div>
                 </Dialog.Panel>

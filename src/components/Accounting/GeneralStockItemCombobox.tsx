@@ -13,6 +13,7 @@ import {
   IconLoader2,
 } from "@tabler/icons-react";
 import clsx from "clsx";
+import { useTranslation } from "react-i18next";
 import type { GeneralStockRow } from "../../types/types";
 
 interface GeneralStockItemComboboxProps {
@@ -66,6 +67,8 @@ const GeneralStockItemCombobox: React.FC<GeneralStockItemComboboxProps> = ({
   optionsPosition = "bottom",
   className = "",
 }) => {
+  const { t } = useTranslation("accounting");
+
   const handleChange = (row: GeneralStockRow | null): void => {
     onChange(row ? String(row.line_id) : "", row);
     onQueryChange("");
@@ -108,7 +111,7 @@ const GeneralStockItemCombobox: React.FC<GeneralStockItemComboboxProps> = ({
               onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                 onQueryChange(event.target.value)
               }
-              placeholder="Search stock item..."
+              placeholder={t("Search stock item...")}
               disabled={disabled}
               className={clsx(
                 "w-full border-none bg-transparent py-2 pl-3 pr-10 text-sm leading-5 text-gray-900 focus:ring-0 dark:text-gray-100",
@@ -162,7 +165,7 @@ const GeneralStockItemCombobox: React.FC<GeneralStockItemComboboxProps> = ({
                         selected ? "font-medium" : "font-normal"
                       )}
                     >
-                      New General stock item
+                      {t("New General stock item")}
                     </span>
                     {selected && (
                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
@@ -176,13 +179,13 @@ const GeneralStockItemCombobox: React.FC<GeneralStockItemComboboxProps> = ({
               {loading && rows.length === 0 ? (
                 <div className="flex items-center gap-2 px-3 py-2 text-sm text-default-500 dark:text-gray-400">
                   <IconLoader2 size={16} className="animate-spin" />
-                  Loading stock items...
+                  {t("Loading stock items...")}
                 </div>
               ) : rows.length === 0 ? (
                 <div className="px-3 py-2 text-sm text-default-500 dark:text-gray-400">
                   {query.trim()
-                    ? "No matching stock items."
-                    : "No stock items found."}
+                    ? t("No matching stock items.")
+                    : t("No stock items found.")}
                 </div>
               ) : (
                 rows.map((row: GeneralStockRow) => (
@@ -219,7 +222,7 @@ const GeneralStockItemCombobox: React.FC<GeneralStockItemComboboxProps> = ({
                                   : "text-default-500 dark:text-gray-400"
                               )}
                             >
-                              Qty {formatQty(row.current_stock)}
+                              {t("Qty")} {formatQty(row.current_stock)}
                             </span>
                           </div>
                           <div
@@ -262,7 +265,7 @@ const GeneralStockItemCombobox: React.FC<GeneralStockItemComboboxProps> = ({
                     {loadingMore && (
                       <IconLoader2 size={16} className="animate-spin" />
                     )}
-                    {loadingMore ? "Loading..." : "Load more..."}
+                    {loadingMore ? t("Loading...") : t("Load more...")}
                   </button>
                 </div>
               )}

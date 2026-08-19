@@ -2,6 +2,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
+import { Trans, useTranslation } from "react-i18next";
 import { IconAlertTriangle } from "@tabler/icons-react";
 import { ChequeDuplicate } from "../../types/types";
 
@@ -19,6 +20,7 @@ const ChequeReuseWarning: React.FC<ChequeReuseWarningProps> = ({
   duplicates,
   className = "",
 }) => {
+  const { t } = useTranslation("accounting");
   if (duplicates.length === 0) return null;
 
   return (
@@ -33,12 +35,21 @@ const ChequeReuseWarning: React.FC<ChequeReuseWarningProps> = ({
         />
         <div className="min-w-0 text-xs text-amber-800 dark:text-amber-200">
           <p>
-            Cheque{" "}
-            <span className="font-semibold break-all">{chequeNo}</span> already
-            issued on{" "}
-            {duplicates.length === 1
-              ? "another entry:"
-              : `${duplicates.length} other entries:`}
+            <Trans
+              t={t}
+              i18nKey={
+                duplicates.length === 1
+                  ? "Cheque <strong>{{chequeNo}}</strong> already issued on another entry:"
+                  : "Cheque <strong>{{chequeNo}}</strong> already issued on {{n}} other entries:"
+              }
+              values={{
+                chequeNo,
+                n: duplicates.length,
+              }}
+              components={{
+                strong: <strong className="font-semibold break-all" />,
+              }}
+            />
           </p>
           <ul className="mt-1 space-y-0.5">
             {duplicates.map((duplicate) => (
@@ -56,7 +67,7 @@ const ChequeReuseWarning: React.FC<ChequeReuseWarningProps> = ({
                 </span>
                 {duplicate.status === "cancelled" && (
                   <span className="inline-flex rounded bg-rose-100 dark:bg-rose-900/40 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 dark:text-rose-300">
-                    Cancelled
+                    {t("Cancelled")}
                   </span>
                 )}
               </li>

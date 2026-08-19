@@ -3,6 +3,7 @@
 // preserving GT's simpler all-employees processing workflow.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconAdjustments,
   IconArrowsSort,
@@ -264,6 +265,7 @@ const formatAmount = (amount: number): string =>
   }).format(amount);
 
 const GTPayrollPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { allStaffs } = useStaffsCache();
@@ -488,8 +490,8 @@ const GTPayrollPage: React.FC = () => {
       setGtEmployees([]);
       setMidMonthPayrollsMap({});
       setMidMonthLoadError(true);
-      setLoadError("Failed to load Green Target payroll data.");
-      toast.error("Failed to load payroll data");
+      setLoadError(t("Failed to load Green Target payroll data."));
+      toast.error(t("Failed to load payroll data"));
     } finally {
       if (requestId === payrollRequestIdRef.current) {
         setIsLoading(false);
@@ -511,12 +513,17 @@ const GTPayrollPage: React.FC = () => {
     setIsCreating(true);
     try {
       await api.post("/greentarget/api/monthly-payrolls", { year, month });
-      toast.success(`Created payroll for ${getMonthName(month)} ${year}`);
+      toast.success(
+        t("Created payroll for {{month}} {{year}}", {
+          month: getMonthName(month),
+          year,
+        })
+      );
       await fetchPayrollData();
     } catch (error: unknown) {
       console.error("Error creating payroll:", error);
       const errorMessage: string =
-        error instanceof Error ? error.message : "Failed to create payroll";
+        error instanceof Error ? error.message : t("Failed to create payroll");
       toast.error(errorMessage);
     } finally {
       setIsCreating(false);
@@ -535,7 +542,7 @@ const GTPayrollPage: React.FC = () => {
     }));
 
     if (selectedEmployees.length === 0) {
-      toast.error("No employees in GT payroll. Add employees first.");
+      toast.error(t("No employees in GT payroll. Add employees first."));
       return;
     }
 
@@ -547,7 +554,11 @@ const GTPayrollPage: React.FC = () => {
       );
 
       if (result.success) {
-        toast.success(`Processed ${result.processed_count} employee(s)`);
+        toast.success(
+          t("Processed {{count}} employee(s)", {
+            count: result.processed_count,
+          })
+        );
         if ((result.missing_income_tax_employees?.length || 0) > 0) {
           setMissingIncomeTaxEmployees(
             result.missing_income_tax_employees || []
@@ -556,16 +567,18 @@ const GTPayrollPage: React.FC = () => {
         }
         if ((result.errors?.length || 0) > 0) {
           toast.error(
-            `${result.errors?.length || 0} error(s) occurred during processing`
+            t("{{count}} error(s) occurred during processing", {
+              count: result.errors?.length || 0,
+            })
           );
         }
         await fetchPayrollData();
       } else {
-        toast.error(result.message || "Processing failed");
+        toast.error(result.message || t("Processing failed"));
       }
     } catch (error: unknown) {
       console.error("Error processing payroll:", error);
-      toast.error("Failed to process payroll");
+      toast.error(t("Failed to process payroll"));
     } finally {
       setIsProcessing(false);
     }
@@ -846,17 +859,18 @@ const GTPayrollPage: React.FC = () => {
           }
           size={18}
           checkedColor="text-sky-600 dark:text-sky-400"
-          ariaLabel={`Select ${
-            employeePayroll.employee_name || employeePayroll.employee_id
-          } payslip`}
+          ariaLabel={t("Select {{name}} payslip", {
+            name:
+              employeePayroll.employee_name || employeePayroll.employee_id,
+          })}
         />
       </td>
       <td className="px-3 py-2">
         <div
           className="truncate font-medium text-default-700 dark:text-gray-200"
-          title={employeePayroll.employee_name || "Unknown"}
+          title={employeePayroll.employee_name || t("Unknown")}
         >
-          {employeePayroll.employee_name || "Unknown"}
+          {employeePayroll.employee_name || t("Unknown")}
         </div>
       </td>
       <td className="w-44 px-3 py-2 text-sm text-default-500 dark:text-gray-400">
@@ -929,10 +943,10 @@ const GTPayrollPage: React.FC = () => {
             />
             <div className="flex-1">
               <h3 className="font-medium text-sky-800 dark:text-sky-200">
-                Processing Payroll
+                {t("Processing Payroll")}
               </h3>
               <p className="text-sm text-sky-600 dark:text-sky-400">
-                Rebuilding Green Target payroll for the selected month...
+                {t("Rebuilding Green Target payroll for the selected month...")}
               </p>
             </div>
           </div>
@@ -968,11 +982,13 @@ const GTPayrollPage: React.FC = () => {
                   />
                   <span
                     className="font-semibold text-emerald-700 dark:text-emerald-300"
-                    title={`Jumlah Digenapkan: ${formatCurrency(
-                      totalRounded
-                    )}. Net Pay before mid-month and rounding: ${formatCurrency(
-                      totalNet
-                    )}.`}
+                    title={t(
+                      "Rounded Total: {{amount}}. Net Pay before mid-month and rounding: {{net}}.",
+                      {
+                        amount: formatCurrency(totalRounded),
+                        net: formatCurrency(totalNet),
+                      }
+                    )}
                   >
                     {formatAmount(totalRounded)}
                   </span>
@@ -984,12 +1000,18 @@ const GTPayrollPage: React.FC = () => {
                   className="inline-flex items-center gap-1.5 text-default-500 transition-colors hover:text-sky-600 dark:text-gray-300 dark:hover:text-sky-400"
                   title={
                     viewMode === "groups"
-                      ? "Showing employees in job groups. Click for the recently opened list."
-                      : "Showing recently opened employees. Click for job groups."
+                      ? t(
+                          "Showing employees in job groups. Click for the recently opened list."
+                        )
+                      : t(
+                          "Showing recently opened employees. Click for job groups."
+                        )
                   }
                 >
                   <IconArrowsSort size={14} />
-                  <span>{viewMode === "groups" ? "Groups" : "Recent"}</span>
+                  <span>
+                    {viewMode === "groups" ? t("Groups") : t("Recent")}
+                  </span>
                 </button>
                 <span className="text-default-300 dark:text-gray-600">•</span>
                 <button
@@ -997,13 +1019,17 @@ const GTPayrollPage: React.FC = () => {
                   onClick={handleProcessPayroll}
                   disabled={isProcessing}
                   className="inline-flex items-center gap-1.5 text-default-400 transition-colors hover:text-sky-600 disabled:opacity-50 dark:text-gray-400 dark:hover:text-sky-400"
-                  title="Re-process the full Green Target payroll roster. Search and payslip selection do not change processing."
+                  title={t(
+                    "Re-process the full Green Target payroll roster. Search and payslip selection do not change processing."
+                  )}
                 >
                   <IconRefresh
                     size={14}
                     className={isProcessing ? "animate-spin" : ""}
                   />
-                  <span>{isProcessing ? "Processing..." : "Process"}</span>
+                  <span>
+                    {isProcessing ? t("Processing...") : t("Process")}
+                  </span>
                 </button>
               </div>
             )}
@@ -1019,7 +1045,9 @@ const GTPayrollPage: React.FC = () => {
                 size="sm"
                 variant="outline"
                 color="sky"
-                buttonText={`${selectedCount} selected`}
+                buttonText={t("{{count}} selected", {
+                  count: selectedCount,
+                })}
               />
             )}
             {batchPayrolls.length > 0 && (
@@ -1030,7 +1058,7 @@ const GTPayrollPage: React.FC = () => {
                   disabled={midMonthLoadError}
                   companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
                   size="sm"
-                  buttonLabel="Payslips"
+                  buttonLabel={t("Payslips")}
                 />
               </div>
             )}
@@ -1042,8 +1070,8 @@ const GTPayrollPage: React.FC = () => {
                   onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
                     handleSearchChange(event.target.value)
                   }
-                  placeholder="Search employees..."
-                  aria-label="Search payroll employees"
+                  placeholder={t("Search employees...")}
+                  aria-label={t("Search payroll employees")}
                   className="w-[170px] rounded-full border border-default-300 bg-white px-3 py-1 pr-8 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:focus:border-sky-400 dark:focus:ring-sky-400"
                 />
                 {searchTerm && (
@@ -1051,8 +1079,8 @@ const GTPayrollPage: React.FC = () => {
                     type="button"
                     onClick={(): void => handleSearchChange("")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 transition-colors hover:text-default-700 dark:text-gray-400 dark:hover:text-gray-200"
-                    title="Clear search"
-                    aria-label="Clear employee search"
+                    title={t("Clear search")}
+                    aria-label={t("Clear employee search")}
                   >
                     <IconX size={14} />
                   </button>
@@ -1076,13 +1104,13 @@ const GTPayrollPage: React.FC = () => {
                   }
                   title={
                     areAllSectionsExpanded
-                      ? "Collapse all job groups"
-                      : "Expand all job groups"
+                      ? t("Collapse all job groups")
+                      : t("Expand all job groups")
                   }
                   aria-label={
                     areAllSectionsExpanded
-                      ? "Collapse all job groups"
-                      : "Expand all job groups"
+                      ? t("Collapse all job groups")
+                      : t("Expand all job groups")
                   }
                 />
               )}
@@ -1097,7 +1125,7 @@ const GTPayrollPage: React.FC = () => {
                 )
               }
             >
-              Office
+              {t("Office")}
             </Button>
             <Button
               size="sm"
@@ -1108,7 +1136,7 @@ const GTPayrollPage: React.FC = () => {
                 navigate("/greentarget/payroll/daily-lori-habuk")
               }
             >
-              Driver
+              {t("Driver")}
             </Button>
             <Button
               size="sm"
@@ -1117,7 +1145,7 @@ const GTPayrollPage: React.FC = () => {
               iconSize={16}
               onClick={() => navigate("/greentarget/payroll/settings")}
             >
-              Rules
+              {t("Rules")}
             </Button>
             <Button
               size="sm"
@@ -1126,7 +1154,7 @@ const GTPayrollPage: React.FC = () => {
               iconSize={16}
               onClick={() => setShowManageModal(true)}
             >
-              Employees
+              {t("Employees")}
             </Button>
           </div>
         </div>
@@ -1134,8 +1162,9 @@ const GTPayrollPage: React.FC = () => {
         {payroll && midMonthLoadError && (
           <div className="mb-3 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-300 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              Mid-month payment data could not be loaded. Payslip printing is
-              disabled so the printed totals cannot omit a deduction.
+              {t(
+                "Mid-month payment data could not be loaded. Payslip printing is disabled so the printed totals cannot omit a deduction."
+              )}
             </span>
             <Button
               type="button"
@@ -1146,7 +1175,7 @@ const GTPayrollPage: React.FC = () => {
                 void fetchPayrollData();
               }}
             >
-              Retry
+              {t("Retry")}
             </Button>
           </div>
         )}
@@ -1162,14 +1191,15 @@ const GTPayrollPage: React.FC = () => {
                 />
               </div>
               <h3 className="mb-2 text-lg font-semibold text-default-700 dark:text-gray-200">
-                No Payroll Yet
+                {t("No Payroll Yet")}
               </h3>
               <p className="mb-6 max-w-sm text-center text-default-400 dark:text-gray-400">
-                There is no Green Target payroll record for{" "}
-                <span className="font-medium text-default-600 dark:text-gray-300">
-                  {getMonthName(selectedMonthNumber)} {selectedYear}
-                </span>
-                . Create one to start processing employee payments.
+                {t(
+                  "There is no Green Target payroll record for {{month}}. Create one to start processing employee payments.",
+                  {
+                    month: `${getMonthName(selectedMonthNumber)} ${selectedYear}`,
+                  }
+                )}
               </p>
               <Button
                 color="sky"
@@ -1179,11 +1209,11 @@ const GTPayrollPage: React.FC = () => {
                 iconSize={18}
                 size="md"
               >
-                {isCreating ? "Creating..." : "Create Payroll"}
+                {isCreating ? t("Creating...") : t("Create Payroll")}
               </Button>
               {gtEmployees.length === 0 && (
                 <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
-                  Add employees to Green Target payroll first.
+                  {t("Add employees to Green Target payroll first.")}
                 </p>
               )}
             </div>
@@ -1195,7 +1225,7 @@ const GTPayrollPage: React.FC = () => {
             {payroll.employeePayrolls.length === 0 ? (
               <div className="rounded-lg border border-default-200 bg-white py-8 text-center dark:border-gray-700 dark:bg-gray-800">
                 <p className="text-default-500 dark:text-gray-400">
-                  No employee payrolls found.
+                  {t("No employee payrolls found.")}
                 </p>
                 <Button
                   onClick={handleProcessPayroll}
@@ -1204,20 +1234,22 @@ const GTPayrollPage: React.FC = () => {
                   className="mt-4"
                   disabled={isProcessing}
                 >
-                  {isProcessing ? "Processing..." : "Process Payroll"}
+                  {isProcessing ? t("Processing...") : t("Process Payroll")}
                 </Button>
               </div>
             ) : visibleEmployeePayrolls.length === 0 ? (
               <div className="rounded-lg border border-default-200 bg-white px-6 py-10 text-center dark:border-gray-700 dark:bg-gray-800">
                 <p className="font-medium text-default-600 dark:text-gray-300">
-                  No employees match “{searchTerm}”.
+                  {t('No employees match "{{query}}".', {
+                    query: searchTerm,
+                  })}
                 </p>
                 <button
                   type="button"
                   onClick={(): void => handleSearchChange("")}
                   className="mt-2 text-sm font-medium text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300"
                 >
-                  Clear search
+                  {t("Clear search")}
                 </button>
               </div>
             ) : (
@@ -1234,8 +1266,8 @@ const GTPayrollPage: React.FC = () => {
                             checkedColor="text-sky-600 dark:text-sky-400"
                             ariaLabel={
                               allVisibleSelected
-                                ? "Deselect all shown payslips"
-                                : "Select all shown payslips"
+                                ? t("Deselect all shown payslips")
+                                : t("Select all shown payslips")
                             }
                             ariaChecked={
                               someVisibleSelected && !allVisibleSelected
@@ -1245,19 +1277,19 @@ const GTPayrollPage: React.FC = () => {
                           />
                         </th>
                         <th className="px-3 py-2.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                          Name
+                          {t("Name")}
                         </th>
                         <th className="w-44 px-3 py-2.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                          ID
+                          {t("ID")}
                         </th>
                         <th className="w-28 px-3 py-2.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                          Section
+                          {t("Section")}
                         </th>
                         <th className="w-32 px-3 py-2.5 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                          Gross
+                          {t("Gross")}
                         </th>
                         <th className="w-32 px-3 py-2.5 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                          Net
+                          {t("Net")}
                         </th>
                       </tr>
                     </thead>
@@ -1329,7 +1361,10 @@ const GTPayrollPage: React.FC = () => {
                                       }
                                       size={18}
                                       checkedColor="text-sky-600 dark:text-sky-400"
-                                      ariaLabel={`Select ${jobType} payslips`}
+                                      ariaLabel={t(
+                                        "Select {{jobType}} payslips",
+                                        { jobType }
+                                      )}
                                       ariaChecked={
                                         isSomeGroupSelected &&
                                         !isGroupSelected
@@ -1356,11 +1391,9 @@ const GTPayrollPage: React.FC = () => {
                                         {jobType}
                                       </span>
                                       <span className="text-sm text-default-500 dark:text-gray-400">
-                                        ({rows.length}{" "}
-                                        {rows.length === 1
-                                          ? "employee"
-                                          : "employees"}
-                                        )
+                                        {t("({{count}} employee/employees)", {
+                                          count: rows.length,
+                                        })}
                                       </span>
                                     </div>
                                   </td>

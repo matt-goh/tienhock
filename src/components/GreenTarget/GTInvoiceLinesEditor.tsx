@@ -5,6 +5,7 @@
 // GTAdjustmentDocsFormPage.tsx, minus the product/tax/subtotal columns. Raw
 // English labels, matching the GT invoice module's existing convention.
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import Button from "../Button";
 import { multiplyMoney, sumMoneyBy } from "../../utils/moneyUtils";
@@ -43,6 +44,7 @@ const GTInvoiceLinesEditor: React.FC<GTInvoiceLinesEditorProps> = ({
   onChange,
   disabled = false,
 }) => {
+  const { t } = useTranslation("greentarget");
   const updateLine = (
     uid: string,
     patch: Partial<GreenTargetInvoiceLineInput>
@@ -67,7 +69,7 @@ const GTInvoiceLinesEditor: React.FC<GTInvoiceLinesEditorProps> = ({
     <div>
       <div className="flex justify-between items-center mb-3">
         <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-          Line Items
+          {t("Line Items")}
         </h2>
         <Button
           type="button"
@@ -77,7 +79,7 @@ const GTInvoiceLinesEditor: React.FC<GTInvoiceLinesEditorProps> = ({
           size="sm"
           disabled={disabled}
         >
-          Add Line
+          {t("Add Line")}
         </Button>
       </div>
       <div className="overflow-x-auto">
@@ -85,16 +87,16 @@ const GTInvoiceLinesEditor: React.FC<GTInvoiceLinesEditorProps> = ({
           <thead className="bg-default-50 dark:bg-gray-900/50">
             <tr>
               <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                Description
+                {t("Description")}
               </th>
               <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
-                Qty
+                {t("Qty")}
               </th>
               <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-28">
-                Unit Price
+                {t("Unit Price")}
               </th>
               <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-28">
-                Amount
+                {t("Amount")}
               </th>
               <th className="w-12" />
             </tr>
@@ -148,7 +150,7 @@ const GTInvoiceLinesEditor: React.FC<GTInvoiceLinesEditorProps> = ({
                     onClick={(): void => removeLine(line.uid)}
                     disabled={disabled || lines.length <= 1}
                     className="p-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="Remove line"
+                    title={t("Remove line")}
                   >
                     <IconTrash size={16} />
                   </button>
@@ -162,7 +164,7 @@ const GTInvoiceLinesEditor: React.FC<GTInvoiceLinesEditorProps> = ({
                 colSpan={3}
                 className="px-3 py-2 text-right text-sm font-medium text-default-700 dark:text-gray-300"
               >
-                Total
+                {t("Total")}
               </td>
               <td className="px-3 py-2 text-right text-sm font-semibold text-default-900 dark:text-gray-100">
                 {gtInvoiceLinesTotal(lines).toFixed(2)}

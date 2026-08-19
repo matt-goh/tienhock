@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/Dumpsters/DumpsterFormPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
@@ -23,6 +24,7 @@ interface Dumpster {
 }
 
 const DumpsterFormPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const goBack = useSmartBack("/greentarget/dumpsters");
   const { id } = useParams<{ id: string }>();
@@ -97,7 +99,7 @@ const DumpsterFormPage: React.FC = () => {
 
       setError(null);
     } catch (err) {
-      setError("Failed to fetch dumpster details. Please try again later.");
+      setError(t("Failed to fetch dumpster details. Please try again later."));
       console.error("Error fetching dumpster details:", err);
     } finally {
       setLoading(false);
@@ -151,12 +153,12 @@ const DumpsterFormPage: React.FC = () => {
     e.preventDefault();
 
     if (!formData.tong_no) {
-      toast.error("Dumpster number is required");
+      toast.error(t("Dumpster number is required"));
       return;
     }
 
     if (isDuplicate) {
-      toast.error("A dumpster with this number already exists");
+      toast.error(t("A dumpster with this number already exists"));
       return;
     }
 
@@ -168,14 +170,14 @@ const DumpsterFormPage: React.FC = () => {
         await greenTargetApi.updateDumpster(id!, {
           status: formData.status,
         });
-        toast.success("Dumpster updated successfully!");
+        toast.success(t("Dumpster updated successfully!"));
       } else {
         // Create new dumpster
         await greenTargetApi.createDumpster({
           tong_no: formData.tong_no,
           status: formData.status,
         });
-        toast.success("Dumpster created successfully!");
+        toast.success(t("Dumpster created successfully!"));
       }
       if (isEditMode) {
         goBack();
@@ -190,9 +192,9 @@ const DumpsterFormPage: React.FC = () => {
       }
     } catch (error: any) {
       if (error.message && error.message.includes("already exists")) {
-        toast.error("A dumpster with this number already exists");
+        toast.error(t("A dumpster with this number already exists"));
       } else {
-        toast.error("An unexpected error occurred.");
+        toast.error(t("An unexpected error occurred."));
       }
     } finally {
       setIsSaving(false);
@@ -204,7 +206,7 @@ const DumpsterFormPage: React.FC = () => {
       setIsSaving(true);
 
       if (!formData.tong_no) {
-        toast.error("Cannot delete: dumpster number is missing");
+        toast.error(t("Cannot delete: dumpster number is missing"));
         return;
       }
 
@@ -217,23 +219,30 @@ const DumpsterFormPage: React.FC = () => {
       ) {
         // Show specific error message based on association type
         let errorMessage =
-          response.message || "Cannot delete dumpster: unknown error occurred";
+          response.message ||
+          t("Cannot delete dumpster: unknown error occurred");
 
         if (response.associationType === "rentals") {
           errorMessage =
-            "Cannot delete dumpster: it is currently being used in active rentals. Please complete or remove the rentals first.";
+            t(
+              "Cannot delete dumpster: it is currently being used in active rentals. Please complete or remove the rentals first."
+            );
         } else if (response.associationType === "invoices") {
           errorMessage =
-            "Cannot delete dumpster: it has associated invoices. Please handle the invoices first.";
+            t(
+              "Cannot delete dumpster: it has associated invoices. Please handle the invoices first."
+            );
         } else if (response.associationType === "payments") {
           errorMessage =
-            "Cannot delete dumpster: it has associated payments. Please handle the payments first.";
+            t(
+              "Cannot delete dumpster: it has associated payments. Please handle the payments first."
+            );
         }
 
         toast.error(errorMessage);
       } else {
         // Show success message and navigate back to dumpster list
-        toast.success("Dumpster deleted successfully");
+        toast.success(t("Dumpster deleted successfully"));
         navigate("/greentarget/dumpsters");
       }
     } catch (error) {
@@ -241,7 +250,7 @@ const DumpsterFormPage: React.FC = () => {
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
-        toast.error("Failed to delete dumpster");
+        toast.error(t("Failed to delete dumpster"));
       }
     } finally {
       setIsDeleteDialogOpen(false);
@@ -258,7 +267,11 @@ const DumpsterFormPage: React.FC = () => {
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <div>
+        {t("Error")}: {error}
+      </div>
+    );
   }
 
   return (
@@ -270,12 +283,14 @@ const DumpsterFormPage: React.FC = () => {
             <div className="h-6 w-px bg-default-300"></div>
             <div>
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                {isEditMode ? "Edit Dumpster" : "Add New Dumpster"}
+                {isEditMode ? t("Edit Dumpster") : t("Add New Dumpster")}
               </h1>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
-                  ? 'Edit dumpster details here. Click "Save" when you\'re done.'
-                  : 'Enter new dumpster details here. Click "Save" when you\'re done.'}
+                  ? t('Edit dumpster details here. Click "Save" when you\'re done.')
+                  : t(
+                      'Enter new dumpster details here. Click "Save" when you\'re done.'
+                    )}
               </p>
             </div>
           </div>
@@ -288,7 +303,7 @@ const DumpsterFormPage: React.FC = () => {
                   htmlFor="tong_no"
                   className="text-sm font-medium text-default-700 dark:text-gray-200"
                 >
-                  Dumpster Number
+                  {t("Dumpster Number")}
                 </label>
                 <div>
                   <input
@@ -311,12 +326,12 @@ const DumpsterFormPage: React.FC = () => {
                   />
                   {isDuplicate && (
                     <p className="mt-1 text-sm text-rose-600">
-                      A dumpster with this number already exists
+                      {t("A dumpster with this number already exists")}
                     </p>
                   )}
                   {isCheckingDuplicate && (
                     <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                      Checking availability...
+                      {t("Checking availability...")}
                     </p>
                   )}
                 </div>
@@ -327,7 +342,7 @@ const DumpsterFormPage: React.FC = () => {
                   htmlFor="status"
                   className="text-sm font-medium text-default-700 dark:text-gray-200"
                 >
-                  Status
+                  {t("Status")}
                 </label>
                 <div className="mt-2">
                   <Listbox
@@ -343,8 +358,7 @@ const DumpsterFormPage: React.FC = () => {
                     <div className="relative">
                       <ListboxButton className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 disabled:bg-default-50">
                         <span className="block truncate">
-                          {formData.status.charAt(0).toUpperCase() +
-                            formData.status.slice(1)}
+                          {t(formData.status)}
                         </span>
                         <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                           <IconChevronDown
@@ -371,7 +385,7 @@ const DumpsterFormPage: React.FC = () => {
                                   selected ? "font-medium" : "font-normal"
                                 }`}
                               >
-                                Available
+                                {t("Available")}
                               </span>
                               {selected && (
                                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -402,7 +416,7 @@ const DumpsterFormPage: React.FC = () => {
                                   selected ? "font-medium" : "font-normal"
                                 } ${disabled ? "opacity-50" : ""}`}
                               >
-                                Rented
+                                {t("Rented")}
                               </span>
                               {selected && (
                                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -432,7 +446,7 @@ const DumpsterFormPage: React.FC = () => {
                                   selected ? "font-medium" : "font-normal"
                                 }`}
                               >
-                                Maintenance
+                                {t("Maintenance")}
                               </span>
                               {selected && (
                                 <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -455,10 +469,12 @@ const DumpsterFormPage: React.FC = () => {
 
           {isEditMode && (
             <div className="mt-6 pt-4 border-t border-default-200 dark:border-gray-700">
-              <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">Rental Schedule</h2>
+              <h2 className="text-lg font-medium text-default-900 dark:text-gray-100 mb-4">
+                {t("Rental Schedule")}
+              </h2>
               {rentals.length === 0 ? (
                 <p className="text-default-500 dark:text-gray-400">
-                  No rentals scheduled for this dumpster.
+                  {t("No rentals scheduled for this dumpster.")}
                 </p>
               ) : (
                 <div className="overflow-hidden border border-default-200 dark:border-gray-700 rounded-lg">
@@ -466,16 +482,16 @@ const DumpsterFormPage: React.FC = () => {
                     <thead className="bg-default-50 dark:bg-gray-900/50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                          Customer
+                          {t("Customer")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                          Placement Date
+                          {t("Placement Date")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                          Pickup Date
+                          {t("Pickup Date")}
                         </th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                          Status
+                          {t("Status")}
                         </th>
                       </tr>
                     </thead>
@@ -522,7 +538,7 @@ const DumpsterFormPage: React.FC = () => {
                                 ? new Date(
                                     rental.date_picked
                                   ).toLocaleDateString()
-                                : "Not set"}
+                                : t("Not set")}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span
@@ -535,10 +551,10 @@ const DumpsterFormPage: React.FC = () => {
                                 }`}
                               >
                                 {isCurrent
-                                  ? "Ongoing"
+                                  ? t("Ongoing")
                                   : isScheduled
-                                  ? "Scheduled"
-                                  : "Completed"}
+                                  ? t("Scheduled")
+                                  : t("Completed")}
                               </span>
                             </td>
                           </tr>
@@ -560,7 +576,7 @@ const DumpsterFormPage: React.FC = () => {
                 onClick={() => setIsDeleteDialogOpen(true)}
                 className="mr-3"
               >
-                Delete
+                {t("Delete")}
               </Button>
             )}
             <Button
@@ -571,7 +587,7 @@ const DumpsterFormPage: React.FC = () => {
                 isSaving || !isFormChanged || isDuplicate || isCheckingDuplicate
               }
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? t("Saving...") : t("Save")}
             </Button>
           </div>
         </form>
@@ -581,18 +597,21 @@ const DumpsterFormPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Changes"
-        message="Are you sure you want to go back? All unsaved changes will be lost."
-        confirmButtonText="Discard"
+        title={t("Discard Changes")}
+        message={t("Are you sure you want to go back? All unsaved changes will be lost.")}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
       <ConfirmationDialog
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDeleteDumpster}
-        title="Delete Dumpster"
-        message={`Are you sure you want to delete dumpster ${formData.tong_no}? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Dumpster")}
+        message={t(
+          "Are you sure you want to delete dumpster {{tong}}? This action cannot be undone.",
+          { tong: formData.tong_no }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

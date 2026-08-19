@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconArrowLeft,
   IconHierarchy,
@@ -61,6 +62,7 @@ const isAllZeroRow = (row: GreenTargetDebtorSubScheduleRow): boolean => {
 };
 
 const GTDebtorSubSchedulePage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const requestSequenceRef = useRef<number>(0);
   const [selectedMonth, setSelectedMonth] = useState<Date>(getInitialMonth);
@@ -109,7 +111,7 @@ const GTDebtorSubSchedulePage: React.FC = () => {
       setError(
         fetchError instanceof Error
           ? fetchError.message
-          : "Failed to load the CD/SD debtor schedule."
+          : t("Failed to load the CD/SD debtor schedule.")
       );
     } finally {
       if (requestSequence === requestSequenceRef.current) setLoading(false);
@@ -156,7 +158,9 @@ const GTDebtorSubSchedulePage: React.FC = () => {
     if (printing) return;
 
     setPrinting(true);
-    const toastId: string = toast.loading("Preparing the full CD/SD schedule...");
+    const toastId: string = toast.loading(
+      t("Preparing the full CD/SD schedule...")
+    );
     try {
       const fullData: GreenTargetDebtorSubScheduleResponse =
         await getAllGreenTargetDebtorSubScheduleRows({
@@ -167,18 +171,20 @@ const GTDebtorSubSchedulePage: React.FC = () => {
         });
 
       if (fullData.rows.length === 0) {
-        toast.error("There are no matching accounts to print.", { id: toastId });
+        toast.error(t("There are no matching accounts to print."), {
+          id: toastId,
+        });
         return;
       }
 
       await printGreenTargetDebtorSubSchedulePDF(fullData);
-      toast.success("Print dialog opened.", { id: toastId });
+      toast.success(t("Print dialog opened."), { id: toastId });
     } catch (printError: unknown) {
       console.error("Error printing Green Target CD/SD schedule:", printError);
       toast.error(
         printError instanceof Error
           ? printError.message
-          : "Failed to generate the CD/SD schedule PDF.",
+          : t("Failed to generate the CD/SD schedule PDF."),
         { id: toastId }
       );
     } finally {
@@ -205,9 +211,9 @@ const GTDebtorSubSchedulePage: React.FC = () => {
             variant="outline"
             icon={IconArrowLeft}
             onClick={() => navigate("/greentarget/debtors")}
-            title="Back to Green Target Debtors"
+            title={t("Back to Green Target Debtors")}
           >
-            Debtors
+            {t("Debtors")}
           </Button>
           <div>
             <div className="flex items-center gap-2">
@@ -216,12 +222,13 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                 className="text-emerald-600 dark:text-emerald-400"
               />
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                CD/SD Debtor Sub-Schedule
+                {t("CD/SD Debtor Sub-Schedule")}
               </h1>
             </div>
             <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-              Named sundry-debtor identities assigned to the CD_SD control,
-              with month-end balance and two months of movement.
+              {t(
+                "Named sundry-debtor identities assigned to the CD_SD control, with month-end balance and two months of movement."
+              )}
             </p>
           </div>
         </div>
@@ -244,11 +251,11 @@ const GTDebtorSubSchedulePage: React.FC = () => {
             <input
               type="search"
               value={searchTerm}
-              aria-label="Search CD/SD account number or particulars"
+              aria-label={t("Search CD/SD account number or particulars")}
               onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                 setSearchTerm(event.target.value)
               }
-              placeholder="Search account or particulars..."
+              placeholder={t("Search account or particulars...")}
               className="h-[34px] w-64 rounded-lg border border-default-300 bg-white pl-8 pr-3 text-sm text-default-900 outline-none transition-colors focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
@@ -258,8 +265,10 @@ const GTDebtorSubSchedulePage: React.FC = () => {
               checked={hideZero}
               onChange={handleHideZeroChange}
               size={18}
-              label="Hide all-zero accounts"
-              ariaLabel="Hide accounts whose balance and both movements are zero"
+              label={t("Hide all-zero accounts")}
+              ariaLabel={t(
+                "Hide accounts whose balance and both movements are zero"
+              )}
             />
           </div>
 
@@ -270,9 +279,9 @@ const GTDebtorSubSchedulePage: React.FC = () => {
             icon={IconRefresh}
             onClick={() => void fetchSchedule()}
             disabled={loading}
-            title="Refresh schedule"
+            title={t("Refresh schedule")}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             type="button"
@@ -280,9 +289,9 @@ const GTDebtorSubSchedulePage: React.FC = () => {
             icon={IconPrinter}
             onClick={() => void handlePrint()}
             disabled={loading || printing}
-            title="Print the full filtered schedule"
+            title={t("Print the full filtered schedule")}
           >
-            {printing ? "Preparing..." : "Print PDF"}
+            {printing ? t("Preparing...") : t("Print PDF")}
           </Button>
         </div>
       </div>
@@ -291,7 +300,7 @@ const GTDebtorSubSchedulePage: React.FC = () => {
         <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <div className="rounded-lg border border-default-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-              Balance as at {data.statement_date}
+              {t("Balance as at {{date}}", { date: data.statement_date })}
             </p>
             <p className="mt-1 text-lg font-semibold text-default-900 dark:text-gray-100">
               RM {formatCurrency(data.totals.closing_balance)}
@@ -299,7 +308,7 @@ const GTDebtorSubSchedulePage: React.FC = () => {
           </div>
           <div className="rounded-lg border border-default-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-              {currentMovementLabel} movement
+              {t("{{month}} movement", { month: currentMovementLabel })}
             </p>
             <p className="mt-1 text-lg font-semibold text-default-900 dark:text-gray-100">
               RM {formatCurrency(data.totals.current_month)}
@@ -307,7 +316,7 @@ const GTDebtorSubSchedulePage: React.FC = () => {
           </div>
           <div className="rounded-lg border border-default-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
             <p className="text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-              {previousMovementLabel} movement
+              {t("{{month}} movement", { month: previousMovementLabel })}
             </p>
             <p className="mt-1 text-lg font-semibold text-default-900 dark:text-gray-100">
               RM {formatCurrency(data.totals.previous_month)}
@@ -318,16 +327,24 @@ const GTDebtorSubSchedulePage: React.FC = () => {
 
       {data && !loading && hasReconciliationResidual && (
         <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
-          <p className="font-medium">Unallocated control reconciliation</p>
+          <p className="font-medium">
+            {t("Unallocated control reconciliation")}
+          </p>
           <p className="mt-1 text-xs">
-            The legacy source did not name a customer for RM{" "}
-            {formatCurrency(data.reconciliation_residual.closing_balance)} of
-            the closing control, RM{" "}
-            {formatCurrency(data.reconciliation_residual.current_month)} of the
-            current movement and RM{" "}
-            {formatCurrency(data.reconciliation_residual.previous_month)} of the
-            previous movement. These amounts remain in the control totals but
-            are not presented as a customer account.
+            {t(
+              "The legacy source did not name a customer for RM {{closing}} of the closing control, RM {{current}} of the current movement and RM {{previous}} of the previous movement. These amounts remain in the control totals but are not presented as a customer account.",
+              {
+                closing: formatCurrency(
+                  data.reconciliation_residual.closing_balance
+                ),
+                current: formatCurrency(
+                  data.reconciliation_residual.current_month
+                ),
+                previous: formatCurrency(
+                  data.reconciliation_residual.previous_month
+                ),
+              }
+            )}
           </p>
         </div>
       )}
@@ -350,19 +367,24 @@ const GTDebtorSubSchedulePage: React.FC = () => {
               className="mt-4"
               onClick={() => void fetchSchedule()}
             >
-              Try Again
+              {t("Try Again")}
             </Button>
           </div>
         ) : data ? (
           <>
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-default-200 px-4 py-2.5 dark:border-gray-700">
               <p className="text-sm text-default-500 dark:text-gray-400">
-                {data.total_accounts} matching account
-                {data.total_accounts === 1 ? "" : "s"}
+                {t(
+                  data.total_accounts === 1
+                    ? "{{count}} matching account"
+                    : "{{count}} matching accounts",
+                  { count: data.total_accounts }
+                )}
               </p>
               <p className="text-xs text-default-400 dark:text-gray-500">
-                Summary and footer are the full CD_SD control total; PDF follows
-                the search and zero-account filters.
+                {t(
+                  "Summary and footer are the full CD_SD control total; PDF follows the search and zero-account filters."
+                )}
               </p>
             </div>
 
@@ -373,12 +395,12 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                   className="mx-auto mb-3 text-default-300 dark:text-gray-600"
                 />
                 <h2 className="font-medium text-default-800 dark:text-gray-100">
-                  No matching debtors
+                  {t("No matching debtors")}
                 </h2>
                 <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                   {hideZero
-                    ? "Try clearing the search or showing all-zero accounts."
-                    : "Try clearing the search or selecting another month."}
+                    ? t("Try clearing the search or showing all-zero accounts.")
+                    : t("Try clearing the search or selecting another month.")}
                 </p>
               </div>
             ) : (
@@ -387,19 +409,25 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                   <thead className="bg-default-100 dark:bg-gray-900/50">
                     <tr>
                       <th className="px-3 py-2.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                        Account No.
+                        {t("Account No.")}
                       </th>
                       <th className="px-3 py-2.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                        Particulars
+                        {t("Particulars")}
                       </th>
                       <th className="px-3 py-2.5 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                        Balance as at {data.statement_date}
+                        {t("Balance as at {{date}}", {
+                          date: data.statement_date,
+                        })}
                       </th>
                       <th className="px-3 py-2.5 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                        {currentMovementLabel} movement
+                        {t("{{month}} movement", {
+                          month: currentMovementLabel,
+                        })}
                       </th>
                       <th className="px-3 py-2.5 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                        {previousMovementLabel} movement
+                        {t("{{month}} movement", {
+                          month: previousMovementLabel,
+                        })}
                       </th>
                     </tr>
                   </thead>
@@ -426,7 +454,9 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                                   )}`
                                 )
                               }
-                              title={`Open ${row.account_no} account ledger`}
+                              title={t("Open {{account}} account ledger", {
+                                account: row.account_no,
+                              })}
                             >
                               {row.account_no}
                             </button>
@@ -448,7 +478,9 @@ const GTDebtorSubSchedulePage: React.FC = () => {
                   <tfoot className="border-t-2 border-default-300 bg-default-50 font-semibold text-default-900 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100">
                     <tr>
                       <td className="px-3 py-3" />
-                      <td className="px-3 py-3">Full CD_SD control total</td>
+                      <td className="px-3 py-3">
+                        {t("Full CD_SD control total")}
+                      </td>
                       <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums">
                         RM {formatCurrency(data.totals.closing_balance)}
                       </td>

@@ -1,6 +1,7 @@
 // src/components/GreenTarget/AssociatedInvoiceDisplay.tsx
 import React from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   IconAlertTriangle,
   IconCircleCheck,
@@ -59,15 +60,18 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
   onViewReceipt,
   className = "",
 }) => {
+  const { t } = useTranslation("greentarget");
   if (!invoiceInfo) {
     return (
       <div className={clsx("bg-gray-50 dark:bg-gray-900/50 rounded-lg p-4 border border-gray-200 dark:border-gray-700", className)}>
         <div className="flex items-center text-gray-500 dark:text-gray-400">
           <IconFileInvoice size={20} className="mr-2" />
-          <span className="text-sm font-medium">No Associated Invoice</span>
+          <span className="text-sm font-medium">
+            {t("No Associated Invoice")}
+          </span>
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-          This rental has not been invoiced yet.
+          {t("This rental has not been invoiced yet.")}
         </p>
       </div>
     );
@@ -144,13 +148,13 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
         <div className="flex items-center">
           <IconFileInvoice size={20} className="mr-2 text-gray-600 dark:text-gray-400" />
           <div>
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Associated Invoice
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {t("Associated Invoice")}
             </span>
             <div className="flex items-center mt-1">
               {statusConfig.icon}
               <span className={clsx("text-xs font-medium ml-1", statusConfig.textColor)}>
-                {statusConfig.text}
+                {t(statusConfig.text)}
               </span>
             </div>
           </div>
@@ -161,7 +165,7 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
             onClick={() => onViewInvoice(invoiceInfo.invoice_id)}
             className="flex items-center text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 text-sm font-medium"
           >
-            View
+            {t("View")}
             <IconExternalLink size={16} className="ml-1" />
           </button>
         )}
@@ -169,14 +173,18 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
       
       <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
         <div>
-          <span className="text-gray-500 dark:text-gray-400">Invoice Number:</span>
+          <span className="text-gray-500 dark:text-gray-400">
+            {t("Invoice Number:")}
+          </span>
           <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">
             {invoiceInfo.invoice_number}
           </p>
         </div>
         {invoiceInfo.amount && (
           <div>
-            <span className="text-gray-500 dark:text-gray-400">Amount:</span>
+            <span className="text-gray-500 dark:text-gray-400">
+              {t("Amount:")}
+            </span>
             <p className="font-medium text-gray-900 dark:text-gray-100 mt-0.5">
               {formatAmount(invoiceInfo.amount)}
             </p>
@@ -188,17 +196,23 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
         <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
           <p className="text-xs font-medium text-gray-600 dark:text-gray-400 flex items-center">
             <IconCircleCheck size={12} className="mr-1 text-green-500" />
-            Payment Records
+            {t("Payment Records")}
           </p>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[620px] text-xs">
               <thead>
                 <tr className="text-left text-gray-500 dark:text-gray-400">
-                  <th className="pb-1.5 pr-3 font-medium">Date</th>
-                  <th className="pb-1.5 pr-3 font-medium">Method</th>
-                  <th className="pb-1.5 pr-3 font-medium">Reference</th>
-                  <th className="pb-1.5 pr-3 text-right font-medium">Amount</th>
-                  <th className="pb-1.5 text-right font-medium">Status</th>
+                  <th className="pb-1.5 pr-3 font-medium">{t("Date")}</th>
+                  <th className="pb-1.5 pr-3 font-medium">{t("Method")}</th>
+                  <th className="pb-1.5 pr-3 font-medium">
+                    {t("Reference")}
+                  </th>
+                  <th className="pb-1.5 pr-3 text-right font-medium">
+                    {t("Amount")}
+                  </th>
+                  <th className="pb-1.5 text-right font-medium">
+                    {t("Status")}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -207,7 +221,7 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
                   const reference: string =
                     payment.internal_reference?.trim() ||
                     (payment.receipt_id !== null
-                      ? `Receipt #${payment.receipt_id}`
+                      ? t("Receipt #{{id}}", { id: payment.receipt_id })
                       : "-");
 
                   return (
@@ -219,7 +233,7 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
                         {formatPaymentDate(payment.payment_date)}
                       </td>
                       <td className="py-2 pr-3 whitespace-nowrap text-gray-900 dark:text-gray-100">
-                        {PAYMENT_METHOD_LABELS[payment.payment_method]}
+                        {t(PAYMENT_METHOD_LABELS[payment.payment_method])}
                       </td>
                       <td className="py-2 pr-3 text-gray-600 dark:text-gray-400">
                         {payment.receipt_id !== null && onViewReceipt ? (
@@ -229,7 +243,9 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
                               onViewReceipt(payment.receipt_id as number)
                             }
                             className="inline-flex items-center font-medium text-sky-600 hover:text-sky-800 dark:text-sky-400 dark:hover:text-sky-300"
-                            title="View this receipt and every invoice it settles"
+                            title={t(
+                              "View this receipt and every invoice it settles"
+                            )}
                           >
                             {reference}
                             <IconExternalLink size={12} className="ml-1" />
@@ -244,12 +260,12 @@ const AssociatedInvoiceDisplay: React.FC<AssociatedInvoiceDisplayProps> = ({
                       <td className="py-2 text-right">
                         {payment.status === "pending" && (
                           <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-                            Pending
+                            {t("Pending")}
                           </span>
                         )}
                         {isCancelled && (
                           <span className="rounded-full bg-rose-100 px-2 py-0.5 font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-400">
-                            Cancelled
+                            {t("Cancelled")}
                           </span>
                         )}
                       </td>

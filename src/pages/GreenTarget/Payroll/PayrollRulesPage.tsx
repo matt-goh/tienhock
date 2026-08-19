@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/Payroll/PayrollRulesPage.tsx
 import React, { useState, useEffect, Fragment } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -107,6 +108,7 @@ const getPrimaryOperatorOptions = (conditionField: string): OperatorOption[] =>
 
 const PayrollRulesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("greentarget");
   const [activeTab, setActiveTab] = usePersistedFilters<TabType>(
     "gtPayrollRulesTab",
     () => "rules",
@@ -190,7 +192,7 @@ const PayrollRulesPage: React.FC = () => {
       setHasUnsavedSettings(false);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Failed to load settings data");
+      toast.error(t("Failed to load settings data"));
     } finally {
       setIsLoading(false);
     }
@@ -220,7 +222,7 @@ const PayrollRulesPage: React.FC = () => {
 
   const handleSaveDestination = async () => {
     if (!destinationForm.code || !destinationForm.name) {
-      toast.error("Please fill in all required fields");
+      toast.error(t("Please fill in all required fields"));
       return;
     }
 
@@ -231,16 +233,16 @@ const PayrollRulesPage: React.FC = () => {
           editingDestination.id,
           destinationForm
         );
-        toast.success("Destination updated");
+        toast.success(t("Destination updated"));
       } else {
         await greenTargetApi.createPickupDestination(destinationForm);
-        toast.success("Destination created");
+        toast.success(t("Destination created"));
       }
       setIsDestinationModalOpen(false);
       fetchAllData();
     } catch (error) {
       console.error("Error saving destination:", error);
-      toast.error("Failed to save destination");
+      toast.error(t("Failed to save destination"));
     } finally {
       setIsSaving(false);
     }
@@ -262,18 +264,18 @@ const PayrollRulesPage: React.FC = () => {
         await greenTargetApi.deletePickupDestination(
           (deleteTarget.item as PickupDestination).id
         );
-        toast.success("Destination deleted");
+        toast.success(t("Destination deleted"));
       } else if (deleteTarget.type === "rule") {
         await greenTargetApi.deletePayrollRule(
           (deleteTarget.item as PayrollRule).id
         );
-        toast.success("Rule deleted");
+        toast.success(t("Rule deleted"));
       }
       fetchAllData();
     } catch (error: unknown) {
       console.error("Error deleting:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to delete";
+        error instanceof Error ? error.message : t("Failed to delete");
       toast.error(errorMessage);
     } finally {
       setDeleteConfirmOpen(false);
@@ -284,12 +286,14 @@ const PayrollRulesPage: React.FC = () => {
   const getDeleteMessage = () => {
     if (!deleteTarget) return "";
     if (deleteTarget.type === "destination") {
-      return `Delete destination "${
-        (deleteTarget.item as PickupDestination).name
-      }"?`;
+      return t('Delete destination "{{name}}"?', {
+        name: (deleteTarget.item as PickupDestination).name,
+      });
     } else {
       const rule = deleteTarget.item as PayrollRule;
-      return `Delete rule "${rule.description || rule.pay_code_id}"?`;
+      return t('Delete rule "{{rule}}"?', {
+        rule: rule.description || rule.pay_code_id,
+      });
     }
   };
 
@@ -334,7 +338,7 @@ const PayrollRulesPage: React.FC = () => {
 
   const handleSaveRule = async () => {
     if (!ruleForm.condition_value) {
-      toast.error("Please fill in all required fields");
+      toast.error(t("Please fill in all required fields"));
       return;
     }
 
@@ -343,7 +347,7 @@ const PayrollRulesPage: React.FC = () => {
       ruleForm.condition_field === "invoice_amount" &&
       isNaN(parseFloat(ruleForm.condition_value))
     ) {
-      toast.error("Condition value must be a number for invoice_amount");
+      toast.error(t("Condition value must be a number for invoice_amount"));
       return;
     }
     if (
@@ -352,7 +356,7 @@ const PayrollRulesPage: React.FC = () => {
       isNaN(parseFloat(ruleForm.secondary_condition_value))
     ) {
       toast.error(
-        "Secondary condition value must be a number for invoice_amount"
+        t("Secondary condition value must be a number for invoice_amount")
       );
       return;
     }
@@ -376,16 +380,16 @@ const PayrollRulesPage: React.FC = () => {
 
       if (editingRule) {
         await greenTargetApi.updatePayrollRule(editingRule.id, payload);
-        toast.success("Rule updated");
+        toast.success(t("Rule updated"));
       } else {
         await greenTargetApi.createPayrollRule(payload);
-        toast.success("Rule created");
+        toast.success(t("Rule created"));
       }
       setIsRuleModalOpen(false);
       fetchAllData();
     } catch (error) {
       console.error("Error saving rule:", error);
-      toast.error("Failed to save rule");
+      toast.error(t("Failed to save rule"));
     } finally {
       setIsSaving(false);
     }
@@ -414,10 +418,10 @@ const PayrollRulesPage: React.FC = () => {
 
       setSettings(editedSettings);
       setHasUnsavedSettings(false);
-      toast.success("Settings saved");
+      toast.success(t("Settings saved"));
     } catch (error) {
       console.error("Error saving settings:", error);
-      toast.error("Failed to save settings");
+      toast.error(t("Failed to save settings"));
     } finally {
       setIsSaving(false);
     }
@@ -476,7 +480,7 @@ const PayrollRulesPage: React.FC = () => {
           <BackButton fallbackPath="/greentarget/payroll" />
           <span className="text-default-300 dark:text-gray-600">|</span>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Payroll Settings
+            {t("Payroll Settings")}
           </h1>
           <span className="text-default-300 dark:text-gray-600">|</span>
           {/* Stats */}
@@ -489,7 +493,9 @@ const PayrollRulesPage: React.FC = () => {
               <span className="font-medium text-default-700 dark:text-gray-200">
                 {destinations.length}
               </span>
-              <span className="text-default-400 dark:text-gray-400">dest</span>
+              <span className="text-default-400 dark:text-gray-400">
+                {t("dest")}
+              </span>
             </div>
             <span className="text-default-300 dark:text-gray-600">•</span>
             <div className="flex items-center gap-1.5">
@@ -497,7 +503,9 @@ const PayrollRulesPage: React.FC = () => {
               <span className="font-medium text-default-700 dark:text-gray-200">
                 {rules.length}
               </span>
-              <span className="text-default-400 dark:text-gray-400">rules</span>
+              <span className="text-default-400 dark:text-gray-400">
+                {t("rules")}
+              </span>
             </div>
           </div>
         </div>
@@ -514,7 +522,7 @@ const PayrollRulesPage: React.FC = () => {
                 />
                 <input
                   type="text"
-                  placeholder="Search..."
+                  placeholder={t("Search...")}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-7 pr-7 py-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-gray-900 dark:text-gray-100 rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 dark:focus:ring-amber-400 focus:border-amber-500 dark:focus:border-amber-400 w-32 placeholder-gray-400 dark:placeholder-gray-500"
@@ -523,7 +531,7 @@ const PayrollRulesPage: React.FC = () => {
                   <button
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300 transition-colors"
                     onClick={() => setSearchTerm("")}
-                    title="Clear search"
+                    title={t("Clear search")}
                   >
                     <IconX size={12} />
                   </button>
@@ -544,7 +552,7 @@ const PayrollRulesPage: React.FC = () => {
                   : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
               )}
             >
-              Rules
+              {t("Rules")}
             </button>
             <button
               onClick={() => setActiveTab("settings")}
@@ -555,7 +563,7 @@ const PayrollRulesPage: React.FC = () => {
                   : "text-default-600 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200"
               )}
             >
-              Settings
+              {t("Settings")}
             </button>
           </div>
         </div>
@@ -569,10 +577,10 @@ const PayrollRulesPage: React.FC = () => {
             <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
               <div>
                 <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                  PLACEMENT Rules
+                  {t("PLACEMENT Rules")}
                 </span>
                 <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
-                  Based on invoice amount
+                  {t("Based on invoice amount")}
                 </span>
               </div>
               <button
@@ -580,26 +588,26 @@ const PayrollRulesPage: React.FC = () => {
                 className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
               >
                 <IconPlus size={14} />
-                Add Rule
+                {t("Add Rule")}
               </button>
             </div>
             <table className="w-full text-sm">
               <thead className="bg-default-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Condition
+                    {t("Condition")}
                   </th>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Pay Code
+                    {t("Pay Code")}
                   </th>
                   <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-20">
-                    Priority
+                    {t("Priority")}
                   </th>
                   <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -631,7 +639,7 @@ const PayrollRulesPage: React.FC = () => {
                         </>
                       ) : (
                         <span className="text-amber-600 dark:text-amber-400 text-xs italic">
-                          Not assigned
+                          {t("Not assigned")}
                         </span>
                       )}
                     </td>
@@ -643,14 +651,14 @@ const PayrollRulesPage: React.FC = () => {
                         <button
                           onClick={() => openRuleModal(rule)}
                           className="p-1 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={16} />
                         </button>
                         <button
                           onClick={() => openDeleteConfirm("rule", rule)}
                           className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={16} />
                         </button>
@@ -665,8 +673,8 @@ const PayrollRulesPage: React.FC = () => {
                       className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
                     >
                       {searchTerm
-                        ? "No PLACEMENT rules matching search"
-                        : "No PLACEMENT rules configured"}
+                        ? t("No PLACEMENT rules matching search")
+                        : t("No PLACEMENT rules configured")}
                     </td>
                   </tr>
                 )}
@@ -679,10 +687,10 @@ const PayrollRulesPage: React.FC = () => {
             <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
               <div>
                 <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                  PICKUP Rules
+                  {t("PICKUP Rules")}
                 </span>
                 <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
-                  Based on destination & amount
+                  {t("Based on destination & amount")}
                 </span>
               </div>
               <button
@@ -690,26 +698,26 @@ const PayrollRulesPage: React.FC = () => {
                 className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
               >
                 <IconPlus size={14} />
-                Add Rule
+                {t("Add Rule")}
               </button>
             </div>
             <table className="w-full text-sm">
               <thead className="bg-default-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Condition
+                    {t("Condition")}
                   </th>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Pay Code
+                    {t("Pay Code")}
                   </th>
                   <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-20">
-                    Priority
+                    {t("Priority")}
                   </th>
                   <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -741,7 +749,7 @@ const PayrollRulesPage: React.FC = () => {
                         </>
                       ) : (
                         <span className="text-amber-600 dark:text-amber-400 text-xs italic">
-                          Not assigned
+                          {t("Not assigned")}
                         </span>
                       )}
                     </td>
@@ -753,14 +761,14 @@ const PayrollRulesPage: React.FC = () => {
                         <button
                           onClick={() => openRuleModal(rule)}
                           className="p-1 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={16} />
                         </button>
                         <button
                           onClick={() => openDeleteConfirm("rule", rule)}
                           className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={16} />
                         </button>
@@ -775,8 +783,8 @@ const PayrollRulesPage: React.FC = () => {
                       className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
                     >
                       {searchTerm
-                        ? "No PICKUP rules matching search"
-                        : "No PICKUP rules configured"}
+                        ? t("No PICKUP rules matching search")
+                        : t("No PICKUP rules configured")}
                     </td>
                   </tr>
                 )}
@@ -792,7 +800,9 @@ const PayrollRulesPage: React.FC = () => {
                   Driver Pay Codes
                 </span>
                 <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
-                  Mapped to the driver job — read-only, click to view in Pay Codes
+                  {t(
+                    "Mapped to the driver job — read-only, click to view in Pay Codes"
+                  )}
                 </span>
               </div>
             </div>
@@ -800,25 +810,25 @@ const PayrollRulesPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Pay Code
+                    {t("Pay Code")}
                   </th>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs w-20">
-                    Unit
+                    {t("Unit")}
                   </th>
                   <th className="px-4 py-2 text-right text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                    Biasa
+                    {t("Biasa")}
                   </th>
                   <th className="px-4 py-2 text-right text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                    Ahad
+                    {t("Ahad")}
                   </th>
                   <th className="px-4 py-2 text-right text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                    Umum
+                    {t("Umum")}
                   </th>
                 </tr>
               </thead>
@@ -828,7 +838,7 @@ const PayrollRulesPage: React.FC = () => {
                     key={pc.id}
                     onClick={() => openInPayCodePage(pc.id)}
                     className="border-b border-default-100 dark:border-gray-700 cursor-pointer hover:bg-sky-50/60 dark:hover:bg-sky-900/20 group"
-                    title="Open in Pay Codes"
+                    title={t("Open in Pay Codes")}
                   >
                     <td className="px-4 py-2">
                       <span className="inline-flex items-center gap-1 font-mono font-medium text-sky-600 dark:text-sky-400 text-xs">
@@ -866,8 +876,8 @@ const PayrollRulesPage: React.FC = () => {
                       className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
                     >
                       {searchTerm
-                        ? "No driver pay codes matching search"
-                        : "No driver pay codes found"}
+                        ? t("No driver pay codes matching search")
+                        : t("No driver pay codes found")}
                     </td>
                   </tr>
                 )}
@@ -887,10 +897,10 @@ const PayrollRulesPage: React.FC = () => {
             <div className="flex items-center justify-between p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg border border-default-100 dark:border-gray-700">
               <div>
                 <h4 className="text-sm font-medium text-default-800 dark:text-gray-200">
-                  Default Invoice Amount
+                  {t("Default Invoice Amount")}
                 </h4>
                 <p className="text-xs text-default-500 dark:text-gray-400">
-                  Used when a rental has no invoice linked
+                  {t("Used when a rental has no invoice linked")}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -946,7 +956,7 @@ const PayrollRulesPage: React.FC = () => {
 
             {Object.keys(settings).length === 0 && (
               <div className="text-center py-6 text-default-500 dark:text-gray-400 text-sm">
-                No settings configured. Settings will appear here once added.
+                {t("No settings configured. Settings will appear here once added.")}
               </div>
             )}
 
@@ -962,7 +972,7 @@ const PayrollRulesPage: React.FC = () => {
                       : "bg-default-200 dark:bg-gray-700 text-default-400 dark:text-gray-500 cursor-not-allowed"
                   }`}
                 >
-                  {isSaving ? "Saving..." : "Save Settings"}
+                  {isSaving ? t("Saving...") : t("Save Settings")}
                 </button>
               </div>
             )}
@@ -974,10 +984,10 @@ const PayrollRulesPage: React.FC = () => {
           <div className="px-4 py-2 border-b border-default-200 dark:border-gray-700 bg-default-50 dark:bg-gray-900/50 flex items-center justify-between">
             <div>
               <span className="text-sm font-medium text-default-700 dark:text-gray-300">
-                Pickup Destinations
+                {t("Pickup Destinations")}
               </span>
               <span className="text-xs text-default-400 dark:text-gray-500 ml-2">
-                Available pickup locations
+                {t("Available pickup locations")}
               </span>
             </div>
             <button
@@ -985,26 +995,26 @@ const PayrollRulesPage: React.FC = () => {
               className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
             >
               <IconPlus size={14} />
-              Add Destination
+              {t("Add Destination")}
             </button>
           </div>
           <table className="w-full text-sm">
             <thead className="bg-default-50 dark:bg-gray-700">
               <tr>
                 <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                  Code
+                  {t("Code")}
                 </th>
                 <th className="px-4 py-2 text-left text-default-600 dark:text-gray-300 font-medium text-xs">
-                  Name
+                  {t("Name")}
                 </th>
                 <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-20">
-                  Order
+                  {t("Order")}
                 </th>
                 <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-20">
-                  Default
+                  {t("Default")}
                 </th>
                 <th className="px-4 py-2 text-center text-default-600 dark:text-gray-300 font-medium text-xs w-24">
-                  Actions
+                  {t("Actions")}
                 </th>
               </tr>
             </thead>
@@ -1038,14 +1048,14 @@ const PayrollRulesPage: React.FC = () => {
                       <button
                         onClick={() => openDestinationModal(dest)}
                         className="p-1 text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded"
-                        title="Edit"
+                        title={t("Edit")}
                       >
                         <IconEdit size={16} />
                       </button>
                       <button
                         onClick={() => openDeleteConfirm("destination", dest)}
                         className="p-1 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded"
-                        title="Delete"
+                        title={t("Delete")}
                       >
                         <IconTrash size={16} />
                       </button>
@@ -1059,7 +1069,7 @@ const PayrollRulesPage: React.FC = () => {
                     colSpan={5}
                     className="px-4 py-6 text-center text-default-500 dark:text-gray-400 text-sm"
                   >
-                    No pickup destinations configured
+                    {t("No pickup destinations configured")}
                   </td>
                 </tr>
               )}
@@ -1103,8 +1113,8 @@ const PayrollRulesPage: React.FC = () => {
                   <div className="flex items-center justify-between border-b border-default-200 dark:border-gray-700 px-6 py-4">
                     <DialogTitle className="text-lg font-semibold text-default-900 dark:text-gray-100">
                       {editingDestination
-                        ? "Edit Destination"
-                        : "Add Destination"}
+                        ? t("Edit Destination")
+                        : t("Add Destination")}
                     </DialogTitle>
                     <button
                       onClick={() => setIsDestinationModalOpen(false)}
@@ -1117,7 +1127,7 @@ const PayrollRulesPage: React.FC = () => {
                   <div className="p-6 space-y-3">
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Code *
+                        {t("Code *")}
                       </label>
                       <input
                         type="text"
@@ -1134,7 +1144,7 @@ const PayrollRulesPage: React.FC = () => {
                     </div>
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Name *
+                        {t("Name *")}
                       </label>
                       <input
                         type="text"
@@ -1152,7 +1162,7 @@ const PayrollRulesPage: React.FC = () => {
                     <div className="flex gap-4">
                       <div className="flex-1">
                         <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                          Sort Order
+                          {t("Sort Order")}
                         </label>
                         <input
                           type="number"
@@ -1180,7 +1190,7 @@ const PayrollRulesPage: React.FC = () => {
                             className="w-4 h-4 rounded border-default-300 dark:border-gray-600"
                           />
                           <span className="text-sm text-default-600 dark:text-gray-300">
-                            Default
+                            {t("Default")}
                           </span>
                         </label>
                       </div>
@@ -1192,7 +1202,7 @@ const PayrollRulesPage: React.FC = () => {
                       variant="outline"
                       onClick={() => setIsDestinationModalOpen(false)}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       variant="filled"
@@ -1200,7 +1210,7 @@ const PayrollRulesPage: React.FC = () => {
                       onClick={handleSaveDestination}
                       disabled={isSaving}
                     >
-                      {isSaving ? "Saving..." : "Save"}
+                      {isSaving ? t("Saving...") : t("Save")}
                     </Button>
                   </div>
                 </DialogPanel>
@@ -1243,7 +1253,7 @@ const PayrollRulesPage: React.FC = () => {
                 <DialogPanel className="w-full max-w-lg transform rounded-lg bg-white dark:bg-gray-800 shadow-xl transition-all">
                   <div className="flex items-center justify-between border-b border-default-200 dark:border-gray-700 px-6 py-4">
                     <DialogTitle className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                      {editingRule ? "Edit Rule" : "Add Rule"}
+                      {editingRule ? t("Edit Rule") : t("Add Rule")}
                     </DialogTitle>
                     <button
                       onClick={() => setIsRuleModalOpen(false)}
@@ -1256,7 +1266,7 @@ const PayrollRulesPage: React.FC = () => {
                   <div className="p-6 space-y-3">
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Rule Type
+                        {t("Rule Type")}
                       </label>
                       <Listbox
                         value={ruleForm.rule_type}
@@ -1275,7 +1285,7 @@ const PayrollRulesPage: React.FC = () => {
                         <div className="relative">
                           <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-amber-500 sm:text-sm">
                             <span className="block truncate text-default-800 dark:text-gray-200">
-                              {ruleForm.rule_type}
+                              {t(ruleForm.rule_type)}
                             </span>
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                               <IconChevronDown
@@ -1303,7 +1313,7 @@ const PayrollRulesPage: React.FC = () => {
                                         selected ? "font-medium" : "font-normal"
                                       )}
                                     >
-                                      PLACEMENT
+                                      {t("PLACEMENT")}
                                     </span>
                                     {selected && (
                                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
@@ -1325,7 +1335,7 @@ const PayrollRulesPage: React.FC = () => {
                                         selected ? "font-medium" : "font-normal"
                                       )}
                                     >
-                                      PICKUP
+                                      {t("PICKUP")}
                                     </span>
                                     {selected && (
                                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
@@ -1343,7 +1353,7 @@ const PayrollRulesPage: React.FC = () => {
 
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Description
+                        {t("Description")}
                       </label>
                       <input
                         type="text"
@@ -1362,7 +1372,7 @@ const PayrollRulesPage: React.FC = () => {
                     {/* Primary Condition */}
                     <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg space-y-3">
                       <p className="text-sm font-medium text-default-700 dark:text-gray-200">
-                        Primary Condition
+                        {t("Primary Condition")}
                       </p>
                       <div className="grid grid-cols-3 gap-2">
                         <div>
@@ -1506,7 +1516,7 @@ const PayrollRulesPage: React.FC = () => {
                     {ruleForm.rule_type === "PICKUP" && (
                       <div className="p-3 bg-default-50 dark:bg-gray-900/50 rounded-lg space-y-3">
                         <p className="text-sm font-medium text-default-700 dark:text-gray-200">
-                          Secondary Condition (optional)
+                          {t("Secondary Condition (optional)")}
                         </p>
                         <div className="grid grid-cols-3 gap-2">
                           <div>
@@ -1523,7 +1533,7 @@ const PayrollRulesPage: React.FC = () => {
                                 <ListboxButton className="relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-8 text-left text-sm focus:outline-none focus:ring-1 focus:ring-amber-500">
                                   <span className="block truncate text-default-800 dark:text-gray-200">
                                     {ruleForm.secondary_condition_field ||
-                                      "None"}
+                                      t("None")}
                                   </span>
                                   <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                                     <IconChevronDown
@@ -1534,7 +1544,7 @@ const PayrollRulesPage: React.FC = () => {
                                 </ListboxButton>
                                 <ListboxOptions className="absolute z-10 mt-1 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-sm shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                                   {[
-                                    { value: "", label: "None" },
+                                    { value: "", label: t("None") },
                                     {
                                       value: "invoice_amount",
                                       label: "invoice_amount",
@@ -1658,7 +1668,7 @@ const PayrollRulesPage: React.FC = () => {
                     {/* Pay Code Selection */}
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Pay Code
+                        {t("Pay Code")}
                       </label>
                       <Listbox
                         value={ruleForm.pay_code_id}
@@ -1685,7 +1695,7 @@ const PayrollRulesPage: React.FC = () => {
                                       (p) => p.id === ruleForm.pay_code_id
                                     )?.description || ""
                                   }`
-                                : "Not assigned"}
+                                : t("Not assigned")}
                             </span>
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                               <IconChevronDown
@@ -1713,7 +1723,7 @@ const PayrollRulesPage: React.FC = () => {
                                         selected ? "font-medium" : "font-normal"
                                       )}
                                     >
-                                      Not assigned
+                                      {t("Not assigned")}
                                     </span>
                                     {selected && (
                                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-amber-600">
@@ -1766,7 +1776,7 @@ const PayrollRulesPage: React.FC = () => {
 
                     <div>
                       <label className="block text-sm text-default-600 dark:text-gray-300 mb-1">
-                        Priority (higher = checked first)
+                        {t("Priority (higher = checked first)")}
                       </label>
                       <input
                         type="number"
@@ -1787,7 +1797,7 @@ const PayrollRulesPage: React.FC = () => {
                       variant="outline"
                       onClick={() => setIsRuleModalOpen(false)}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       variant="filled"
@@ -1795,7 +1805,7 @@ const PayrollRulesPage: React.FC = () => {
                       onClick={handleSaveRule}
                       disabled={isSaving}
                     >
-                      {isSaving ? "Saving..." : "Save"}
+                      {isSaving ? t("Saving...") : t("Save")}
                     </Button>
                   </div>
                 </DialogPanel>
@@ -1813,9 +1823,9 @@ const PayrollRulesPage: React.FC = () => {
           setDeleteTarget(null);
         }}
         onConfirm={handleConfirmDelete}
-        title="Confirm Delete"
+        title={t("Confirm Delete")}
         message={getDeleteMessage()}
-        confirmButtonText="Delete"
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

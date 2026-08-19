@@ -1,4 +1,5 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { IconSearch, IconTrash } from "@tabler/icons-react";
 import { GreenTargetInvoice } from "../../types/greenTargetTypes";
 import Button from "../Button";
@@ -30,6 +31,7 @@ const GreenTargetInvoiceSelectionTable: React.FC<
   onDateRangeChange,
   isLoading,
 }) => {
+  const { t } = useTranslation("greentarget");
   const tableHeaderClassName: string =
     "bg-gray-100 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-gray-600 dark:bg-gray-950 dark:text-gray-300";
 
@@ -52,14 +54,16 @@ const GreenTargetInvoiceSelectionTable: React.FC<
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div>
             <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              Find unpaid invoices
+              {t("Find unpaid invoices")}
             </h4>
             <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              Invoices with pending payments are not shown.
+              {t("Invoices with pending payments are not shown.")}
             </p>
           </div>
           <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
-            {isLoading ? "Loading..." : `${invoices.length} found`}
+            {isLoading
+              ? t("Loading...")
+              : t("{{count}} found", { count: invoices.length })}
           </span>
         </div>
 
@@ -71,8 +75,8 @@ const GreenTargetInvoiceSelectionTable: React.FC<
             />
             <input
               type="text"
-              placeholder="Invoice or customer"
-              aria-label="Search available invoices"
+              placeholder={t("Invoice or customer")}
+              aria-label={t("Search available invoices")}
               className="h-[34px] w-full rounded-lg border border-gray-300 bg-white py-1.5 pl-10 pr-3 text-sm text-gray-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               value={searchTerm}
               onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
@@ -98,32 +102,32 @@ const GreenTargetInvoiceSelectionTable: React.FC<
               <th
                 className={`${tableHeaderClassName} border-b border-gray-200 text-left dark:border-gray-700`}
               >
-                Invoice
+                {t("Invoice")}
               </th>
               <th
                 className={`${tableHeaderClassName} border-b border-gray-200 text-left dark:border-gray-700`}
               >
-                Customer
+                {t("Customer")}
               </th>
               <th
                 className={`${tableHeaderClassName} border-b border-gray-200 text-left dark:border-gray-700`}
               >
-                Date
+                {t("Date")}
               </th>
               <th
                 className={`${tableHeaderClassName} hidden border-b border-gray-200 text-right dark:border-gray-700 2xl:table-cell`}
               >
-                Total
+                {t("Total")}
               </th>
               <th
                 className={`${tableHeaderClassName} border-b border-gray-200 text-right dark:border-gray-700`}
               >
-                Balance Due
+                {t("Balance Due")}
               </th>
               <th
                 className={`${tableHeaderClassName} border-b border-gray-200 text-center dark:border-gray-700`}
               >
-                Action
+                {t("Action")}
               </th>
             </tr>
           </thead>
@@ -135,7 +139,7 @@ const GreenTargetInvoiceSelectionTable: React.FC<
                     <LoadingSpinner />
                   </div>
                   <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                    Loading unpaid invoices...
+                    {t("Loading unpaid invoices...")}
                   </p>
                 </td>
               </tr>
@@ -146,8 +150,8 @@ const GreenTargetInvoiceSelectionTable: React.FC<
                   className="px-6 py-8 text-center text-gray-500 dark:text-gray-400"
                 >
                   {searchTerm.trim()
-                    ? "No invoices match your search in this date range."
-                    : "No unpaid invoices found in this date range."}
+                    ? t("No invoices match your search in this date range.")
+                    : t("No unpaid invoices found in this date range.")}
                 </td>
               </tr>
             ) : (
@@ -194,9 +198,9 @@ const GreenTargetInvoiceSelectionTable: React.FC<
                       </td>
                       <td
                         className="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-right text-sm font-semibold text-red-600 dark:border-gray-800 dark:text-red-400"
-                        title={`Invoice total: ${formatCurrency(
-                          invoice.total_amount
-                        )}`}
+                        title={t("Invoice total: {{amount}}", {
+                          amount: formatCurrency(invoice.total_amount),
+                        })}
                       >
                         {formatCurrency(invoice.current_balance)}
                       </td>
@@ -206,7 +210,9 @@ const GreenTargetInvoiceSelectionTable: React.FC<
                             type="button"
                             onClick={(): void => onInvoiceRemove(invoiceId)}
                             className="rounded-md p-2 text-red-500 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/30"
-                            aria-label={`Remove invoice ${invoice.invoice_number}`}
+                            aria-label={t("Remove invoice {{number}}", {
+                              number: invoice.invoice_number,
+                            })}
                           >
                             <IconTrash size={16} />
                           </button>
@@ -218,7 +224,7 @@ const GreenTargetInvoiceSelectionTable: React.FC<
                             color="sky"
                             onClick={(): void => onInvoiceSelect(invoice)}
                           >
-                            Add
+                            {t("Add")}
                           </Button>
                         )}
                       </td>

@@ -75,7 +75,7 @@ const TrialBalanceOrderModal: React.FC<TrialBalanceOrderModalProps> = ({
   onOnlyShowMonthAccountsChange,
   monthAccountCodes,
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("accounting");
   const [workingItems, setWorkingItems] = useState<TrialBalanceOrderItem[]>([]);
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
@@ -575,7 +575,7 @@ const TrialBalanceOrderModal: React.FC<TrialBalanceOrderModalProps> = ({
 
               <div className="mt-4 flex justify-end gap-2">
                 <Button variant="outline" onClick={onClose}>
-                  {t("cancel")}
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="sky"
@@ -586,7 +586,7 @@ const TrialBalanceOrderModal: React.FC<TrialBalanceOrderModalProps> = ({
                     displayedItems.length === 0
                   }
                 >
-                  {t("save")}
+                  {t("Save")}
                 </Button>
               </div>
             </DialogPanel>

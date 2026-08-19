@@ -17,6 +17,7 @@ import React, {
   useState,
 } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   IconPlus,
@@ -40,10 +41,10 @@ export type GTLeaveType =
   | "cuti_rawatan";
 
 export const GT_LEAVE_TYPES: { value: GTLeaveType; label: string }[] = [
-  { value: "cuti_tahunan", label: "Cuti Tahunan" },
-  { value: "cuti_sakit", label: "Cuti Sakit" },
-  { value: "cuti_umum", label: "Cuti Umum" },
-  { value: "cuti_rawatan", label: "Cuti Rawatan" },
+  { value: "cuti_tahunan", label: "Annual Leave" },
+  { value: "cuti_sakit", label: "Sick Leave" },
+  { value: "cuti_umum", label: "Public Holiday" },
+  { value: "cuti_rawatan", label: "Medical Leave" },
 ];
 
 export const getGTLeaveTypeLabel = (type: string): string =>
@@ -149,6 +150,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
     },
     ref
   ) => {
+    const { t } = useTranslation("greentarget");
     const [existingLeave, setExistingLeave] = useState<GTLeaveEntry[]>([]);
     const [newLeave, setNewLeave] = useState<GTLeaveEntry[]>([]);
     const [deletedIds, setDeletedIds] = useState<number[]>([]);
@@ -222,7 +224,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
         setBalances(next);
       } catch (error) {
         console.error("Error fetching GT leave balances:", error);
-        toast.error("Failed to fetch leave balances");
+        toast.error(t("Failed to fetch leave balances"));
       }
     }, [employeeIdsKey, year]);
 
@@ -302,7 +304,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
         const lo = format(new Date(year, month - 1, 1), "yyyy-MM-dd");
         const hi = format(new Date(year, month, 0), "yyyy-MM-dd");
         if (ymd < lo || ymd > hi) {
-          toast.error("Leave date must be within the selected month");
+          toast.error(t("Leave date must be within the selected month"));
           return;
         }
       }
@@ -328,7 +330,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
 
     const handleAddLeave = () => {
       if (!formLeaveDate) {
-        toast.error("Please select a date");
+        toast.error(t("Please select a date"));
         return;
       }
       const targetIds = Object.entries(selections)
@@ -336,7 +338,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
         .map(([id]) => id);
 
       if (targetIds.length === 0) {
-        toast.error("Please select at least one employee");
+        toast.error(t("Please select at least one employee"));
         return;
       }
 
@@ -349,9 +351,10 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
           .map((id) => employees.find((e) => e.id === id)?.name || id)
           .join(", ");
         toast.error(
-          `${names} have insufficient ${getGTLeaveTypeLabel(
-            formLeaveType
-          )} balance`
+          t("{{names}} have insufficient {{type}} balance", {
+            names,
+            type: t(getGTLeaveTypeLabel(formLeaveType)),
+          })
         );
         return;
       }
@@ -359,7 +362,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
       const trimmed = formAmount.trim();
       const parsed = trimmed === "" ? DEFAULT_LEAVE_AMOUNT : Number(trimmed);
       if (!Number.isFinite(parsed) || parsed < 0) {
-        toast.error("Please enter a valid non-negative leave amount");
+        toast.error(t("Please enter a valid non-negative leave amount"));
         return;
       }
       const amountPaid = Math.round(parsed * 100) / 100;
@@ -375,8 +378,10 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
       setNewLeave((prev) => [...prev, ...additions]);
       toast.success(
         additions.length === 1
-          ? "Leave entry added"
-          : `Added leave for ${additions.length} employees`
+          ? t("Leave entry added")
+          : t("Added leave for {{count}} employees", {
+              count: additions.length,
+            })
       );
       setShowModal(false);
     };
@@ -423,13 +428,15 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
           date: fixedDate,
           ...buildPayload(),
         });
-        toast.success("Leave saved successfully");
+        toast.success(t("Leave saved successfully"));
         await loadLeave();
         await loadBalances();
         onSaved?.();
       } catch (error: any) {
         console.error("Error saving GT driver leave:", error);
-        toast.error(error?.response?.data?.message || "Failed to save leave");
+        toast.error(
+          error?.response?.data?.message || t("Failed to save leave")
+        );
       } finally {
         setIsSaving(false);
       }
@@ -446,7 +453,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
               className="text-default-500 dark:text-gray-400"
             />
             <h3 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-              Leave &amp; Absence Recording
+              {t("Leave & Absence Recording")}
             </h3>
             <span className="text-xs text-default-400 dark:text-gray-500">
               ({rows.length})
@@ -459,7 +466,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
               disabled={disabled || employees.length === 0}
               className="inline-flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 px-3 py-1 text-xs font-medium text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <IconPlus size={14} /> Add Leave
+              <IconPlus size={14} /> {t("Add Leave")}
             </button>
             {mode === "daily" && (
               <Button
@@ -468,7 +475,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                 onClick={handleSelfSave}
                 disabled={disabled || isSaving}
               >
-                {isSaving ? "Saving..." : "Save Leave"}
+                {isSaving ? t("Saving...") : t("Save Leave")}
               </Button>
             )}
           </div>
@@ -476,7 +483,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
 
         {rows.length === 0 ? (
           <div className="p-6 text-center text-sm text-default-400 dark:text-gray-500">
-            No leave recorded.
+            {t("No leave recorded.")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -484,16 +491,16 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-4 py-1.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Employee
+                    {t("Employee")}
                   </th>
                   <th className="px-4 py-1.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-4 py-1.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-4 py-1.5 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Amount (RM)
+                    {t("Amount (RM)")}
                   </th>
                   <th className="px-4 py-1.5 w-12" />
                 </tr>
@@ -511,7 +518,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                       {leave.leaveDate}
                     </td>
                     <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
-                      {getGTLeaveTypeLabel(leave.leaveType)}
+                      {t(getGTLeaveTypeLabel(leave.leaveType))}
                     </td>
                     <td className="px-4 py-2 text-right">
                       <input
@@ -532,7 +539,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                         onClick={() => removeExisting(leave.id!)}
                         disabled={disabled}
                         className="text-rose-500 hover:text-rose-700 disabled:opacity-40"
-                        title="Remove leave"
+                        title={t("Remove leave")}
                       >
                         <IconTrash size={16} />
                       </button>
@@ -550,14 +557,14 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                         {leave.employeeId}
                       </span>
                       <span className="ml-2 rounded-full bg-sky-100 dark:bg-sky-900/40 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
-                        New
+                        {t("New")}
                       </span>
                     </td>
                     <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
                       {leave.leaveDate}
                     </td>
                     <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
-                      {getGTLeaveTypeLabel(leave.leaveType)}
+                      {t(getGTLeaveTypeLabel(leave.leaveType))}
                     </td>
                     <td className="px-4 py-2 text-right">
                       <input
@@ -576,7 +583,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                         onClick={() => removeNew(index)}
                         disabled={disabled}
                         className="text-rose-500 hover:text-rose-700 disabled:opacity-40"
-                        title="Remove leave"
+                        title={t("Remove leave")}
                       >
                         <IconTrash size={16} />
                       </button>
@@ -594,19 +601,19 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
             <div className="w-full max-w-lg rounded-lg bg-white dark:bg-gray-800 shadow-xl">
               <div className="px-5 py-3 border-b border-default-200 dark:border-gray-700">
                 <h3 className="text-base font-semibold text-default-800 dark:text-gray-100">
-                  Add Leave
+                  {t("Add Leave")}
                 </h3>
               </div>
               <div className="px-5 py-4 space-y-4">
                 <div className="grid grid-cols-2 gap-3 items-start">
                   <div>
                     <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                      Date
+                      {t("Date")}
                     </label>
                     {mode === "daily" ? (
                       <div
                         className="flex h-[38px] items-center gap-2 rounded-lg border border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 px-2.5 text-sm text-default-900 dark:text-gray-100"
-                        title="Leave is recorded for the day you are viewing"
+                        title={t("Leave is recorded for the day you are viewing")}
                       >
                         <IconCalendar
                           size={16}
@@ -636,7 +643,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                      Amount (RM)
+                      {t("Amount (RM)")}
                     </label>
                     <input
                       type="number"
@@ -651,7 +658,7 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                    Type
+                    {t("Type")}
                   </label>
                   <PillSelect<GTLeaveType>
                     value={formLeaveType}
@@ -659,24 +666,28 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                       setFormLeaveType(value);
                       setSelections({});
                     }}
-                    options={GT_LEAVE_TYPES}
-                    ariaLabel="Leave type"
+                    options={GT_LEAVE_TYPES.map((option) => ({
+                      value: option.value,
+                      label: t(option.label),
+                    }))}
+                    ariaLabel={t("Leave type")}
                   size="md"
                   />
                 </div>
                 {mode === "daily" && (
                   <p className="-mt-2 text-xs text-default-400 dark:text-gray-500">
-                    Leave is recorded for the day currently selected on the page.
-                    Change the date using the day navigator above the driver
-                    cards.
+                    {t(
+                      "Leave is recorded for the day currently selected on the page. Change the date using the day navigator above the driver cards."
+                    )}
                   </p>
                 )}
 
                 {blockedEmployees.length > 0 && (
                   <p className="text-xs text-rose-500">
-                    Cannot select:{" "}
-                    {blockedEmployees.map((e) => e.name).join(", ")} have
-                    insufficient {getGTLeaveTypeLabel(formLeaveType)} balance.
+                    {t("Cannot select: {{names}} have insufficient {{type}} balance.", {
+                      names: blockedEmployees.map((e) => e.name).join(", "),
+                      type: t(getGTLeaveTypeLabel(formLeaveType)),
+                    })}
                   </p>
                 )}
 
@@ -713,8 +724,12 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                         </div>
                         <span className="text-xs text-default-400 dark:text-gray-500">
                           {hasLeave
-                            ? "Already on leave this date"
-                            : `${remaining} left (${taken}/${total})`}
+                            ? t("Already on leave this date")
+                            : t("{{remaining}} left ({{taken}}/{{total}})", {
+                                remaining,
+                                taken,
+                                total,
+                              })}
                         </span>
                       </div>
                     );
@@ -727,10 +742,10 @@ const GTLeaveSection = forwardRef<GTLeaveSectionHandle, GTLeaveSectionProps>(
                   size="sm"
                   onClick={() => setShowModal(false)}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button color="sky" size="sm" onClick={handleAddLeave}>
-                  Add
+                  {t("Add")}
                 </Button>
               </div>
             </div>

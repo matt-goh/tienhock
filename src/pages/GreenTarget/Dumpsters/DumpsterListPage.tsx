@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { format } from "date-fns";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconSearch,
   IconCalendar,
@@ -91,6 +92,7 @@ interface DumpsterStatus {
 }
 
 const DumpsterListPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const [dumpsters, setDumpsters] = useState<Dumpster[]>([]);
   const [rentals, setRentals] = useState<Rental[]>([]);
@@ -137,7 +139,7 @@ const DumpsterListPage: React.FC = () => {
       setRentals(rentalsData);
     } catch (err) {
       console.error("Error fetching data:", err);
-      toast.error("Failed to load dumpster data");
+      toast.error(t("Failed to load dumpster data"));
     } finally {
       setLoading(false);
     }
@@ -150,15 +152,15 @@ const DumpsterListPage: React.FC = () => {
         setDumpsters(
           dumpsters.filter((d) => d.tong_no !== dumpsterToDelete.tong_no)
         );
-        toast.success("Dumpster deleted successfully");
+        toast.success(t("Dumpster deleted successfully"));
       } catch (err: any) {
         console.error("Error deleting dumpster:", err);
         if (err.message && err.message.includes("being used")) {
           toast.error(
-            "Cannot delete dumpster: it is being used in one or more rentals"
+            t("Cannot delete dumpster: it is being used in one or more rentals")
           );
         } else {
-          toast.error("Failed to delete dumpster");
+          toast.error(t("Failed to delete dumpster"));
         }
       } finally {
         setIsDeleteDialogOpen(false);
@@ -357,7 +359,7 @@ const DumpsterListPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl text-default-700 dark:text-gray-200 font-bold">
-          Dumpsters ({filteredDumpsters.length})
+          {t("Dumpsters ({{count}})", { count: filteredDumpsters.length })}
         </h1>
         <div className="flex space-x-3">
           <div className="relative">
@@ -367,7 +369,7 @@ const DumpsterListPage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search"
+              placeholder={t("Search")}
               className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -379,12 +381,12 @@ const DumpsterListPage: React.FC = () => {
                 <ListboxButton className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500">
                   <span className="pl-2 block truncate">
                     {statusFilter === "All"
-                      ? "All Statuses"
+                      ? t("All Statuses")
                       : statusFilter === "Available"
-                      ? "Available"
+                      ? t("Available")
                       : statusFilter === "Rented"
-                      ? "Rented"
-                      : "Maintenance"}
+                      ? t("Rented")
+                      : t("Maintenance")}
                   </span>
                   <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
                     <IconChevronDown
@@ -411,7 +413,7 @@ const DumpsterListPage: React.FC = () => {
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          All Statuses
+                          {t("All Statuses")}
                         </span>
                         {selected && (
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -438,7 +440,7 @@ const DumpsterListPage: React.FC = () => {
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          Available
+                          {t("Available")}
                         </span>
                         {selected && (
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -465,7 +467,7 @@ const DumpsterListPage: React.FC = () => {
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          Rented
+                          {t("Rented")}
                         </span>
                         {selected && (
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -492,7 +494,7 @@ const DumpsterListPage: React.FC = () => {
                             selected ? "font-medium" : "font-normal"
                           }`}
                         >
-                          Maintenance
+                          {t("Maintenance")}
                         </span>
                         {selected && (
                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
@@ -511,7 +513,7 @@ const DumpsterListPage: React.FC = () => {
             icon={IconPlus}
             variant="outline"
           >
-            Add Dumpster
+            {t("Add Dumpster")}
           </Button>
         </div>
       </div>
@@ -522,7 +524,7 @@ const DumpsterListPage: React.FC = () => {
           <div className="flex items-center">
             <IconCalendar size={18} className="text-default-500 dark:text-gray-400 mr-2" />
             <h3 className="font-medium text-default-900 dark:text-gray-100">
-              Dumpster Availability Timeline
+              {t("Dumpster Availability Timeline")}
             </h3>
           </div>
 
@@ -530,13 +532,19 @@ const DumpsterListPage: React.FC = () => {
           <div className="flex items-center space-x-6">
             <div className="flex items-center space-x-3 bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 px-3 py-1 rounded-full shadow-sm">
               <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-              <span className="text-sm text-default-600 dark:text-gray-300">Available</span>
+              <span className="text-sm text-default-600 dark:text-gray-300">
+                {t("Available")}
+              </span>
 
               <div className="w-2.5 h-2.5 rounded-full bg-rose-500"></div>
-              <span className="text-sm text-default-600 dark:text-gray-300">Rented</span>
+              <span className="text-sm text-default-600 dark:text-gray-300">
+                {t("Rented")}
+              </span>
 
               <div className="w-2.5 h-2.5 rounded-full bg-amber-400"></div>
-              <span className="text-sm text-default-600 dark:text-gray-300">Maintenance</span>
+              <span className="text-sm text-default-600 dark:text-gray-300">
+                {t("Maintenance")}
+              </span>
             </div>
 
             <div className="flex items-center border border-default-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 shadow-sm overflow-hidden">
@@ -546,7 +554,7 @@ const DumpsterListPage: React.FC = () => {
                   setStartDate(new Date(today.getFullYear(), today.getMonth(), 1));
                 }}
                 className="text-sm font-medium text-default-700 dark:text-gray-200 px-3 py-1 hover:bg-default-100 dark:hover:bg-gray-600 transition-colors"
-                title="Go to current month"
+                title={t("Go to current month")}
               >
                 {startDate.toLocaleDateString("en-US", {
                   month: "long",
@@ -558,7 +566,7 @@ const DumpsterListPage: React.FC = () => {
                 <button
                   onClick={() => navigatePeriod("prev")}
                   className="p-1.5 hover:bg-default-100 dark:hover:bg-gray-600 transition-colors"
-                  title="Previous month"
+                  title={t("Previous month")}
                 >
                   <IconChevronLeft size={18} className="text-default-700 dark:text-gray-200" />
                 </button>
@@ -566,7 +574,7 @@ const DumpsterListPage: React.FC = () => {
                 <button
                   onClick={() => navigatePeriod("next")}
                   className="p-1.5 hover:bg-default-100 dark:hover:bg-gray-600 transition-colors"
-                  title="Next month"
+                  title={t("Next month")}
                 >
                   <IconChevronRight size={18} className="text-default-700 dark:text-gray-200" />
                 </button>
@@ -577,7 +585,7 @@ const DumpsterListPage: React.FC = () => {
 
         {filteredDumpsters.length === 0 ? (
           <div className="p-8 text-center text-default-500 dark:text-gray-400">
-            No dumpsters match your search criteria.
+            {t("No dumpsters match your search criteria.")}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -589,7 +597,7 @@ const DumpsterListPage: React.FC = () => {
             >
               {/* Header Row: Dates */}
               <div className="bg-default-50 dark:bg-gray-900/50 py-2 px-2 sticky left-0 z-10 text-sm font-medium text-default-600 dark:text-gray-300 border-b border-r border-default-200 dark:border-gray-700">
-                Dumpster
+                {t("Dumpster")}
               </div>
               {dateRange.map((date, index) => {
                 // Highlight today
@@ -720,10 +728,10 @@ const DumpsterListPage: React.FC = () => {
                         }`}
                       >
                         {tooltipData.status.type === "available"
-                          ? "Available"
+                          ? t("Available")
                           : tooltipData.status.type === "rented"
-                          ? "Rented"
-                          : "Under Maintenance"}
+                          ? t("Rented")
+                          : t("Under Maintenance")}
                       </span>
                     </div>
                     <span className="text-xs text-default-500 dark:text-gray-400">
@@ -735,7 +743,9 @@ const DumpsterListPage: React.FC = () => {
                 </div>
 
                 <div className="font-medium text-default-800 dark:text-gray-100">
-                  Dumpster: {tooltipData.dumpster.tong_no}
+                  {t("Dumpster: {{tong}}", {
+                    tong: tooltipData.dumpster.tong_no,
+                  })}
                 </div>
 
                 {tooltipData.status.type === "rented" &&
@@ -776,21 +786,23 @@ const DumpsterListPage: React.FC = () => {
                         />
                         <div className="flex flex-col">
                           <span className="text-default-600 dark:text-gray-300 text-sm">
-                            Placed:{" "}
-                            {formatDetailDate(
-                              tooltipData.status.rental.date_placed
-                            )}
+                            {t("Placed: {{date}}", {
+                              date: formatDetailDate(
+                                tooltipData.status.rental.date_placed
+                              ),
+                            })}
                           </span>
                           {tooltipData.status.rental.date_picked ? (
                             <span className="text-default-600 dark:text-gray-300 text-sm">
-                              Pickup:{" "}
-                              {formatDetailDate(
-                                tooltipData.status.rental.date_picked
-                              )}
+                              {t("Pickup: {{date}}", {
+                                date: formatDetailDate(
+                                  tooltipData.status.rental.date_picked
+                                ),
+                              })}
                             </span>
                           ) : (
                             <span className="text-green-600 text-sm">
-                              Ongoing rental
+                              {t("Ongoing rental")}
                             </span>
                           )}
                         </div>
@@ -802,7 +814,9 @@ const DumpsterListPage: React.FC = () => {
                           className="mt-0.5 text-default-400 shrink-0"
                         />
                         <span className="text-default-600 dark:text-gray-300 text-sm">
-                          Driver: {tooltipData.status.rental.driver}
+                          {t("Driver: {{driver}}", {
+                            driver: tooltipData.status.rental.driver,
+                          })}
                         </span>
                       </div>
 
@@ -816,7 +830,7 @@ const DumpsterListPage: React.FC = () => {
                             setTooltipData(null);
                           }}
                         >
-                          View rental details →
+                          {t("View rental details →")}
                         </button>
                       </div>
                     </div>
@@ -835,7 +849,7 @@ const DumpsterListPage: React.FC = () => {
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
           >
-            <IconChevronLeft className="w-5 h-5 mr-2" /> Previous
+            <IconChevronLeft className="w-5 h-5 mr-2" /> {t("Previous")}
           </button>
           <div className="flex space-x-2">
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -871,7 +885,7 @@ const DumpsterListPage: React.FC = () => {
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
-            Next <IconChevronRight className="w-5 h-5 ml-2" />
+            {t("Next")} <IconChevronRight className="w-5 h-5 ml-2" />
           </button>
         </div>
       )}
@@ -881,9 +895,12 @@ const DumpsterListPage: React.FC = () => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Dumpster"
-        message={`Are you sure you want to delete dumpster ${dumpsterToDelete?.tong_no}? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Dumpster")}
+        message={t(
+          "Are you sure you want to delete dumpster {{tong}}? This action cannot be undone.",
+          { tong: dumpsterToDelete?.tong_no }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

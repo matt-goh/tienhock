@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { IconTrash, IconX } from "@tabler/icons-react";
 import toast from "react-hot-toast";
 import { greenTargetApi } from "../../routes/greentarget/api";
@@ -119,6 +120,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const { t } = useTranslation("greentarget");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [loadingInvoices, setLoadingInvoices] = useState<boolean>(false);
   const [availableInvoices, setAvailableInvoices] = useState<
@@ -206,7 +208,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
       console.error("Error fetching unpaid invoices:", error);
       if (requestId === invoiceRequestIdRef.current) {
         setAvailableInvoices([]);
-        toast.error("Failed to fetch unpaid invoices");
+        toast.error(t("Failed to fetch unpaid invoices"));
       }
     } finally {
       if (requestId === invoiceRequestIdRef.current) {
@@ -235,7 +237,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
     allowAdvancePayment: boolean = false
   ): Promise<void> => {
     setIsSubmitting(true);
-    const toastId: string = toast.loading("Processing payment...");
+    const toastId: string = toast.loading(t("Processing payment..."));
 
     try {
       const paymentReference: string = formData.payment_reference.trim();
@@ -266,18 +268,24 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
 
       toast.success(
         joinedReceipt
-          ? `${selectedInvoices.length} invoice${
-              selectedInvoices.length === 1 ? "" : "s"
-            } added to receipt ${joinedReceipt.display_reference}`
+          ? t(
+              "{{count}} invoice/invoices added to receipt {{reference}}",
+              {
+                count: selectedInvoices.length,
+                reference: joinedReceipt.display_reference,
+              }
+            )
           : selectedInvoices.length === 1
-          ? "Payment recorded successfully"
-          : `Payments recorded for ${selectedInvoices.length} invoices`,
+          ? t("Payment recorded successfully")
+          : t("Payments recorded for {{count}} invoices", {
+              count: selectedInvoices.length,
+            }),
         { id: toastId, duration: 6000 }
       );
       onSuccess(formData.payment_date);
     } catch (error: unknown) {
       console.error("Error creating payment:", error);
-      toast.error(getApiErrorMessage(error), { id: toastId });
+      toast.error(t(getApiErrorMessage(error)), { id: toastId });
     } finally {
       setIsSubmitting(false);
     }
@@ -293,7 +301,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
     }
 
     if (selectedInvoices.length === 0) {
-      toast.error("Please select at least one invoice to pay");
+      toast.error(t("Please select at least one invoice to pay"));
       return;
     }
 
@@ -313,39 +321,45 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
       );
       if (invalidAllocation.amountToPay > invoiceBalance) {
         toast.error(
-          `Payment for invoice ${invalidAllocation.invoice.invoice_number} cannot exceed ${formatCurrency(
-            invoiceBalance
-          )}`
+          t("Payment for invoice {{number}} cannot exceed {{amount}}", {
+            number: invalidAllocation.invoice.invoice_number,
+            amount: formatCurrency(invoiceBalance),
+          })
         );
       } else {
         toast.error(
-          `Enter a payment amount of at least RM0.01 using no more than two decimal places for invoice ${invalidAllocation.invoice.invoice_number}`
+          t(
+            "Enter a payment amount of at least RM0.01 using no more than two decimal places for invoice {{number}}",
+            { number: invalidAllocation.invoice.invoice_number }
+          )
         );
       }
       return;
     }
 
     if (!formData.internal_reference.trim()) {
-      toast.error("Green Target reference number is required");
+      toast.error(t("Green Target reference number is required"));
       return;
     }
     if (formData.internal_reference.trim().length > 50) {
-      toast.error("Green Target reference number cannot exceed 50 characters");
+      toast.error(
+        t("Green Target reference number cannot exceed 50 characters")
+      );
       return;
     }
     if (formData.payment_reference.trim().length > 50) {
-      toast.error("Cheque number cannot exceed 50 characters");
+      toast.error(t("Cheque number cannot exceed 50 characters"));
       return;
     }
     if (paymentReceiptLookup.isLooking) {
-      toast.error("Wait for the Green Target reference check to finish");
+      toast.error(t("Wait for the Green Target reference check to finish"));
       return;
     }
     if (paymentReceiptLookup.receipt && !joinedReceipt) {
       toast.error(
         paymentReceiptLookup.joinable
-          ? "Confirm that these payments belong to the existing receipt"
-          : "This Green Target reference cannot accept another payment"
+          ? t("Confirm that these payments belong to the existing receipt")
+          : t("This Green Target reference cannot accept another payment")
       );
       return;
     }
@@ -468,7 +482,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
             onClick={onClose}
             className="flex-shrink-0 rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             disabled={isSubmitting}
-            aria-label="Close payment form"
+            aria-label={t("Close payment form")}
           >
             <IconX size={20} />
           </button>
@@ -483,16 +497,17 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
               <section className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <div className="border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                   <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                    Payment details
+                    {t("Payment details")}
                   </h4>
                   <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    Date, payment method and reference information.
+                    {t("Date, payment method and reference information.")}
                   </p>
                 </div>
                 <div className="space-y-4 p-4">
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
-                      Date Received <span className="text-red-500">*</span>
+                      {t("Date Received")}{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <TimeNavigator
                       range={paymentDateRange}
@@ -507,7 +522,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                   </div>
                   <FormInput
                     name="internal_reference"
-                    label="Green Target Reference No."
+                    label={t("Green Target Reference No.")}
                     placeholder="e.g. RV26/06/62"
                     value={formData.internal_reference}
                     onChange={(
@@ -531,7 +546,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                   />
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Payment Method
+                      {t("Payment Method")}
                     </label>
                     <PillSelect<string>
                       value={effectivePaymentMethod}
@@ -551,9 +566,12 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                           })
                         )
                       }
-                      options={PAYMENT_METHOD_OPTIONS}
+                      options={PAYMENT_METHOD_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: t(option.label),
+                      }))}
                       disabled={isSubmitting || joinedReceipt !== null}
-                      ariaLabel="Payment method"
+                      ariaLabel={t("Payment method")}
                     size="md"
                     />
                   </div>
@@ -564,8 +582,8 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                   {effectivePaymentMethod === "cheque" && (
                     <FormInput
                       name="payment_reference"
-                      label="Cheque No. (Optional)"
-                      placeholder="Cheque number"
+                      label={t("Cheque No. (Optional)")}
+                      placeholder={t("Cheque Number")}
                       value={
                         joinedReceipt
                           ? joinedReceipt.payment_reference || ""
@@ -592,7 +610,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
               <section className="rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900">
                 <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                   <h4 className="font-semibold text-gray-900 dark:text-gray-100">
-                    Selected invoices
+                    {t("Selected invoices")}
                   </h4>
                   <span className="inline-flex min-w-6 items-center justify-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
                     {selectedInvoices.length}
@@ -602,10 +620,12 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                 {selectedInvoices.length === 0 ? (
                   <div className="px-4 py-8 text-center">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                      No invoices selected
+                      {t("No invoices selected")}
                     </p>
                     <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      Use the invoice browser to add one or more unpaid invoices.
+                      {t(
+                        "Use the invoice browser to add one or more unpaid invoices."
+                      )}
                     </p>
                   </div>
                 ) : (
@@ -653,7 +673,9 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                                 }
                                 className="flex-shrink-0 rounded-md p-2 text-red-500 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/40"
                                 disabled={isSubmitting}
-                                aria-label={`Remove invoice ${invoice.invoice_number}`}
+                                aria-label={t("Remove invoice {{number}}", {
+                                  number: invoice.invoice_number,
+                                })}
                               >
                                 <IconTrash size={16} />
                               </button>
@@ -662,7 +684,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                             <div className="mt-3 grid grid-cols-[minmax(0,1fr)_minmax(120px,0.8fr)] items-end gap-3 border-t border-gray-200 pt-3 dark:border-gray-700">
                               <div>
                                 <span className="block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Balance due
+                                  {t("Balance Due")}
                                 </span>
                                 <span className="mt-1 block text-sm font-semibold text-gray-900 dark:text-gray-100">
                                   {formatCurrency(invoiceBalance)}
@@ -670,7 +692,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                               </div>
                               <label>
                                 <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                  Payment amount
+                                  {t("Payment amount")}
                                 </span>
                                 <input
                                   type="number"
@@ -704,12 +726,12 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
 
                             {isInvalidAmount && (
                               <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
-                                Enter an amount above RM0.
+                                {t("Enter an amount above RM0.")}
                               </p>
                             )}
                             {isAboveBalance && (
                               <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">
-                                Payment cannot exceed the invoice balance.
+                                {t("Payment cannot exceed the invoice balance.")}
                               </p>
                             )}
                           </div>
@@ -743,16 +765,16 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
             <div className="min-w-0">
               <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-sm">
                 {selectedInvoices.length === 0
-                  ? "Select at least one invoice to continue."
-                  : `${selectedInvoices.length} invoice${
-                      selectedInvoices.length === 1 ? "" : "s"
-                    } selected`}
+                  ? t("Select at least one invoice to continue.")
+                  : t("{{count}} invoice/invoices selected", {
+                      count: selectedInvoices.length,
+                    })}
                 {selectedInvoices.length > 0 &&
                   (joinedReceipt
                     ? joinedReceipt.status === "pending"
                     : effectivePaymentMethod === "cheque") && (
                     <span className="ml-1 text-amber-600 dark:text-amber-400">
-                      - Pending until confirmed
+                      {t("- Pending until confirmed")}
                     </span>
                   )}
               </p>
@@ -761,7 +783,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
               {selectedInvoices.length > 0 && (
                 <div className="mr-auto text-left sm:mr-2 sm:text-right">
                   <span className="block text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Payment total
+                    {t("Payment total")}
                   </span>
                   <span className="block text-lg font-bold text-green-600 dark:text-green-400">
                     {formatCurrency(totalPaymentAmount)}
@@ -774,7 +796,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                 onClick={onClose}
                 disabled={isSubmitting}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 type="submit"
@@ -789,10 +811,10 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                 }
               >
                 {isSubmitting
-                  ? "Processing..."
+                  ? t("Processing...")
                   : joinedReceipt
-                  ? "Add to Receipt"
-                  : "Record Payment"}
+                  ? t("Add to Receipt")
+                  : t("Record Payment")}
               </Button>
             </div>
           </div>
@@ -804,13 +826,20 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
             setAdvancePaymentPrompt(null);
             void processPayments(true);
           }}
-          title="Record Advance Payment?"
+          title={t("Record Advance Payment?")}
           message={
             advancePaymentPrompt
-              ? `The payment received date (${advancePaymentPrompt.paymentDate}) is before invoice ${advancePaymentPrompt.invoiceNumber}'s date (${advancePaymentPrompt.invoiceDate}). Record this as an advance payment?`
+              ? t(
+                  "The payment received date ({{received}}) is before invoice {{number}}'s date ({{issued}}). Record this as an advance payment?",
+                  {
+                    received: advancePaymentPrompt.paymentDate,
+                    number: advancePaymentPrompt.invoiceNumber,
+                    issued: advancePaymentPrompt.invoiceDate,
+                  }
+                )
               : ""
           }
-          confirmButtonText="Record Payment"
+          confirmButtonText={t("Record Payment")}
           variant="default"
         />
       </div>

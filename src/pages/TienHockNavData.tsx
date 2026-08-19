@@ -91,6 +91,7 @@ import PackingCutiEntryPage from "./Payroll/Leave/PackingCutiEntryPage";
 // Payroll - Statutory
 import ContributionRatesPage from "./Payroll/Statutory/ContributionRatesPage";
 import ECarumanPage from "./Payroll/Statutory/ECarumanPage";
+import CP8DPage from "./Payroll/Statutory/CP8DPage";
 
 // Payroll - AddOn
 import OthersAdvancePage from "./Payroll/AddOn/OthersAdvancePage";
@@ -184,6 +185,15 @@ const generatePayrollSubItems = (): SidebarItem[] => {
     name: "e-Caruman",
     path: "/payroll/e-caruman",
     component: ECarumanPage,
+    group: "Payroll",
+    dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.main.key,
+    dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.main.order,
+  });
+
+  payrollSubItems.push({
+    name: "CP8D",
+    path: "/payroll/cp8d",
+    component: CP8DPage,
     group: "Payroll",
     dropdownColumn: PAYROLL_DROPDOWN_COLUMNS.main.key,
     dropdownColumnOrder: PAYROLL_DROPDOWN_COLUMNS.main.order,

@@ -30,7 +30,7 @@ const TrialBalanceOrderButton: React.FC<TrialBalanceOrderButtonProps> = ({
   onModeChange,
   onOpen,
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("accounting");
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isStandardMode: boolean = preference.mode === "standard";

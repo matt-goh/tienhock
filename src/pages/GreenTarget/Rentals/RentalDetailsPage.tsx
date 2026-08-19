@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { format } from "date-fns";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import {
   IconChevronDown,
   IconFileInvoice,
@@ -219,7 +219,7 @@ const RentalDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation("nav");
+  const { t } = useTranslation("greentarget");
 
   const [rental, setRental] = useState<RentalDetails | null>(null);
   const [selectedReceiptId, setSelectedReceiptId] = useState<number | null>(
@@ -335,7 +335,7 @@ const RentalDetailsPage: React.FC = () => {
       setError(null);
     } catch (err) {
       console.error("Error fetching rental details:", err);
-      setError("Failed to fetch rental details. Please try again.");
+      setError(t("Failed to fetch rental details. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -452,7 +452,7 @@ const RentalDetailsPage: React.FC = () => {
       setCustomerRentals(available);
     } catch (err) {
       console.error("Error fetching customer rentals:", err);
-      toast.error("Failed to load this customer's rentals.");
+      toast.error(t("Failed to load this customer's rentals."));
       setCustomerRentals([]);
     } finally {
       setIsLoadingCustomerRentals(false);
@@ -541,9 +541,11 @@ const RentalDetailsPage: React.FC = () => {
               isValid: result.available,
               isDuplicate: result.exists,
               message: result.exists
-                ? `Invoice number already exists${
-                    result.existing_id ? ` (ID: ${result.existing_id})` : ""
-                  }`
+                ? result.existing_id
+                  ? t("Invoice number already exists (ID: {{id}})", {
+                      id: result.existing_id,
+                    })
+                  : t("Invoice number already exists")
                 : "",
             });
           }
@@ -554,7 +556,7 @@ const RentalDetailsPage: React.FC = () => {
             isValidating: false,
             isValid: false,
             isDuplicate: false,
-            message: "Error validating invoice number",
+            message: t("Error validating invoice number"),
           });
         });
     }, 500);
@@ -581,25 +583,23 @@ const RentalDetailsPage: React.FC = () => {
     if (!rental) return;
     const amount = parseFloat(invoiceAmount);
     if (selectedRentalIds.length === 0) {
-      toast.error("Select at least one rental.");
+      toast.error(t("Select at least one rental."));
       return;
     }
     if (isNaN(amount) || amount <= 0) {
-      toast.error("Please enter a valid amount.");
+      toast.error(t("Please enter a valid amount."));
       return;
     }
     if (!dateIssued) {
-      toast.error("Date issued is required.");
+      toast.error(t("Date issued is required."));
       return;
     }
     if (invoiceNumber.trim() && invoiceNumberValidation.isDuplicate) {
-      toast.error(
-        "Invoice number already exists. Please choose a different number."
-      );
+      toast.error(t("Invoice number already exists. Please choose a different number."));
       return;
     }
     if (invoiceNumber.trim() && invoiceNumberValidation.isValidating) {
-      toast.error("Please wait while the invoice number is checked.");
+      toast.error(t("Please wait while the invoice number is checked."));
       return;
     }
     const hasInvalidRevenueSplit: boolean =
@@ -614,11 +614,13 @@ const RentalDetailsPage: React.FC = () => {
       0
     );
     if (hasInvalidRevenueSplit) {
-      toast.error("Enter an amount greater than RM 0.00 for every revenue line.");
+      toast.error(
+        t("Enter an amount greater than RM 0.00 for every revenue line")
+      );
       return;
     }
     if (allocatedRevenueCents !== toCents(amount)) {
-      toast.error("Revenue allocation must equal the invoice total.");
+      toast.error(t("Revenue allocation must equal the invoice total"));
       return;
     }
     const hasInvalidLine: boolean =
@@ -633,31 +635,27 @@ const RentalDetailsPage: React.FC = () => {
       );
     if (hasInvalidLine) {
       toast.error(
-        "Every line item needs a description, a quantity above 0 and a unit price of 0 or more."
+        t(
+          "Every line item needs a description, a quantity above 0 and a unit price of 0 or more"
+        )
       );
       return;
     }
     if (recordPayment && !paymentInternalReference.trim()) {
-      toast.error(
-        "Green Target Reference No. is required to record a payment."
-      );
+      toast.error(t("Green Target Reference No. is required to record a payment."));
       return;
     }
     if (recordPayment && paymentReceiptLookup.isLooking) {
-      toast.error("Please wait while the reference number is checked.");
+      toast.error(t("Please wait while the reference number is checked."));
       return;
     }
     if (recordPayment && paymentReceiptLookup.receipt) {
       if (!paymentReceiptLookup.joinable) {
-        toast.error(
-          "This reference belongs to a receipt that cannot accept this payment."
-        );
+        toast.error(t("This reference belongs to a receipt that cannot accept this payment."));
         return;
       }
       if (!confirmedPaymentReceipt) {
-        toast.error(
-          "Confirm that this payment should join the existing receipt."
-        );
+        toast.error(t("Confirm that this payment should join the existing receipt."));
         return;
       }
     }
@@ -666,7 +664,7 @@ const RentalDetailsPage: React.FC = () => {
         confirmedPaymentReceipt.received_date
       );
       if (!inheritedReceivedDate) {
-        toast.error("The existing receipt has no received date.");
+        toast.error(t("The existing receipt has no received date."));
         return;
       }
       if (
@@ -679,7 +677,7 @@ const RentalDetailsPage: React.FC = () => {
       }
     } else if (recordPayment) {
       if (!paymentDate) {
-        toast.error("Payment received date is required.");
+        toast.error(t("Payment received date is required."));
         return;
       }
       if (paymentDate < dateIssued && !advancePaymentConfirmedRef.current) {
@@ -702,7 +700,7 @@ const RentalDetailsPage: React.FC = () => {
         toast.error(
           identityError instanceof Error
             ? identityError.message
-            : "Gagal menyediakan identiti penghutang."
+            : t("Failed to prepare the debtor identity.")
         );
         return;
       }
@@ -727,7 +725,11 @@ const RentalDetailsPage: React.FC = () => {
           })
         ),
       });
-      toast.success(`Invoice ${response.invoice.invoice_number} created`);
+      toast.success(
+        t("Invoice {{number}} created", {
+          number: response.invoice.invoice_number,
+        })
+      );
       if (recordPayment) {
         try {
           const paymentResponse: GreenTargetPaymentMutationResponse =
@@ -755,16 +757,22 @@ const RentalDetailsPage: React.FC = () => {
             });
           toast.success(
             paymentResponse.receipt?.joined
-              ? `Payment added to receipt ${paymentResponse.receipt.display_reference}`
-              : "Payment recorded"
+              ? t("Payment added to receipt {{reference}}", {
+                  reference: paymentResponse.receipt.display_reference,
+                })
+              : t("Payment recorded")
           );
         } catch (paymentError: any) {
           console.error("Error recording payment:", paymentError);
           const paymentMessage =
             paymentError?.response?.data?.error ||
             paymentError?.response?.data?.message ||
-            "failed to record the payment.";
-          toast.error(`Invoice created, but ${paymentMessage}`);
+            t("failed to record the payment.");
+          toast.error(
+            t("Invoice created, but {{message}}", {
+              message: paymentMessage,
+            })
+          );
         }
       }
       navigate(`/greentarget/invoices/${response.invoice.invoice_id}`);
@@ -773,7 +781,7 @@ const RentalDetailsPage: React.FC = () => {
       const message =
         error?.response?.data?.error ||
         error?.response?.data?.message ||
-        "Failed to create invoice.";
+        t("Failed to create invoice.");
       toast.error(message);
     } finally {
       setIsCreatingInvoice(false);
@@ -799,14 +807,14 @@ const RentalDetailsPage: React.FC = () => {
     if (!rental) return;
 
     if (!selectedDestination) {
-      toast.error("Please select a pickup destination");
+      toast.error(t("Please select a pickup destination"));
       return;
     }
 
     const today = format(new Date(), "yyyy-MM-dd");
     // A rental with no placement date has no lower bound to check against.
     if (rental.date_placed && toLocalDateString(rental.date_placed) > today) {
-      toast.error("Pickup date cannot be earlier than placement date");
+      toast.error(t("Pickup date cannot be earlier than placement date"));
       setIsPickupDialogOpen(false);
       return;
     }
@@ -820,12 +828,12 @@ const RentalDetailsPage: React.FC = () => {
         pickup_destination: selectedDestination,
         remarks: rental.remarks,
       });
-      toast.success("Rental marked as picked up");
+      toast.success(t("Rental marked as picked up"));
       setIsPickupDialogOpen(false);
       fetchDetails();
     } catch (error) {
       console.error("Error updating rental:", error);
-      toast.error("Failed to mark rental as picked up");
+      toast.error(t("Failed to mark rental as picked up"));
     } finally {
       setIsPickingUp(false);
     }
@@ -839,12 +847,12 @@ const RentalDetailsPage: React.FC = () => {
     setIsDeleting(true);
     try {
       await greenTargetApi.deleteRental(rental.rental_id);
-      toast.success("Rental deleted successfully");
+      toast.success(t("Rental deleted successfully"));
       navigate("/greentarget/rentals");
     } catch (error: any) {
       console.error("Error deleting rental:", error);
       const message =
-        error?.response?.data?.message || "Failed to delete rental";
+        error?.response?.data?.message || t("Failed to delete rental");
       toast.error(message);
       setIsDeleteDialogOpen(false);
     } finally {
@@ -866,7 +874,7 @@ const RentalDetailsPage: React.FC = () => {
         <BackButton fallbackPath="/greentarget/rentals" />
         <div className="text-center py-8">
           <p className="text-default-500 dark:text-gray-400">
-            {error || "Rental not found."}
+            {error || t("Rental not found.")}
           </p>
         </div>
       </div>
@@ -886,12 +894,12 @@ const RentalDetailsPage: React.FC = () => {
           <BackButton fallbackPath="/greentarget/rentals" />
           <div className="h-6 w-px bg-default-300 dark:bg-default-700"></div>
           <h1 className="text-2xl font-bold text-default-700 dark:text-gray-200">
-            Rental #{rental.rental_id}
+            {t("Rental #{{id}}", { id: rental.rental_id })}
           </h1>
           <span
             className={`text-sm px-2.5 py-0.5 rounded-full font-medium ${billingStatus.badgeClassName}`}
           >
-            {billingStatus.label}
+            {t(billingStatus.label)}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -903,7 +911,7 @@ const RentalDetailsPage: React.FC = () => {
               variant="outline"
               color="amber"
             >
-              Mark as Picked Up
+              {t("Mark as Picked Up")}
             </Button>
           )}
           <Button
@@ -912,7 +920,7 @@ const RentalDetailsPage: React.FC = () => {
             variant="outline"
             color="sky"
           >
-            Edit
+            {t("Edit")}
           </Button>
           <Button
             onClick={() => setIsDeleteDialogOpen(true)}
@@ -920,7 +928,7 @@ const RentalDetailsPage: React.FC = () => {
             variant="outline"
             color="rose"
           >
-            Delete
+            {t("Delete")}
           </Button>
         </div>
       </div>
@@ -930,7 +938,7 @@ const RentalDetailsPage: React.FC = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Customer
+              {t("Customer")}
             </p>
             <button
               onClick={() =>
@@ -943,7 +951,7 @@ const RentalDetailsPage: React.FC = () => {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Location
+              {t("Location")}
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200 flex items-center gap-1.5">
               {locationLabel ? (
@@ -958,7 +966,7 @@ const RentalDetailsPage: React.FC = () => {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Tong No
+              {t("Tong No")}
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200">
               {rental.tong_no || "-"}
@@ -966,7 +974,7 @@ const RentalDetailsPage: React.FC = () => {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Driver
+              {t("Driver")}
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200">
               {rental.driver}
@@ -974,7 +982,7 @@ const RentalDetailsPage: React.FC = () => {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Date Placed
+              {t("Date Placed")}
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200">
               {formatDisplayDate(rental.date_placed)}
@@ -982,15 +990,17 @@ const RentalDetailsPage: React.FC = () => {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Date Picked
+              {t("Date Picked")}
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200">
-              {rental.date_picked ? formatDisplayDate(rental.date_picked) : "Ongoing"}
+              {rental.date_picked
+                ? formatDisplayDate(rental.date_picked)
+                : t("Ongoing")}
             </p>
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Pickup Destination
+              {t("Pickup Destination")}
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200">
               {rental.pickup_destination_name || rental.pickup_destination || "-"}
@@ -998,7 +1008,7 @@ const RentalDetailsPage: React.FC = () => {
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-500 mb-0.5">
-              Remarks
+              {t("Remarks")}
             </p>
             <p className="font-medium text-default-800 dark:text-gray-200">
               {rental.remarks || "-"}
@@ -1011,7 +1021,7 @@ const RentalDetailsPage: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 rounded-lg shadow-sm p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-            Invoices &amp; Payments
+            {t("Invoices & Payments")}
           </h2>
           <Button
             onClick={openInvoiceModal}
@@ -1021,17 +1031,17 @@ const RentalDetailsPage: React.FC = () => {
             disabled={hasActiveInvoice}
             title={
               hasActiveInvoice
-                ? "This rental is already linked to an invoice"
-                : "Create an invoice for this rental"
+                ? t("This rental is already linked to an invoice")
+                : t("Create an invoice for this rental")
             }
           >
-            Create Invoice
+            {t("Create Invoice")}
           </Button>
         </div>
 
         {invoices.length === 0 ? (
           <p className="text-sm text-default-500 dark:text-gray-400">
-            No invoices linked to this rental yet.
+            {t("No invoices linked to this rental yet.")}
           </p>
         ) : (
           <div className="space-y-4">
@@ -1058,7 +1068,7 @@ const RentalDetailsPage: React.FC = () => {
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.classes}`}
                       >
-                        {badge.label}
+                        {t(badge.label)}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
@@ -1092,9 +1102,11 @@ const RentalDetailsPage: React.FC = () => {
                                   {formatDisplayDate(payment.payment_date)}
                                 </td>
                                 <td className="py-1.5 pr-3 text-default-800 dark:text-gray-200">
-                                  {paymentMethodLabels[
-                                    payment.payment_method
-                                  ] || payment.payment_method}
+                                  {t(
+                                    paymentMethodLabels[
+                                      payment.payment_method
+                                    ] || payment.payment_method
+                                  )}
                                 </td>
                                 <td className="py-1.5 pr-3 text-default-600 dark:text-gray-400">
                                   {payment.receipt_id ? (
@@ -1106,12 +1118,16 @@ const RentalDetailsPage: React.FC = () => {
                                         )
                                       }
                                       className="text-sky-600 hover:underline dark:text-sky-400"
-                                      title={`View receipt ${
-                                        payment.internal_reference || ""
-                                      } and every invoice it settles`}
+                                      title={t(
+                                        "View receipt {{reference}} and every invoice it settles",
+                                        {
+                                          reference:
+                                            payment.internal_reference || "",
+                                        }
+                                      )}
                                     >
                                       {payment.internal_reference ||
-                                        "View receipt"}
+                                        t("View receipt")}
                                     </button>
                                   ) : (
                                     payment.internal_reference || "-"
@@ -1125,7 +1141,7 @@ const RentalDetailsPage: React.FC = () => {
                                     <span
                                       className={`text-xs px-2 py-0.5 rounded-full font-medium ${paymentBadge.classes}`}
                                     >
-                                      {paymentBadge.label}
+                                      {t(paymentBadge.label)}
                                     </span>
                                   )}
                                 </td>
@@ -1157,9 +1173,12 @@ const RentalDetailsPage: React.FC = () => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={confirmDeleteRental}
-        title="Delete Rental"
-        message={`Are you sure you want to delete rental #${rental.rental_id} for ${rental.customer_name}? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Rental")}
+        message={t(
+          "Are you sure you want to delete rental #{{id}} for {{customer}}? This action cannot be undone.",
+          { id: rental.rental_id, customer: rental.customer_name }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
         isConfirming={isDeleting}
       />
@@ -1173,11 +1192,15 @@ const RentalDetailsPage: React.FC = () => {
           setAdvancePaymentPrompt(null);
           void handleCreateInvoice();
         }}
-        title="Record Advance Payment?"
-        message={`The payment received date (${
-          advancePaymentPrompt?.paymentDate ?? ""
-        }) is before the invoice date (${dateIssued}). Record this as an advance payment?`}
-        confirmButtonText="Record Payment"
+        title={t("Record Advance Payment?")}
+        message={t(
+          "The payment received date ({{received}}) is before the invoice date ({{issued}}). Record this as an advance payment?",
+          {
+            received: advancePaymentPrompt?.paymentDate ?? "",
+            issued: dateIssued,
+          }
+        )}
+        confirmButtonText={t("Record Payment")}
         variant="default"
       />
 
@@ -1214,7 +1237,7 @@ const RentalDetailsPage: React.FC = () => {
                 <Dialog.Panel className="w-full max-w-md transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                      Mark Rental as Picked Up
+                      {t("Mark Rental as Picked Up")}
                     </Dialog.Title>
                     <button
                       onClick={() => setIsPickupDialogOpen(false)}
@@ -1225,16 +1248,15 @@ const RentalDetailsPage: React.FC = () => {
                   </div>
 
                   <p className="text-sm text-default-600 dark:text-gray-400 mb-4">
-                    Mark the rental for{" "}
-                    <span className="font-medium text-default-800 dark:text-gray-200">
-                      {rental.customer_name}
-                    </span>{" "}
-                    as picked up today.
+                    {t("Mark the rental for {{customer}} as picked up today.", {
+                      customer: rental.customer_name,
+                    })}
                   </p>
 
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                      Pickup Destination <span className="text-rose-500">*</span>
+                      {t("Pickup Destination")}{" "}
+                      <span className="text-rose-500">*</span>
                     </label>
                     <Listbox
                       value={selectedDestination}
@@ -1245,7 +1267,7 @@ const RentalDetailsPage: React.FC = () => {
                           <span className="block truncate text-default-800 dark:text-gray-200">
                             {pickupDestinations.find(
                               (d) => d.code === selectedDestination
-                            )?.name || "Select destination..."}
+                            )?.name || t("Select destination...")}
                           </span>
                           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -1283,7 +1305,7 @@ const RentalDetailsPage: React.FC = () => {
                                       {dest.name}
                                       {dest.is_default && (
                                         <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
-                                          (Default)
+                                          {t("(Default)")}
                                         </span>
                                       )}
                                     </span>
@@ -1308,7 +1330,7 @@ const RentalDetailsPage: React.FC = () => {
                       onClick={() => setIsPickupDialogOpen(false)}
                       disabled={isPickingUp}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       variant="filled"
@@ -1316,7 +1338,9 @@ const RentalDetailsPage: React.FC = () => {
                       onClick={confirmPickupRental}
                       disabled={isPickingUp || !selectedDestination}
                     >
-                      {isPickingUp ? "Processing..." : "Confirm Pickup"}
+                      {isPickingUp
+                        ? t("Processing...")
+                        : t("Confirm Pickup")}
                     </Button>
                   </div>
                 </Dialog.Panel>
@@ -1359,7 +1383,7 @@ const RentalDetailsPage: React.FC = () => {
                 <Dialog.Panel className="w-full max-w-5xl transform rounded-lg bg-white dark:bg-gray-800 p-6 shadow-xl transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <Dialog.Title className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                      Create Invoice
+                      {t("Create Invoice")}
                     </Dialog.Title>
                     <button
                       onClick={() => setIsInvoiceModalOpen(false)}
@@ -1381,7 +1405,7 @@ const RentalDetailsPage: React.FC = () => {
                   {/* Rental selection */}
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                      Rentals <span className="text-rose-500">*</span>
+                      {t("Rentals")} <span className="text-rose-500">*</span>
                     </label>
                     <div className="border border-default-300 dark:border-gray-600 rounded-lg max-h-56 overflow-y-auto divide-y divide-default-100 dark:divide-gray-700">
                       {isLoadingCustomerRentals ? (
@@ -1390,7 +1414,7 @@ const RentalDetailsPage: React.FC = () => {
                         </div>
                       ) : customerRentals.length === 0 ? (
                         <p className="py-4 px-3 text-sm text-default-500 dark:text-gray-400">
-                          No un-invoiced rentals for this customer.
+                          {t("No un-invoiced rentals for this customer.")}
                         </p>
                       ) : (
                         customerRentals.map((option) => {
@@ -1434,20 +1458,30 @@ const RentalDetailsPage: React.FC = () => {
                                 <p className="text-sm font-medium text-default-800 dark:text-gray-200 truncate">
                                   #{option.rental_id}
                                   {option.tong_no
-                                    ? ` — Tong ${option.tong_no}`
-                                    : ""}
+
+                                      ? t("#{{id}} — Tong {{tong}}", {
+
+                                          id: option.rental_id,
+
+                                          tong: option.tong_no,
+
+                                        })
+
+                                      : `#${option.rental_id}`}
                                   {isCurrent && (
                                     <span className="ml-2 text-xs text-default-400 dark:text-gray-500">
-                                      (this rental)
+                                      {t("(this rental)")}
                                     </span>
                                   )}
                                 </p>
                                 <p className="text-xs text-default-500 dark:text-gray-400 truncate">
                                   {option.date_placed
-                                    ? `Placed ${formatDisplayDate(
-                                        option.date_placed
-                                      )}`
-                                    : "No placement date"}
+                                    ? t("Placed {{date}}", {
+                                        date: formatDisplayDate(
+                                          option.date_placed
+                                        ),
+                                      })
+                                    : t("No placement date")}
                                   {optionLocation
                                     ? ` • ${optionLocation}`
                                     : ""}
@@ -1464,9 +1498,9 @@ const RentalDetailsPage: React.FC = () => {
                   <div className="mb-4">
                     <div className="flex items-end justify-between gap-3">
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-300">
-                        Invoice Number
+                        {t("Invoice Number")}
                         <span className="ml-1 text-xs font-normal text-default-500 dark:text-gray-400">
-                          (optional - auto-generated if empty)
+                          {t("(optional - auto-generated if empty)")}
                         </span>
                       </label>
                       <label
@@ -1484,7 +1518,9 @@ const RentalDetailsPage: React.FC = () => {
                             value={invoiceNumber}
                             onChange={(e) => setInvoiceNumber(e.target.value)}
                             disabled={isCreatingInvoice}
-                            placeholder="Enter custom invoice number or leave blank"
+                            placeholder={t(
+                              "Enter custom invoice number or leave blank"
+                            )}
                             className={`w-full px-3 py-2 border rounded-lg text-default-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sky-500 dark:focus:ring-sky-400 ${
                               invoiceNumberValidation.isDuplicate
                                 ? "border-rose-500 bg-rose-50 dark:bg-rose-900/30"
@@ -1514,7 +1550,7 @@ const RentalDetailsPage: React.FC = () => {
                           invoiceNumberValidation.isValid &&
                           !invoiceNumberValidation.isValidating && (
                             <p className="mt-1 text-xs text-green-600">
-                              Invoice number is available
+                              {t("Invoice number is available")}
                             </p>
                           )}
                       </div>
@@ -1537,7 +1573,8 @@ const RentalDetailsPage: React.FC = () => {
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                        Amount (RM) <span className="text-rose-500">*</span>
+                        {t("Amount (RM)")}{" "}
+                        <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="text"
@@ -1547,12 +1584,13 @@ const RentalDetailsPage: React.FC = () => {
                         tabIndex={-1}
                       />
                       <p className="mt-1 text-xs text-default-400 dark:text-gray-500">
-                        Derived from the line items below.
+                        {t("Derived from the line items below.")}
                       </p>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                        Date Issued <span className="text-rose-500">*</span>
+                        {t("Date Issued")}{" "}
+                        <span className="text-rose-500">*</span>
                       </label>
                       <input
                         type="date"
@@ -1589,7 +1627,7 @@ const RentalDetailsPage: React.FC = () => {
                       customerDefaultLoading={isLoadingCustomerDefault}
                     />
                     <p className="mt-2 text-xs text-default-500 dark:text-gray-400">
-                      Creates the matching Green Target sales journal.
+                      {t("Creates the matching Green Target sales journal.")}
                     </p>
                   </div>
 
@@ -1616,7 +1654,7 @@ const RentalDetailsPage: React.FC = () => {
                         />
                       )}
                       <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-100">
-                        Record Payment
+                        {t("Record Payment")}
                       </span>
                     </button>
                   </div>
@@ -1625,14 +1663,16 @@ const RentalDetailsPage: React.FC = () => {
                     <div className="mb-4 border border-default-200 dark:border-gray-700 rounded-lg p-4 space-y-4">
                       {!confirmedPaymentReceipt && paymentMethod === "cheque" && (
                         <p className="text-xs text-default-500 dark:text-gray-400">
-                          Cheque payments remain pending until they are
-                          confirmed.
+                          {t(
+                            "Cheque payments remain pending until they are confirmed."
+                          )}
                         </p>
                       )}
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                            Date Received <span className="text-rose-500">*</span>
+                            {t("Date Received")}{" "}
+                            <span className="text-rose-500">*</span>
                           </label>
                           <input
                             type="date"
@@ -1654,7 +1694,8 @@ const RentalDetailsPage: React.FC = () => {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                            Method <span className="text-rose-500">*</span>
+                            {t("Method")}{" "}
+                            <span className="text-rose-500">*</span>
                           </label>
                           <Listbox
                             value={effectivePaymentMethod}
@@ -1675,9 +1716,11 @@ const RentalDetailsPage: React.FC = () => {
                                 }`}
                               >
                                 <span className="block truncate">
-                                  {paymentMethodLabels[
-                                    effectivePaymentMethod
-                                  ] || effectivePaymentMethod}
+                                  {t(
+                                    paymentMethodLabels[
+                                      effectivePaymentMethod
+                                    ] || effectivePaymentMethod
+                                  )}
                                 </span>
                                 {!confirmedPaymentReceipt && (
                                   <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
@@ -1716,7 +1759,7 @@ const RentalDetailsPage: React.FC = () => {
                                                 : "font-normal"
                                             }`}
                                           >
-                                            {label}
+                                            {t(label)}
                                           </span>
                                         )}
                                       </Listbox.Option>
@@ -1731,7 +1774,7 @@ const RentalDetailsPage: React.FC = () => {
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                            Green Target Reference No.{" "}
+                            {t("Green Target Reference No.")}{" "}
                             <span className="text-rose-500">*</span>
                           </label>
                           <input
@@ -1746,7 +1789,7 @@ const RentalDetailsPage: React.FC = () => {
                         {confirmedPaymentReceipt ? (
                           <div>
                             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                              Cheque / Transaction Ref.
+                              {t("Cheque / Transaction Ref.")}
                             </label>
                             <input
                               type="text"
@@ -1760,7 +1803,7 @@ const RentalDetailsPage: React.FC = () => {
                         ) : paymentMethod === "cheque" ? (
                           <div>
                             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                              Cheque No.
+                              {t("Cheque No.")}
                             </label>
                             <input
                               type="text"
@@ -1793,7 +1836,7 @@ const RentalDetailsPage: React.FC = () => {
                       onClick={() => setIsInvoiceModalOpen(false)}
                       disabled={isCreatingInvoice}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       variant="filled"
@@ -1813,7 +1856,9 @@ const RentalDetailsPage: React.FC = () => {
                             )))
                       }
                     >
-                      {isCreatingInvoice ? "Creating..." : "Create Invoice"}
+                      {isCreatingInvoice
+                        ? t("Creating...")
+                        : t("Create Invoice")}
                     </Button>
                   </div>
                 </Dialog.Panel>

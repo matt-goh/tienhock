@@ -91,7 +91,7 @@ const MonthListbox: React.FC<MonthListboxProps> = ({
   onChange,
   disabled = false,
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("greentarget");
   const selected = MONTHS[parseInt(value, 10) - 1];
   return (
     <Listbox value={value} onChange={onChange} disabled={disabled}>
@@ -159,7 +159,7 @@ const GTRateSchedulePanel: React.FC<GTRateSchedulePanelProps> = ({
   baseRates,
   onSchedulesChanged,
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("greentarget");
   const now = new Date();
   const [schedules, setSchedules] = useState<GTPayRateSchedule[]>([]);
   const [loading, setLoading] = useState(false);
@@ -281,7 +281,7 @@ const GTRateSchedulePanel: React.FC<GTRateSchedulePanelProps> = ({
 
       <div className="mt-2 space-y-1">
         {loading ? (
-          <p className="text-xs text-gray-500">{t("loading")}</p>
+          <p className="text-xs text-gray-500">{t("Loading...")}</p>
         ) : schedules.length === 0 ? (
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {t("No scheduled changes.")}
@@ -433,7 +433,7 @@ const GTEditPayCodeRatesModal: React.FC<GTEditPayCodeRatesModalProps> = ({
   sharedRates,
   onSaved,
 }) => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("greentarget");
   const [mappings, setMappings] = useState<GTPayCodeOverride[]>([]);
   const [editRates, setEditRates] = useState<EditRatesState>({
     biasa: "",
@@ -683,7 +683,7 @@ const GTEditPayCodeRatesModal: React.FC<GTEditPayCodeRatesModalProps> = ({
                     onClick={handleClose}
                     disabled={isSaving}
                   >
-                    {t("cancel")}
+                    {t("Cancel")}
                   </Button>
                   <Button
                     type="button"

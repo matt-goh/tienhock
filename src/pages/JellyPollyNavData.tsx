@@ -31,6 +31,7 @@ import JPPayrollPage from "./JellyPolly/Payroll/JPPayrollPage";
 import JPPayrollDetailsPage from "./JellyPolly/Payroll/JPPayrollDetailsPage";
 import JPSalaryReportPage from "./JellyPolly/Payroll/JPSalaryReportPage";
 import JPECarumanPage from "./JellyPolly/Payroll/JPECarumanPage";
+import JPCP8DPage from "./JellyPolly/Payroll/JPCP8DPage";
 import JPMonthlyLogListPage from "./JellyPolly/Payroll/JPMonthlyLogListPage";
 import JPMonthlyLogEntryPage from "./JellyPolly/Payroll/JPMonthlyLogEntryPage";
 import JPMonthlyLogDetailsPage from "./JellyPolly/Payroll/JPMonthlyLogDetailsPage";
@@ -205,6 +206,14 @@ export const JellyPollyNavData: SidebarItem[] = [
         name: "e-Caruman",
         path: "/payroll/e-caruman",
         component: JPECarumanPage,
+        group: "Payroll",
+        dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.main.key,
+        dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.main.order,
+      },
+      {
+        name: "CP8D",
+        path: "/payroll/cp8d",
+        component: JPCP8DPage,
         group: "Payroll",
         dropdownColumn: JP_PAYROLL_DROPDOWN_COLUMNS.main.key,
         dropdownColumnOrder: JP_PAYROLL_DROPDOWN_COLUMNS.main.order,

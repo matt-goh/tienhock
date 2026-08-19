@@ -767,7 +767,8 @@ const LocalGeneralPurchaseFormPage: React.FC = () => {
     if (!validateEinvoiceSupplier()) return false;
     const paymentError: string | null = validateSupplierPaymentDraft(
       supplierPayment,
-      outstandingPaymentAmount
+      outstandingPaymentAmount,
+      t
     );
     if (paymentError) {
       toast.error(paymentError);

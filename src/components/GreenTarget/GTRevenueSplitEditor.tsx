@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { IconPlus, IconTrash } from "@tabler/icons-react";
 import Button from "../Button";
 import PillSelect, { PillSelectOption } from "../PillSelect";
@@ -76,8 +77,9 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
   className = "",
   allowedAccounts,
   displayOnlyAccounts = [],
-  totalLabel = "Jumlah invois",
+  totalLabel = "Invoice total",
 }) => {
+  const { t } = useTranslation("greentarget");
   const editorId: string = useId();
   const selectableRevenueAccounts: ReadonlyArray<{
     code: GreenTargetRevenueAccountCode;
@@ -247,11 +249,12 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-sm font-medium text-default-800 dark:text-gray-100">
-            Agihan hasil
+            {t("Revenue Allocation")}
           </p>
           <p className="text-xs text-default-500 dark:text-gray-400">
-            Tambah baris berasingan apabila satu invois melibatkan lebih
-            daripada satu akaun hasil.
+            {t(
+              "Add a separate row when one invoice involves more than one revenue account."
+            )}
           </p>
         </div>
         <Button
@@ -264,7 +267,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
           onClick={addSplit}
           disabled={disabled || !defaultSelectableAccount}
         >
-          Tambah baris
+          {t("Add row")}
         </Button>
       </div>
 
@@ -284,7 +287,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
               >
                 <div className="space-y-1">
                   <span className="block text-xs font-medium text-default-600 dark:text-gray-300">
-                    Akaun {index + 1}
+                    {t("Account {{number}}", { number: index + 1 })}
                   </span>
                   <PillSelect<GreenTargetRevenueSplitAccountCode>
                     value={split.account_code}
@@ -319,7 +322,9 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
                       ),
                     ]}
                     disabled={disabled || isDisplayOnlyAccount}
-                    ariaLabel={`Akaun hasil bagi baris ${index + 1}`}
+                    ariaLabel={t("Revenue account for row {{number}}", {
+                      number: index + 1,
+                    })}
                     size="md"
                   />
                 </div>
@@ -329,7 +334,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
                     htmlFor={`${editorId}-amount-${index}`}
                     className="block text-xs font-medium text-default-600 dark:text-gray-300"
                   >
-                    Amaun
+                    {t("Amount")}
                   </label>
                   <div className="relative">
                     <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-xs text-default-500 dark:text-gray-400">
@@ -361,11 +366,13 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
                   type="button"
                   onClick={(): void => removeSplit(index)}
                   disabled={disabled || splits.length <= 1}
-                  aria-label={`Buang baris hasil ${index + 1}`}
+                  aria-label={t("Remove revenue row {{number}}", {
+                    number: index + 1,
+                  })}
                   title={
                     splits.length <= 1
-                      ? "Sekurang-kurangnya satu baris hasil diperlukan"
-                      : "Buang baris hasil"
+                      ? t("At least one revenue row is required")
+                      : t("Remove revenue row")
                   }
                   className="inline-flex h-9 w-8 items-center justify-center rounded-lg text-default-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-30 dark:text-gray-500 dark:hover:bg-rose-900/20 dark:hover:text-rose-300"
                 >
@@ -380,7 +387,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
       <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-default-50 px-3 py-2 text-xs dark:bg-gray-900/40">
         <div>
           <span className="block text-default-500 dark:text-gray-400">
-            Telah diagih
+            {t("Allocated")}
           </span>
           <span className="font-medium tabular-nums text-default-800 dark:text-gray-100">
             {formatCents(allocatedCents)}
@@ -388,7 +395,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
         </div>
         <div>
           <span className="block text-default-500 dark:text-gray-400">
-            {totalLabel}
+            {t(totalLabel)}
           </span>
           <span className="font-medium tabular-nums text-default-800 dark:text-gray-100">
             {formatCents(totalCents)}
@@ -396,7 +403,7 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
         </div>
         <div>
           <span className="block text-default-500 dark:text-gray-400">
-            Baki
+            {t("Balance")}
           </span>
           <span className={`font-semibold tabular-nums ${balanceClasses}`}>
             {formatCents(remainingCents)}
@@ -407,10 +414,10 @@ const GTRevenueSplitEditor: React.FC<GTRevenueSplitEditorProps> = ({
       {!isBalanced && (
         <p className={`mt-2 text-xs ${balanceClasses}`} role="status">
           {hasEmptyAmount
-            ? "Masukkan amaun melebihi RM 0.00 bagi setiap baris hasil."
+            ? t("Enter an amount greater than RM 0.00 for every revenue line")
             : remainingCents < 0
-            ? "Agihan hasil melebihi jumlah yang perlu diagih."
-            : "Agihkan baki jumlah tersebut sebelum menyimpan."}
+            ? t("Revenue allocation exceeds the amount to allocate.")
+            : t("Allocate the remaining amount before saving.")}
         </p>
       )}
     </div>

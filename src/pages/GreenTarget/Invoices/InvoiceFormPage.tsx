@@ -175,7 +175,7 @@ const paymentMethodOptions: SelectOption[] = [
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation("nav");
+  const { t } = useTranslation("greentarget");
   const isEditMode = !!id;
   const goBack = useSmartBack(
     isEditMode && id ? `/greentarget/invoices/${id}` : "/greentarget/invoices"
@@ -341,7 +341,7 @@ const InvoiceFormPage: React.FC = () => {
       // setLoading(false) happens in fetchInvoiceDetails
     } else if (!isEditMode && customers.length === 0 && !loading) {
       // Handle case where customers couldn't load in create mode
-      setError("Could not load customer data. Cannot create invoice.");
+      setError(t("Could not load customer data. Cannot create invoice."));
       setLoading(false);
     }
   }, [isEditMode, customers, initialFormData, rentalData, id, loading]);
@@ -482,7 +482,7 @@ const InvoiceFormPage: React.FC = () => {
       setCustomers(data || []);
     } catch (err) {
       console.error("Error fetching customers:", err);
-      toast.error("Failed load customers.");
+      toast.error(t("Failed load customers."));
     }
   };
 
@@ -514,7 +514,7 @@ const InvoiceFormPage: React.FC = () => {
       setRentalTotalPages(lastPage);
     } catch (err) {
       console.error("Error fetching billable rentals:", err);
-      toast.error("Failed load rentals.");
+      toast.error(t("Failed load rentals."));
       setAvailableRentals([]);
       setRentalTotal(0);
       setRentalTotalPages(1);
@@ -701,9 +701,11 @@ const InvoiceFormPage: React.FC = () => {
           isValid: result.available,
           isDuplicate: result.exists,
           message: result.exists
-            ? `Invoice number already exists${
-                result.existing_id ? ` (ID: ${result.existing_id})` : ""
-              }`
+            ? result.existing_id
+              ? t("Invoice number already exists (ID: {{id}})", {
+                  id: result.existing_id,
+                })
+              : t("Invoice number already exists")
             : "",
         });
       } catch (error) {
@@ -712,7 +714,7 @@ const InvoiceFormPage: React.FC = () => {
           isValidating: false,
           isValid: false,
           isDuplicate: false,
-          message: "Error validating invoice number",
+          message: t("Error validating invoice number"),
         });
       }
     },
@@ -848,7 +850,9 @@ const InvoiceFormPage: React.FC = () => {
       rental.customer_id !== formData.customer_id
     ) {
       toast.error(
-        "An invoice covers a single customer. Clear the selected rentals to bill another customer."
+        t(
+          "An invoice covers a single customer. Clear the selected rentals to bill another customer."
+        )
       );
       return;
     }
@@ -903,7 +907,7 @@ const InvoiceFormPage: React.FC = () => {
     // Check invoice number validation
     if (formData.invoice_number && invoiceNumberValidation.isDuplicate) {
       toast.error(
-        "Invoice number already exists. Please choose a different number."
+        t("Invoice number already exists. Please choose a different number.")
       );
       return false;
     }
@@ -912,11 +916,11 @@ const InvoiceFormPage: React.FC = () => {
       formData.type === "regular" &&
       (!formData.rental_ids || formData.rental_ids.length === 0)
     ) {
-      toast.error("Select at least one rental");
+      toast.error(t("Select at least one rental"));
       return false;
     }
     if (!formData.customer_id || formData.customer_id <= 0) {
-      toast.error("Select a rental to set the customer");
+      toast.error(t("Select a rental to set the customer"));
       return false;
     }
     const invoiceTotalCents: number = toCents(
@@ -934,11 +938,13 @@ const InvoiceFormPage: React.FC = () => {
       0
     );
     if (hasInvalidRevenueSplit) {
-      toast.error("Enter an amount greater than RM 0.00 for every revenue line");
+      toast.error(
+        t("Enter an amount greater than RM 0.00 for every revenue line")
+      );
       return false;
     }
     if (allocatedRevenueCents !== invoiceTotalCents) {
-      toast.error("Revenue allocation must equal the invoice total");
+      toast.error(t("Revenue allocation must equal the invoice total"));
       return false;
     }
     const hasInvalidLine: boolean =
@@ -953,7 +959,9 @@ const InvoiceFormPage: React.FC = () => {
       );
     if (hasInvalidLine) {
       toast.error(
-        "Every line item needs a description, a quantity above 0 and a unit price of 0 or more"
+        t(
+          "Every line item needs a description, a quantity above 0 and a unit price of 0 or more"
+        )
       );
       return false;
     }
@@ -961,28 +969,28 @@ const InvoiceFormPage: React.FC = () => {
       (c) => c.customer_id === formData.customer_id
     );
     if (!formData.date_issued) {
-      toast.error("Specify issue date");
+      toast.error(t("Specify issue date"));
       return false;
     }
     if (formData.amount_before_tax <= 0 && formData.tax_amount <= 0) {
-      toast.error("Amount > 0");
+      toast.error(t("Amount > 0"));
       return false;
     }
     if (!isEditMode && submitAsEinvoice) {
       if (!selCust) {
-        toast.error("eInvoice: Customer missing.");
+        toast.error(t("eInvoice: Customer missing."));
         return false;
       }
     }
     if (isPaid && paymentReceiptLookup.isLooking) {
-      toast.error("Wait for the Green Target reference check to finish.");
+      toast.error(t("Wait for the Green Target reference check to finish."));
       return false;
     }
     if (isPaid && paymentReceiptLookup.receipt && !joinedPaymentReceipt) {
       toast.error(
         paymentReceiptLookup.joinable
-          ? "Confirm that this payment belongs to the existing receipt."
-          : "This Green Target reference cannot accept another payment."
+          ? t("Confirm that this payment belongs to the existing receipt.")
+          : t("This Green Target reference cannot accept another payment.")
       );
       return false;
     }
@@ -991,7 +999,7 @@ const InvoiceFormPage: React.FC = () => {
         joinedPaymentReceipt.received_date
       );
       if (!inheritedReceivedDate) {
-        toast.error("The existing receipt has no received date.");
+        toast.error(t("The existing receipt has no received date."));
         return false;
       }
       if (
@@ -1005,11 +1013,11 @@ const InvoiceFormPage: React.FC = () => {
       }
     } else if (isPaid) {
       if (!paymentMethod) {
-        toast.error("Select payment method.");
+        toast.error(t("Select payment method."));
         return false;
       }
       if (!paymentDate) {
-        toast.error("Enter the payment received date.");
+        toast.error(t("Enter the payment received date."));
         return false;
       }
       if (
@@ -1022,15 +1030,17 @@ const InvoiceFormPage: React.FC = () => {
         return false;
       }
       if (!paymentInternalReference.trim()) {
-        toast.error("Enter the Green Target reference number.");
+        toast.error(t("Enter the Green Target reference number."));
         return false;
       }
       if (paymentInternalReference.trim().length > 50) {
-        toast.error("Green Target reference number cannot exceed 50 characters.");
+        toast.error(
+          t("Green Target reference number cannot exceed 50 characters.")
+        );
         return false;
       }
       if (paymentReference.trim().length > 50) {
-        toast.error("Cheque number cannot exceed 50 characters.");
+        toast.error(t("Cheque number cannot exceed 50 characters."));
         return false;
       }
       if (paymentAmount.trim() !== "") {
@@ -1038,12 +1048,14 @@ const InvoiceFormPage: React.FC = () => {
           formData.amount_before_tax + formData.tax_amount;
         const entered = Number(paymentAmount);
         if (!Number.isFinite(entered) || entered <= 0) {
-          toast.error("Enter a payment amount greater than RM0.");
+          toast.error(t("Enter a payment amount greater than RM0."));
           return false;
         }
         if (entered > invoiceTotal + 0.005) {
           toast.error(
-            `Payment cannot exceed the RM${invoiceTotal.toFixed(2)} invoice total.`
+            t("Payment cannot exceed the RM{{amount}} invoice total.", {
+              amount: invoiceTotal.toFixed(2),
+            })
           );
           return false;
         }
@@ -1062,7 +1074,9 @@ const InvoiceFormPage: React.FC = () => {
             paymentInternalReference.trim()
           );
         if (referenceAvailability.exists) {
-          toast.error("This Green Target reference number is already in use.");
+          toast.error(
+            t("This Green Target reference number is already in use.")
+          );
           return;
         }
       }
@@ -1077,7 +1091,7 @@ const InvoiceFormPage: React.FC = () => {
         toast.error(
           identityError instanceof Error
             ? identityError.message
-            : "Gagal menyediakan identiti penghutang."
+            : t("Failed to prepare the debtor identity.")
         );
         return;
       }
@@ -1121,13 +1135,13 @@ const InvoiceFormPage: React.FC = () => {
           invData.invoice_id,
           invData
         );
-        toast.success("Invoice updated");
+        toast.success(t("Invoice updated"));
         navId = invData.invoice_id;
       } else {
         response = await greenTargetApi.createInvoice(invData);
         if (response.invoice?.invoice_id) {
           navId = response.invoice.invoice_id;
-          toast.success("Invoice created");
+          toast.success(t("Invoice created"));
           const selCust = customers.find(
             (c) => c.customer_id === formData.customer_id
           );
@@ -1143,7 +1157,7 @@ const InvoiceFormPage: React.FC = () => {
             setSubmissionResults(null); // Clear previous results
             setShowSubmissionResultsModal(true); // Show modal immediately with loading state
 
-            const eTid = toast.loading("Submitting e-Invoice...");
+            const eTid = toast.loading(t("Submitting e-Invoice..."));
             try {
               const eRes = await greenTargetApi.submitEInvoice(navId);
 
@@ -1153,7 +1167,7 @@ const InvoiceFormPage: React.FC = () => {
               // Transform the response to match the expected format
               const transformedResponse = {
                 success: eRes.success,
-                message: eRes.message || "e-Invoice submitted successfully",
+                message: eRes.message || t("e-Invoice submitted successfully"),
                 overallStatus:
                   eRes.einvoice?.einvoice_status === "valid"
                     ? "Valid"
@@ -1181,7 +1195,7 @@ const InvoiceFormPage: React.FC = () => {
                           internalId: navId.toString(),
                           error: {
                             code: "ERROR",
-                            message: eRes.error.message || "Unknown error",
+                            message: eRes.error.message || t("Unknown error"),
                             details: eRes.error.details,
                           },
                         },
@@ -1196,21 +1210,25 @@ const InvoiceFormPage: React.FC = () => {
               if (eRes.success && !showSubmissionResultsModal) {
                 const status = eRes.einvoice?.einvoice_status || "pending";
                 if (status === "valid") {
-                  toast.success("e-Invoice submitted and validated");
+                  toast.success(t("e-Invoice submitted and validated"));
                 } else {
-                  toast.success("e-Invoice submitted and pending validation");
+                  toast.success(
+                    t("e-Invoice submitted and pending validation")
+                  );
                 }
               }
             } catch (eErr) {
               console.error("e-Invoice submission error:", eErr);
-              toast.error("e-Invoice submission failed", { id: eTid });
+              toast.error(t("e-Invoice submission failed"), { id: eTid });
 
               // Format error for modal with the expected structure
               const errorMessage =
-                eErr instanceof Error ? eErr.message : "Unknown error";
+                eErr instanceof Error ? eErr.message : t("Unknown error");
               setSubmissionResults({
                 success: false,
-                message: `e-Invoice submission failed: ${errorMessage}`,
+                message: t("e-Invoice submission failed: {{message}}", {
+                  message: errorMessage,
+                }),
                 overallStatus: "Error",
                 rejectedDocuments: [
                   {
@@ -1228,7 +1246,7 @@ const InvoiceFormPage: React.FC = () => {
             }
           }
           if (isPaid && navId) {
-            const pTid = toast.loading("Recording payment...");
+            const pTid = toast.loading(t("Recording payment..."));
             try {
               const inheritedReceivedDate: string = joinedPaymentReceipt
                 ? toLocalDateInputValue(joinedPaymentReceipt.received_date)
@@ -1260,14 +1278,18 @@ const InvoiceFormPage: React.FC = () => {
                 await greenTargetApi.createPayment(pData);
               toast.success(
                 paymentResponse.receipt?.joined
-                  ? `Payment added to receipt ${paymentResponse.receipt.display_reference}`
-                  : "Payment recorded",
+                  ? t("Payment added to receipt {{reference}}", {
+                      reference: paymentResponse.receipt.display_reference,
+                    })
+                  : t("Payment recorded"),
                 { id: pTid }
               );
             } catch (pErr) {
               console.error("Payment err:", pErr);
               toast.error(
-                "Invoice created, payment failed. You can record the payment later from the invoice details page.",
+                t(
+                  "Invoice created, payment failed. You can record the payment later from the invoice details page."
+                ),
                 { id: pTid }
               );
             }
@@ -1283,8 +1305,8 @@ const InvoiceFormPage: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Save error:", error);
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      toast.error(`Error: ${msg}`);
+      const msg = error instanceof Error ? error.message : t("Unknown error");
+      toast.error(t("Error: {{message}}", { message: msg }));
     } finally {
       setIsSaving(false);
       // One-shot: a fresh advance needs a fresh confirmation.
@@ -1327,11 +1349,11 @@ const InvoiceFormPage: React.FC = () => {
         <BackButton onClick={handleBackClick} className="ml-5" />
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-rose-200 shadow-sm">
           <h2 className="text-xl font-semibold text-rose-700 mb-4">
-            Error Loading Invoice
+            {t("Error Loading Invoice")}
           </h2>
           <p className="text-default-600 dark:text-gray-300 mb-4">{error}</p>
           <Button onClick={handleBackClick} variant="outline" color="secondary">
-            Go Back
+            {t("Go Back")}
           </Button>
         </div>
       </div>
@@ -1358,31 +1380,35 @@ const InvoiceFormPage: React.FC = () => {
             <div>
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {isEditMode
-                  ? `Edit Invoice ${
-                      formData.invoice_number ? `(#${formData.invoice_number})` : ""
-                    }`
-                  : "Create New Invoice"}
+                  ? formData.invoice_number
+                    ? t("Edit Invoice (#{{number}})", {
+                        number: formData.invoice_number,
+                      })
+                    : t("Edit Invoice")
+                  : t("Create New Invoice")}
               </h1>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                {isEditMode ? "Update invoice info." : "Fill in the details."}
+                {isEditMode
+                  ? t("Update invoice info.")
+                  : t("Fill in the details.")}
               </p>
             </div>
           </div>
         </div>
         {documentIdentityLocked && (
           <div className="mx-6 mt-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-            Invoice number, date, customer, amount, rentals, line items, and
-            debtor identity are locked because receipt/adjustment history or a
-            detached journal depends on them. Revenue allocation remains
-            editable only when no adjustment or detached journal exists.
+            {t(
+              "Invoice number, date, customer, amount, rentals, line items, and debtor identity are locked because receipt/adjustment history or a detached journal depends on them. Revenue allocation remains editable only when no adjustment or detached journal exists."
+            )}
           </div>
         )}
         {!documentIdentityLocked &&
           isEditMode &&
           invoiceEinvoiceStatus === "valid" && (
             <div className="mx-6 mt-5 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              Line items are locked because a validated e-Invoice carries this
-              invoice's descriptions.
+              {t(
+                "Line items are locked because a validated e-Invoice carries this invoice's descriptions."
+              )}
             </div>
           )}
         <form onSubmit={handleSubmit} className="p-6">
@@ -1395,10 +1421,10 @@ const InvoiceFormPage: React.FC = () => {
                   htmlFor="invoice_number"
                   className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
-                  Invoice Number
+                  {t("Invoice Number")}
                   {!isEditMode && (
                     <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
-                      (optional - auto-generated if empty)
+                      {t("(optional - auto-generated if empty)")}
                     </span>
                   )}
                 </label>
@@ -1427,7 +1453,9 @@ const InvoiceFormPage: React.FC = () => {
                         ? "border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700"
                         : "border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30"
                     )}
-                    placeholder="Enter custom invoice number or leave blank"
+                    placeholder={t(
+                      "Enter custom invoice number or leave blank"
+                    )}
                   />
                   {invoiceNumberValidation.isValidating && (
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3">
@@ -1465,7 +1493,7 @@ const InvoiceFormPage: React.FC = () => {
                 invoiceNumberValidation.isValid &&
                 !invoiceNumberValidation.isValidating && (
                   <p className="text-sm text-green-600">
-                    Invoice number is available
+                    {t("Invoice number is available")}
                   </p>
                 )}
             </div>
@@ -1473,7 +1501,7 @@ const InvoiceFormPage: React.FC = () => {
             {/* Invoice Date */}
             <div className="space-y-2">
               <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                Invoice Date <span className="text-red-500">*</span>
+                {t("Invoice Date")} <span className="text-red-500">*</span>
               </span>
               <TimeNavigator
                 range={{
@@ -1494,7 +1522,7 @@ const InvoiceFormPage: React.FC = () => {
           <div className="mt-6">
             <div className="space-y-2">
               <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                Customer <span className="text-red-500">*</span>
+                {t("Customer")} <span className="text-red-500">*</span>
               </span>
               <div className="flex items-center justify-between gap-3 rounded-lg border border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 px-3 py-2">
                 {selectedCustomer ? (
@@ -1510,8 +1538,9 @@ const InvoiceFormPage: React.FC = () => {
                   </div>
                 ) : (
                   <span className="text-sm text-default-500 dark:text-gray-400">
-                    Select a rental below — the customer is set from your
-                    selection.
+                    {t(
+                      "Select a rental below — the customer is set from your selection."
+                    )}
                   </span>
                 )}
                 {!isEditMode &&
@@ -1521,9 +1550,9 @@ const InvoiceFormPage: React.FC = () => {
                       type="button"
                       onClick={handleClearRentals}
                       className="shrink-0 text-sm text-sky-600 hover:text-sky-700 hover:underline dark:text-sky-400"
-                    >
-                      Change customer
-                    </button>
+                >
+                  {t("Change customer")}
+                </button>
                   )}
               </div>
             </div>
@@ -1540,11 +1569,15 @@ const InvoiceFormPage: React.FC = () => {
             >
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                  Select Rentals <span className="text-red-500">*</span>
+                  {t("Select Rentals")} <span className="text-red-500">*</span>
                   <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
                     {isEditMode
-                      ? "(Rentals cannot be changed after the invoice is created)"
-                      : "(Every rental still waiting to be invoiced — pick one or more from the same customer)"}
+                      ? t(
+                          "(Rentals cannot be changed after the invoice is created)"
+                        )
+                      : t(
+                          "(Every rental still waiting to be invoiced — pick one or more from the same customer)"
+                        )}
                   </span>
                 </label>
 
@@ -1561,7 +1594,9 @@ const InvoiceFormPage: React.FC = () => {
                         onChange={(
                           event: React.ChangeEvent<HTMLInputElement>
                         ): void => setRentalQuery(event.target.value)}
-                        placeholder="Search customer, site, address, dumpster, driver or rental no..."
+                        placeholder={t(
+                          "Search customer, site, address, dumpster, driver or rental no..."
+                        )}
                         className={clsx(
                           "block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg shadow-sm",
                           "bg-white dark:bg-gray-700",
@@ -1571,9 +1606,13 @@ const InvoiceFormPage: React.FC = () => {
                     </div>
                     {formData.customer_id > 0 && (
                       <p className="text-xs text-default-500 dark:text-gray-400">
-                        {`Showing only ${
-                          selectedCustomer?.name || "this customer"
-                        }'s rentals. Use "Change customer" above to browse every customer again.`}
+                        {t(
+                          `Showing only {{name}}'s rentals. Use "Change customer" above to browse every customer again.`,
+                          {
+                            name:
+                              selectedCustomer?.name || t("this customer"),
+                          }
+                        )}
                       </p>
                     )}
                   </>
@@ -1581,15 +1620,17 @@ const InvoiceFormPage: React.FC = () => {
 
                 {rentalsLoading ? (
                   <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
-                    Loading rentals...
+                    {t("Loading rentals...")}
                   </div>
                 ) : rentalGroups.length === 0 ? (
                   <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
                     {appliedRentalQuery
-                      ? "No rentals match your search"
+                      ? t("No rentals match your search")
                       : formData.customer_id > 0
-                      ? "No rentals are waiting to be invoiced for this customer"
-                      : "No rentals are waiting to be invoiced"}
+                      ? t(
+                          "No rentals are waiting to be invoiced for this customer"
+                        )
+                      : t("No rentals are waiting to be invoiced")}
                   </div>
                 ) : (
                   <div className="border border-default-300 dark:border-gray-600 rounded-lg max-h-96 overflow-y-auto">
@@ -1620,8 +1661,12 @@ const InvoiceFormPage: React.FC = () => {
                               {group.customer_name}
                             </span>
                             <span className="shrink-0 text-xs text-default-500 dark:text-gray-400">
-                              {group.rentals.length} rental
-                              {group.rentals.length === 1 ? "" : "s"}
+                              {t(
+                                group.rentals.length === 1
+                                  ? "{{count}} rental"
+                                  : "{{count}} rentals",
+                                { count: group.rentals.length }
+                              )}
                             </span>
                           </div>
 
@@ -1673,17 +1718,24 @@ const InvoiceFormPage: React.FC = () => {
                                       </div>
                                       <div>
                                         <div className="font-medium text-gray-900 dark:text-gray-100">
-                                          Rental #{rental.rental_id}
-                                          {rental.tong_no
-                                            ? ` - Dumpster ${rental.tong_no}`
-                                            : ""}
+                                          {t(
+                                            rental.tong_no
+                                              ? "Rental #{{id}} - Dumpster {{tong}}"
+                                              : "Rental #{{id}}",
+                                            {
+                                              id: rental.rental_id,
+                                              tong: rental.tong_no,
+                                            }
+                                          )}
                                         </div>
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                           {rental.date_placed
-                                            ? `Placed: ${new Date(
-                                                rental.date_placed
-                                              ).toLocaleDateString()}`
-                                            : "No placement date"}
+                                            ? t("Placed: {{date}}", {
+                                                date: new Date(
+                                                  rental.date_placed
+                                                ).toLocaleDateString(),
+                                              })
+                                            : t("No placement date")}
                                           {locationDisplay &&
                                             ` • ${locationDisplay}`}
                                         </div>
@@ -1698,7 +1750,9 @@ const InvoiceFormPage: React.FC = () => {
                                             : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400"
                                         )}
                                       >
-                                        {isActive ? "Ongoing" : "Completed"}
+                                        {isActive
+                                          ? t("Ongoing")
+                                          : t("Completed")}
                                       </span>
                                     </div>
                                   </div>
@@ -1715,9 +1769,19 @@ const InvoiceFormPage: React.FC = () => {
                 {!isEditMode && !rentalsLoading && rentalTotal > 0 && (
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                     <span className="text-xs text-default-500 dark:text-gray-400">
-                      Showing {(rentalPage - 1) * RENTALS_PER_PAGE + 1}-
-                      {Math.min(rentalPage * RENTALS_PER_PAGE, rentalTotal)} of{" "}
-                      {rentalTotal} rental{rentalTotal === 1 ? "" : "s"}
+                      {t(
+                        rentalTotal === 1
+                          ? "Showing {{start}}-{{end}} of {{count}} rental"
+                          : "Showing {{start}}-{{end}} of {{count}} rentals",
+                        {
+                          start: (rentalPage - 1) * RENTALS_PER_PAGE + 1,
+                          end: Math.min(
+                            rentalPage * RENTALS_PER_PAGE,
+                            rentalTotal
+                          ),
+                          count: rentalTotal,
+                        }
+                      )}
                     </span>
                     {rentalTotalPages > 1 && (
                       <div className="flex items-center gap-2">
@@ -1733,10 +1797,13 @@ const InvoiceFormPage: React.FC = () => {
                           }
                           disabled={rentalPage <= 1}
                         >
-                          Previous
+                          {t("Previous")}
                         </Button>
                         <span className="text-xs text-default-600 dark:text-gray-300">
-                          Page {rentalPage} of {rentalTotalPages}
+                          {t("Page {{page}} of {{count}}", {
+                            page: rentalPage,
+                            count: rentalTotalPages,
+                          })}
                         </span>
                         <Button
                           type="button"
@@ -1750,7 +1817,7 @@ const InvoiceFormPage: React.FC = () => {
                           }
                           disabled={rentalPage >= rentalTotalPages}
                         >
-                          Next
+                          {t("Next")}
                         </Button>
                       </div>
                     )}
@@ -1760,7 +1827,9 @@ const InvoiceFormPage: React.FC = () => {
                 {selectedRentals.length > 0 && (
                   <div className="mt-4">
                     <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                      Selected Rentals ({selectedRentals.length})
+                      {t("Selected Rentals ({{count}})", {
+                        count: selectedRentals.length,
+                      })}
                     </div>
                     <div className="space-y-2">
                       {selectedRentals.map((rental) => (
@@ -1771,21 +1840,31 @@ const InvoiceFormPage: React.FC = () => {
                           <div className="flex justify-between items-start">
                             <div>
                               <div className="font-medium text-gray-900 dark:text-gray-100">
-                                Rental #{rental.rental_id}
-                                {rental.tong_no
-                                  ? ` - Dumpster ${rental.tong_no}`
-                                  : ""}
+                                {t(
+                                  rental.tong_no
+                                    ? "Rental #{{id}} - Dumpster {{tong}}"
+                                    : "Rental #{{id}}",
+                                  {
+                                    id: rental.rental_id,
+                                    tong: rental.tong_no,
+                                  }
+                                )}
                               </div>
                               <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                                <span>Driver: {rental.driver}</span>
+                                <span>
+                                  {t("Driver: {{driver}}", {
+                                    driver: rental.driver,
+                                  })}
+                                </span>
                                 {rental.date_placed && (
                                   <>
                                     <span className="mx-2">•</span>
                                     <span>
-                                      Placed:{" "}
-                                      {new Date(
-                                        rental.date_placed
-                                      ).toLocaleDateString()}
+                                      {t("Placed: {{date}}", {
+                                        date: new Date(
+                                          rental.date_placed
+                                        ).toLocaleDateString(),
+                                      })}
                                     </span>
                                   </>
                                 )}
@@ -1793,10 +1872,11 @@ const InvoiceFormPage: React.FC = () => {
                                   <>
                                     <span className="mx-2">•</span>
                                     <span>
-                                      Picked:{" "}
-                                      {new Date(
-                                        rental.date_picked
-                                      ).toLocaleDateString()}
+                                      {t("Picked: {{date}}", {
+                                        date: new Date(
+                                          rental.date_picked
+                                        ).toLocaleDateString(),
+                                      })}
                                     </span>
                                   </>
                                 )}
@@ -1806,11 +1886,12 @@ const InvoiceFormPage: React.FC = () => {
                                 rental.location_address
                               ) && (
                                 <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                  Location:{" "}
-                                  {formatLocationDisplay(
-                                    rental.location_site,
-                                    rental.location_address
-                                  )}
+                                  {t("Location: {{location}}", {
+                                    location: formatLocationDisplay(
+                                      rental.location_site,
+                                      rental.location_address
+                                    ),
+                                  })}
                                 </div>
                               )}
                             </div>
@@ -1822,7 +1903,7 @@ const InvoiceFormPage: React.FC = () => {
                                   handleRentalToggle(rental);
                                 }}
                                 className="text-red-600 hover:text-red-700 p-1"
-                                title="Remove rental"
+                                title={t("Remove rental")}
                               >
                                 ✕
                               </button>
@@ -1876,14 +1957,17 @@ const InvoiceFormPage: React.FC = () => {
 
           {/* Amount and Tax Section */}
           <div className="mt-6 border-t dark:border-gray-700 pt-6">
-            <h2 className="text-lg font-medium mb-4 dark:text-gray-100">Invoice Amount</h2>
+            <h2 className="text-lg font-medium mb-4 dark:text-gray-100">
+              {t("Invoice Amount")}
+            </h2>
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-4">
               <div className="space-y-2">
                 <label
                   htmlFor="amount_before_tax"
                   className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
-                  Amount (Excl. Tax) <span className="text-red-500">*</span>
+                  {t("Amount (Excl. Tax)")}{" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400 text-sm">
@@ -1897,7 +1981,7 @@ const InvoiceFormPage: React.FC = () => {
                     className="w-full pl-10 pr-3 py-1.5 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-700 font-medium text-default-700 dark:text-gray-200 cursor-default"
                     readOnly
                     tabIndex={-1}
-                    title="Derived from the line items total"
+                    title={t("Derived from the line items total")}
                   />
                 </div>
               </div>
@@ -1906,7 +1990,7 @@ const InvoiceFormPage: React.FC = () => {
                   htmlFor="tax_amount"
                   className="block text-sm font-medium text-default-700 dark:text-gray-200"
                 >
-                  Tax Amount
+                  {t("Tax Amount")}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400 text-sm">
@@ -1930,7 +2014,7 @@ const InvoiceFormPage: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                  Total Amount
+                  {t("Total Amount")}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-3 flex items-center text-default-500 dark:text-gray-400 text-sm">
@@ -1967,7 +2051,7 @@ const InvoiceFormPage: React.FC = () => {
                         />
                       )}
                       <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-100">
-                        Record Payment
+                        {t("Record Payment")}
                       </span>
                     </button>
                   </div>
@@ -1980,11 +2064,11 @@ const InvoiceFormPage: React.FC = () => {
           {!isEditMode && isPaid && (
             <div className="mt-6 border-t dark:border-gray-700 pt-6">
               <h2 className="text-lg font-medium mb-4 dark:text-gray-100">
-                Payment Info
+                {t("Payment Info")}
               </h2>
               {!joinedPaymentReceipt && paymentMethod === "cheque" && (
                 <p className="mb-4 text-sm text-default-500 dark:text-gray-400">
-                  Cheque payments remain pending until they are confirmed.
+                  {t("Cheque payments remain pending until they are confirmed.")}
                 </p>
               )}
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -1993,7 +2077,8 @@ const InvoiceFormPage: React.FC = () => {
                     htmlFor="payment_date_paid"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Date Received <span className="text-red-500">*</span>
+                    {t("Date Received")}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
@@ -2025,7 +2110,8 @@ const InvoiceFormPage: React.FC = () => {
                     htmlFor="internal_reference_paid"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Green Target Reference No. <span className="text-red-500">*</span>
+                    {t("Green Target Reference No.")}{" "}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -2048,7 +2134,7 @@ const InvoiceFormPage: React.FC = () => {
                     htmlFor="payment_amount_paid"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Amount Received
+                    {t("Amount Received")}
                   </label>
                   <input
                     type="number"
@@ -2070,8 +2156,9 @@ const InvoiceFormPage: React.FC = () => {
                     )}
                   />
                   <p className="text-xs text-default-500 dark:text-gray-400">
-                    Leave blank for the full invoice. Enter less to record a
-                    part payment and leave the balance outstanding.
+                    {t(
+                      "Leave blank for the full invoice. Enter less to record a part payment and leave the balance outstanding."
+                    )}
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -2079,17 +2166,19 @@ const InvoiceFormPage: React.FC = () => {
                     htmlFor="pm-paid"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Method <span className="text-red-500">*</span>
+                    {t("Method")} <span className="text-red-500">*</span>
                   </label>
                   {joinedPaymentReceipt ? (
                     <input
                       type="text"
                       id="pm-paid"
                       value={
-                        getOptionName(
-                          paymentMethodOptions,
-                          joinedPaymentReceipt.payment_method
-                        ) || joinedPaymentReceipt.payment_method
+                        t(
+                          getOptionName(
+                            paymentMethodOptions,
+                            joinedPaymentReceipt.payment_method
+                          ) || joinedPaymentReceipt.payment_method
+                        )
                       }
                       readOnly
                       className="block w-full cursor-default rounded-lg border border-default-300 bg-gray-100 px-3 py-2 shadow-sm dark:border-gray-600 dark:bg-gray-800 sm:text-sm"
@@ -2109,8 +2198,12 @@ const InvoiceFormPage: React.FC = () => {
                           )}
                         >
                           <span className="block truncate">
-                            {getOptionName(paymentMethodOptions, paymentMethod) ||
-                              "Select"}
+                            {t(
+                              getOptionName(
+                                paymentMethodOptions,
+                                paymentMethod
+                              ) || "Select"
+                            )}
                           </span>
                           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -2152,7 +2245,7 @@ const InvoiceFormPage: React.FC = () => {
                                         selected ? "font-medium" : "font-normal"
                                       )}
                                     >
-                                      {o.name}
+                                      {t(o.name)}
                                     </span>
                                     {selected && (
                                       <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
@@ -2179,7 +2272,7 @@ const InvoiceFormPage: React.FC = () => {
                       htmlFor="payment_reference"
                       className="block text-sm font-medium text-default-700 dark:text-gray-200"
                     >
-                      Cheque No. (Optional)
+                      {t("Cheque No. (Optional)")}
                     </label>
                     <input
                       type="text"
@@ -2219,7 +2312,9 @@ const InvoiceFormPage: React.FC = () => {
           {/* e-Invoice Section */}
           {!isEditMode && formData.customer_id > 0 && (
             <div className="mt-6 border-t dark:border-gray-700 pt-6">
-              <h2 className="text-lg font-medium mb-2 dark:text-gray-100">e-Invoice Option</h2>
+              <h2 className="text-lg font-medium mb-2 dark:text-gray-100">
+                {t("e-Invoice Option")}
+              </h2>
               {canSubmitEinvoice ? (
                 isInvoiceDateEligibleForEinvoice(formData.date_issued) ? (
                   <div className="flex items-center space-x-2">
@@ -2240,13 +2335,13 @@ const InvoiceFormPage: React.FC = () => {
                         />
                       )}
                       <span className="ml-2 text-sm font-medium text-default-700 group-hover:text-default-900 dark:text-gray-100">
-                        Submit e-Invoice upon saving
+                        {t("Submit e-Invoice upon saving")}
                       </span>
                     </button>
                   </div>
                 ) : (
                   <div className="text-sm text-amber-600">
-                    Cannot submit e-Invoice for dates older than 3 days.
+                    {t("Cannot submit e-Invoice for dates older than 3 days.")}
                   </div>
                 )
               ) : (
@@ -2257,10 +2352,11 @@ const InvoiceFormPage: React.FC = () => {
                       navigate(`/greentarget/customers/${formData.customer_id}`)
                     }
                     className="text-sm text-default-500 dark:text-gray-400 hover:text-sky-800 hover:underline focus:outline-none"
-                    title="Add TIN & ID or phone number for customer"
+                    title={t("Add TIN & ID or phone number for customer")}
                   >
-                    Cannot submit e-Invoice. Customer missing TIN & ID or phone
-                    number.
+                    {t(
+                      "Cannot submit e-Invoice. Customer missing TIN & ID or phone number."
+                    )}
                   </button>
                 </div>
               )}
@@ -2276,7 +2372,7 @@ const InvoiceFormPage: React.FC = () => {
               onClick={handleBackClick}
               className="mr-3"
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               type="submit"
@@ -2285,10 +2381,10 @@ const InvoiceFormPage: React.FC = () => {
               disabled={isSaving || (!isFormChanged && isEditMode)}
             >
               {isSaving
-                ? "Saving..."
+                ? t("Saving...")
                 : isEditMode
-                ? "Save Changes"
-                : "Create Invoice"}
+                ? t("Save Changes")
+                : t("Create Invoice")}
             </Button>
           </div>
         </form>
@@ -2312,9 +2408,9 @@ const InvoiceFormPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Changes"
-        message="Leave without saving?"
-        confirmButtonText="Discard"
+        title={t("Discard Changes")}
+        message={t("Leave without saving?")}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
       <ConfirmationDialog
@@ -2325,13 +2421,15 @@ const InvoiceFormPage: React.FC = () => {
           setAdvancePaymentPrompt(null);
           void submitForm();
         }}
-        title="Record Advance Payment?"
-        message={`The payment received date (${
-          advancePaymentPrompt?.paymentDate ?? ""
-        }) is before the invoice date (${
-          formData.date_issued
-        }). Record this as an advance payment?`}
-        confirmButtonText="Record Payment"
+        title={t("Record Advance Payment?")}
+        message={t(
+          "The payment received date ({{received}}) is before the invoice date ({{issued}}). Record this as an advance payment?",
+          {
+            received: advancePaymentPrompt?.paymentDate ?? "",
+            issued: formData.date_issued,
+          }
+        )}
+        confirmButtonText={t("Record Payment")}
         variant="default"
       />
     </div>

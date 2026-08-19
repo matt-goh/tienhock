@@ -1,5 +1,6 @@
 // src/components/GreenTarget/PayrollEmployeeManagementModal.tsx
 import React, { useState, useEffect, Fragment, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -49,6 +50,7 @@ interface PayrollEmployeeManagementModalProps {
 const PayrollEmployeeManagementModal: React.FC<
   PayrollEmployeeManagementModalProps
 > = ({ isOpen, onClose, availableEmployees, onUpdate }) => {
+  const { t } = useTranslation("greentarget");
   const [gtEmployees, setGtEmployees] = useState<GTPayrollEmployee[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -79,7 +81,7 @@ const PayrollEmployeeManagementModal: React.FC<
       setGtEmployees(response);
     } catch (error) {
       console.error("Error fetching GT payroll employees:", error);
-      toast.error("Failed to fetch GT payroll employees");
+      toast.error(t("Failed to fetch GT payroll employees"));
     } finally {
       setLoading(false);
     }
@@ -215,9 +217,22 @@ const PayrollEmployeeManagementModal: React.FC<
         });
       }
 
-      toast.success(
-        `Saved changes: ${pendingAdds.length > 0 ? `+${pendingAdds.length}` : ""}${pendingAdds.length > 0 && pendingRemoves.size > 0 ? ", " : ""}${pendingRemoves.size > 0 ? `-${pendingRemoves.size}` : ""}`
-      );
+      if (pendingAdds.length > 0 && pendingRemoves.size > 0) {
+        toast.success(
+          t("Saved changes: +{{added}}, -{{removed}}", {
+            added: pendingAdds.length,
+            removed: pendingRemoves.size,
+          })
+        );
+      } else if (pendingAdds.length > 0) {
+        toast.success(
+          t("Saved changes: +{{added}}", { added: pendingAdds.length })
+        );
+      } else {
+        toast.success(
+          t("Saved changes: -{{removed}}", { removed: pendingRemoves.size })
+        );
+      }
 
       // Refresh and reset
       await fetchGTEmployees();
@@ -226,7 +241,7 @@ const PayrollEmployeeManagementModal: React.FC<
       onUpdate?.();
     } catch (error) {
       console.error("Error saving changes:", error);
-      toast.error("Failed to save changes");
+      toast.error(t("Failed to save changes"));
     } finally {
       setIsSaving(false);
     }
@@ -280,7 +295,7 @@ const PayrollEmployeeManagementModal: React.FC<
                     as="h3"
                     className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100"
                   >
-                    Manage GT Payroll Employees
+                    {t("Manage GT Payroll Employees")}
                   </DialogTitle>
                   <button
                     onClick={handleClose}
@@ -292,7 +307,9 @@ const PayrollEmployeeManagementModal: React.FC<
                 </div>
 
                 <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
-                  Add or remove employees from the Green Target payroll system.
+                  {t(
+                    "Add or remove employees from the Green Target payroll system."
+                  )}
                 </p>
 
                 {loading ? (
@@ -306,7 +323,9 @@ const PayrollEmployeeManagementModal: React.FC<
                       <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                         <div className="flex items-center gap-2 text-sm font-medium text-default-700 dark:text-gray-200">
                           <IconUsers size={16} />
-                          Current Members ({currentMembers.length})
+                          {t("Current Members ({{count}})", {
+                            count: currentMembers.length,
+                          })}
                         </div>
                         <div className="relative mt-2">
                           <IconSearch
@@ -315,7 +334,7 @@ const PayrollEmployeeManagementModal: React.FC<
                           />
                           <input
                             type="text"
-                            placeholder="Search members..."
+                            placeholder={t("Search members...")}
                             className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                             value={memberSearch}
                             onChange={(e) => setMemberSearch(e.target.value)}
@@ -332,8 +351,8 @@ const PayrollEmployeeManagementModal: React.FC<
                               className="mx-auto mb-2 text-default-300 dark:text-gray-500"
                             />
                             {memberSearch
-                              ? "No members found"
-                              : "No employees in GT Payroll yet"}
+                              ? t("No members found")
+                              : t("No employees in GT Payroll yet")}
                           </div>
                         ) : (
                           <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -342,7 +361,9 @@ const PayrollEmployeeManagementModal: React.FC<
                               <>
                                 <li className="px-3 py-1.5 bg-sky-50 dark:bg-sky-900/30 text-xs text-sky-700 dark:text-sky-300 font-medium flex items-center gap-1.5">
                                   <IconUser size={14} />
-                                  OFFICE ({officeMembers.length})
+                                  {t("OFFICE ({{count}})", {
+                                    count: officeMembers.length,
+                                  })}
                                 </li>
                                 {officeMembers.map((emp) => (
                                   <li
@@ -358,7 +379,7 @@ const PayrollEmployeeManagementModal: React.FC<
                                         {emp.employee_name}
                                         {emp.isNew && (
                                           <span className="text-xs px-1.5 py-0.5 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
-                                            New
+                                            {t("New")}
                                           </span>
                                         )}
                                       </div>
@@ -389,7 +410,9 @@ const PayrollEmployeeManagementModal: React.FC<
                               <>
                                 <li className="px-3 py-1.5 bg-amber-50 dark:bg-amber-900/30 text-xs text-amber-700 dark:text-amber-300 font-medium flex items-center gap-1.5">
                                   <IconTruck size={14} />
-                                  DRIVER ({driverMembers.length})
+                                  {t("DRIVER ({{count}})", {
+                                    count: driverMembers.length,
+                                  })}
                                 </li>
                                 {driverMembers.map((emp) => (
                                   <li
@@ -405,7 +428,7 @@ const PayrollEmployeeManagementModal: React.FC<
                                         {emp.employee_name}
                                         {emp.isNew && (
                                           <span className="text-xs px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded">
-                                            New
+                                            {t("New")}
                                           </span>
                                         )}
                                       </div>
@@ -440,10 +463,12 @@ const PayrollEmployeeManagementModal: React.FC<
                       <div className="bg-default-50 dark:bg-gray-700 px-3 py-2 border-b border-default-200 dark:border-gray-600">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-default-700 dark:text-gray-200">
-                            Add Employee
+                            {t("Add Employee")}
                           </div>
                           <span className="text-xs text-default-500 dark:text-gray-400">
-                            {eligibleEmployees.length} available
+                            {t("{{count}} available", {
+                              count: eligibleEmployees.length,
+                            })}
                           </span>
                         </div>
 
@@ -459,7 +484,7 @@ const PayrollEmployeeManagementModal: React.FC<
                             }`}
                           >
                             <IconUser size={14} />
-                            OFFICE
+                            {t("OFFICE")}
                           </button>
                           <button
                             onClick={() => setSelectedJobType("DRIVER")}
@@ -471,7 +496,7 @@ const PayrollEmployeeManagementModal: React.FC<
                             }`}
                           >
                             <IconTruck size={14} />
-                            DRIVER
+                            {t("DRIVER")}
                           </button>
                         </div>
 
@@ -483,7 +508,7 @@ const PayrollEmployeeManagementModal: React.FC<
                           />
                           <input
                             type="text"
-                            placeholder="Search employees..."
+                            placeholder={t("Search employees...")}
                             className="w-full pl-8 pr-3 py-1.5 text-sm border border-default-300 dark:border-gray-500 rounded-lg focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder-gray-400"
                             value={employeeSearch}
                             onChange={(e) => setEmployeeSearch(e.target.value)}
@@ -500,8 +525,8 @@ const PayrollEmployeeManagementModal: React.FC<
                               className="mx-auto mb-2 text-emerald-400"
                             />
                             {employeeSearch
-                              ? "No employees found"
-                              : "All employees already added"}
+                              ? t("No employees found")
+                              : t("All employees already added")}
                           </div>
                         ) : (
                           <ul className="divide-y divide-default-100 dark:divide-gray-600">
@@ -515,8 +540,12 @@ const PayrollEmployeeManagementModal: React.FC<
                                     {employee.name}
                                   </div>
                                   <div className="text-xs text-default-500 dark:text-gray-400">
-                                    {employee.id} -{" "}
-                                    {employee.job?.join(", ") || "No job"}
+                                    {t("{{id}} - {{job}}", {
+                                      id: employee.id,
+                                      job:
+                                        employee.job?.join(", ") ||
+                                        t("No job"),
+                                    })}
                                   </div>
                                 </div>
                                 <button
@@ -546,41 +575,52 @@ const PayrollEmployeeManagementModal: React.FC<
                       <div className="flex items-center gap-3">
                         <span className="inline-flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                          OFFICE:{" "}
-                          {
-                            currentMembers.filter((e) => e.job_type === "OFFICE")
-                              .length
-                          }
+                          {t("OFFICE: {{count}}", {
+                            count: currentMembers.filter(
+                              (e) => e.job_type === "OFFICE"
+                            ).length,
+                          })}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                          DRIVER:{" "}
-                          {
-                            currentMembers.filter((e) => e.job_type === "DRIVER")
-                              .length
-                          }
+                          {t("DRIVER: {{count}}", {
+                            count: currentMembers.filter(
+                              (e) => e.job_type === "DRIVER"
+                            ).length,
+                          })}
                         </span>
                         <span className="text-amber-600 dark:text-amber-400">
-                          ({changesSummary.toAdd > 0 && `+${changesSummary.toAdd}`}
-                          {changesSummary.toAdd > 0 &&
-                            changesSummary.toRemove > 0 &&
-                            ", "}
-                          {changesSummary.toRemove > 0 &&
-                            `-${changesSummary.toRemove}`}{" "}
-                          changes)
+                          {t("({{changes}} changes)", {
+                            changes: [
+                              changesSummary.toAdd > 0
+                                ? `+${changesSummary.toAdd}`
+                                : null,
+                              changesSummary.toRemove > 0
+                                ? `-${changesSummary.toRemove}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(", "),
+                          })}
                         </span>
                       </div>
                     ) : (
                       <>
                         <span className="inline-flex items-center gap-1.5 mr-4">
                           <span className="w-2 h-2 rounded-full bg-sky-500"></span>
-                          OFFICE:{" "}
-                          {gtEmployees.filter((e) => e.job_type === "OFFICE").length}
+                          {t("OFFICE: {{count}}", {
+                            count: gtEmployees.filter(
+                              (e) => e.job_type === "OFFICE"
+                            ).length,
+                          })}
                         </span>
                         <span className="inline-flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                          DRIVER:{" "}
-                          {gtEmployees.filter((e) => e.job_type === "DRIVER").length}
+                          {t("DRIVER: {{count}}", {
+                            count: gtEmployees.filter(
+                              (e) => e.job_type === "DRIVER"
+                            ).length,
+                          })}
                         </span>
                       </>
                     )}
@@ -592,7 +632,7 @@ const PayrollEmployeeManagementModal: React.FC<
                       onClick={handleClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     {hasChanges && (
                       <Button
@@ -602,7 +642,7 @@ const PayrollEmployeeManagementModal: React.FC<
                         onClick={handleSave}
                         disabled={isSaving}
                       >
-                        {isSaving ? "Saving..." : "Save Changes"}
+                        {isSaving ? t("Saving...") : t("Save Changes")}
                       </Button>
                     )}
                   </div>

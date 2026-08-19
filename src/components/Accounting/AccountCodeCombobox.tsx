@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconCheck,
   IconChevronDown,
@@ -62,17 +63,18 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
   label,
   required,
   disabled = false,
-  placeholder = "Search account...",
+  placeholder,
   filter,
   className,
   hierarchical = false,
   allowEmpty = false,
-  emptyLabel = "No account",
+  emptyLabel,
   onAddAccount,
   favouriteCodes,
   pendingFavouriteCodes,
   onToggleFavourite,
 }: AccountCodeComboboxProps) => {
+  const { t } = useTranslation("accounting");
   const { accountCodes: allAccountCodes } = useAccountCodesCache(
     company,
     accounts === undefined
@@ -402,12 +404,12 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
     : selectableAccounts.find((account: AccountCode): boolean => account.code === value);
   const displayValue: string = selectedAccount
     ? `${selectedAccount.code} - ${selectedAccount.description}${
-        selectedAccount.is_active ? "" : " (Inactive)"
+        selectedAccount.is_active ? "" : ` ${t("Inactive")}`
       }`
     : value && hierarchical
       ? value
       : allowEmpty && !value
-        ? emptyLabel
+        ? (emptyLabel ?? t("No account"))
         : "";
   const getOptionId = (code: string): string => {
     const optionKey: string = code ? encodeURIComponent(code) : "empty";
@@ -706,14 +708,14 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
               }}
               onKeyDown={handleKeyDown}
               disabled={disabled}
-              placeholder={placeholder}
+              placeholder={placeholder ?? t("Search account...")}
               className={`${inputClassName} pr-8`}
             />
             <button
               type="button"
               onClick={handleToggleOpen}
               disabled={disabled}
-              aria-label={isOpen ? "Close account options" : "Open account options"}
+              aria-label={t(isOpen ? "Close account options" : "Open account options")}
               className="absolute inset-y-0 right-0 flex items-center pr-2 text-default-400 hover:text-default-600 disabled:cursor-not-allowed dark:text-gray-500 dark:hover:text-gray-300"
             >
               <IconChevronDown size={16} />
@@ -724,8 +726,8 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
               type="button"
               onClick={handleAddAccount}
               disabled={disabled}
-              title="Add account code"
-              aria-label="Add account code"
+              title={t("Add account code")}
+              aria-label={t("Add account code")}
               className="flex items-center pl-1 pr-2 text-default-400 hover:text-sky-600 disabled:cursor-not-allowed dark:text-gray-500 dark:hover:text-sky-400"
             >
               <IconPlus size={16} />
@@ -738,8 +740,8 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
               <div className="flex items-center justify-between gap-3 border-b border-default-200 px-3 py-2 text-xs dark:border-gray-700">
                 <span className="font-medium text-default-600 dark:text-gray-300">
                   {normalizedQuery
-                    ? "Padanan dipaparkan bersama laluan akaun induk"
-                    : "Account hierarchy"}
+                    ? t("Matches shown with the parent account path")
+                    : t("Account hierarchy")}
                 </span>
                 {!normalizedQuery && (
                   <div className="flex items-center gap-2">
@@ -748,7 +750,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                       onClick={handleExpandAll}
                       className="text-sky-700 hover:underline dark:text-sky-400"
                     >
-                      Expand all
+                      {t("Expand all")}
                     </button>
                     <span
                       className="text-default-300 dark:text-gray-600"
@@ -761,7 +763,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                       onClick={handleCollapseAll}
                       className="text-sky-700 hover:underline dark:text-sky-400"
                     >
-                      Collapse all
+                      {t("Collapse all")}
                     </button>
                   </div>
                 )}
@@ -788,7 +790,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                       : "text-default-700 dark:text-gray-200"
                   }`}
                 >
-                  <span className="font-medium">{emptyLabel}</span>
+                  <span className="font-medium">{emptyLabel ?? t("No account")}</span>
                   {!value && (
                     <IconCheck
                       size={16}
@@ -805,7 +807,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
               >
                 {displayedRows.length === 0 ? (
                   <div className="px-3 py-2 text-sm text-default-500 dark:text-gray-400">
-                    No accounts found
+                    {t("No accounts found")}
                   </div>
                 ) : (
                   displayedRows.map((row: AccountHierarchyRow, rowIndex: number) => {
@@ -884,7 +886,7 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                                 onClick={(
                                   event: React.MouseEvent<HTMLSpanElement>
                                 ): void => handleToggleExpand(event, account.code)}
-                                title={`${isExpanded ? "Collapse" : "Expand"} ${account.code}`}
+                                title={`${t(isExpanded ? "Collapse" : "Expand")} ${account.code}`}
                                 aria-hidden="true"
                                 className="flex h-6 w-6 flex-shrink-0 cursor-pointer items-center justify-center rounded hover:bg-default-200 dark:hover:bg-gray-600"
                               >
@@ -939,12 +941,17 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
 
                       {hierarchical && hasChildren && (
                         <span className="flex-shrink-0 whitespace-nowrap text-xs text-default-400 dark:text-gray-500">
-                          {childCount} {childCount === 1 ? "child" : "children"}
+                          {t(
+                            childCount === 1
+                              ? "{{count}} child"
+                              : "{{count}} children",
+                            { count: childCount }
+                          )}
                         </span>
                       )}
                       {hierarchical && !account.is_active && (
                         <span className="flex-shrink-0 rounded bg-default-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-default-500 dark:bg-gray-700 dark:text-gray-400">
-                          Inactive
+                          {t("Inactive")}
                         </span>
                       )}
                       {favouritesEnabled && (
@@ -962,13 +969,17 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                           aria-pressed={isFavourite}
                           aria-label={
                             isFavourite
-                              ? `Remove ${account.code} from favourites`
-                              : `Add ${account.code} to favourites`
+                              ? t("Remove {{code}} from favourites", {
+                                  code: account.code,
+                                })
+                              : t("Add {{code}} to favourites", {
+                                  code: account.code,
+                                })
                           }
                           title={
                             isFavourite
-                              ? "Remove from favourites"
-                              : "Add to favourites"
+                              ? t("Remove from favourites")
+                              : t("Add to favourites")
                           }
                           className="flex-shrink-0 text-default-300 transition-colors hover:text-amber-500 disabled:cursor-wait disabled:opacity-50 dark:text-gray-500 dark:hover:text-amber-400"
                         >
@@ -1008,7 +1019,9 @@ const AccountCodeCombobox: React.FC<AccountCodeComboboxProps> = ({
                       className="flex w-full items-center justify-center rounded-md bg-sky-50 px-4 py-1.5 text-center text-sm font-medium text-sky-600 transition-colors duration-200 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400 dark:hover:bg-sky-900/50"
                     >
                       <IconChevronDown size={16} className="mr-1.5" />
-                      <span>Load more ({remaining} remaining)</span>
+                      <span>
+                        {t("Load more ({{remaining}} remaining)", { remaining })}
+                      </span>
                     </button>
                   </div>
                 )}

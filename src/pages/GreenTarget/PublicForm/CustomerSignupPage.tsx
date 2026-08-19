@@ -2,6 +2,7 @@
 // Served on greentarget.tienhock.com and at /greentarget-form.
 // A Vite development-only route renders this component with previewMode enabled.
 import { type FormEvent, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconCheck,
   IconDownload,
@@ -12,11 +13,10 @@ import {
 import { API_BASE_URL } from "../../../configs/config";
 import Checkbox from "../../../components/Checkbox";
 import GreenTargetLogo from "../../../utils/GreenTargetLogo";
-import {
-  translations,
-  LANGUAGE_LABELS,
-  type FormLanguage,
-} from "./translations";
+import i18n, {
+  SUPPORTED_LANGUAGES,
+  type SupportedLanguage,
+} from "../../../i18n";
 
 type PaymentMethod = "cash" | "online" | "qr";
 type IdentityType = "BRN" | "NRIC" | "PASSPORT" | "ARMY";
@@ -54,6 +54,12 @@ const ID_TYPE_OPTIONS: SelectOption[] = [
 const inputClassName =
   "w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-gray-900 shadow-sm outline-none transition focus:border-green-500 focus:ring-2 focus:ring-green-500/20 lg:py-3";
 
+const FORM_LANGUAGE_LABELS: Record<SupportedLanguage, string> = {
+  en: "EN",
+  ms: "BM",
+  "zh-Hans": "中文",
+};
+
 const createBlankLocation = (clientId: number): SignupLocation => ({
   clientId,
   address: "",
@@ -62,8 +68,7 @@ const createBlankLocation = (clientId: number): SignupLocation => ({
 const CustomerSignupPage = ({
   previewMode = false,
 }: CustomerSignupPageProps): JSX.Element => {
-  const [lang, setLang] = useState<FormLanguage>("ms");
-  const t = translations[lang];
+  const { t } = useTranslation("greentarget");
   const nextLocationId = useRef<number>(1);
 
   const [name, setName] = useState<string>("");
@@ -86,14 +91,14 @@ const CustomerSignupPage = ({
 
   useEffect((): void => {
     document.title = previewMode
-      ? `${t.title} UI Preview | Green Target`
-      : `${t.title} | Green Target`;
-  }, [previewMode, t.title]);
+      ? `${t("Customer Registration")} UI Preview | Green Target`
+      : `${t("Customer Registration")} | Green Target`;
+  }, [previewMode, t]);
 
   const paymentOptions: { value: PaymentMethod; label: string }[] = [
-    { value: "cash", label: t.paymentCash },
-    { value: "online", label: t.paymentOnline },
-    { value: "qr", label: t.paymentQr },
+    { value: "cash", label: t("Cash") },
+    { value: "online", label: t("Online Transfer") },
+    { value: "qr", label: t("QR") },
   ];
 
   const resetForm = (): void => {
@@ -159,19 +164,21 @@ const CustomerSignupPage = ({
     status: number,
     responseBody: SignupErrorResponse
   ): string => {
-    if (status === 429) return t.rateLimited;
+    if (status === 429) return t("Too many submissions. Please try again later.");
 
     switch (responseBody.code) {
       case "EINVOICE_FIELDS_REQUIRED":
-        return t.einvoiceFieldsRequired;
+        return t("Please enter an ID Type, ID Number and TIN No.");
       case "INVALID_EMAIL":
-        return t.invalidEmail;
+        return t("Please enter a valid email address.");
       case "EINVOICE_IDENTITY_INVALID":
-        return t.invalidEinvoiceIdentity;
+        return t("The TIN and identity details could not be verified.");
       case "EINVOICE_VALIDATION_UNAVAILABLE":
-        return t.einvoiceUnavailable;
+        return t(
+          "e-Invoice validation is temporarily unavailable. Please try again."
+        );
       default:
-        return t.submitError;
+        return t("Failed to submit. Please try again.");
     }
   };
 
@@ -185,15 +192,15 @@ const CustomerSignupPage = ({
     }));
 
     if (!name.trim()) {
-      setError(t.nameRequired);
+      setError(t("Please enter a full name or company name."));
       return;
     }
     if (!idNumber.trim()) {
-      setError(t.idRequired);
+      setError(t("Please enter an IC or company number."));
       return;
     }
     if (!phone.trim()) {
-      setError(t.phoneRequired);
+      setError(t("Please enter a telephone number."));
       return;
     }
     if (
@@ -202,18 +209,18 @@ const CustomerSignupPage = ({
         (location: { address: string }) => !location.address
       )
     ) {
-      setError(t.locationRequired);
+      setError(t("Please enter an address for every location."));
       return;
     }
     if (!paymentMethod) {
-      setError(t.paymentRequired);
+      setError(t("Please select a payment method."));
       return;
     }
     if (
       einvoiceRequested &&
       (!idType || !einvoiceIdNumber.trim() || !tinNumber.trim())
     ) {
-      setError(t.einvoiceFieldsRequired);
+      setError(t("Please enter an ID Type, ID Number and TIN No."));
       return;
     }
     if (
@@ -221,7 +228,7 @@ const CustomerSignupPage = ({
       email.trim() &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
     ) {
-      setError(t.invalidEmail);
+      setError(t("Please enter a valid email address."));
       return;
     }
 
@@ -262,7 +269,7 @@ const CustomerSignupPage = ({
       setSubmitted(true);
     } catch (submitError: unknown) {
       console.error("Error submitting Green Target signup:", submitError);
-      setError(t.submitError);
+      setError(t("Failed to submit. Please try again."));
     } finally {
       setSubmitting(false);
     }
@@ -274,22 +281,22 @@ const CustomerSignupPage = ({
 
   const LanguageSwitcher = (): JSX.Element => (
     <div className="flex shrink-0 items-center gap-1 self-end whitespace-nowrap rounded-full bg-white/15 p-1 text-sm sm:self-auto lg:mt-12 lg:self-start">
-      {(Object.keys(LANGUAGE_LABELS) as FormLanguage[]).map(
-        (code: FormLanguage) => (
+      {SUPPORTED_LANGUAGES.map((code: SupportedLanguage) => (
           <button
             key={code}
             type="button"
-            onClick={(): void => setLang(code)}
+            onClick={(): void => {
+              void i18n.changeLanguage(code);
+            }}
             className={`whitespace-nowrap rounded-full px-2.5 py-1 font-medium transition-colors sm:px-3 ${
-              lang === code
+              i18n.resolvedLanguage === code
                 ? "bg-white text-green-800 shadow-sm"
                 : "text-white hover:bg-white/15"
             }`}
           >
-            {LANGUAGE_LABELS[code]}
+            {FORM_LANGUAGE_LABELS[code]}
           </button>
-        )
-      )}
+        ))}
     </div>
   );
 
@@ -301,16 +308,18 @@ const CustomerSignupPage = ({
         className="w-56 max-w-full rounded-xl bg-white p-2 shadow-sm"
       />
       <p className="mt-2 text-center text-sm font-semibold text-green-900">
-        {t.qrCompany}
+        GREEN TARGET WASTE TREATMENT
       </p>
-      <p className="mt-1 text-center text-xs text-green-700">{t.qrHint}</p>
+      <p className="mt-1 text-center text-xs text-green-700">
+        {t("Scan this DuitNow QR code to pay.")}
+      </p>
       <a
         href={QR_IMAGE_PATH}
         download="greentarget-duitnow-qr.jpg"
         className="mt-3 inline-flex items-center gap-2 rounded-full bg-green-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-800"
       >
         <IconDownload size={18} />
-        {t.downloadQr}
+        {t("Download QR code")}
       </a>
     </div>
   );
@@ -347,7 +356,7 @@ const CustomerSignupPage = ({
                   Green Target
                 </p>
                 <p className="text-xs text-green-100 lg:mt-1 lg:text-sm">
-                  Waste Treatment
+                  {t("Waste Treatment")}
                 </p>
               </div>
             </div>
@@ -355,10 +364,10 @@ const CustomerSignupPage = ({
             <div aria-hidden="true" className="hidden lg:block lg:pt-14">
               <div className="lg:h-px lg:w-14 lg:bg-green-300/70" />
               <h2 className="lg:mt-6 lg:text-3xl lg:font-bold lg:leading-tight">
-                {t.title}
+                {t("Customer Registration")}
               </h2>
               <p className="lg:mt-3 lg:text-sm lg:leading-6 lg:text-green-100">
-                {t.subtitle}
+                {t("Please complete all details below to register.")}
               </p>
 
               <div className="lg:mt-10 lg:space-y-5">
@@ -367,7 +376,7 @@ const CustomerSignupPage = ({
                     01
                   </span>
                   <span className="lg:text-sm lg:font-medium lg:text-green-50">
-                    {t.nameLabel}
+                    {t("Full Name / Company Name")}
                   </span>
                 </div>
                 <div className="lg:flex lg:items-center lg:gap-3">
@@ -375,7 +384,7 @@ const CustomerSignupPage = ({
                     02
                   </span>
                   <span className="lg:text-sm lg:font-medium lg:text-green-50">
-                    {t.locationsTitle}
+                    {t("Locations")}
                   </span>
                 </div>
                 <div className="lg:flex lg:items-center lg:gap-3">
@@ -383,7 +392,7 @@ const CustomerSignupPage = ({
                     03
                   </span>
                   <span className="lg:text-sm lg:font-medium lg:text-green-50">
-                    {t.paymentLabel}
+                    {t("Payment method")}
                   </span>
                 </div>
               </div>
@@ -398,7 +407,7 @@ const CustomerSignupPage = ({
               role="status"
               className="mb-5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900"
             >
-              Development UI preview — submissions are disabled.
+              t("Development UI preview — submissions are disabled.")
             </div>
           )}
           {submitted ? (
@@ -407,16 +416,18 @@ const CustomerSignupPage = ({
                 <IconCheck size={36} className="text-green-700" />
               </div>
               <h1 className="mt-4 text-2xl font-bold text-gray-900">
-                {t.successTitle}
+                {t("Thank you!")}
               </h1>
-              <p className="mt-2 text-gray-600">{t.successMessage}</p>
+              <p className="mt-2 text-gray-600">
+                {t("Your registration has been received.")}
+              </p>
               {paymentMethod === "qr" && <QrBlock />}
               <button
                 type="button"
                 onClick={resetForm}
                 className="mt-7 rounded-full border border-green-700 px-5 py-2.5 text-sm font-semibold text-green-800 transition-colors hover:bg-green-50"
               >
-                {t.submitAnother}
+                {t("Submit another")}
               </button>
             </div>
           ) : (
@@ -425,20 +436,24 @@ const CustomerSignupPage = ({
               className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(300px,0.92fr)] lg:items-start lg:gap-x-6 lg:gap-y-6 lg:space-y-0"
             >
               <div className="lg:col-span-2">
-                <h1 className="text-2xl font-bold text-gray-900">{t.title}</h1>
-                <p className="mt-1 text-sm text-gray-500">{t.subtitle}</p>
+                <h1 className="text-2xl font-bold text-gray-900">
+                  {t("Customer Registration")}
+                </h1>
+                <p className="mt-1 text-sm text-gray-500">
+                  {t("Please complete all details below to register.")}
+                </p>
               </div>
 
               <section className="grid gap-4 rounded-2xl border border-gray-200 bg-gray-50/70 p-4 sm:grid-cols-2 lg:col-span-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)] lg:p-5">
                 <div className="sm:col-span-2 lg:col-span-1">
                   <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                    {t.nameLabel} <RequiredMark />
+                    {t("Full Name / Company Name")} <RequiredMark />
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={(event): void => setName(event.target.value)}
-                    placeholder={t.namePlaceholder}
+                    placeholder={t("Enter a full name or company name")}
                     maxLength={255}
                     required
                     autoComplete="name"
@@ -447,7 +462,7 @@ const CustomerSignupPage = ({
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                    {t.idLabel} <RequiredMark />
+                    {t("IC No. / Company No.")} <RequiredMark />
                   </label>
                   <input
                     type="text"
@@ -455,7 +470,7 @@ const CustomerSignupPage = ({
                     onChange={(event): void =>
                       handleIdNumberChange(event.target.value)
                     }
-                    placeholder={t.idPlaceholder}
+                    placeholder={t("Enter an IC or company registration number")}
                     maxLength={50}
                     required
                     className={inputClassName}
@@ -463,14 +478,14 @@ const CustomerSignupPage = ({
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                    {t.phoneLabel} <RequiredMark />
+                    {t("Telephone No.")} <RequiredMark />
                   </label>
                   <input
                     type="tel"
                     inputMode="tel"
                     value={phone}
                     onChange={(event): void => setPhone(event.target.value)}
-                    placeholder={t.phonePlaceholder}
+                    placeholder="e.g. 0123456789"
                     maxLength={20}
                     required
                     autoComplete="tel"
@@ -483,10 +498,12 @@ const CustomerSignupPage = ({
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <h2 className="text-base font-bold text-gray-900">
-                      {t.locationsTitle}
+                      {t("Locations")}
                     </h2>
                     <p className="text-xs text-gray-500">
-                      {locations.length} {t.locationLabel.toLowerCase()}
+                      {t("{{count}} location/locations", {
+                        count: locations.length,
+                      })}
                     </p>
                   </div>
                   <button
@@ -496,7 +513,7 @@ const CustomerSignupPage = ({
                     className="inline-flex items-center gap-1.5 rounded-full border border-green-700 px-3 py-2 text-sm font-semibold text-green-800 transition-colors hover:bg-green-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <IconPlus size={17} />
-                    {t.addLocation}
+                    {t("Add location")}
                   </button>
                 </div>
 
@@ -510,23 +527,25 @@ const CustomerSignupPage = ({
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-700">
                           <IconMapPin size={17} />
                         </span>
-                        {t.locationLabel} {index + 1}
+                        {t("Location")} {index + 1}
                       </div>
                       {locations.length > 1 && (
                         <button
                           type="button"
                           onClick={(): void => removeLocation(location.clientId)}
                           className="inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50"
-                          aria-label={`${t.removeLocation} ${index + 1}`}
+                          aria-label={t("Remove location {{n}}", {
+                            n: index + 1,
+                          })}
                         >
                           <IconTrash size={16} />
-                          {t.removeLocation}
+                          {t("Remove location")}
                         </button>
                       )}
                     </div>
                     <div>
                       <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                        {t.addressLabel} <RequiredMark />
+                        {t("Address")} <RequiredMark />
                       </label>
                       <textarea
                         value={location.address}
@@ -536,7 +555,7 @@ const CustomerSignupPage = ({
                             event.target.value
                           )
                         }
-                        placeholder={t.addressPlaceholder}
+                        placeholder={t("Enter the full address")}
                         maxLength={255}
                         rows={2}
                         required
@@ -553,24 +572,26 @@ const CustomerSignupPage = ({
                   onChange={setEinvoiceRequested}
                   checkedColor="text-green-700"
                   uncheckedColor="text-green-700 hover:!text-green-800 dark:!text-green-700 dark:hover:!text-green-800"
-                  ariaLabel={t.einvoiceRequestLabel}
-                  label={t.einvoiceRequestLabel}
+                  ariaLabel={t("I need an e-Invoice")}
+                  label={t("I need an e-Invoice")}
                   className="items-start [&_span]:!text-green-950 [&_span]:hover:!text-green-800"
                   buttonClassName="mt-0.5 rounded hover:!bg-green-100 dark:hover:!bg-green-100"
                 />
                 <p className="ml-7 mt-1 text-xs text-green-800">
-                  {t.einvoiceRequestHint}
+                  {t(
+                    "Select this only if you need e-Invoices for your Green Target bills."
+                  )}
                 </p>
 
                 {einvoiceRequested && (
                   <div className="mt-4 border-t border-green-200 pt-4">
                     <h2 className="mb-3 text-sm font-bold text-green-950">
-                      {t.einvoiceTitle}
+                      {t("e-Invoice information")}
                     </h2>
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.idTypeLabel} <RequiredMark />
+                          {t("ID Type")} <RequiredMark />
                         </label>
                         <select
                           value={idType}
@@ -580,7 +601,7 @@ const CustomerSignupPage = ({
                           required={einvoiceRequested}
                           className={inputClassName}
                         >
-                          <option value="">{t.idTypePlaceholder}</option>
+                          <option value="">{t("Select an ID type")}</option>
                           {ID_TYPE_OPTIONS.map((option: SelectOption) => (
                             <option key={option.id} value={option.id}>
                               {option.name}
@@ -590,7 +611,7 @@ const CustomerSignupPage = ({
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.einvoiceIdLabel} <RequiredMark />
+                          {t("ID Number")} <RequiredMark />
                         </label>
                         <input
                           type="text"
@@ -598,7 +619,7 @@ const CustomerSignupPage = ({
                           onChange={(event): void =>
                             handleEinvoiceIdNumberChange(event.target.value)
                           }
-                          placeholder={t.einvoiceIdPlaceholder}
+                          placeholder={t("Enter an ID number")}
                           maxLength={50}
                           required={einvoiceRequested}
                           className={inputClassName}
@@ -606,7 +627,7 @@ const CustomerSignupPage = ({
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.tinLabel} <RequiredMark />
+                          {t("TIN Number")} <RequiredMark />
                         </label>
                         <input
                           type="text"
@@ -614,7 +635,7 @@ const CustomerSignupPage = ({
                           onChange={(event): void =>
                             setTinNumber(event.target.value)
                           }
-                          placeholder={t.tinPlaceholder}
+                          placeholder="e.g. C21636482050"
                           maxLength={20}
                           required={einvoiceRequested}
                           className={inputClassName}
@@ -622,16 +643,16 @@ const CustomerSignupPage = ({
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-semibold text-gray-700">
-                          {t.emailLabel}{" "}
+                          {t("Email")}{" "}
                           <span className="font-normal text-gray-500">
-                            {t.optionalLabel}
+                            {t("(Optional)")}
                           </span>
                         </label>
                         <input
                           type="email"
                           value={email}
                           onChange={(event): void => setEmail(event.target.value)}
-                          placeholder={t.emailPlaceholder}
+                          placeholder="name@company.com"
                           maxLength={255}
                           autoComplete="email"
                           className={inputClassName}
@@ -644,7 +665,7 @@ const CustomerSignupPage = ({
 
               <section className="lg:col-start-2 lg:row-start-4 lg:rounded-2xl lg:border lg:border-gray-200 lg:bg-white lg:p-5 lg:shadow-sm">
                 <label className="mb-2 block text-sm font-semibold text-gray-700">
-                  {t.paymentLabel} <RequiredMark />
+                  {t("Payment method")} <RequiredMark />
                 </label>
                 <div className="grid grid-cols-3 gap-2">
                   {paymentOptions.map(
@@ -669,7 +690,7 @@ const CustomerSignupPage = ({
 
               <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 lg:col-start-2 lg:row-start-5">
                 <p className="text-sm font-semibold text-red-700">
-                  {t.paymentNote}
+                  {t("Payment must be made on the same day the bin is received.")}
                 </p>
               </div>
 
@@ -687,7 +708,9 @@ const CustomerSignupPage = ({
                 disabled={submitting}
                 className="w-full rounded-full bg-green-700 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-60 lg:col-start-2"
               >
-                {submitting ? t.submitting : t.submit}
+                {submitting
+                  ? t("Validating and submitting...")
+                  : t("Submit")}
               </button>
             </form>
           )}

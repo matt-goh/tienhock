@@ -11,6 +11,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import { IconHelpCircle, IconX } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import Button from "../Button";
 
 type ReportKind = "trial_balance" | "income_statement" | "balance_sheet" | "cogm";
@@ -408,9 +409,12 @@ interface ReportSourceGuideProps {
 }
 
 const ReportSourceGuide: React.FC<ReportSourceGuideProps> = ({ report }) => {
+  const { i18n } = useTranslation("accounting");
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const [lang, setLang] = useState<Lang>(
-    () => (localStorage.getItem("report_guide_lang") as Lang) || "ms"
+    () =>
+      (localStorage.getItem("report_guide_lang") as Lang) ||
+      (i18n.resolvedLanguage === "ms" ? "ms" : "en")
   );
 
   const content = GUIDE_CONTENT[report][lang];

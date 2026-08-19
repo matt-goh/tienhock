@@ -1,5 +1,5 @@
 // src/components/Accounting/SellerTypeHelpDialog.tsx
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogPanel,
@@ -8,6 +8,7 @@ import {
   TransitionChild,
 } from "@headlessui/react";
 import { IconHelpCircle } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import Button from "../Button";
 
 type Language = "ms" | "en";
@@ -83,8 +84,24 @@ const SellerTypeHelpDialog: React.FC<SellerTypeHelpDialogProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { i18n } = useTranslation("accounting");
   const [language, setLanguage] = useState<Language>("en");
+  const languageTouchedRef = useRef<boolean>(false);
   const content = CONTENT[language];
+
+  // The dialog keeps its own BM/EN toggle (bilingual content); the default
+  // follows the app language so e.g. zh-Hans users land on the English tab.
+  // Manual choice wins and is kept for the rest of the session.
+  useEffect(() => {
+    if (isOpen && !languageTouchedRef.current) {
+      setLanguage(i18n.resolvedLanguage === "ms" ? "ms" : "en");
+    }
+  }, [isOpen, i18n.resolvedLanguage]);
+
+  const handleLanguageChange = (nextLanguage: Language): void => {
+    languageTouchedRef.current = true;
+    setLanguage(nextLanguage);
+  };
 
   return (
     <Transition appear show={isOpen} as={React.Fragment}>
@@ -131,7 +148,7 @@ const SellerTypeHelpDialog: React.FC<SellerTypeHelpDialogProps> = ({
                       <button
                         key={lang}
                         type="button"
-                        onClick={() => setLanguage(lang)}
+                        onClick={() => handleLanguageChange(lang)}
                         className={`px-2.5 py-1 transition-colors ${
                           language === lang
                             ? "bg-sky-600 text-white"

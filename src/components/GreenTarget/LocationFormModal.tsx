@@ -1,5 +1,6 @@
 // src/components/GreenTarget/LocationFormModal.tsx
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { IconBuilding, IconMapPin, IconPhone } from "@tabler/icons-react";
 import Button from "../Button";
 
@@ -44,6 +45,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
   customerName = "",
   customerId,
 }) => {
+  const { t } = useTranslation("greentarget");
   const [formData, setFormData] = useState<LocationFormData>({
     site: initialData.site || "",
     address: initialData.address || "",
@@ -109,10 +111,10 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
 
     const validationErrors: LocationFormErrors = {};
     if (!formData.site.trim()) {
-      validationErrors.site = "Site is required";
+      validationErrors.site = t("Site is required");
     }
     if (!formData.address.trim()) {
-      validationErrors.address = "Address is required";
+      validationErrors.address = t("Address is required");
     }
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -137,10 +139,10 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
   const modalTitle =
     title ||
     (isCreatingCustomer
-      ? "Add New Customer & Location"
+      ? t("Add New Customer & Location")
       : initialData.location_id
-      ? "Edit Location"
-      : "Add New Location");
+      ? t("Edit Location")
+      : t("Add New Location"));
 
   // If not open, don't render anything
   if (!isOpen) return null;
@@ -161,7 +163,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
             {isCreatingCustomer && (
               <div className="mb-4">
                 <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
-                  Customer Name
+                  {t("Customer Name")}
                 </label>
                 <input
                   type="text"
@@ -169,7 +171,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                   value={formData.customer_name}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-default-500 dark:focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder="Enter customer name"
+                  placeholder={t("Enter customer name")}
                   required
                 />
               </div>
@@ -178,7 +180,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
             {/* Site Field */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
-                Site
+                {t("Site")}
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400 dark:text-gray-400">
@@ -196,7 +198,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                       ? "border-rose-300 dark:border-rose-500 focus:border-rose-500"
                       : "border-default-300 dark:border-gray-600 focus:border-default-500 dark:focus:border-sky-500"
                   } rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                  placeholder="e.g. Kolombong"
+                  placeholder={t("e.g. Kolombong")}
                 />
               </div>
               {errors.site && (
@@ -209,7 +211,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
             {/* Location Address Field */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
-                Location Address
+                {t("Location Address")}
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400 dark:text-gray-400">
@@ -227,7 +229,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                       ? "border-rose-300 dark:border-rose-500 focus:border-rose-500"
                       : "border-default-300 dark:border-gray-600 focus:border-default-500 dark:focus:border-sky-500"
                   } rounded-lg focus:outline-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100`}
-                  placeholder="Enter location address"
+                  placeholder={t("Enter location address")}
                 />
               </div>
               {errors.address && (
@@ -238,7 +240,7 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
             {/* Phone Number Field */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-default-600 dark:text-gray-300 mb-1">
-                Phone Number
+                {t("Phone Number")}
               </label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-default-400 dark:text-gray-400">
@@ -251,9 +253,10 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
                   onChange={handleChange}
                   maxLength={20}
                   className="w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-lg focus:outline-none focus:border-default-500 dark:focus:border-sky-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                  placeholder={`Custom phone number (optional, default: ${
-                    customerPhoneNumber || "none"
-                  })`}
+                  placeholder={t(
+                    "Custom phone number (optional, default: {{default}})",
+                    { default: customerPhoneNumber || t("none") }
+                  )}
                 />
               </div>
             </div>
@@ -261,10 +264,10 @@ const LocationFormModal: React.FC<LocationFormModalProps> = ({
             {/* Action Buttons */}
             <div className="mt-6 flex justify-end space-x-3">
               <Button type="button" onClick={onClose} variant="outline">
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button type="submit" variant="boldOutline" color="sky">
-                {initialData.location_id ? "Update" : "Save"}
+                {initialData.location_id ? t("Update") : t("Save")}
               </Button>
             </div>
           </form>

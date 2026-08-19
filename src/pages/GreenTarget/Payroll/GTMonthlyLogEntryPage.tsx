@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/Payroll/GTMonthlyLogEntryPage.tsx
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Button from "../../../components/Button";
 import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
@@ -104,6 +105,7 @@ const getActivityIdentity = (a: {
 
 const GTMonthlyLogEntryPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("greentarget");
   const goBack = useSmartBack("/greentarget/payroll");
   const [searchParams] = useSearchParams();
 
@@ -352,7 +354,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       setEmployeeActivities(activities);
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error("Failed to load data");
+      toast.error(t("Failed to load data"));
     } finally {
       setIsLoading(false);
     }
@@ -425,9 +427,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
     setIsRefreshingCache(true);
     try {
       await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
-      toast.success("Data refreshed");
+      toast.success(t("Data refreshed"));
     } catch (err) {
-      toast.error("Failed to refresh data");
+      toast.error(t("Failed to refresh data"));
     } finally {
       setIsRefreshingCache(false);
     }
@@ -455,7 +457,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
   const handleSave = async () => {
     const selectedEntries = Object.values(employeeEntries).filter((e) => e.selected);
     if (selectedEntries.length === 0) {
-      toast.error("Select at least one employee");
+      toast.error(t("Select at least one employee"));
       return;
     }
 
@@ -499,17 +501,17 @@ const GTMonthlyLogEntryPage: React.FC = () => {
           `/greentarget/api/monthly-work-logs/${existingWorkLog.id}`,
           payload
         );
-        toast.success("Work log updated successfully");
+        toast.success(t("Work log updated successfully"));
       } else {
         await api.post("/greentarget/api/monthly-work-logs", payload);
-        toast.success("Work log created successfully");
+        toast.success(t("Work log created successfully"));
       }
       // Green Target has no work-log details route, so both create and edit
       // return the user to wherever they came from.
       goBack();
     } catch (error) {
       console.error("Error saving work log:", error);
-      toast.error("Failed to save work log");
+      toast.error(t("Failed to save work log"));
     } finally {
       setIsSaving(false);
     }
@@ -564,15 +566,15 @@ const GTMonthlyLogEntryPage: React.FC = () => {
       <div className="grid grid-cols-2 gap-1.5">
         <div>
           <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
-            Hrs
+            {t("Hrs")}
           </div>
-          {renderHourInput(entry, "totalHours", "Biasa hours")}
+          {renderHourInput(entry, "totalHours", t("Biasa hours"))}
         </div>
         <div>
           <div className="mb-0.5 text-center text-[10px] uppercase text-default-400 dark:text-gray-500">
-            OT
+            {t("OT")}
           </div>
-          {renderHourInput(entry, "overtimeHours", "Overtime hours")}
+          {renderHourInput(entry, "overtimeHours", t("Overtime hours"))}
         </div>
       </div>
     </div>
@@ -595,7 +597,9 @@ const GTMonthlyLogEntryPage: React.FC = () => {
             <BackButton fallbackPath="/greentarget/payroll" />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              {existingWorkLog ? "Edit" : "New"} Office Monthly Entry
+              {t("{{action}} Office Monthly Entry", {
+                action: existingWorkLog ? t("Edit") : t("New"),
+              })}
             </h1>
             <div className="w-px h-6 bg-default-300 dark:bg-gray-600" />
             <MonthNavigator
@@ -611,7 +615,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                     : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                 }`}
               >
-                {existingWorkLog.status}
+                {t(existingWorkLog.status)}
               </span>
             )}
           </div>
@@ -620,10 +624,10 @@ const GTMonthlyLogEntryPage: React.FC = () => {
               onClick={handleRefreshCache}
               disabled={isRefreshingCache}
               className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-              title="Refresh staff, jobs, and pay codes"
+              title={t("Refresh staff, jobs, and pay codes")}
             >
               <IconRefresh size={16} className={isRefreshingCache ? "animate-spin" : ""} />
-              Refresh
+              {t("Refresh")}
             </button>
             <Button
               variant="outline"
@@ -631,7 +635,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
               onClick={() => navigate("/greentarget/payroll")}
               disabled={isSaving}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               color="sky"
@@ -639,7 +643,11 @@ const GTMonthlyLogEntryPage: React.FC = () => {
               onClick={handleSave}
               disabled={isSaving || totals.count === 0}
             >
-              {isSaving ? "Saving..." : existingWorkLog ? "Update" : "Save"}
+              {isSaving
+                ? t("Saving...")
+                : existingWorkLog
+                ? t("Update")
+                : t("Save")}
             </Button>
           </div>
         </div>
@@ -650,13 +658,13 @@ const GTMonthlyLogEntryPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-8 text-center">
           <IconClock size={48} className="mx-auto text-default-300 dark:text-gray-600 mb-4" />
           <h3 className="text-lg font-medium text-default-800 dark:text-gray-200 mb-2">
-            No Office Employees
+            {t("No Office Employees")}
           </h3>
           <p className="text-default-500 dark:text-gray-400 mb-4">
-            Add OFFICE employees to GT Payroll first.
+            {t("Add OFFICE employees to GT Payroll first.")}
           </p>
           <Button variant="outline" onClick={() => navigate("/greentarget/payroll")}>
-            Go to Payroll
+            {t("Go to Payroll")}
           </Button>
         </div>
       ) : (
@@ -678,19 +686,19 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                       />
                     </th>
                     <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                      ID
+                      {t("ID")}
                     </th>
                     <th className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                      Name
+                      {t("Name")}
                     </th>
                     <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap w-44">
-                      Biasa
+                      {t("Biasa")}
                     </th>
                     <th className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                      Activities
+                      {t("Activities")}
                     </th>
                     <th className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase whitespace-nowrap">
-                      Amount
+                      {t("Amount")}
                     </th>
                   </tr>
                 </thead>
@@ -744,10 +752,12 @@ const GTMonthlyLogEntryPage: React.FC = () => {
                             }}
                             disabled={!entry.selected || isSaving}
                             className="inline-flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 px-3 py-1 text-xs font-medium text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
-                            title="Manage pay code activities"
+                            title={t("Manage pay code activities")}
                           >
                             <IconListCheck size={14} />
-                            {selectedCount} selected
+                            {t("{{count}} selected", {
+                              count: selectedCount,
+                            })}
                           </button>
                         </td>
                         <td className="px-6 py-2 whitespace-nowrap text-right text-sm font-medium text-emerald-600 dark:text-emerald-400">
@@ -762,7 +772,7 @@ const GTMonthlyLogEntryPage: React.FC = () => {
 
             {Object.values(employeeEntries).length === 0 && (
               <div className="p-8 text-center text-default-500 dark:text-gray-400">
-                No employees found.
+                {t("No employees found.")}
               </div>
             )}
           </div>
@@ -771,25 +781,33 @@ const GTMonthlyLogEntryPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 p-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
               <div>
-                <p className="text-sm text-default-500 dark:text-gray-400">Selected</p>
+                <p className="text-sm text-default-500 dark:text-gray-400">
+                  {t("Selected")}
+                </p>
                 <p className="text-xl font-semibold text-default-800 dark:text-gray-100">
                   {totals.count} / {gtEmployees.length}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-default-500 dark:text-gray-400">Total Hours</p>
+                <p className="text-sm text-default-500 dark:text-gray-400">
+                  {t("Total Hours")}
+                </p>
                 <p className="text-xl font-semibold text-default-800 dark:text-gray-100">
                   {totals.totalHours}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-default-500 dark:text-gray-400">Overtime Hours</p>
+                <p className="text-sm text-default-500 dark:text-gray-400">
+                  {t("Overtime Hours")}
+                </p>
                 <p className="text-xl font-semibold text-default-800 dark:text-gray-100">
                   {totals.totalOvertime}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-default-500 dark:text-gray-400">Est. Amount</p>
+                <p className="text-sm text-default-500 dark:text-gray-400">
+                  {t("Est. Amount")}
+                </p>
                 <p className="text-xl font-semibold text-emerald-600 dark:text-emerald-400">
                   RM {totals.totalAmount.toFixed(2)}
                 </p>

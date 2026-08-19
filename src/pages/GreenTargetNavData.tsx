@@ -36,6 +36,7 @@ import GTDailyLoriHabukEntryPage from "./GreenTarget/Payroll/GTDailyLoriHabukEnt
 import GTSalaryReportPage from "./GreenTarget/Payroll/GTSalaryReportPage";
 import GTCutiReportPage from "./GreenTarget/Payroll/GTCutiReportPage";
 import GTECarumanPage from "./GreenTarget/Payroll/GTECarumanPage";
+import GTCP8DPage from "./GreenTarget/Payroll/GTCP8DPage";
 import GTPayRatesPage from "./GreenTarget/Payroll/GTPayRatesPage";
 import GTAdjustmentDocsListPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsListPage";
 import GTAdjustmentDocsFormPage from "./GreenTarget/AdjustmentDocs/GTAdjustmentDocsFormPage";
@@ -193,6 +194,12 @@ export const GreenTargetNavData: SidebarItem[] = [
         name: "E-Caruman",
         path: "/payroll/e-caruman",
         component: GTECarumanPage,
+        group: "Payroll",
+      },
+      {
+        name: "CP8D",
+        path: "/payroll/cp8d",
+        component: GTCP8DPage,
         group: "Payroll",
       },
       {

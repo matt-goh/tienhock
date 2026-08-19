@@ -3,6 +3,7 @@
 // GT payroll-employee subset of public.staffs; balances/records come from the GT
 // leave-management route (greentarget.leave_records ledger).
 import React, { useState, useMemo, useEffect } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import {
   getGroupedStaffIdsByEmployeeId,
@@ -75,6 +76,7 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
   groupedIds,
   onClick,
 }) => {
+  const { t } = useTranslation("greentarget");
   const jobDisplay = Array.isArray(employee.job)
     ? employee.job.join(", ")
     : employee.job || "N/A";
@@ -93,24 +95,25 @@ const EmployeeCard: React.FC<EmployeeCardProps> = ({
         {employee.name}
       </h3>
       <p className="text-xs text-default-500 dark:text-gray-400 uppercase mb-2">
-        ID: {employee.id}
+        {t("ID: {{id}}", { id: employee.id })}
       </p>
       {hasCollapsedIds && (
         <p
           className="text-xs text-sky-600 dark:text-sky-400 mb-2 line-clamp-2"
           title={groupedIdsText}
         >
-          Collapsed IDs: {groupedIdsText}
+          {t("Collapsed IDs: {{ids}}", { ids: groupedIdsText })}
         </p>
       )}
       <p className="text-sm text-default-600 dark:text-gray-300 line-clamp-2" title={jobDisplay}>
-        <span className="font-medium">Job:</span> {jobDisplay}
+        <span className="font-medium">{t("Job:")}</span> {jobDisplay}
       </p>
     </button>
   );
 };
 
 const GTCutiReportPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const { staffs: allStaffs, loading: loadingStaffs } = useStaffsCache();
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] =
@@ -137,7 +140,7 @@ const GTCutiReportPage: React.FC = () => {
         setGtEmployeeIds(new Set((rows || []).map((r) => r.employee_id)));
       } catch (error) {
         console.error("Failed to fetch GT payroll employees:", error);
-        toast.error("Failed to load Green Target employees");
+        toast.error(t("Failed to load Green Target employees"));
       } finally {
         setLoadingGtEmployees(false);
       }
@@ -166,7 +169,9 @@ const GTCutiReportPage: React.FC = () => {
           groupedStaffIdsByEmployeeId.get(staff.id) || [staff.id];
         const groupedIdsLabel: string =
           groupedIds.length > 1
-            ? ` | Collapsed IDs: ${groupedIds.join(", ")}`
+            ? ` | ${t("Collapsed IDs: {{ids}}", {
+                ids: groupedIds.join(", "),
+              })}`
             : "";
 
         return {
@@ -240,7 +245,7 @@ const GTCutiReportPage: React.FC = () => {
       } catch (error: any) {
         console.error("Failed to fetch leave data:", error);
         setReportError(
-          error.response?.data?.message || "Failed to load leave report."
+          error.response?.data?.message || t("Failed to load leave report.")
         );
       } finally {
         setLoadingReport(false);
@@ -302,7 +307,7 @@ const GTCutiReportPage: React.FC = () => {
   // Single employee PDF generation
   const generateSinglePDF = async (action: "download" | "print") => {
     if (!selectedStaff || !leaveBalances) {
-      toast.error("No employee data available to generate PDF");
+      toast.error(t("No employee data available to generate PDF"));
       return;
     }
 
@@ -327,11 +332,13 @@ const GTCutiReportPage: React.FC = () => {
       await generateSingleCutiReportPDF(pdfData, action);
 
       const actionText =
-        action === "download" ? "downloaded" : "generated for printing";
-      toast.success(`Leave report ${actionText} successfully`);
+        action === "download"
+          ? t("Leave report downloaded successfully")
+          : t("Leave report generated for printing successfully");
+      toast.success(actionText);
     } catch (error) {
       console.error("Error generating PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -340,13 +347,13 @@ const GTCutiReportPage: React.FC = () => {
   // Batch PDF generation for all employees
   const generateBatchPDF = async (action: "download" | "print") => {
     if (filteredEmployees.length === 0) {
-      toast.error("No employees available to generate batch PDF");
+      toast.error(t("No employees available to generate batch PDF"));
       return;
     }
 
     setIsGeneratingPDF(true);
     try {
-      toast.loading("Fetching batch leave report data...");
+      toast.loading(t("Fetching batch leave report data..."));
 
       const employeeIds = filteredEmployees.map((emp) => emp.id);
 
@@ -359,7 +366,7 @@ const GTCutiReportPage: React.FC = () => {
       );
 
       if (!batchResponse.employees || batchResponse.employees.length === 0) {
-        toast.error("No leave data found for selected employees");
+        toast.error(t("No leave data found for selected employees"));
         return;
       }
 
@@ -391,11 +398,13 @@ const GTCutiReportPage: React.FC = () => {
       await generateBatchCutiReportPDF(batchData, action);
 
       toast.success(
-        `Batch leave report generated successfully (${validEmployeeData.length} employees)`
+        t("Batch leave report generated successfully ({{count}} employees)", {
+          count: validEmployeeData.length,
+        })
       );
     } catch (error) {
       console.error("Error generating batch PDF:", error);
-      toast.error("Failed to generate batch PDF");
+      toast.error(t("Failed to generate batch PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -419,7 +428,7 @@ const GTCutiReportPage: React.FC = () => {
               <p className="text-default-500 dark:text-gray-400">{staff.id}</p>
               {hasCollapsedIds && (
                 <p className="text-sm text-sky-600 dark:text-sky-400">
-                  Collapsed IDs: {groupedIdsText}
+                  {t("Collapsed IDs: {{ids}}", { ids: groupedIdsText })}
                 </p>
               )}
             </div>
@@ -434,7 +443,7 @@ const GTCutiReportPage: React.FC = () => {
               variant="outline"
               disabled={!leaveBalances || isGeneratingPDF}
             >
-              Print Report
+              {t("Print Report")}
             </Button>
           </div>
         </div>
@@ -442,7 +451,9 @@ const GTCutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconBriefcase size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Job</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Job")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {(Array.isArray(staff.job) ? staff.job.join(", ") : staff.job) ||
                   "N/A"}
@@ -452,7 +463,9 @@ const GTCutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconCalendar size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Date Joined</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Date Joined")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {staff.dateJoined
                   ? new Date(staff.dateJoined).toLocaleDateString()
@@ -463,16 +476,20 @@ const GTCutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconClockHour4 size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Years of Service</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Years of Service")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
-                {yearsOfService} years
+                {t("{{count}} year/years", { count: yearsOfService })}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <IconId size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">IC No.</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("IC No.")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {staff.icNo || "N/A"}
               </p>
@@ -481,7 +498,9 @@ const GTCutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <IconWorld size={20} className="text-default-500 dark:text-gray-400" />
             <div>
-              <p className="text-xs text-default-500 dark:text-gray-400">Nationality</p>
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t("Nationality")}
+              </p>
               <p className="text-sm font-medium text-default-800 dark:text-gray-100">
                 {staff.nationality || "N/A"}
               </p>
@@ -505,50 +524,58 @@ const GTCutiReportPage: React.FC = () => {
     return (
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-default-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-default-800 dark:text-gray-100 mb-4">
-          Leave Balances ({currentYear})
+          {t("Leave Balances ({{year}})", { year: currentYear })}
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-sky-50 dark:bg-sky-900/30 p-4 rounded-lg border border-sky-200 dark:border-sky-800">
-            <p className="font-semibold text-sky-800 dark:text-sky-300">Cuti Tahunan</p>
+            <p className="font-semibold text-sky-800 dark:text-sky-300">
+              {t("Annual Leave")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-sky-600 dark:text-sky-400">
                 {remainingTahunan}
               </span>
               <span className="text-sm text-sky-500 dark:text-sky-400">
-                / {balances.cuti_tahunan_total} days
+                {t("/ {{count}} days", { count: balances.cuti_tahunan_total })}
               </span>
             </div>
           </div>
           <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
-            <p className="font-semibold text-amber-800 dark:text-amber-300">Cuti Sakit</p>
+            <p className="font-semibold text-amber-800 dark:text-amber-300">
+              {t("Sick Leave")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-amber-600 dark:text-amber-400">
                 {remainingSakit}
               </span>
               <span className="text-sm text-amber-500 dark:text-amber-400">
-                / {balances.cuti_sakit_total} days
+                {t("/ {{count}} days", { count: balances.cuti_sakit_total })}
               </span>
             </div>
           </div>
           <div className="bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-lg border border-emerald-200 dark:border-emerald-800">
-            <p className="font-semibold text-emerald-800 dark:text-emerald-300">Cuti Umum</p>
+            <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+              {t("Public Holiday")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                 {remainingUmum}
               </span>
               <span className="text-sm text-emerald-500 dark:text-emerald-400">
-                / {balances.cuti_umum_total} days
+                {t("/ {{count}} days", { count: balances.cuti_umum_total })}
               </span>
             </div>
           </div>
           <div className="bg-violet-50 dark:bg-violet-900/30 p-4 rounded-lg border border-violet-200 dark:border-violet-800">
-            <p className="font-semibold text-violet-800 dark:text-violet-300">Cuti Rawatan</p>
+            <p className="font-semibold text-violet-800 dark:text-violet-300">
+              {t("Medical Leave")}
+            </p>
             <div className="flex justify-between items-baseline mt-2">
               <span className="text-2xl font-bold text-violet-600 dark:text-violet-400">
                 {remainingRawatan}
               </span>
               <span className="text-sm text-violet-500 dark:text-violet-400">
-                / {balances.cuti_rawatan_total} days
+                {t("/ {{count}} days", { count: balances.cuti_rawatan_total })}
               </span>
             </div>
           </div>
@@ -623,26 +650,26 @@ const GTCutiReportPage: React.FC = () => {
     return (
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-default-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-default-800 dark:text-gray-100 mb-4">
-          Monthly Leave Details ({currentYear})
+          {t("Monthly Leave Details ({{year}})", { year: currentYear })}
         </h3>
         <div className="overflow-x-auto">
           <table className="min-w-full border border-default-200 dark:border-gray-700 rounded-lg text-sm">
             <thead>
               <tr className="bg-default-100 dark:bg-gray-800">
                 <th className="py-3 px-4 text-left font-semibold text-default-700 dark:text-gray-200 uppercase border-r border-default-300 dark:border-gray-600">
-                  Month
+                  {t("Month")}
                 </th>
                 <th className="py-3 px-4 text-center font-semibold text-sky-800 dark:text-sky-300 uppercase border-r border-default-300 dark:border-gray-600">
-                  Cuti Tahunan
+                  {t("Annual Leave")}
                 </th>
                 <th className="py-3 px-4 text-center font-semibold text-amber-800 dark:text-amber-300 uppercase border-r border-default-300 dark:border-gray-600">
-                  Cuti Sakit
+                  {t("Sick Leave")}
                 </th>
                 <th className="py-3 px-4 text-center font-semibold text-emerald-800 dark:text-emerald-300 uppercase border-r border-default-300 dark:border-gray-600">
-                  Cuti Umum
+                  {t("Public Holiday")}
                 </th>
                 <th className="py-3 px-4 text-center font-semibold text-violet-800 dark:text-violet-300 uppercase">
-                  Cuti Rawatan
+                  {t("Medical Leave")}
                 </th>
               </tr>
               <tr className="bg-default-50 dark:bg-gray-900/50 text-xs">
@@ -653,9 +680,9 @@ const GTCutiReportPage: React.FC = () => {
                     className="py-2 px-2 text-center border-r border-default-200 dark:border-gray-700 text-default-500 dark:text-gray-400"
                   >
                     <div className="flex justify-around">
-                      <span>Days</span>
-                      <span>Amount</span>
-                      <span>Balance</span>
+                      <span>{t("Days")}</span>
+                      <span>{t("Amount")}</span>
+                      <span>{t("Balance")}</span>
                     </div>
                   </th>
                 ))}
@@ -745,26 +772,37 @@ const GTCutiReportPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-sky-500"></div>
             <span>
-              <strong>Cuti Tahunan:</strong> Annual leave based on years of
-              service
+              <Trans
+                i18nKey="<strong>Annual Leave:</strong> Annual leave based on years of service"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-amber-500"></div>
             <span>
-              <strong>Cuti Sakit:</strong> Sick leave (available any day)
+              <Trans
+                i18nKey="<strong>Sick Leave:</strong> Sick leave (available any day)"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
             <span>
-              <strong>Cuti Umum:</strong> Public holiday leave
+              <Trans
+                i18nKey="<strong>Public Holiday:</strong> Public holiday leave"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-violet-500"></div>
             <span>
-              <strong>Cuti Rawatan:</strong> Hospital leave (60 days per year)
+              <Trans
+                i18nKey="<strong>Medical Leave:</strong> Hospital leave (60 days per year)"
+                components={{ strong: <strong /> }}
+              />
             </span>
           </div>
         </div>
@@ -789,7 +827,7 @@ const GTCutiReportPage: React.FC = () => {
                 <input
                   type="text"
                   className="block w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 rounded-full leading-5 bg-white placeholder-default-500 dark:placeholder:text-gray-400 focus:outline-none focus:placeholder-default-400 focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:bg-transparent dark:text-gray-100"
-                  placeholder="Search employees by name, ID, or job..."
+                  placeholder={t("Search employees by name, ID, or job...")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -805,7 +843,9 @@ const GTCutiReportPage: React.FC = () => {
                 variant="outline"
                 disabled={filteredEmployees.length === 0 || isGeneratingPDF}
               >
-                Print All ({filteredEmployees.length})
+                {t("Print All ({{count}})", {
+                  count: filteredEmployees.length,
+                })}
               </Button>
             </div>
           </div>
@@ -829,8 +869,10 @@ const GTCutiReportPage: React.FC = () => {
               <div className="text-center py-16 border border-dashed border-default-300 dark:border-gray-600 rounded-lg">
                 <p className="text-default-600 dark:text-gray-300">
                   {searchQuery
-                    ? `No employees found matching "${searchQuery}"`
-                    : "No Green Target payroll employees found."}
+                    ? t('No employees found matching "{{query}}"', {
+                        query: searchQuery,
+                      })
+                    : t("No Green Target payroll employees found.")}
                 </p>
               </div>
             )}
@@ -842,7 +884,9 @@ const GTCutiReportPage: React.FC = () => {
       {isLoading && !selectedStaffId && (
         <div className="flex justify-center items-center h-40">
           <LoadingSpinner />
-          <span className="ml-3 text-default-600 dark:text-gray-300">Loading employees...</span>
+          <span className="ml-3 text-default-600 dark:text-gray-300">
+            {t("Loading employees...")}
+          </span>
         </div>
       )}
 
@@ -872,19 +916,19 @@ const GTCutiReportPage: React.FC = () => {
                     d="M10 19l-7-7m0 0l7-7m-7 7h18"
                   />
                 </svg>
-                Back to Employee List
+                {t("Back to Employee List")}
               </button>
             </div>
             <div className="flex-1 md:max-w-lg">
               <FormCombobox
                 name="staff"
-                label="Select Staff"
+                label={t("Select Staff")}
                 value={selectedStaffId || ""}
                 onChange={(value) => setSelectedStaffId(value as string)}
                 options={staffOptions}
                 query={searchQuery}
                 setQuery={setSearchQuery}
-                placeholder="Search by name or ID..."
+                placeholder={t("Search by name or ID...")}
                 mode="single"
                 disabled={isLoading}
               />

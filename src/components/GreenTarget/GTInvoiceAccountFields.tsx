@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconAlertTriangle,
   IconCheck,
@@ -51,13 +52,8 @@ export const deriveGTIdentityCode = (
   return `${IDENTITY_CODE_PREFIX}${stem}`.slice(0, MAX_IDENTITY_CODE_LENGTH);
 };
 
-const identityLabel = (
-  identity: GreenTargetDebtorSubledgerIdentity
-): string =>
-  `${identity.code} - ${identity.description} (masuk ke ${identity.control_account_code})`;
-
 const errorMessage = (error: unknown): string => {
-  if (!error || typeof error !== "object") return "Ralat tidak diketahui";
+  if (!error || typeof error !== "object") return "Unknown error";
   const candidate = error as {
     message?: string;
     data?: { message?: string; error?: string };
@@ -69,7 +65,7 @@ const errorMessage = (error: unknown): string => {
     candidate.data?.message ||
     candidate.data?.error ||
     candidate.message ||
-    "Ralat tidak diketahui"
+    "Unknown error"
   );
 };
 
@@ -111,23 +107,30 @@ const readAvailability = (
   if (response.reason === "invalid") {
     return {
       state: "invalid",
-      message: response.message || "Kod identiti ini tidak sah.",
+      message: response.message || "This identity code is invalid.",
     };
   }
   return {
     state: "taken",
-    takenBy: response.taken_by || "identiti sedia ada",
+    takenBy: response.taken_by || "the existing identity",
     source: response.source === "account" ? "account" : "identity",
   };
 };
 
 const takenMessage = (
   code: string,
-  availability: Extract<CodeAvailability, { state: "taken" }>
+  availability: Extract<CodeAvailability, { state: "taken" }>,
+  t: (key: string, options?: Record<string, unknown>) => string
 ): string =>
-  `${code} sudah digunakan oleh ${availability.takenBy}${
-    availability.source === "account" ? " (kod akaun sedia ada)" : ""
-  }. Sila ubah kod sebelum menyimpan.`;
+  availability.source === "account"
+    ? t(
+        "{{code}} is already used by {{takenBy}} (existing account code). Please change the code before saving.",
+        { code, takenBy: availability.takenBy }
+      )
+    : t("{{code}} is already used by {{takenBy}}. Please change the code before saving.", {
+        code,
+        takenBy: availability.takenBy,
+      });
 
 /**
  * Imperative surface the invoice screens use at save time. A staged identity is
@@ -182,6 +185,7 @@ const GTInvoiceAccountFields = forwardRef<
   }: GTInvoiceAccountFieldsProps,
   ref: React.ForwardedRef<GTInvoiceAccountFieldsHandle>
 ) {
+  const { t } = useTranslation("greentarget");
   const [debtorQuery, setDebtorQuery] = useState<string>("");
   const [searchResults, setSearchResults] = useState<
     GreenTargetDebtorSubledgerIdentity[]
@@ -392,7 +396,14 @@ const GTInvoiceAccountFields = forwardRef<
     const options = identities.map(
       (identity: GreenTargetDebtorSubledgerIdentity): SelectOption => ({
         id: identity.code,
-        name: identityLabel(identity),
+        name: t(
+          "{{code}} - {{description}} (maps to {{account}})",
+          {
+            code: identity.code,
+            description: identity.description,
+            account: identity.control_account_code,
+          }
+        ),
       })
     );
     if (
@@ -403,11 +414,13 @@ const GTInvoiceAccountFields = forwardRef<
     ) {
       options.unshift({
         id: debtorAccountCode,
-        name: `${debtorAccountCode} - identiti dipilih`,
+        name: t("{{code}} - selected identity", {
+          code: debtorAccountCode,
+        }),
       });
     }
     return options;
-  }, [debtorAccountCode, identities]);
+  }, [debtorAccountCode, identities, t]);
 
   const toggleCreateIdentity = (checked: boolean): void => {
     setIsCreatingNewIdentity(checked);
@@ -426,7 +439,9 @@ const GTInvoiceAccountFields = forwardRef<
       const existingCode = String(debtorAccountCode || "").trim();
       if (!existingCode) {
         throw new Error(
-          "Pilih identiti penghutang untuk invois ini, atau tandakan Cipta identiti CD/SD baharu."
+          t(
+            "Select a debtor identity for this invoice, or tick Create new CD/SD identity."
+          )
         );
       }
       return existingCode;
@@ -435,12 +450,12 @@ const GTInvoiceAccountFields = forwardRef<
     const code = newCode.trim().toUpperCase();
     const description = newDescription.trim();
     if (!code || !description) {
-      const message = "Kod dan nama identiti diperlukan.";
+      const message = t("Identity code and name are required.");
       setCreateError(message);
       throw new Error(message);
     }
     if (!dateIssued) {
-      const message = "Pilih tarikh invois sebelum mencipta identiti.";
+      const message = t("Select the invoice date before creating the identity.");
       setCreateError(message);
       throw new Error(message);
     }
@@ -448,7 +463,7 @@ const GTInvoiceAccountFields = forwardRef<
     // code the user was already told is unusable. `checking`/`unknown` fall
     // through: the POST is transactional and reports the duplicate itself.
     if (codeAvailability.state === "taken") {
-      const message = takenMessage(code, codeAvailability);
+      const message = takenMessage(code, codeAvailability, t);
       setCreateError(message);
       throw new Error(message);
     }
@@ -501,6 +516,7 @@ const GTInvoiceAccountFields = forwardRef<
     newCode,
     newDescription,
     onDebtorChange,
+    t,
   ]);
 
   useImperativeHandle(
@@ -524,14 +540,16 @@ const GTInvoiceAccountFields = forwardRef<
         return (
           <span className="inline-flex items-center gap-1.5 text-default-500 dark:text-gray-400">
             <IconLoader2 size={14} className="animate-spin" />
-            Menyemak sama ada {previewCode} sudah digunakan...
+            {t("Checking whether {{code}} is already used...", {
+              code: previewCode,
+            })}
           </span>
         );
       case "taken":
         return (
           <span className="inline-flex items-start gap-1.5 text-rose-700 dark:text-rose-300">
             <IconAlertTriangle size={14} className="mt-px shrink-0" />
-            {takenMessage(previewCode, codeAvailability)}
+            {takenMessage(previewCode, codeAvailability, t)}
           </span>
         );
       case "invalid":
@@ -545,24 +563,32 @@ const GTInvoiceAccountFields = forwardRef<
         return (
           <span className="inline-flex items-start gap-1.5 text-emerald-700 dark:text-emerald-300">
             <IconCheck size={14} className="mt-px shrink-0" />
-            {previewCode} belum digunakan. Identiti ini akan dicipta semasa
-            menyimpan, berkuat kuasa {dateIssued || "tarikh invois"}, dan masuk
-            ke CD_SD dalam lejar am.
+            {t(
+              "{{code}} is not used yet. This identity will be created on save, effective {{date}}, and posted to CD_SD in the general ledger.",
+              {
+                code: previewCode,
+                date: dateIssued || t("invoice date"),
+              }
+            )}
           </span>
         );
       case "unknown":
         return (
           <span className="inline-flex items-start gap-1.5 text-amber-700 dark:text-amber-300">
             <IconAlertTriangle size={14} className="mt-px shrink-0" />
-            {previewCode} tidak dapat disemak sekarang. Sistem akan menyemak
-            sekali lagi semasa menyimpan.
+            {t(
+              "{{code}} could not be checked right now. The system will check again on save.",
+              { code: previewCode }
+            )}
           </span>
         );
       default:
         return (
           <span className="text-default-600 dark:text-gray-300">
-            Identiti ini akan dicipta semasa menyimpan, berkuat kuasa{" "}
-            {dateIssued || "tarikh invois"}, dan masuk ke CD_SD dalam lejar am.
+            {t(
+              "This identity will be created on save, effective {{date}}, and posted to CD_SD in the general ledger.",
+              { date: dateIssued || t("invoice date") }
+            )}
           </span>
         );
     }
@@ -572,7 +598,7 @@ const GTInvoiceAccountFields = forwardRef<
     <div className="space-y-1.5">
       <div>
         <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
-          Identiti Penghutang <span className="text-rose-500">*</span>
+          {t("Debtor Identity")} <span className="text-rose-500">*</span>
         </span>
         <Checkbox
           checked={isCreatingNewIdentity}
@@ -580,7 +606,7 @@ const GTInvoiceAccountFields = forwardRef<
           disabled={identityLocked || isCreating || !customerId}
           size={18}
           className="mt-2"
-          label="Cipta identiti CD/SD baharu untuk pelanggan ini"
+          label={t("Create a new CD/SD identity for this customer")}
         />
       </div>
 
@@ -592,7 +618,7 @@ const GTInvoiceAccountFields = forwardRef<
                 htmlFor="gt-new-debtor-code"
                 className="block text-xs font-medium text-default-600 dark:text-gray-300"
               >
-                Kod Identiti
+                {t("Identity Code")}
               </label>
               <input
                 id="gt-new-debtor-code"
@@ -618,7 +644,7 @@ const GTInvoiceAccountFields = forwardRef<
                 htmlFor="gt-new-debtor-description"
                 className="block text-xs font-medium text-default-600 dark:text-gray-300"
               >
-                Nama dalam jadual penghutang (Trade Debtors)
+                {t("Name in the debtor schedule (Trade Debtors)")}
               </label>
               <input
                 id="gt-new-debtor-description"
@@ -663,8 +689,8 @@ const GTInvoiceAccountFields = forwardRef<
             setQuery={setDebtorQuery}
             placeholder={
               isSearching
-                ? "Mencari identiti penghutang..."
-                : "Cari kod penghutang atau nama pelanggan..."
+                ? t("Searching for debtor identities...")
+                : t("Search debtor code or customer name...")
             }
             disabled={identityLocked}
             mode="single"
@@ -674,7 +700,7 @@ const GTInvoiceAccountFields = forwardRef<
           <div className="mt-2 min-h-5 text-xs">
             {customerDefaultLoading ? (
               <span className="text-default-500 dark:text-gray-400">
-                Memuatkan identiti lalai pelanggan...
+                {t("Loading the customer's default identity...")}
               </span>
             ) : debtorAccountCode ? (
               <span
@@ -685,20 +711,32 @@ const GTInvoiceAccountFields = forwardRef<
                 }
               >
                 {selectionUnavailable
-                  ? `${debtorAccountCode} tidak boleh dipilih untuk tarikh invois ini.`
+                  ? t("{{code}} cannot be selected for this invoice date.", {
+                      code: debtorAccountCode,
+                    })
                   : selectedControlAccount
-                  ? `${debtorAccountCode} masuk ke ${selectedControlAccount} dalam lejar am.`
-                  : `Menentukan ke mana ${debtorAccountCode} masuk dalam lejar am...`}
+                  ? t(
+                      "{{code}} posts to {{account}} in the general ledger.",
+                      {
+                        code: debtorAccountCode,
+                        account: selectedControlAccount,
+                      }
+                    )
+                  : t(
+                      "Determining where {{code}} posts in the general ledger...",
+                      { code: debtorAccountCode }
+                    )}
               </span>
             ) : (
               <span className="text-amber-700 dark:text-amber-300">
-                Pilih identiti pelanggan yang perlu dipaparkan dalam jadual
-                penghutang (Trade Debtors).
+                {t(
+                  "Select the customer identity to show in the debtor schedule (Trade Debtors)."
+                )}
               </span>
             )}
             {searchFailed && (
               <span className="ml-2 text-rose-700 dark:text-rose-300">
-                Carian identiti tidak dapat dimuatkan.
+                {t("The identity search could not be loaded.")}
               </span>
             )}
           </div>
@@ -720,11 +758,12 @@ const GTInvoiceAccountFields = forwardRef<
     <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-900 dark:bg-sky-950/20">
       <div className="mb-3">
         <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-          Perakaunan
+          {t("Accounting")}
         </h2>
         <p className="text-xs text-default-500 dark:text-gray-400">
-          Pilih identiti penghutang dan agihkan jumlah invois kepada baris
-          jurnal hasilnya.
+          {t(
+            "Select the debtor identity and allocate the invoice total across its revenue journal lines."
+          )}
         </p>
       </div>
       {body}

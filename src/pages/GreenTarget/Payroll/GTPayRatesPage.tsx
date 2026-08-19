@@ -46,7 +46,7 @@ interface EditingTarget {
 }
 
 const GTPayRatesPage: React.FC = () => {
-  const { t } = useTranslation("common");
+  const { t } = useTranslation("greentarget");
   const {
     employees,
     loading: loadingEmployees,
@@ -249,7 +249,7 @@ const GTPayRatesPage: React.FC = () => {
       <div className="space-y-3">
         {employees.length === 0 && (
           <div className="rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 text-center text-sm text-default-500 dark:text-gray-400">
-            {t("noRecords")}
+            {t("No records")}
           </div>
         )}
         {employees.map((emp) => {

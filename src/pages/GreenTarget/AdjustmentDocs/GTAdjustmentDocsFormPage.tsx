@@ -14,6 +14,7 @@ import React, {
   useRef,
 } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Trans, useTranslation } from "react-i18next";
 import {
   IconExternalLink,
   IconPlus,
@@ -237,6 +238,7 @@ const todayIso = (): string => {
 };
 
 const GTAdjustmentDocsFormPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const goBack = useSmartBack(UI_BASE);
   const [params, setParams] = useSearchParams();
@@ -325,7 +327,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
   // Validate type once
   useEffect(() => {
     if (!type) {
-      toast.error("Missing required parameter: type");
+      toast.error(t("Missing required parameter: type"));
       navigate(UI_BASE, { replace: true });
     }
   }, [type, navigate]);
@@ -372,7 +374,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
       try {
         const invResp: any = await api.get(`${INVOICES_API}/${invoiceId}`);
         if (!invResp?.invoice) {
-          toast.error(`Invoice ${invoiceId} not found`);
+          toast.error(t("Invoice {{id}} not found", { id: invoiceId }));
           navigate(UI_BASE, { replace: true });
           return;
         }
@@ -380,7 +382,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         const pays: GTPayment[] = invResp.payments || [];
 
         if (inv.status === "cancelled") {
-          toast.error("Cannot create adjustment for a cancelled invoice");
+          toast.error(t("Cannot create adjustment for a cancelled invoice"));
           navigate(`${INVOICE_UI_BASE}/${invoiceId}`, { replace: true });
           return;
         }
@@ -407,7 +409,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             creditNote.original_invoice_id !== inv.invoice_id ||
             creditNote.status !== "active"
           ) {
-            toast.error("Active Credit Note not found for this invoice");
+            toast.error(t("Active Credit Note not found for this invoice"));
             navigate(`${INVOICE_UI_BASE}/${invoiceId}`, { replace: true });
             return;
           }
@@ -416,7 +418,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               `${API_BASE}/${creditNote.paired_with_id}`
             );
             if (pairedDoc.status === "active") {
-              toast.error("This Credit Note already has an active Refund Note");
+              toast.error(
+                t("This Credit Note already has an active Refund Note")
+              );
               navigate(`${UI_BASE}/${creditNote.id}`, { replace: true });
               return;
             }
@@ -486,7 +490,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         }
       } catch (error: any) {
         console.error(error);
-        toast.error(error?.message || "Failed to load invoice");
+        toast.error(error?.message || t("Failed to load invoice"));
         navigate(UI_BASE, { replace: true });
       } finally {
         setIsLoading(false);
@@ -688,19 +692,24 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
   const validate = (): string[] => {
     const errors: string[] = [];
     const nonSub = lines.filter((l) => !l.issubtotal);
-    if (nonSub.length === 0) errors.push("At least one line item required");
+    if (nonSub.length === 0)
+      errors.push(t("At least one line item required"));
     nonSub.forEach((l, i) => {
       if (!l.description.trim())
-        errors.push(`Line ${i + 1}: description required`);
+        errors.push(t("Line {{n}}: description required", { n: i + 1 }));
       const qty = Number(l.quantity || 0);
       const price = Number(l.price || 0);
-      if (qty <= 0) errors.push(`Line ${i + 1}: quantity must be greater than 0`);
-      if (price < 0) errors.push(`Line ${i + 1}: price cannot be negative`);
+      if (qty <= 0)
+        errors.push(
+          t("Line {{n}}: quantity must be greater than 0", { n: i + 1 })
+        );
+      if (price < 0)
+        errors.push(t("Line {{n}}: price cannot be negative", { n: i + 1 }));
       if (!isFinite(Number(l.total || 0)))
-        errors.push(`Line ${i + 1}: invalid total`);
+        errors.push(t("Line {{n}}: invalid total", { n: i + 1 }));
     });
     if (totals.total_amount <= 0)
-      errors.push("Document total must be greater than 0");
+      errors.push(t("Document total must be greater than 0"));
 
     if (
       requiresManualRevenueAllocation &&
@@ -710,7 +719,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         | GreenTargetRevenueSplit[]
         | undefined = getRevenueSplitsForSubmission();
       if (!adjustmentRevenueSplits || adjustmentRevenueSplits.length === 0) {
-        errors.push("Add at least one revenue allocation");
+        errors.push(t("Add at least one revenue allocation"));
       } else {
         let allocatedRevenueCents: number = 0;
         adjustmentRevenueSplits.forEach(
@@ -719,14 +728,19 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             const amountCents: number = toCents(amount);
             if (!Number.isFinite(amount) || amountCents <= 0) {
               errors.push(
-                `Revenue allocation ${index + 1}: amount must be greater than 0`
+                t("Revenue allocation {{n}}: amount must be greater than 0", {
+                  n: index + 1,
+                })
               );
             } else {
               allocatedRevenueCents += amountCents;
             }
             if (!originalRevenueAccountSet.has(split.account_code)) {
               errors.push(
-                `Revenue allocation ${index + 1}: ${split.account_code} was not used by the original invoice`
+                t(
+                  "Revenue allocation {{n}}: {{code}} was not used by the original invoice",
+                  { n: index + 1, code: split.account_code }
+                )
               );
             }
           }
@@ -734,9 +748,13 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
 
         if (allocatedRevenueCents !== toCents(totals.total_amount)) {
           errors.push(
-            `Revenue allocations must equal the document total exactly (allocated RM ${(
-              allocatedRevenueCents / 100
-            ).toFixed(2)}, document RM ${totals.total_amount.toFixed(2)})`
+            t(
+              "Revenue allocations must equal the document total exactly (allocated RM {{allocated}}, document RM {{document}})",
+              {
+                allocated: (allocatedRevenueCents / 100).toFixed(2),
+                document: totals.total_amount.toFixed(2),
+              }
+            )
           );
         }
 
@@ -750,7 +768,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         ).length;
         if (adjustmentLegacyRowCount > originalLegacyRowCount) {
           errors.push(
-            "WS_OTH4 is an inherited legacy account and cannot be added as a new allocation row"
+            t(
+              "WS_OTH4 is an inherited legacy account and cannot be added as a new allocation row"
+            )
           );
         }
       }
@@ -759,7 +779,10 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
     if (isCN && invoice) {
       if (totals.total_amount > maxCreditNoteAmount + MONEY_TOLERANCE) {
         errors.push(
-          `Credit Note amount cannot exceed adjusted invoice total RM ${maxCreditNoteAmount.toFixed(2)}`
+          t(
+            "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}",
+            { amount: maxCreditNoteAmount.toFixed(2) }
+          )
         );
       }
       if (
@@ -767,25 +790,35 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         totals.total_amount > invoiceBalanceDue + MONEY_TOLERANCE
       ) {
         errors.push(
-          `Credit Note amount cannot exceed unpaid balance RM ${invoiceBalanceDue.toFixed(2)} when the invoice has no received payment`
+          t(
+            "Credit Note amount cannot exceed unpaid balance RM {{amount}} when the invoice has no received payment",
+            { amount: invoiceBalanceDue.toFixed(2) }
+          )
         );
       }
     }
 
     if (isRN) {
-      if (!refundMethod) errors.push("Refund method required");
+      if (!refundMethod) errors.push(t("Refund method required"));
       if (refundMethod !== "cash" && !bankAccount)
-        errors.push("Bank account required for non-cash refund");
+        errors.push(t("Bank account required for non-cash refund"));
       if (!pairedCreditNoteId)
         errors.push(
-          "Refund Note must be linked to a Credit Note (standalone Refund Notes are not supported for Green Target)"
+          t(
+            "Refund Note must be linked to a Credit Note (standalone Refund Notes are not supported for Green Target)"
+          )
         );
       if (isReplacementPairedRefund && !pairedCreditNote)
-        errors.push("Credit Note link required for replacement Refund Note");
+        errors.push(
+          t("Credit Note link required for replacement Refund Note")
+        );
       if (isReplacementPairedRefund && pairedCreditNote) {
         if (totals.total_amount > pairedCreditNote.total_amount + MONEY_TOLERANCE) {
           errors.push(
-            `Refund amount cannot exceed Credit Note amount RM ${pairedCreditNote.total_amount.toFixed(2)}`
+            t(
+              "Refund amount cannot exceed Credit Note amount RM {{amount}}",
+              { amount: pairedCreditNote.total_amount.toFixed(2) }
+            )
           );
         }
         const maxReplacementRefundAmount = roundMoney(
@@ -800,15 +833,20 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         );
         if (maxReplacementRefundAmount <= MONEY_TOLERANCE) {
           errors.push(
-            `Refund Note cannot be paired because Credit Note ${formatAdjustmentDocId(
-              pairedCreditNote.id
-            )} did not create a refundable excess.`
+            t(
+              "Refund Note cannot be paired because Credit Note {{doc}} did not create a refundable excess.",
+              { doc: formatAdjustmentDocId(pairedCreditNote.id) }
+            )
           );
         } else if (totals.total_amount > maxReplacementRefundAmount + MONEY_TOLERANCE) {
           errors.push(
-            `Refund amount cannot exceed refundable excess RM ${maxReplacementRefundAmount.toFixed(
-              2
-            )} from Credit Note ${formatAdjustmentDocId(pairedCreditNote.id)}.`
+            t(
+              "Refund amount cannot exceed refundable excess RM {{amount}} from Credit Note {{doc}}.",
+              {
+                amount: maxReplacementRefundAmount.toFixed(2),
+                doc: formatAdjustmentDocId(pairedCreditNote.id),
+              }
+            )
           );
         }
       }
@@ -816,11 +854,16 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
 
     if (isCN && issuePairedRefund && canPairRefund) {
       if (refundMethod !== "cash" && !bankAccount)
-        errors.push("Paired refund requires bank account for non-cash method");
+        errors.push(
+          t("Paired refund requires bank account for non-cash method")
+        );
     }
     if (isCN && issuePairedRefund && !canPairRefund) {
       errors.push(
-        `Paired refund is only available when the Credit Note exceeds the outstanding balance. Current balance: RM ${invoiceBalanceDue.toFixed(2)}`
+        t(
+          "Paired refund is only available when the Credit Note exceeds the outstanding balance. Current balance: RM {{amount}}",
+          { amount: invoiceBalanceDue.toFixed(2) }
+        )
       );
     }
 
@@ -836,7 +879,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
     if (!invoice || !type) return;
 
     setIsSaving(true);
-    const toastId = toast.loading("Creating adjustment document...");
+    const toastId = toast.loading(t("Creating adjustment document..."));
     try {
       const payload: any = {
         type,
@@ -896,10 +939,12 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
       }
 
       const response = await api.post(API_BASE, payload);
-      toast.success(response.message || "Document created", { id: toastId });
+      toast.success(response.message || t("Document created"), { id: toastId });
       navigate(`${UI_BASE}/${response.document.id}`, { replace: true });
     } catch (error: any) {
-      toast.error(error?.message || "Failed to create document", { id: toastId });
+      toast.error(error?.message || t("Failed to create document"), {
+        id: toastId,
+      });
     } finally {
       setIsSaving(false);
     }
@@ -934,16 +979,20 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               <BackButton fallbackPath={UI_BASE} />
               <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                New {TYPE_LABEL[type]} — Pick Invoice
+                {t("New {{type}} — Pick Invoice", {
+                  type: t(TYPE_LABEL[type]),
+                })}
               </h1>
             </div>
           </div>
 
           <div className="p-4 border-b border-default-200 dark:border-gray-700">
             <p className="text-sm text-default-600 dark:text-gray-300 mb-3">
-              Pick the invoice you want to adjust. The list below shows the
-              <strong> 50 most recent invoices</strong> — use search to find
-              older invoices.
+              <Trans
+                t={t}
+                i18nKey="Pick the invoice you want to adjust. The list below shows the <strong>50 most recent invoices</strong> — use search to find older invoices."
+                components={{ strong: <strong /> }}
+              />
             </p>
             <div className="relative">
               <IconSearch
@@ -953,7 +1002,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               <input
                 autoFocus
                 type="text"
-                placeholder="Search by invoice number or customer name..."
+                placeholder={t("Search by invoice number or customer name...")}
                 className="w-full pl-10 pr-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 value={pickerQuery}
                 onChange={(e) => setPickerQuery(e.target.value)}
@@ -969,30 +1018,30 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             ) : pickerResults.length === 0 ? (
               <div className="p-8 text-center text-sm text-default-500 dark:text-gray-400">
                 {pickerQuery
-                  ? "No matching invoices found."
-                  : "No invoices to display."}
+                  ? t("No matching invoices found.")
+                  : t("No invoices to display.")}
               </div>
             ) : (
               <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
                 <thead className="bg-default-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Invoice
+                      {t("Invoice")}
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Customer
+                      {t("Customer")}
                     </th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Date
+                      {t("Date")}
                     </th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Total
+                      {t("Total")}
                     </th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Balance
+                      {t("Balance")}
                     </th>
                     <th className="px-4 py-2 text-center text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                      Status
+                      {t("Status")}
                     </th>
                   </tr>
                 </thead>
@@ -1058,7 +1107,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             <BackButton onClick={handleBackClick} disabled={isSaving} />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
             <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100 flex items-center gap-2">
-              New {TYPE_LABEL[type]}
+              {t("New {{type}}", { type: t(TYPE_LABEL[type]) })}
               <AdjustmentDocTypeBadge type={type} />
             </h1>
           </div>
@@ -1070,7 +1119,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               size="md"
               disabled={isSaving}
             >
-              {isSaving ? "Saving..." : `Create ${TYPE_LABEL[type]}`}
+              {isSaving
+                ? t("Saving...")
+                : t("Create {{type}}", { type: t(TYPE_LABEL[type]) })}
             </Button>
           </div>
         </div>
@@ -1080,23 +1131,25 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-sm">
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Document No.
+                {t("Document No.")}
               </div>
               <div
                 className="font-medium text-default-900 dark:text-gray-100 w-fit"
-                title="Predicted next number — the final number is assigned when you save"
+                title={t(
+                  "Predicted next number — the final number is assigned when you save"
+                )}
               >
                 {previewDocId ? formatAdjustmentDocId(previewDocId) : "—"}
               </div>
             </div>
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Original Invoice
+                {t("Original Invoice")}
               </div>
               <div
                 className="font-medium text-default-900 dark:text-gray-100 flex items-center gap-1 cursor-pointer hover:text-sky-600 dark:hover:text-sky-400 w-fit"
                 onClick={() => navigate(`${INVOICE_UI_BASE}/${invoice.invoice_id}`)}
-                title="Open invoice"
+                title={t("Open invoice")}
               >
                 {invoice.invoice_number}
                 <IconExternalLink size={14} className="text-sky-600 dark:text-sky-400" />
@@ -1104,7 +1157,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             </div>
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Customer
+                {t("Customer")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 {invoice.customer_name ||
@@ -1113,7 +1166,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             </div>
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Invoice Total
+                {t("Invoice Total")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 RM {Number(invoice.total_amount).toFixed(2)}
@@ -1121,7 +1174,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             </div>
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider">
-                Balance Due
+                {t("Balance Due")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 RM {Number(invoice.balance_due).toFixed(2)}
@@ -1129,7 +1182,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             </div>
             <div>
               <div className="text-default-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-0.5">
-                Invoice e-Status
+                {t("Invoice e-Status")}
               </div>
               <div className="font-medium text-default-900 dark:text-gray-100">
                 <AdjustmentDocStatusBadge
@@ -1153,11 +1206,14 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
           {pairedCreditNote && (
             <div className="mt-3 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 text-sm">
               <span className="font-medium text-indigo-800 dark:text-indigo-300">
-                Reissuing Refund Note for Credit Note{" "}
-                {formatAdjustmentDocId(pairedCreditNote.id)}
+                {t("Reissuing Refund Note for Credit Note {{doc}}", {
+                  doc: formatAdjustmentDocId(pairedCreditNote.id),
+                })}
               </span>
               <span className="ml-2 text-indigo-700 dark:text-indigo-400">
-                (Credit Note amount: RM {Number(pairedCreditNote.total_amount).toFixed(2)})
+                {t("(Credit Note amount: RM {{amount}})", {
+                  amount: Number(pairedCreditNote.total_amount).toFixed(2),
+                })}
               </span>
             </div>
           )}
@@ -1167,21 +1223,21 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <div>
             <label className="block text-sm font-medium text-default-700 dark:text-gray-300 mb-1">
-              Reason / Description
+              {t("Reason / Description")}
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder={
                 isCN
-                  ? "e.g. Rental cancelled / dumpster not delivered"
+                  ? t("e.g. Rental cancelled / dumpster not delivered")
                   : isDN
-                  ? "e.g. Additional rental period billed"
+                  ? t("e.g. Additional rental period billed")
                   : isReplacementPairedRefund
-                  ? `Replacement refund for Credit Note ${formatAdjustmentDocId(
-                      pairedCreditNoteId
-                    )}`
-                  : "Reason for this adjustment"
+                  ? t("Replacement refund for Credit Note {{doc}}", {
+                      doc: formatAdjustmentDocId(pairedCreditNoteId),
+                    })
+                  : t("Reason for this adjustment")
               }
               rows={2}
               className="w-full px-3 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
@@ -1194,7 +1250,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-              Line Items
+              {t("Line Items")}
             </h2>
             <Button
               onClick={addLine}
@@ -1203,16 +1259,14 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               size="sm"
               disabled={isSaving}
             >
-              Add Line
+              {t("Add Line")}
             </Button>
           </div>
           {!isRN && (
             <div className="mb-3 rounded-lg border border-sky-200 dark:border-sky-800 bg-sky-50/70 dark:bg-sky-900/20 px-3 py-2 text-xs text-sky-800 dark:text-sky-300">
-              Enter only the amounts relevant to this adjustment. For a price
-              correction, use the quantity involved and the per-unit price
-              difference. For a rental cancellation or return, use the quantity
-              and original unit price. A Debit Note adds to the invoice balance;
-              a Credit Note reduces it.
+              {t(
+                "Enter only the amounts relevant to this adjustment. For a price correction, use the quantity involved and the per-unit price difference. For a rental cancellation or return, use the quantity and original unit price. A Debit Note adds to the invoice balance; a Credit Note reduces it."
+              )}
             </div>
           )}
           <div className="overflow-x-auto">
@@ -1220,19 +1274,19 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-300 uppercase">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
-                    Qty
+                    {t("Qty")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-28">
-                    Price
+                    {t("Price")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-24">
-                    Tax
+                    {t("Tax")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-300 uppercase w-28">
-                    Total
+                    {t("Total")}
                   </th>
                   <th className="w-12" />
                 </tr>
@@ -1294,7 +1348,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                         onClick={() => removeLine(line.uid)}
                         disabled={isSaving || lines.length <= 1}
                         className="p-1 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"
-                        title="Remove line"
+                        title={t("Remove line")}
                       >
                         <IconTrash size={16} />
                       </button>
@@ -1310,41 +1364,47 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
           <div className="p-4 border-b border-default-200 dark:border-gray-700">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-default-900 dark:text-gray-100">
-                Revenue Posting
+                {t("Revenue Posting")}
               </h2>
               <p className="text-xs text-default-500 dark:text-gray-400">
-                The adjustment can only use revenue accounts carried by the
-                original invoice.
+                {t(
+                  "The adjustment can only use revenue accounts carried by the original invoice."
+                )}
               </p>
             </div>
 
             {originalRevenueAccountCodes.length === 0 ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                The original invoice has no stored revenue split. Its existing
-                revenue posting will be resolved automatically when this
-                document is saved.
+                {t(
+                  "The original invoice has no stored revenue split. Its existing revenue posting will be resolved automatically when this document is saved."
+                )}
               </div>
             ) : originalRevenueAccountCodes.length === 1 ? (
               <div className="rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-300">
                 <span className="font-medium">
-                  Automatic: {originalRevenueAccountCodes[0]}
+                  {t("Automatic: {{code}}", {
+                    code: originalRevenueAccountCodes[0],
+                  })}
                 </span>
                 <span className="ml-2">
-                  The adjustment amount of RM {totals.total_amount.toFixed(2)}
-                  {" "}will post to the invoice's only revenue account.
+                  {t(
+                    "The adjustment amount of RM {{amount}} will post to the invoice's only revenue account.",
+                    { amount: totals.total_amount.toFixed(2) }
+                  )}
                 </span>
                 {originalRevenueAccountCodes[0] === "WS_OTH4" && (
                   <span className="mt-1 block text-xs">
-                    WS_OTH4 is retained only because it was inherited from the
-                    legacy invoice; it is not available for new allocations.
+                    {t(
+                      "WS_OTH4 is retained only because it was inherited from the legacy invoice; it is not available for new allocations."
+                    )}
                   </span>
                 )}
               </div>
             ) : totals.total_amount <= 0 ? (
               <div className="rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                Enter the adjustment line amounts first. A partial adjustment
-                must then be allocated across the original invoice's revenue
-                accounts.
+                {t(
+                  "Enter the adjustment line amounts first. A partial adjustment must then be allocated across the original invoice's revenue accounts."
+                )}
               </div>
             ) : (
               <div className="space-y-2">
@@ -1356,13 +1416,17 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                   }`}
                 >
                   {isFullValueMixedAdjustment
-                    ? "This is a full-value adjustment, so the exact ordered allocation from the original invoice is inherited automatically."
-                    : "This is a partial adjustment. Enter a positive amount for every retained row and allocate the document total exactly. Duplicate account rows are allowed."}
+                    ? t(
+                        "This is a full-value adjustment, so the exact ordered allocation from the original invoice is inherited automatically."
+                      )
+                    : t(
+                        "This is a partial adjustment. Enter a positive amount for every retained row and allocate the document total exactly. Duplicate account rows are allowed."
+                      )}
                   {displayOnlyOriginalRevenueAccounts.includes("WS_OTH4") && (
                     <span className="mt-1 block">
-                      An inherited WS_OTH4 row is display-only. It may be
-                      retained or removed, but a new WS_OTH4 row cannot be
-                      created.
+                      {t(
+                        "An inherited WS_OTH4 row is display-only. It may be retained or removed, but a new WS_OTH4 row cannot be created."
+                      )}
                     </span>
                   )}
                 </div>
@@ -1380,7 +1444,7 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                   disabled={isSaving || isFullValueMixedAdjustment}
                   allowedAccounts={selectableOriginalRevenueAccounts}
                   displayOnlyAccounts={displayOnlyOriginalRevenueAccounts}
-                  totalLabel="Jumlah pelarasan"
+                  totalLabel={t("Adjustment total")}
                 />
               </div>
             )}
@@ -1405,7 +1469,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                   disabled={isSaving || !canPairRefund}
                   title={
                     !canPairRefund
-                      ? "Paired Refund Note is only available when the Credit Note amount exceeds the outstanding balance. Only the excess can be refunded."
+                      ? t(
+                          "Paired Refund Note is only available when the Credit Note amount exceeds the outstanding balance. Only the excess can be refunded."
+                        )
                       : ""
                   }
                 >
@@ -1422,12 +1488,17 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                   )}
                   <div>
                     <div className="font-medium text-sm text-default-900 dark:text-gray-100">
-                      Issue paired Refund Note
+                      {t("Issue paired Refund Note")}
                     </div>
                     <div className="text-xs text-default-500 dark:text-gray-400">
                       {canPairRefund
-                        ? `Excess RM ${pairedRefundAmount.toFixed(2)} will be refunded; remainder reduces the customer balance.`
-                        : "Not available: Credit Note amount does not exceed the outstanding balance. The Credit Note alone will reduce the customer balance."}
+                        ? t(
+                            "Excess RM {{amount}} will be refunded; remainder reduces the customer balance.",
+                            { amount: pairedRefundAmount.toFixed(2) }
+                          )
+                        : t(
+                            "Not available: Credit Note amount does not exceed the outstanding balance. The Credit Note alone will reduce the customer balance."
+                          )}
                     </div>
                   </div>
                 </button>
@@ -1437,32 +1508,35 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             {showRefundFields && (
               <div className="space-y-3 bg-indigo-50/40 dark:bg-indigo-900/10 rounded-lg p-3 border border-indigo-200 dark:border-indigo-800">
                 <div className="text-sm font-medium text-indigo-800 dark:text-indigo-300">
-                  {isRN ? "Refund details" : "Paired refund details"}
+                  {isRN ? t("Refund details") : t("Paired refund details")}
                 </div>
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                    Refund Method
+                    {t("Refund Method")}
                   </label>
                   <PillSelect<string>
                     value={refundMethod}
                     onChange={(value: string) => setRefundMethod(value)}
-                    options={PAYMENT_METHOD_OPTIONS}
+                    options={PAYMENT_METHOD_OPTIONS.map((option) => ({
+                      ...option,
+                      label: t(option.label),
+                    }))}
                     disabled={isSaving}
-                    ariaLabel="Refund method"
+                    ariaLabel={t("Refund method")}
                   size="md"
                   />
                 </div>
                 {refundMethod !== "cash" && (
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Bank Account
+                      {t("Bank Account")}
                     </label>
                     <PillSelect<string>
                       value={bankAccount}
                       onChange={(value: string) => setBankAccount(value)}
                       options={BANK_ACCOUNT_OPTIONS}
                       disabled={isSaving}
-                      ariaLabel="Bank account"
+                      ariaLabel={t("Bank account")}
                     size="md"
                     />
                   </div>
@@ -1474,14 +1548,14 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
                     name="refundReference"
                     label={
                       refundMethod === "cheque"
-                        ? "Cheque Number"
+                        ? t("Cheque Number")
                         : refundMethod === "online"
-                        ? "Transaction ID"
-                        : "Transaction Ref"
+                        ? t("Transaction ID")
+                        : t("Transaction Ref")
                     }
                     value={refundReference}
                     onChange={(e) => setRefundReference(e.target.value)}
-                    placeholder="Enter reference"
+                    placeholder={t("Enter reference")}
                     disabled={isSaving}
                   />
                 )}
@@ -1493,21 +1567,23 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-default-600 dark:text-gray-400">
-                  Amount Before Tax
+                  {t("Amount Before Tax")}
                 </span>
                 <span className="font-medium text-default-900 dark:text-gray-100">
                   RM {totals.amount_before_tax.toFixed(2)}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-default-600 dark:text-gray-400">Tax</span>
+                <span className="text-default-600 dark:text-gray-400">
+                  {t("Tax")}
+                </span>
                 <span className="font-medium text-default-900 dark:text-gray-100">
                   RM {totals.tax_amount.toFixed(2)}
                 </span>
               </div>
               <div className="border-t border-default-200 dark:border-gray-700 pt-2 mt-2 flex justify-between">
                 <span className="font-semibold text-default-900 dark:text-gray-100">
-                  Total Amount
+                  {t("Total Amount")}
                 </span>
                 <span className="font-bold text-lg text-default-900 dark:text-gray-100">
                   RM {totals.total_amount.toFixed(2)}
@@ -1522,9 +1598,9 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
         isOpen={showBackConfirm}
         onClose={() => setShowBackConfirm(false)}
         onConfirm={goBack}
-        title="Discard Draft"
-        message="Are you sure you want to leave? Your changes will be lost."
-        confirmButtonText="Discard"
+        title={t("Discard Draft")}
+        message={t("Are you sure you want to leave? Your changes will be lost.")}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
     </div>

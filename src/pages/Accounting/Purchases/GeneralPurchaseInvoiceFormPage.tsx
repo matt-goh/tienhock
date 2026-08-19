@@ -679,7 +679,8 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
     }
     const paymentError: string | null = validateSupplierPaymentDraft(
       supplierPayment,
-      outstandingPaymentAmount
+      outstandingPaymentAmount,
+      t
     );
     if (paymentError) {
       toast.error(paymentError);
@@ -831,7 +832,8 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
 
     const paymentError: string | null = validateSupplierPaymentDraft(
       supplierPayment,
-      outstandingPaymentAmount
+      outstandingPaymentAmount,
+      t
     );
     if (paymentError) {
       toast.error(paymentError);

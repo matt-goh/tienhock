@@ -3,6 +3,7 @@
 // keeping GT's own item, deduction, mid-month, and pinjam data model.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconBuildingBank,
   IconCalendarEvent,
@@ -168,13 +169,13 @@ const formatDisplayDate = (value: string | null | undefined): string => {
 const getLeaveTypeLabel = (type: string): string => {
   switch (type) {
     case "cuti_umum":
-      return "Cuti Umum";
+      return "Public Holiday";
     case "cuti_sakit":
-      return "Cuti Sakit";
+      return "Sick Leave";
     case "cuti_tahunan":
-      return "Cuti Tahunan";
+      return "Annual Leave";
     case "cuti_rawatan":
-      return "Cuti Rawatan";
+      return "Medical Leave";
     default:
       return type;
   }
@@ -305,6 +306,7 @@ const getPayrollItemGroupStyle = (
 const GTPayrollDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslation("greentarget");
 
   const [payroll, setPayroll] = useState<GTEmployeePayroll | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -341,7 +343,7 @@ const GTPayrollDetailsPage: React.FC = () => {
       if (requestId !== payrollRequestIdRef.current) return;
       console.error("Error fetching GT employee payroll:", error);
       setPayroll(null);
-      toast.error("Failed to load payroll details");
+      toast.error(t("Failed to load payroll details"));
     } finally {
       if (requestId === payrollRequestIdRef.current) {
         setIsLoading(false);
@@ -364,11 +366,11 @@ const GTPayrollDetailsPage: React.FC = () => {
       await api.delete(
         `/greentarget/api/employee-payrolls/items/${itemToDelete.id}`
       );
-      toast.success("Item deleted successfully");
+      toast.success(t("Item deleted successfully"));
       await fetchPayrollDetails();
     } catch (error: unknown) {
       console.error("Error deleting payroll item:", error);
-      toast.error("Failed to delete payroll item");
+      toast.error(t("Failed to delete payroll item"));
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -388,14 +390,14 @@ const GTPayrollDetailsPage: React.FC = () => {
     return (
       <div className="py-12 text-center">
         <p className="text-default-500 dark:text-gray-400">
-          Employee payroll not found
+          {t("Employee payroll not found")}
         </p>
         <Button
           onClick={() => navigate("/greentarget/payroll")}
           className="mt-4"
           variant="outline"
         >
-          Back
+          {t("Back")}
         </Button>
       </div>
     );
@@ -600,9 +602,9 @@ const GTPayrollDetailsPage: React.FC = () => {
           <div className="min-w-0">
             <h1
               className="max-w-48 truncate text-xl font-semibold text-default-800 dark:text-gray-100 sm:max-w-72"
-              title={payroll.employee_name || "Unknown employee"}
+              title={payroll.employee_name || t("Unknown employee")}
             >
-              {payroll.employee_name || "Unknown employee"}
+              {payroll.employee_name || t("Unknown employee")}
             </h1>
             <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
               {getMonthName(payroll.month)} {payroll.year}
@@ -615,7 +617,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
             companyName="GREEN TARGET WASTE TREATMENT IND. SDN. BHD."
-            buttonText="Pay Slip"
+            buttonText={t("Pay Slip")}
             variant="filled"
             color="sky"
             className="flex-1 shadow-sm md:flex-none"
@@ -637,7 +639,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             color="default"
             className="flex-1 md:flex-none"
           >
-            Manual Item
+            {t("Manual Item")}
           </Button>
         </div>
       </div>
@@ -646,16 +648,16 @@ const GTPayrollDetailsPage: React.FC = () => {
         <div className="overflow-hidden rounded-lg border border-default-200 bg-white transition-shadow hover:shadow-md dark:border-gray-700 dark:bg-gray-800">
           <div className="border-b border-default-100 bg-default-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-900/50">
             <h3 className="text-md font-semibold text-default-700 dark:text-gray-200">
-              Employee Information
+              {t("Employee Information")}
             </h3>
           </div>
           <div className="space-y-4 p-4">
             <div>
               <p className="mb-1 text-xs uppercase tracking-wide text-default-400 dark:text-gray-400">
-                Employee
+                {t("Employee")}
               </p>
               <p className="font-semibold text-default-800 dark:text-gray-100">
-                {payroll.employee_name || "Unknown"}
+                {payroll.employee_name || t("Unknown")}
               </p>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {payroll.employee_id}
@@ -663,7 +665,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             </div>
             <div>
               <p className="mb-1 text-xs uppercase tracking-wide text-default-400 dark:text-gray-400">
-                Job Type
+                {t("Job Type")}
               </p>
               <p className="flex items-center gap-2 font-semibold text-default-800 dark:text-gray-100">
                 {payroll.job_type === "DRIVER" ? (
@@ -671,7 +673,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                 ) : (
                   <IconUser size={18} className="text-sky-500" />
                 )}
-                {payroll.job_type}
+                {t(payroll.job_type)}
               </p>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                 {payroll.section || "GREEN TARGET"}
@@ -687,14 +689,14 @@ const GTPayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-emerald-600 dark:text-emerald-400"
               />
-              Earnings
+              {t("Earnings")}
             </h3>
           </div>
           <div className="flex flex-grow flex-col p-4">
             <div className="flex-grow space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Base Pay
+                  {t("Base Pay")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(baseTotal)}
@@ -703,7 +705,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {tambahanTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Tambahan
+                    {t("Tambahan")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(tambahanTotal)}
@@ -713,7 +715,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {overtimeTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Overtime
+                    {t("Overtime")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(overtimeTotal)}
@@ -723,7 +725,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {otherWorkTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Other Work Pay
+                    {t("Other Work Pay")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(otherWorkTotal)}
@@ -733,7 +735,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {bonusTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Bonus
+                    {t("Bonus")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(bonusTotal)}
@@ -743,7 +745,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {othersTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Others
+                    {t("Others")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(othersTotal)}
@@ -753,7 +755,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {commissionAdvanceTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Advance
+                    {t("Advance")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(commissionAdvanceTotal)}
@@ -763,7 +765,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {leaveTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Cuti (Leave)
+                    {t("Cuti (Leave)")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(leaveTotal)}
@@ -774,7 +776,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             <div className="mt-auto border-t border-default-200 pt-3 dark:border-gray-600">
               <div className="flex justify-between font-semibold">
                 <span className="text-default-800 dark:text-gray-100">
-                  Gross Pay
+                  {t("Gross Pay")}
                 </span>
                 <span className="text-lg text-emerald-700 dark:text-emerald-400">
                   {formatCurrency(grossPay)}
@@ -791,14 +793,14 @@ const GTPayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-sky-600 dark:text-sky-400"
               />
-              Deductions & Final Pay
+              {t("Deductions & Final Pay")}
             </h3>
           </div>
           <div className="flex flex-grow flex-col p-4">
             <div className="flex-grow space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Gross Pay
+                  {t("Gross Pay")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(grossPay)}
@@ -836,7 +838,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                       className="group relative flex justify-between text-sm"
                     >
                       <span className="flex cursor-help items-center gap-1 text-default-600 dark:text-gray-300">
-                        {deductionName}
+                        {t(deductionName)}
                         <IconInfoCircle
                           size={14}
                           className="text-default-400 opacity-60 group-hover:opacity-100 dark:text-gray-400"
@@ -852,33 +854,39 @@ const GTPayrollDetailsPage: React.FC = () => {
                         <div className="relative rounded-lg bg-default-800 p-3 text-xs text-white shadow-lg">
                           <div className="absolute bottom-full left-4 h-0 w-0 border-b-[6px] border-l-[6px] border-r-[6px] border-b-default-800 border-l-transparent border-r-transparent" />
                           <div className="mb-2 font-semibold text-default-100">
-                            {deductionName} Breakdown
+                            {t("{{name}} Breakdown", {
+                              name: t(deductionName),
+                            })}
                           </div>
                           <div className="space-y-1">
                             <div className="flex justify-between">
-                              <span className="text-default-300">Employee:</span>
+                              <span className="text-default-300">
+                                {t("Employee:")}
+                              </span>
                               <span>{formatCurrency(employeeAmount)}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-default-300">Employer:</span>
+                              <span className="text-default-300">
+                                {t("Employer:")}
+                              </span>
                               <span>{formatCurrency(employerAmount)}</span>
                             </div>
                             <div className="mt-2 border-t border-default-600 pt-2">
                               <div className="flex justify-between text-default-400">
-                                <span>Employee Rate:</span>
+                                <span>{t("Employee Rate:")}</span>
                                 <span>
                                   {deduction.rate_info?.employee_rate || "-"}
                                 </span>
                               </div>
                               <div className="flex justify-between text-default-400">
-                                <span>Employer Rate:</span>
+                                <span>{t("Employer Rate:")}</span>
                                 <span>
                                   {deduction.rate_info?.employer_rate || "-"}
                                 </span>
                               </div>
                               {deduction.rate_info?.age_group && (
                                 <div className="flex justify-between text-default-400">
-                                  <span>Age Group:</span>
+                                  <span>{t("Age Group:")}</span>
                                   <span className="capitalize">
                                     {deduction.rate_info.age_group.replace(
                                       /_/g,
@@ -897,7 +905,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               {commissionAdvanceTotal > 0 && (
                 <div className="group relative flex justify-between text-sm">
                   <span className="flex cursor-help items-center gap-1 text-default-600 dark:text-gray-300">
-                    Advance
+                    {t("Advance")}
                     <IconInfoCircle
                       size={14}
                       className="text-default-400 opacity-60 group-hover:opacity-100 dark:text-gray-400"
@@ -910,14 +918,18 @@ const GTPayrollDetailsPage: React.FC = () => {
                     <div className="relative rounded-lg bg-default-800 p-3 text-xs text-white shadow-lg">
                       <div className="absolute bottom-full left-4 h-0 w-0 border-b-[6px] border-l-[6px] border-r-[6px] border-b-default-800 border-l-transparent border-r-transparent" />
                       <div className="mb-2 font-semibold text-default-100">
-                        Advance
+                        {t("Advance")}
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-default-300">Total Amount:</span>
+                        <span className="text-default-300">
+                          {t("Total Amount:")}
+                        </span>
                         <span>{formatCurrency(commissionAdvanceTotal)}</span>
                       </div>
                       <div className="mt-2 border-t border-default-600 pt-2 text-default-400">
-                        Payments made in advance, deducted from final pay.
+                        {t(
+                          "Payments made in advance, deducted from final pay."
+                        )}
                       </div>
                     </div>
                   </div>
@@ -927,7 +939,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                 <div className="group relative flex justify-between text-sm">
                   <div className="flex flex-1 items-center justify-between text-default-600 dark:text-gray-300">
                     <span className="flex cursor-help items-center gap-1">
-                      Mid-month Advance
+                      {t("Mid-month Advance")}
                       <IconInfoCircle
                         size={14}
                         className="text-default-400 opacity-60 group-hover:opacity-100 dark:text-gray-400"
@@ -941,14 +953,18 @@ const GTPayrollDetailsPage: React.FC = () => {
                     <div className="relative rounded-lg bg-default-800 p-3 text-xs text-white shadow-lg">
                       <div className="absolute bottom-full left-4 h-0 w-0 border-b-[6px] border-l-[6px] border-r-[6px] border-b-default-800 border-l-transparent border-r-transparent" />
                       <div className="mb-2 font-semibold text-default-100">
-                        Mid-month Advance
+                        {t("Mid-month Advance")}
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-default-300">Amount:</span>
+                        <span className="text-default-300">
+                          {t("Amount:")}
+                        </span>
                         <span>{formatCurrency(midMonthAmount)}</span>
                       </div>
                       <div className="mt-2 border-t border-default-600 pt-2 text-default-400">
-                        Advance payment made mid-month, deducted before rounding.
+                        {t(
+                          "Advance payment made mid-month, deducted before rounding."
+                        )}
                       </div>
                     </div>
                   </div>
@@ -957,7 +973,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               <div className="mt-2 border-t border-default-200 pt-2 dark:border-gray-600">
                 <div className="flex justify-between text-sm">
                   <span className="font-medium text-default-600 dark:text-gray-300">
-                    Total Deductions
+                    {t("Total Deductions")}
                   </span>
                   <span className="font-semibold text-rose-600 dark:text-rose-400">
                     - {formatCurrency(totalFinalDeductions)}
@@ -967,7 +983,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               <div className="mt-2 border-t border-default-200 pt-2 dark:border-gray-600">
                 <div className="flex justify-between text-sm">
                   <span className="font-medium text-default-600 dark:text-gray-300">
-                    Pay Before Rounding
+                    {t("Pay Before Rounding")}
                   </span>
                   <span className="font-semibold text-default-800 dark:text-gray-100">
                     {formatCurrency(jumlah)}
@@ -978,7 +994,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             {digenapkan > 0.001 && (
               <div className="mt-2 flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Digenapkan
+                  {t("Rounding")}
                 </span>
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
                   + {formatCurrency(digenapkan)}
@@ -988,7 +1004,7 @@ const GTPayrollDetailsPage: React.FC = () => {
             <div className="-mx-4 -mb-4 mt-4 rounded-b-lg border-t border-sky-200 bg-sky-100 px-4 py-4 dark:border-sky-800/50 dark:bg-sky-900/30">
               <div className="flex items-center justify-between">
                 <span className="text-base font-bold text-sky-800 dark:text-sky-300">
-                  Jumlah Digenapkan
+                  {t("Rounded Total")}
                 </span>
                 <span className="text-2xl font-bold text-sky-900 dark:text-sky-200">
                   {formatCurrency(setelahDigenapkan)}
@@ -1003,11 +1019,12 @@ const GTPayrollDetailsPage: React.FC = () => {
         <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
           <div>
             <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-              Earnings Breakdown
+              {t("Earnings Breakdown")}
             </h2>
             <p className="text-sm text-default-500 dark:text-gray-400">
-              Pay items are separated by source so additions and manual entries
-              are easier to review.
+              {t(
+                "Pay items are separated by source so additions and manual entries are easier to review."
+              )}
             </p>
           </div>
         </div>
@@ -1019,7 +1036,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               className="mx-auto mb-2 text-default-300 dark:text-gray-500"
             />
             <p className="text-default-500 dark:text-gray-400">
-              No earnings recorded.
+              {t("No earnings recorded.")}
             </p>
             <Button
               size="sm"
@@ -1029,7 +1046,7 @@ const GTPayrollDetailsPage: React.FC = () => {
               iconSize={16}
               className="mt-3"
             >
-              Add Manual Item
+              {t("Add Manual Item")}
             </Button>
           </div>
         ) : (
@@ -1063,7 +1080,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                         size={18}
                         className={groupStyle.iconClassName}
                       />
-                      <span>{groupStyle.label}</span>
+                      <span>{t(groupStyle.label)}</span>
                       <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-medium text-default-500 dark:bg-gray-800/70 dark:text-gray-400">
                         {items.length}
                       </span>
@@ -1072,9 +1089,12 @@ const GTPayrollDetailsPage: React.FC = () => {
                       <Link
                         to={addOnUrl}
                         className={`inline-flex items-center gap-1 text-sm font-medium transition-opacity hover:opacity-75 ${groupStyle.titleClassName}`}
-                        title={`${groupStyle.addOnLabel} for ${payroll.employee_name}`}
+                        title={t("{{label}} for {{name}}", {
+                          label: t(groupStyle.addOnLabel),
+                          name: payroll.employee_name,
+                        })}
                       >
-                        {groupStyle.addOnLabel}
+                        {t(groupStyle.addOnLabel)}
                         <IconExternalLink size={14} />
                       </Link>
                     )}
@@ -1084,16 +1104,16 @@ const GTPayrollDetailsPage: React.FC = () => {
                       <thead className="bg-default-50/70 dark:bg-gray-800">
                         <tr>
                           <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                            Description
+                            {t("Description")}
                           </th>
                           <th className="w-28 px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                            Rate
+                            {t("Rate")}
                           </th>
                           <th className="w-20 px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                            Qty
+                            {t("Qty")}
                           </th>
                           <th className="w-28 px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                            Amount
+                            {t("Amount")}
                           </th>
                           <th className="w-10 px-3 py-2" />
                         </tr>
@@ -1112,7 +1132,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                                   </span>
                                   {item.is_manual && (
                                     <span className="rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
-                                      Manual
+                                      {t("Manual")}
                                     </span>
                                   )}
                                 </div>
@@ -1140,8 +1160,10 @@ const GTPayrollDetailsPage: React.FC = () => {
                                       setShowDeleteDialog(true);
                                     }}
                                     className="rounded p-1 text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                                    title="Delete manual item"
-                                    aria-label={`Delete ${item.description}`}
+                                    title={t("Delete manual item")}
+                                    aria-label={t("Delete {{description}}", {
+                                      description: item.description,
+                                    })}
                                   >
                                     <IconTrash size={16} />
                                   </button>
@@ -1157,7 +1179,9 @@ const GTPayrollDetailsPage: React.FC = () => {
                             colSpan={3}
                             className="px-3 py-2 text-sm font-semibold text-default-700 dark:text-gray-200"
                           >
-                            Total {groupStyle.label}
+                            {t("Total {{label}}", {
+                              label: t(groupStyle.label),
+                            })}
                           </td>
                           <td
                             className={`px-3 py-2 text-right font-bold ${groupStyle.totalClassName}`}
@@ -1184,7 +1208,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-teal-600 dark:text-teal-400"
               />
-              Leave Pay
+              {t("Leave Pay")}
             </h3>
           </div>
           <div className="overflow-x-auto">
@@ -1192,16 +1216,16 @@ const GTPayrollDetailsPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-800">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Days
+                    {t("Days")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                    Amount
+                    {t("Amount")}
                   </th>
                 </tr>
               </thead>
@@ -1213,7 +1237,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                         {formatDisplayDate(record.leave_date)}
                       </td>
                       <td className="px-3 py-2 text-sm text-default-800 dark:text-gray-200">
-                        {getLeaveTypeLabel(record.leave_type)}
+                        {t(getLeaveTypeLabel(record.leave_type))}
                       </td>
                       <td className="px-3 py-2 text-right text-sm text-default-600 dark:text-gray-400">
                         {record.days_taken}
@@ -1231,7 +1255,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                     colSpan={3}
                     className="px-3 py-2 font-semibold text-default-800 dark:text-gray-200"
                   >
-                    Total Leave Pay
+                    {t("Total Leave Pay")}
                   </td>
                   <td className="px-3 py-2 text-right font-bold text-teal-700 dark:text-teal-300">
                     {formatCurrency(leaveTotal)}
@@ -1254,7 +1278,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-red-600 dark:text-red-400"
               />
-              <span>Pinjam</span>
+              <span>{t("Pinjam")}</span>
             </h3>
           </div>
           <div className="p-4">
@@ -1273,7 +1297,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                 >
                   <div className="mb-3">
                     <p className="mb-1 text-sm text-default-500 dark:text-gray-400">
-                      Mid-Month Pay (Before Pinjam)
+                      {t("Mid-Month Pay (Before Pinjam)")}
                     </p>
                     <p
                       className={`text-xl font-bold ${pinjamAmountColor(
@@ -1286,7 +1310,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                   </div>
                   <div className="mb-3">
                     <p className="mb-2 text-sm font-medium text-default-700 dark:text-gray-200">
-                      Pinjam Items:
+                      {t("Pinjam Items:")}
                     </p>
                     <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                       {midMonthPinjamRecords.map(
@@ -1307,7 +1331,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                   <div className="mt-auto text-sm">
                     <div className="mb-2 flex justify-between">
                       <span className="text-default-600 dark:text-gray-300">
-                        Jumlah Pinjam:
+                        {t("Jumlah Pinjam:")}
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
                         - {formatCurrency(midMonthPinjamTotal)}
@@ -1315,7 +1339,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                     </div>
                     <div className="flex items-center justify-between border-t border-default-200 pt-2 font-semibold dark:border-gray-600">
                       <span className="text-default-800 dark:text-gray-100">
-                        Final Mid-Month Pay
+                        {t("Final Mid-Month Pay")}
                       </span>
                       <span
                         className={`text-lg font-bold ${pinjamAmountColor(
@@ -1338,7 +1362,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                 >
                   <div className="mb-3">
                     <p className="mb-1 text-sm text-default-500 dark:text-gray-400">
-                      Gaji Genap (Before Pinjam)
+                      {t("Gaji Genap (Before Pinjam)")}
                     </p>
                     <p
                       className={`text-xl font-bold ${pinjamAmountColor(
@@ -1351,7 +1375,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                   </div>
                   <div className="mb-3">
                     <p className="mb-2 text-sm font-medium text-default-700 dark:text-gray-200">
-                      Pinjam Items:
+                      {t("Pinjam Items:")}
                     </p>
                     <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                       {monthlyPinjamRecords.map(
@@ -1372,7 +1396,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                   <div className="mt-auto text-sm">
                     <div className="mb-2 flex justify-between">
                       <span className="text-default-600 dark:text-gray-300">
-                        Jumlah Pinjam:
+                        {t("Jumlah Pinjam:")}
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
                         - {formatCurrency(monthlyPinjamTotal)}
@@ -1381,7 +1405,7 @@ const GTPayrollDetailsPage: React.FC = () => {
                     <div className="flex items-center justify-between border-t border-default-200 pt-2 font-semibold dark:border-gray-600">
                       <span className="flex items-center gap-1.5 text-default-800 dark:text-gray-100">
                         <IconBuildingBank className="h-4 w-4 flex-shrink-0" />
-                        Jumlah Masuk Bank
+                        {t("Jumlah Masuk Bank")}
                       </span>
                       <span
                         className={`text-lg font-bold ${pinjamAmountColor(
@@ -1416,11 +1440,14 @@ const GTPayrollDetailsPage: React.FC = () => {
           setItemToDelete(null);
         }}
         onConfirm={handleDeleteItem}
-        title="Delete Payroll Item"
-        message={`Are you sure you want to delete "${
-          itemToDelete?.description || "this item"
-        }"? This action cannot be undone.`}
-        confirmButtonText={isDeleting ? "Deleting..." : "Delete"}
+        title={t("Delete Payroll Item")}
+        message={t(
+          'Are you sure you want to delete "{{description}}"? This action cannot be undone.',
+          {
+            description: itemToDelete?.description || t("this item"),
+          }
+        )}
+        confirmButtonText={isDeleting ? t("Deleting...") : t("Delete")}
         variant="danger"
       />
     </div>

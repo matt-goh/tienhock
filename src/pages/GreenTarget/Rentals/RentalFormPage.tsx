@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, Fragment } from "react";
 import { format } from "date-fns";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
@@ -128,6 +129,7 @@ const formatDateForInput = (dateString: string | null): string => {
 
 const RentalFormPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("greentarget");
   const goBack = useSmartBack("/greentarget/rentals");
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -216,8 +218,8 @@ const RentalFormPage: React.FC = () => {
       } catch (err) {
         if (isMounted) {
           console.error("Error loading ref data:", err);
-          toast.error("Failed data load");
-          setError("Data load error.");
+          toast.error(t("Failed data load"));
+          setError(t("Data load error."));
         }
       } finally {
         if (isMounted && !isEditMode) setLoading(false);
@@ -254,7 +256,7 @@ const RentalFormPage: React.FC = () => {
       } catch (err) {
         console.error("Error fetching dumpster availability:", err);
         if (isMounted) {
-          toast.error("Failed to load dumpster availability");
+          toast.error(t("Failed to load dumpster availability"));
           setDumpsterAvailability(null); // Reset on error
         }
       }
@@ -380,7 +382,7 @@ const RentalFormPage: React.FC = () => {
       console.error("Error fetching locations:", err);
       if (isMounted) {
         setCustomerLocations([]);
-        toast.error("Failed load locations.");
+        toast.error(t("Failed load locations."));
       }
       return null;
     }
@@ -400,13 +402,13 @@ const RentalFormPage: React.FC = () => {
     const newDateValue = value || null;
     if (name === "date_picked" && newDateValue && formData.date_placed) {
       if (new Date(newDateValue) < new Date(formData.date_placed)) {
-        toast.error("Pickup date cannot be earlier than placement date.");
+        toast.error(t("Pickup date cannot be earlier than placement date."));
         return;
       }
     }
     if (name === "date_placed" && formData.date_picked) {
       if (new Date(formData.date_picked) < new Date(value)) {
-        toast.error("Placement date cannot be later than pickup date.");
+        toast.error(t("Placement date cannot be later than pickup date."));
         return;
       }
     }
@@ -594,19 +596,19 @@ const RentalFormPage: React.FC = () => {
   // Validation Function
   const validateForm = (): boolean => {
     if (!formData.customer_id || formData.customer_id <= 0) {
-      toast.error("Please select a customer");
+      toast.error(t("Please select a customer"));
       return false;
     }
     // The dumpster and both dates are optional; they are only validated
     // against each other when they are actually filled in.
     if (formData.date_picked && formData.date_placed) {
       if (new Date(formData.date_picked) < new Date(formData.date_placed)) {
-        toast.error("Pickup date cannot be earlier than placement date.");
+        toast.error(t("Pickup date cannot be earlier than placement date."));
         return false;
       }
     }
     if (!formData.driver) {
-      toast.error("Please select a driver");
+      toast.error(t("Please select a driver"));
       return false;
     }
     if (!isValidSelection) {
@@ -620,18 +622,29 @@ const RentalFormPage: React.FC = () => {
         dumpsterAvailability?.unavailable.find(
           (d) => d.tong_no === formData.tong_no
         );
-      let reason = "selected dumpster is not available for the chosen dates.";
-      if (dumpsterInfo?.next_rental?.date)
-        reason = `it conflicts with a future booking starting ${formatDumpsterDate(
-          dumpsterInfo.next_rental.date
-        )}.`;
-      else if (dumpsterInfo?.available_after)
-        reason = `it is only available after ${formatDumpsterDate(
-          dumpsterInfo.available_after
-        )}.`;
-      else if (dumpsterInfo?.reason)
-        reason = `it is unavailable (${dumpsterInfo.reason}).`;
-      toast.error(`Cannot save: ${reason}`);
+      if (dumpsterInfo?.next_rental?.date) {
+        toast.error(
+          t("Cannot save: it conflicts with a future booking starting {{date}}.", {
+            date: formatDumpsterDate(dumpsterInfo.next_rental.date),
+          })
+        );
+      } else if (dumpsterInfo?.available_after) {
+        toast.error(
+          t("Cannot save: it is only available after {{date}}.", {
+            date: formatDumpsterDate(dumpsterInfo.available_after),
+          })
+        );
+      } else if (dumpsterInfo?.reason) {
+        toast.error(
+          t("Cannot save: it is unavailable ({{reason}}).", {
+            reason: dumpsterInfo.reason,
+          })
+        );
+      } else {
+        toast.error(
+          t("Cannot save: selected dumpster is not available for the chosen dates.")
+        );
+      }
       return false;
     }
     return true;
@@ -682,7 +695,9 @@ const RentalFormPage: React.FC = () => {
         );
       }
       toast.success(
-        `Rental ${isEditMode ? "updated" : "created"} successfully!`
+        isEditMode
+          ? t("Rental updated successfully!")
+          : t("Rental created successfully!")
       );
       // A new rental lands on its own page so add-ons, the invoice and the
       // pickup date can be handled straight away. Falls back to the list if the
@@ -695,13 +710,14 @@ const RentalFormPage: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Error saving rental:", error);
-      let errorMsg = "An unexpected error occurred.";
+      let errorMsg = t("An unexpected error occurred.");
       if (error?.message) {
         if (error.message.toLowerCase().includes("overlap"))
-          errorMsg = "Error: Rental period overlaps with another booking.";
+          errorMsg = t("Error: Rental period overlaps with another booking.");
         else if (error.message.toLowerCase().includes("not available"))
-          errorMsg = "Error: Dumpster not available for specified dates.";
-        else errorMsg = `Error: ${error.message}`;
+          errorMsg = t("Error: Dumpster not available for specified dates.");
+        else
+          errorMsg = t("Error: {{message}}", { message: error.message });
       }
       toast.error(errorMsg);
     } finally {
@@ -714,7 +730,7 @@ const RentalFormPage: React.FC = () => {
     /* ... same as before ... */
     if (!formData.rental_id) return;
     setIsDeleting(true);
-    const toastId = toast.loading("Deleting rental...");
+    const toastId = toast.loading(t("Deleting rental..."));
     try {
       const response = await greenTargetApi.deleteRental(formData.rental_id);
       if (
@@ -726,15 +742,15 @@ const RentalFormPage: React.FC = () => {
           response.message || response.error || "Deletion failed."
         );
       }
-      toast.success("Rental deleted successfully", { id: toastId });
+      toast.success(t("Rental deleted successfully"), { id: toastId });
       navigate("/greentarget/rentals");
     } catch (error: any) {
       console.error("Error deleting rental:", error);
-      let errorMsg = "Failed to delete rental.";
+      let errorMsg = t("Failed to delete rental.");
       if (error?.message?.toLowerCase().includes("associated invoices")) {
-        errorMsg = "Cannot delete rental: It has associated invoices.";
+        errorMsg = t("Cannot delete rental: It has associated invoices.");
       } else if (error?.message) {
-        errorMsg = `Error: ${error.message}`;
+        errorMsg = t("Error: {{message}}", { message: error.message });
       }
       toast.error(errorMsg, { id: toastId });
     } finally {
@@ -806,17 +822,17 @@ const RentalFormPage: React.FC = () => {
               <div>
                 <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                   {isEditMode
-                    ? `Edit Rental #${formData.rental_id}`
-                    : "Create New Rental"}
+                    ? t("Edit Rental #{{id}}", { id: formData.rental_id })
+                    : t("Create New Rental")}
                 </h1>
                 <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
                   {isEditMode
                     ? initialFormData?.date_placed
-                      ? `Update details for the rental placed on ${formatDateForInput(
-                          initialFormData.date_placed
-                        )}.`
-                      : "Update the details of this rental."
-                    : "Fill in the details."}
+                      ? t("Update details for the rental placed on {{date}}.", {
+                          date: formatDateForInput(initialFormData.date_placed),
+                        })
+                      : t("Update the details of this rental.")
+                    : t("Fill in the details.")}
                 </p>
               </div>
             </div>
@@ -830,7 +846,7 @@ const RentalFormPage: React.FC = () => {
                   disabled={isDeleting}
                   icon={IconTrash}
                 >
-                  {isDeleting ? "Deleting..." : "Delete"}
+                  {isDeleting ? t("Deleting...") : t("Delete")}
                 </Button>
               )}
               <Button
@@ -839,7 +855,7 @@ const RentalFormPage: React.FC = () => {
                 color="secondary"
                 onClick={handleBackClick}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 type="submit"
@@ -849,10 +865,10 @@ const RentalFormPage: React.FC = () => {
                 disabled={isSaving || !isFormChanged || !isValidSelection}
               >
                 {isSaving
-                  ? "Saving..."
+                  ? t("Saving...")
                   : isEditMode
-                  ? "Save Changes"
-                  : "Create Rental"}
+                  ? t("Save Changes")
+                  : t("Create Rental")}
               </Button>
             </div>
           </div>
@@ -862,14 +878,14 @@ const RentalFormPage: React.FC = () => {
             {/* --- Customer & Location Section --- */}
             <div className="border-b border-default-200 dark:border-gray-700 pb-6">
               <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100 mb-4">
-                Customer Information
+                {t("Customer Information")}
               </h2>
               <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
                 {/* Customer Combobox (Single Mode) */}
                 <div className="sm:col-span-3">
                   <FormCombobox
                     name="customer_id"
-                    label="Customer"
+                    label={t("Customer")}
                     value={
                       formData.customer_id > 0
                         ? formData.customer_id.toString()
@@ -879,7 +895,7 @@ const RentalFormPage: React.FC = () => {
                     options={customerOptions}
                     query={customerQuery}
                     setQuery={setCustomerQuery}
-                    placeholder="Search or Select Customer..."
+                    placeholder={t("Search or Select Customer...")}
                     disabled={isEditMode}
                     required={true}
                     mode="single"
@@ -890,7 +906,8 @@ const RentalFormPage: React.FC = () => {
                       onClick={() => setIsNewCustomerModalOpen(true)}
                       className="mt-2 text-sm text-sky-600 dark:text-sky-400 hover:text-sky-800 flex items-center"
                     >
-                      <IconPlus size={16} className="mr-1" /> Add New Customer
+                      <IconPlus size={16} className="mr-1" />{" "}
+                      {t("Add New Customer")}
                     </button>
                   )}
                 </div>
@@ -900,7 +917,7 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="location_id-button"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Delivery Location
+                    {t("Delivery Location")}
                   </label>
                   <div className="mt-2">
                     <Listbox
@@ -927,7 +944,7 @@ const RentalFormPage: React.FC = () => {
                             );
                             const locationLabel = l
                               ? formatLocationLabel(l)
-                              : "No Specific Location";
+                              : t("No Specific Location");
                             const p = l?.phone_number;
                             const cp = customers.find(
                               (c) => c.customer_id === formData.customer_id
@@ -989,7 +1006,7 @@ const RentalFormPage: React.FC = () => {
                                       "text-gray-500 dark:text-gray-400"
                                     )}
                                   >
-                                    No Specific Location
+                                    {t("No Specific Location")}
                                   </span>
                                   {selected && (
                                     <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
@@ -1069,8 +1086,8 @@ const RentalFormPage: React.FC = () => {
                                 }
                               >
                                 <span className="flex items-center font-medium">
-                                  <IconPlus size={16} className="mr-1" /> Add
-                                  New Location
+                                  <IconPlus size={16} className="mr-1" />{" "}
+                                  {t("Add New Location")}
                                 </span>
                               </ListboxOption>
                             )}
@@ -1085,7 +1102,7 @@ const RentalFormPage: React.FC = () => {
             {/* --- Rental Details Section --- */}
             <div className="border-b border-default-200 dark:border-gray-700 pb-6">
               <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100 mb-4">
-                Rental Details
+                {t("Rental Details")}
               </h2>
               <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-6">
                 {/* Placement/Pickup Dates (condensed) */}
@@ -1094,9 +1111,9 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="date_placed"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Placement Date{" "}
+                    {t("Placement Date")}{" "}
                     <span className="text-xs text-default-500 dark:text-gray-400">
-                      (Optional)
+                      {t("(Optional)")}
                     </span>
                   </label>
                   <div className="mt-2">
@@ -1118,8 +1135,10 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="date_picked"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Pickup Date{" "}
-                    <span className="text-xs text-default-500 dark:text-gray-400">(Optional)</span>
+                    {t("Pickup Date")}{" "}
+                    <span className="text-xs text-default-500 dark:text-gray-400">
+                      {t("(Optional)")}
+                    </span>
                   </label>
                   <div className="mt-2">
                     <input
@@ -1142,9 +1161,9 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="tong_no-button"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Dumpster{" "}
+                    {t("Dumpster")}{" "}
                     <span className="text-xs text-default-500 dark:text-gray-400">
-                      (Optional)
+                      {t("(Optional)")}
                     </span>
                   </label>
                   <div className="mt-2">
@@ -1168,7 +1187,7 @@ const RentalFormPage: React.FC = () => {
                                 "italic text-gray-500 dark:text-gray-400"
                             )}
                           >
-                            {formData.tong_no || "No Dumpster"}
+                            {formData.tong_no || t("No Dumpster")}
                           </span>
                           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -1209,7 +1228,7 @@ const RentalFormPage: React.FC = () => {
                                       selected ? "font-medium" : "font-normal"
                                     )}
                                   >
-                                    No Dumpster
+                                    {t("No Dumpster")}
                                   </span>
                                   {selected && (
                                     <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
@@ -1221,7 +1240,7 @@ const RentalFormPage: React.FC = () => {
                             </ListboxOption>
                             {dumpsterOptions.length === 0 ? (
                               <div className="relative cursor-default select-none py-2 px-4 text-gray-500 dark:text-gray-400">
-                                Loading...
+                                {t("Loading...")}
                               </div>
                             ) : (
                               dumpsterOptions.map((option) => {
@@ -1232,7 +1251,7 @@ const RentalFormPage: React.FC = () => {
                                     className="mr-2 text-green-500 flex-shrink-0"
                                   />
                                 );
-                                let t = "";
+                                let note = "";
                                 let c = "text-xs ml-6";
                                 if (option.status === "upcoming") {
                                   i = (
@@ -1242,10 +1261,21 @@ const RentalFormPage: React.FC = () => {
                                     />
                                   );
                                   c += " text-amber-600 dark:text-amber-400";
-                                  t = `Available after ${formatDumpsterDate(
-                                    d.available_after
-                                  )}`;
-                                  if (d.customer) t += ` (from ${d.customer})`;
+                                  note = d.customer
+                                    ? t(
+                                        "Available after {{date}} (from {{customer}})",
+                                        {
+                                          date: formatDumpsterDate(
+                                            d.available_after
+                                          ),
+                                          customer: d.customer,
+                                        }
+                                      )
+                                    : t("Available after {{date}}", {
+                                        date: formatDumpsterDate(
+                                          d.available_after
+                                        ),
+                                      });
                                 } else if (option.status === "unavailable") {
                                   i = (
                                     <IconCircleX
@@ -1254,24 +1284,37 @@ const RentalFormPage: React.FC = () => {
                                     />
                                   );
                                   c += " text-rose-600 dark:text-rose-400";
-                                  t = d.reason || "Unavailable";
-                                  if (d.customer) t += ` (with ${d.customer})`;
+                                  note = d.customer
+                                    ? t("Unavailable (with {{customer}})", {
+                                        customer: d.customer,
+                                      })
+                                    : d.reason || t("Unavailable");
                                 } else if (d.next_rental?.date) {
                                   c += " text-amber-600 dark:text-amber-400";
-                                  t = `Available until ${formatDumpsterDate(
-                                    d.available_until
-                                  )}`;
-                                  if (d.next_rental.customer)
-                                    t += ` (next: ${
-                                      d.next_rental.customer
-                                    } on ${formatDumpsterDate(
-                                      d.next_rental.date
-                                    )})`;
+                                  note = d.next_rental.customer
+                                    ? t(
+                                        "Available until {{date}} (next: {{customer}} on {{nextDate}})",
+                                        {
+                                          date: formatDumpsterDate(
+                                            d.available_until
+                                          ),
+                                          customer: d.next_rental.customer,
+                                          nextDate: formatDumpsterDate(
+                                            d.next_rental.date
+                                          ),
+                                        }
+                                      )
+                                    : t("Available until {{date}}", {
+                                        date: formatDumpsterDate(
+                                          d.available_until
+                                        ),
+                                      });
                                 } else if (d.is_transition_day) {
                                   c += " text-blue-600 dark:text-blue-400";
-                                  t = `Transition Day (from ${
-                                    d.transition_from?.customer_name ?? "prev"
-                                  })`;
+                                  note = t("Transition Day (from {{customer}})", {
+                                    customer:
+                                      d.transition_from?.customer_name ?? "prev",
+                                  });
                                 }
                                 return (
                                   <ListboxOption
@@ -1303,7 +1346,9 @@ const RentalFormPage: React.FC = () => {
                                               {option.name}
                                             </span>
                                           </div>
-                                          {t && <span className={c}>{t}</span>}
+                                          {note && (
+                                            <span className={c}>{note}</span>
+                                          )}
                                         </div>
                                         {selected && (
                                           <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
@@ -1339,7 +1384,7 @@ const RentalFormPage: React.FC = () => {
                     htmlFor="driver-button"
                     className="block text-sm font-medium text-default-700 dark:text-gray-200"
                   >
-                    Driver <span className="text-red-500">*</span>
+                    {t("Driver")} <span className="text-red-500">*</span>
                   </label>
                   <div className="mt-2">
                     <Listbox
@@ -1356,7 +1401,7 @@ const RentalFormPage: React.FC = () => {
                           )}
                         >
                           <span className="block truncate">
-                            {formData.driver || "Select Driver"}
+                            {formData.driver || t("Select Driver")}
                           </span>
                           <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                             <IconChevronDown
@@ -1383,7 +1428,7 @@ const RentalFormPage: React.FC = () => {
                               disabled
                               className="text-gray-400 italic py-2 pl-3 pr-10 select-none"
                             >
-                              Select Driver
+                              {t("Select Driver")}
                             </ListboxOption>
                             {driverOptions.map((o) => (
                               <ListboxOption
@@ -1430,7 +1475,7 @@ const RentalFormPage: React.FC = () => {
                       htmlFor="pickup_destination-button"
                       className="block text-sm font-medium text-default-700 dark:text-gray-200"
                     >
-                      Pickup Destination
+                      {t("Pickup Destination")}
                     </label>
                     <div className="mt-2">
                       <Listbox
@@ -1449,7 +1494,7 @@ const RentalFormPage: React.FC = () => {
                             <span className="block truncate">
                               {pickupDestinations.find(
                                 (d) => d.code === formData.pickup_destination
-                              )?.name || "Select destination..."}
+                              )?.name || t("Select destination...")}
                             </span>
                             <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                               <IconChevronDown
@@ -1494,7 +1539,7 @@ const RentalFormPage: React.FC = () => {
                                         {dest.name}
                                         {dest.is_default && (
                                           <span className="ml-2 text-xs text-default-400">
-                                            (default)
+                                            {t("(default)")}
                                           </span>
                                         )}
                                       </span>
@@ -1522,8 +1567,10 @@ const RentalFormPage: React.FC = () => {
                 htmlFor="remarks"
                 className="block text-sm font-medium leading-6 text-default-700 dark:text-gray-200"
               >
-                Remarks{" "}
-                <span className="text-xs text-default-500 dark:text-gray-400">(Optional)</span>
+                {t("Remarks")}{" "}
+                <span className="text-xs text-default-500 dark:text-gray-400">
+                  {t("(Optional)")}
+                </span>
               </label>
               <div className="mt-2">
                 <textarea
@@ -1535,7 +1582,7 @@ const RentalFormPage: React.FC = () => {
                     "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm",
                     "placeholder-default-400"
                   )}
-                  placeholder="Add notes..."
+                  placeholder={t("Add notes...")}
                   value={formData.remarks ?? ""}
                   onChange={handleInputChange}
                 />
@@ -1545,7 +1592,7 @@ const RentalFormPage: React.FC = () => {
             {isEditMode && formData.invoice_info && (
               <div className="border-b border-default-200 dark:border-gray-700 pb-6">
                 <h2 className="text-base font-semibold leading-7 text-default-900 dark:text-gray-100 mb-4">
-                  Invoice Information
+                  {t("Invoice Information")}
                 </h2>
                 <AssociatedInvoiceDisplay
                   invoiceInfo={formData.invoice_info}
@@ -1605,7 +1652,7 @@ const RentalFormPage: React.FC = () => {
               });
               if (r?.customer) {
                 const n = r.customer.customer_id;
-                toast.success("Customer created.");
+                toast.success(t("Customer created."));
                 const d = await greenTargetApi.getCustomers();
                 setCustomers(d || []);
                 setFormData((p) => ({
@@ -1629,7 +1676,7 @@ const RentalFormPage: React.FC = () => {
             }
           } catch (e) {
             console.error(e);
-            toast.error("Failed create customer.");
+            toast.error(t("Failed create customer."));
           }
         }}
       />
@@ -1652,7 +1699,7 @@ const RentalFormPage: React.FC = () => {
                 phone_number: data.phone_number,
               });
               if (r?.location) {
-                toast.success("Location added.");
+                toast.success(t("Location added."));
                 // Set the form to use the newly added location directly
                 setFormData((p) => ({
                   ...p,
@@ -1666,7 +1713,7 @@ const RentalFormPage: React.FC = () => {
             }
           } catch (e) {
             console.error(e);
-            toast.error("Failed add location.");
+            toast.error(t("Failed add location."));
           }
         }}
       />
@@ -1674,18 +1721,18 @@ const RentalFormPage: React.FC = () => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDelete}
-        title="Delete Rental"
-        message={`Delete Rental #${formData.rental_id}?`}
-        confirmButtonText={isDeleting ? "Deleting..." : "Delete"}
+        title={t("Delete Rental")}
+        message={t("Delete Rental #{{id}}?", { id: formData.rental_id })}
+        confirmButtonText={isDeleting ? t("Deleting...") : t("Delete")}
         variant="danger"
       />
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Changes"
-        message="Leave without saving?"
-        confirmButtonText="Discard"
+        title={t("Discard Changes")}
+        message={t("Leave without saving?")}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
     </div>

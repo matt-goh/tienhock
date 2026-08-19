@@ -263,7 +263,7 @@ const SummaryCard: React.FC<SummaryCardProps> = ({
 };
 
 const GTSalesSummaryPage: React.FC = () => {
-  const { t, i18n } = useTranslation("sales");
+  const { t, i18n } = useTranslation("greentarget");
   const [filters, setFilters] = usePersistedFilters<SalesReportFilters>(
     FILTER_STORAGE_KEY,
     getDefaultFilters,
