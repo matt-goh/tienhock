@@ -30,6 +30,17 @@ requires separate approval).
 
 ---
 
+## Removed 19 Aug 2026 — 1 file (GT + JP CP8D yearly employee particulars)
+
+Applied to dev on 2026-08-19, then removed per the project convention. Recover via git history
+(`git log -- dev/migrations/2026-08-19_gt_jp_cp8d_records.sql`). Design: `docs/CP8D_HANDOVER.md`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-19_gt_jp_cp8d_records.sql` | Created `greentarget.cp8d_records` (employee_id FK `public.staffs`) and `jellypolly.cp8d_records` (employee_id FK `jellypolly.staffs`) — schema-isolated clones of the TH `public.cp8d_records` yearly CP8D dataset. Guarded and idempotent; no data seeded. | dev ✓ (2026-08-19), prod PENDING |
+
+---
+
 ## Removed 18 Aug 2026 — 1 file (CP8D yearly employee particulars)
 
 Applied to dev on 2026-08-18, then removed per the project convention. Recover via git history
