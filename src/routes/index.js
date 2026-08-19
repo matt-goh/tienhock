@@ -110,6 +110,7 @@ import greenTargetDailyLoriHabukRouter from "./greentarget/daily-lori-habuk.js";
 import greenTargetSalaryReportRouter from "./greentarget/salary-report.js";
 import greenTargetLeaveManagementRouter from "./greentarget/leave-management.js";
 import greenTargetECarumanRouter from "./greentarget/e-caruman.js";
+import greenTargetCp8dRouter from "./greentarget/cp8d.js";
 import greenTargetCustomerSignupsRouter from "./greentarget/customer-signups.js";
 import greenTargetFinancialReportsRouter from "./greentarget/accounting/financial-reports.js";
 import greenTargetAccountLedgerRouter from "./greentarget/accounting/account-ledger.js";
@@ -139,6 +140,7 @@ import jellypollyIncentivesRouter from "./jellypolly/incentives.js";
 import jellypollyOthersRecordsRouter from "./jellypolly/others-records.js";
 import jellypollySalaryReportRouter from "./jellypolly/salary-report.js";
 import jellypollyECarumanRouter from "./jellypolly/e-caruman.js";
+import jellypollyCp8dRouter from "./jellypolly/cp8d.js";
 import jellypollyStaffsRouter from "./jellypolly/staffs.js";
 import jellypollyJobsRouter from "./jellypolly/jobs.js";
 import jellypollyPayCodesRouter from "./jellypolly/pay-codes.js";
@@ -438,6 +440,12 @@ export default function setupRoutes(app, pool) {
     greenTargetECarumanRouter(pool)
   );
   app.use(
+    "/greentarget/api/cp8d",
+    authMiddleware(pool),
+    checkRestoreState,
+    greenTargetCp8dRouter(pool)
+  );
+  app.use(
     "/greentarget/api/customer-signups",
     greenTargetCustomerSignupsRouter(pool, myInvoisGTConfig)
   );
@@ -605,6 +613,12 @@ export default function setupRoutes(app, pool) {
     authMiddleware(pool),
     checkRestoreState,
     jellypollyECarumanRouter(pool)
+  );
+  app.use(
+    "/jellypolly/api/cp8d",
+    authMiddleware(pool),
+    checkRestoreState,
+    jellypollyCp8dRouter(pool)
   );
   app.use(
     "/jellypolly/api/staffs",

@@ -57,6 +57,11 @@ interface CP8DRecordFormModalProps {
   record: CP8DRecord | null;
   /** Employee ids already on the CP8D year (excluded from the add picker) */
   existingEmployeeIds?: string[];
+  /** Override the API base path (GT/JP use their own company-scoped mounts) */
+  apiBasePath?: string;
+  /** Override the selectable employees (defaults to the full public staff cache;
+   * Jelly Polly passes its own jellypolly.staffs options) */
+  employeeOptions?: { id: string; name: string }[];
 }
 
 const MONEY_KEYS = [
@@ -111,6 +116,8 @@ const CP8DRecordFormModal: React.FC<CP8DRecordFormModalProps> = ({
   year,
   record,
   existingEmployeeIds = [],
+  apiBasePath = "/api/cp8d",
+  employeeOptions,
 }) => {
   const { t } = useTranslation("payroll");
   const { staffs } = useStaffsCache();
@@ -149,13 +156,15 @@ const CP8DRecordFormModal: React.FC<CP8DRecordFormModalProps> = ({
     }
   }, [isOpen, record]);
 
-  const staffOptions = useMemo(
-    () =>
-      staffs
-        .filter((staff) => !existingEmployeeIds.includes(staff.id))
-        .map((staff) => ({ id: staff.id, name: `${staff.name} (${staff.id})` })),
-    [staffs, existingEmployeeIds]
-  );
+  const staffOptions = useMemo(() => {
+    const base =
+      employeeOptions ??
+      staffs.map((staff) => ({
+        id: staff.id,
+        name: `${staff.name} (${staff.id})`,
+      }));
+    return base.filter((option) => !existingEmployeeIds.includes(option.id));
+  }, [employeeOptions, staffs, existingEmployeeIds]);
 
   const setField = (field: string) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -169,12 +178,12 @@ const CP8DRecordFormModal: React.FC<CP8DRecordFormModalProps> = ({
           setIsSaving(false);
           return;
         }
-        await api.post(`/api/cp8d/${year}/records`, {
+        await api.post(`${apiBasePath}/${year}/records`, {
           employee_id: selectedStaffId,
         });
         toast.success(t("CP8D record added"));
       } else {
-        await api.put(`/api/cp8d/records/${record.id}`, {
+        await api.put(`${apiBasePath}/records/${record.id}`, {
           employee_name: form.employee_name,
           tin: form.tin || null,
           identification_no: form.identification_no,

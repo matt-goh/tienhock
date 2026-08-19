@@ -1,6 +1,7 @@
 # CP8D Handover — Yearly LHDN Employee Particulars File
 
-**Status (2026-08-18):** Tien Hock implemented. Green Target and Jelly Polly are **designed below but not yet implemented**.
+**Status (2026-08-19):** implemented for all three companies (Tien Hock 2026-08-18,
+Green Target + Jelly Polly 2026-08-19).
 
 CP8D is the annual statement of employee remuneration and tax deduction particulars submitted to
 LHDN (via e-Data Praisi/e-CP8D), prepared for the previous remuneration year around February.
@@ -114,22 +115,32 @@ Derivation rules (all companies):
   fields blank when 0; `retirement_date` formatted `dd-MM-yyyy` via date-fns `format` (never ISO
   slicing — AGENTS.md rule 17); trailing `|` per line; `\r\n` line endings.
 
-## 4. Green Target / Jelly Polly implementation (NOT done yet)
+## 4. Green Target / Jelly Polly implementation (done 2026-08-19)
 
-When implementing, follow the TH code as the template with these differences:
+Both companies follow the TH code as schema-isolated clones (never a share):
 
-1. **Schema-isolated table:** `greentarget.cp8d_records` / `jellypolly.cp8d_records` — a clone,
-   never a share (same principle as the GT ledger). JP's `employee_id` FK points at
-   `jellypolly.staffs`; GT's points at `public.staffs`.
-2. **Routes:** clone under `src/routes/greentarget/cp8d.js` / `src/routes/jellypolly/cp8d.js`,
-   mounted at `/greentarget/api/cp8d` / `/jellypolly/api/cp8d` with inline
-   `authMiddleware(pool), checkRestoreState` (GT/JP mounts are NOT covered by the global `/api`
-   middleware).
-3. **E number:** read from the company's `payroll_settings` (`ecaruman_lhdn_e_number`), same key
-   the GT/JP e-Caruman pages already use — not a hardcode.
-4. **Pages:** `GTCP8DPage` / `JPCP8DPage` clones registered in `GreenTargetSidebarData.tsx` /
-   the JP nav data, mirroring the GT/JP e-Caruman page wiring.
-5. JP payroll sums its own `jellypolly.*` payroll tables; GT sums `greentarget.*`.
+1. **Tables:** `greentarget.cp8d_records` (employee_id FK `public.staffs`) and
+   `jellypolly.cp8d_records` (employee_id FK `jellypolly.staffs`), created by
+   `2026-08-19_gt_jp_cp8d_records.sql` (applied to dev; see `docs/MIGRATIONS_LOG.md`).
+2. **Routes:** `src/routes/greentarget/cp8d.js` / `src/routes/jellypolly/cp8d.js`
+   (clones of the TH route), mounted at `/greentarget/api/cp8d` /
+   `/jellypolly/api/cp8d` in `src/routes/index.js` with inline
+   `authMiddleware(pool), checkRestoreState` (GT/JP mounts are NOT covered by the
+   global `/api` middleware).
+3. **E number:** read from the company's `payroll_settings`
+   (`ecaruman_lhdn_e_number`) at export time — the same key the GT/JP e-Caruman
+   pages edit. Export returns **400** with a "key it in on the e-Caruman page
+   first" message when the setting is blank (it is blank by default).
+4. **Pages:** thin wrappers `src/pages/GreenTarget/Payroll/GTCP8DPage.tsx` /
+   `src/pages/JellyPolly/Payroll/JPCP8DPage.tsx` over the shared TH `CP8DPage`
+   (parameterized with `apiBasePath` + `persistKey`, plus `employeeOptions` for
+   JP whose picker lists `jellypolly.staffs` via `useJPStaffsCache` — the
+   `PinjamFormModal` override pattern). Registered in `GreenTargetNavData.tsx` /
+   `JellyPollyNavData.tsx` under Payroll → CP8D (`/payroll/cp8d` inside each
+   company prefix).
+5. JP sums its own `jellypolly.*` payroll tables and snapshots
+   `jellypolly.staffs`; GT sums `greentarget.*` and snapshots the shared
+   `public.staffs`.
 
 ## 5. Known limitations
 

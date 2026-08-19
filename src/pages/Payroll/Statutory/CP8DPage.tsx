@@ -42,11 +42,24 @@ const triggerDownload = (filename: string, content: string) => {
   URL.revokeObjectURL(url);
 };
 
-const CP8DPage: React.FC = () => {
+interface CP8DPageProps {
+  /** API base path — TH "/api/cp8d", GT "/greentarget/api/cp8d", JP "/jellypolly/api/cp8d" */
+  apiBasePath?: string;
+  /** Persisted-year storage key (kept per company so selections don't bleed across) */
+  persistKey?: string;
+  /** Override the add-picker employees (Jelly Polly passes jellypolly.staffs options) */
+  employeeOptions?: { id: string; name: string }[];
+}
+
+const CP8DPage: React.FC<CP8DPageProps> = ({
+  apiBasePath = "/api/cp8d",
+  persistKey = "cp8dYear",
+  employeeOptions,
+}) => {
   const { t } = useTranslation("payroll");
   const now = new Date();
   const [selectedYear, setSelectedYear] = usePersistedNumber(
-    "cp8dYear",
+    persistKey,
     2000,
     2100,
     () => now.getFullYear() - 1
@@ -69,7 +82,7 @@ const CP8DPage: React.FC = () => {
   const fetchRecords = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get(`/api/cp8d/${selectedYear}`);
+      const res = await api.get(`${apiBasePath}/${selectedYear}`);
       setRecords(res.records || []);
     } catch (error) {
       console.error("Error loading CP8D records:", error);
@@ -77,7 +90,7 @@ const CP8DPage: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, t]);
+  }, [apiBasePath, selectedYear, t]);
 
   useEffect(() => {
     setWarnings([]);
@@ -87,7 +100,7 @@ const CP8DPage: React.FC = () => {
   const handlePrefill = async () => {
     setIsPrefilling(true);
     try {
-      const res = await api.post(`/api/cp8d/${selectedYear}/prefill`, {});
+      const res = await api.post(`${apiBasePath}/${selectedYear}/prefill`, {});
       toast.success(
         t("Prefill complete: {{created}} added, {{skipped}} already existed", {
           created: res.created,
@@ -107,7 +120,7 @@ const CP8DPage: React.FC = () => {
   const handleDerive = async (record: CP8DRecord) => {
     setDerivingId(record.id);
     try {
-      await api.post(`/api/cp8d/records/${record.id}/derive`, {});
+      await api.post(`${apiBasePath}/records/${record.id}/derive`, {});
       toast.success(
         t("{{name}} re-derived from staff and payroll data", {
           name: record.employee_name,
@@ -126,7 +139,7 @@ const CP8DPage: React.FC = () => {
     if (!deleteTarget) return;
     setIsDeleting(true);
     try {
-      await api.delete(`/api/cp8d/records/${deleteTarget.id}`);
+      await api.delete(`${apiBasePath}/records/${deleteTarget.id}`);
       toast.success(t("CP8D record deleted"));
       setDeleteTarget(null);
       fetchRecords();
@@ -141,7 +154,7 @@ const CP8DPage: React.FC = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const res = await api.get(`/api/cp8d/${selectedYear}/export`);
+      const res = await api.get(`${apiBasePath}/${selectedYear}/export`);
       triggerDownload(res.filename, res.content);
       setWarnings(res.warnings || []);
       toast.success(
@@ -150,9 +163,9 @@ const CP8DPage: React.FC = () => {
           count: res.count,
         })
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error exporting CP8D file:", error);
-      toast.error(t("Failed to export CP8D file"));
+      toast.error(error?.data?.message || t("Failed to export CP8D file"));
     } finally {
       setIsExporting(false);
     }
@@ -340,6 +353,8 @@ const CP8DPage: React.FC = () => {
         year={selectedYear}
         record={modalState.record}
         existingEmployeeIds={records.map((r) => r.employee_id)}
+        apiBasePath={apiBasePath}
+        employeeOptions={employeeOptions}
       />
 
       <ConfirmationDialog
