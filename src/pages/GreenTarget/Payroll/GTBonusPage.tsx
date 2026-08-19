@@ -4,6 +4,7 @@
 // (is_advance = false = pure earning; raises gross + net).
 import React, { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconEdit,
@@ -44,6 +45,7 @@ interface Bonus {
 }
 
 const GTBonusPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const { employees: gtEmployees } = useGTPayrollEmployees();
   const allowedEmployeeIds = useMemo(
     () => gtEmployees.map((e) => e.employee_id),
@@ -121,7 +123,7 @@ const GTBonusPage: React.FC = () => {
       setBonuses(response || []);
     } catch (error) {
       console.error("Error fetching bonuses:", error);
-      toast.error("Failed to load bonuses");
+      toast.error(t("Failed to load bonuses"));
     } finally {
       setIsLoading(false);
     }
@@ -136,13 +138,13 @@ const GTBonusPage: React.FC = () => {
     if (!deletingId) return;
     try {
       await api.delete(`${API_BASE}/${deletingId}`);
-      toast.success("Bonus record deleted successfully");
+      toast.success(t("Bonus record deleted successfully"));
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchBonuses();
     } catch (error) {
       console.error("Error deleting bonus:", error);
-      toast.error("Failed to delete bonus");
+      toast.error(t("Failed to delete bonus"));
     }
   };
 
@@ -192,7 +194,7 @@ const GTBonusPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Bonus Records
+          {t("Bonus Records")}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -201,7 +203,7 @@ const GTBonusPage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}
@@ -209,7 +211,7 @@ const GTBonusPage: React.FC = () => {
             color="teal"
             variant="filled"
           >
-            Add Bonus
+            {t("Add Bonus")}
           </Button>
         </div>
       </div>
@@ -235,7 +237,7 @@ const GTBonusPage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, amount, description..."
+                placeholder={t("Search name, amount, description...")}
                 className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
               {searchQuery && (
@@ -243,7 +245,7 @@ const GTBonusPage: React.FC = () => {
                   type="button"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   <IconX size={13} />
                 </button>
@@ -252,10 +254,14 @@ const GTBonusPage: React.FC = () => {
             <div className="hidden h-6 w-px bg-default-300 dark:bg-gray-600 sm:block" />
             <div className="text-right text-sm text-default-600 dark:text-gray-300">
               <div className="font-medium">
-                Total: {filteredBonuses.length} records
+                {t("Total: {{total}} records", {
+                  total: filteredBonuses.length,
+                })}
               </div>
               <div className="font-medium">
-                Amount: {formatCurrency(totalAmount)}
+                {t("Amount: {{amount}}", {
+                  amount: formatCurrency(totalAmount),
+                })}
               </div>
             </div>
           </div>
@@ -277,12 +283,14 @@ const GTBonusPage: React.FC = () => {
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconGift className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">
-              {searchQuery.trim() ? "No matching bonuses" : "No bonuses found"}
+              {searchQuery.trim()
+                ? t("No matching bonuses")
+                : t("No bonuses found")}
             </p>
             <p>
               {searchQuery.trim()
-                ? "Try a different search term"
-                : 'Click "Add Bonus" to create records'}
+                ? t("Try a different search term")
+                : t('Click "Add Bonus" to create records')}
             </p>
           </div>
         ) : (
@@ -291,22 +299,22 @@ const GTBonusPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee ID
+                    {t("Employee ID")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
+                    {t("Name")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -336,7 +344,7 @@ const GTBonusPage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(bonus)}
                           className="text-teal-600 dark:text-teal-400 hover:text-teal-800 dark:hover:text-teal-300"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -346,7 +354,7 @@ const GTBonusPage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -395,9 +403,11 @@ const GTBonusPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeleteBonus}
-        title="Delete Bonus"
-        message="Are you sure you want to delete this bonus record? This action cannot be undone."
-        confirmButtonText="Delete"
+        title={t("Delete Bonus")}
+        message={t(
+          "Are you sure you want to delete this bonus record? This action cannot be undone."
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

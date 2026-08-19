@@ -1,6 +1,7 @@
 // src/pages/GreenTarget/Customers/CustomerFormPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
@@ -59,6 +60,7 @@ interface SelectOption {
 }
 
 const CustomerFormPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const goBack = useSmartBack("/greentarget/customers");
   const { id } = useParams<{ id: string }>();
@@ -171,7 +173,8 @@ const CustomerFormPage: React.FC = () => {
           );
         } catch (fetchError: unknown) {
           console.error("Failed to load GT debtor identities:", fetchError);
-          if (isCurrent) toast.error("Failed to load trade debtor identities");
+          if (isCurrent)
+            toast.error(t("Failed to load trade debtor identities"));
         }
       };
       void fetchDebtorAccounts();
@@ -228,7 +231,7 @@ const CustomerFormPage: React.FC = () => {
       setLocations(fetchedLocations);
       setError(null);
     } catch (err) {
-      setError("Failed to fetch customer details. Please try again later.");
+      setError(t("Failed to fetch customer details. Please try again later."));
       console.error("Error fetching customer details:", err);
     } finally {
       setLoading(false);
@@ -277,7 +280,7 @@ const CustomerFormPage: React.FC = () => {
 
   const handleAddLocation = (): void => {
     if (!newLocation.address.trim()) {
-      toast.error("Please enter a location address");
+      toast.error(t("Please enter a location address"));
       return;
     }
 
@@ -315,11 +318,11 @@ const CustomerFormPage: React.FC = () => {
     e.preventDefault();
 
     if (!formData.name) {
-      toast.error("Customer name is required");
+      toast.error(t("Customer name is required"));
       return;
     }
     if (locations.some((location: CustomerLocation) => !location.address.trim())) {
-      toast.error("Every location must have an address");
+      toast.error(t("Every location must have an address"));
       return;
     }
     setIsSaving(true);
@@ -334,21 +337,21 @@ const CustomerFormPage: React.FC = () => {
       if (hasIdType || hasTinNumber) {
         if (!hasIdType) {
           toast.error(
-            "ID Type is required when entering e-Invoice information"
+            t("ID Type is required when entering e-Invoice information")
           );
           setIsSaving(false);
           return;
         }
         if (!hasIdNumber) {
           toast.error(
-            "ID Number is required when entering e-Invoice information"
+            t("ID Number is required when entering e-Invoice information")
           );
           setIsSaving(false);
           return;
         }
         if (!hasTinNumber) {
           toast.error(
-            "TIN Number is required when entering e-Invoice information"
+            t("TIN Number is required when entering e-Invoice information")
           );
           setIsSaving(false);
           return;
@@ -456,7 +459,9 @@ const CustomerFormPage: React.FC = () => {
       }
 
       toast.success(
-        `Customer ${isEditMode ? "updated" : "created"} successfully!`
+        isEditMode
+          ? t("Customer updated successfully!")
+          : t("Customer created successfully!")
       );
       if (isEditMode) {
         goBack();
@@ -469,7 +474,7 @@ const CustomerFormPage: React.FC = () => {
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
-        toast.error("An unexpected error occurred.");
+        toast.error(t("An unexpected error occurred."));
       }
     } finally {
       setIsSaving(false);
@@ -481,7 +486,7 @@ const CustomerFormPage: React.FC = () => {
       setIsSaving(true);
 
       if (!formData.customer_id) {
-        toast.error("Cannot delete: customer ID is missing");
+        toast.error(t("Cannot delete: customer ID is missing"));
         return;
       }
 
@@ -496,11 +501,11 @@ const CustomerFormPage: React.FC = () => {
       ) {
         // Show error toast with the server's message
         toast.error(
-          response.message || "Cannot delete customer: unknown error occurred"
+          response.message || t("Cannot delete customer: unknown error occurred")
         );
       } else {
         // Show success message and navigate back to customer list
-        toast.success("Customer deleted successfully");
+        toast.success(t("Customer deleted successfully"));
         navigate("/greentarget/customers");
       }
     } catch (error) {
@@ -508,7 +513,7 @@ const CustomerFormPage: React.FC = () => {
       if (error instanceof Error) {
         toast.error(error.message);
       } else {
-        toast.error("Failed to delete customer");
+        toast.error(t("Failed to delete customer"));
       }
     } finally {
       setIsDeleteDialogOpen(false);
@@ -624,7 +629,11 @@ const CustomerFormPage: React.FC = () => {
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <div>
+        {t("Error")}: {error}
+      </div>
+    );
   }
 
   return (
@@ -636,12 +645,16 @@ const CustomerFormPage: React.FC = () => {
             <div className="hidden h-8 w-px bg-default-200 dark:bg-gray-700 sm:block" />
             <div className="min-w-0">
               <h1 className="truncate text-xl font-bold text-default-900 dark:text-gray-100">
-                {isEditMode ? formData.name || "Edit Customer" : "Add Customer"}
+                {isEditMode
+                  ? formData.name || t("Edit Customer")
+                  : t("Add Customer")}
               </h1>
               <p className="mt-0.5 text-sm text-default-500 dark:text-gray-400">
                 {isEditMode
-                  ? `Customer #${formData.customer_id}`
-                  : "Create a Green Target customer and their service locations."}
+                  ? t("Customer #{{id}}", { id: formData.customer_id })
+                  : t(
+                      "Create a Green Target customer and their service locations."
+                    )}
               </p>
             </div>
           </div>
@@ -654,18 +667,20 @@ const CustomerFormPage: React.FC = () => {
                     : "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
                 }`}
               >
-                {formData.has_active_rental ? "Active rental" : "No active rental"}
+                {formData.has_active_rental
+                  ? t("Active rental")
+                  : t("No active rental")}
               </span>
               <div className="text-right text-xs text-default-500 dark:text-gray-400">
                 <div className="font-medium text-default-700 dark:text-gray-200">
-                  Last activity
+                  {t("Last activity")}
                 </div>
                 {formData.last_activity_date
                   ? new Date(formData.last_activity_date).toLocaleDateString(
                       "en-GB",
                       { year: "numeric", month: "short", day: "numeric" }
                     )
-                  : "Not recorded"}
+                  : t("Not recorded")}
               </div>
             </div>
           )}
@@ -680,21 +695,23 @@ const CustomerFormPage: React.FC = () => {
             </span>
             <div>
               <h2 className="font-semibold text-default-900 dark:text-gray-100">
-                Customer information
+                {t("Customer information")}
               </h2>
               <p className="text-sm text-default-500 dark:text-gray-400">
-                Main contact details used across rentals, invoices and statements.
+                {t(
+                  "Main contact details used across rentals, invoices and statements."
+                )}
               </p>
             </div>
           </div>
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {renderInput("name", "Customer Name")}
-            {renderInput("phone_number", "Phone Number", "tel")}
+            {renderInput("name", t("Customer Name"))}
+            {renderInput("phone_number", t("Phone Number"), "tel")}
           </div>
           <div className="mt-5">
             <FormCombobox
               name="debtor_account_code"
-              label="Default Debtor Identity"
+              label={t("Default Debtor Identity")}
               value={formData.debtor_account_code || undefined}
               onChange={(selectedId: string | string[] | null): void => {
                 setFormData((current: Customer): Customer => ({
@@ -707,27 +724,29 @@ const CustomerFormPage: React.FC = () => {
               options={debtorAccountOptions}
               query={debtorAccountQuery}
               setQuery={setDebtorAccountQuery}
-              placeholder="Search named or CD/SD identity..."
+              placeholder={t("Search named or CD/SD identity...")}
               mode="single"
             />
             <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-              Optional customer default. Every invoice still snapshots a
-              logical identity; CD/SD identities post to the CD_SD control and
-              remain separately visible in the debtor sub-schedule.
+              {t(
+                "Optional customer default. Every invoice still snapshots a logical identity; CD/SD identities post to the CD_SD control and remain separately visible in the debtor sub-schedule."
+              )}
             </p>
           </div>
           <div className="mt-5">
             {renderTextArea(
               "billing_address",
-              "Billing Address (optional)",
-              "Office address shown as Billing Address on invoices and e-Invoices. Leave blank to bill to the service location."
+              t("Billing Address (optional)"),
+              t(
+                "Office address shown as Billing Address on invoices and e-Invoices. Leave blank to bill to the service location."
+              )
             )}
           </div>
           <div className="mt-5">
             {renderTextArea(
               "additional_info",
-              "Additional Notes (optional)",
-              "Notes shown in the customer statement header."
+              t("Additional Notes (optional)"),
+              t("Notes shown in the customer statement header.")
             )}
           </div>
         </section>
@@ -740,16 +759,22 @@ const CustomerFormPage: React.FC = () => {
               </span>
               <div>
                 <h2 className="font-semibold text-default-900 dark:text-gray-100">
-                  Service locations
+                  {t("Service locations")}
                 </h2>
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  Site is optional and is appended after the address on individual
-                  e-Invoices when provided.
+                  {t(
+                    "Site is optional and is appended after the address on individual e-Invoices when provided."
+                  )}
                 </p>
               </div>
             </div>
             <span className="shrink-0 rounded-full bg-default-100 px-2.5 py-1 text-xs font-semibold text-default-600 dark:bg-gray-700 dark:text-gray-300">
-              {locations.length} {locations.length === 1 ? "location" : "locations"}
+              {t(
+                locations.length === 1
+                  ? "{{count}} location"
+                  : "{{count}} locations",
+                { count: locations.length }
+              )}
             </span>
           </div>
 
@@ -757,42 +782,42 @@ const CustomerFormPage: React.FC = () => {
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-[180px_minmax(260px,1fr)_240px_auto] lg:items-end">
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                  Site (optional)
+                  {t("Site (optional)")}
                 </label>
                 <input
                   type="text"
                   name="site"
                   value={newLocation.site}
                   onChange={handleLocationInputChange}
-                  placeholder="e.g. Kolombong"
+                  placeholder={t("e.g. Kolombong")}
                   maxLength={100}
                   className="h-10 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                  Address
+                  {t("Address")}
                 </label>
                 <input
                   type="text"
                   name="address"
                   value={newLocation.address}
                   onChange={handleLocationInputChange}
-                  placeholder="Full service address"
+                  placeholder={t("Full service address")}
                   maxLength={255}
                   className="h-10 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-default-500 dark:text-gray-400">
-                  Location phone (optional)
+                  {t("Location phone (optional)")}
                 </label>
                 <input
                   type="tel"
                   name="phone_number"
                   value={newLocation.phone_number}
                   onChange={handleLocationInputChange}
-                  placeholder={formData.phone_number || "Customer phone"}
+                  placeholder={formData.phone_number || t("Customer phone")}
                   maxLength={20}
                   className="h-10 w-full rounded-lg border border-default-300 bg-white px-3 text-sm text-default-900 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
@@ -805,7 +830,7 @@ const CustomerFormPage: React.FC = () => {
                 icon={IconPlus}
                 className="h-10 justify-center"
               >
-                Add
+                {t("Add")}
               </Button>
             </div>
           </div>
@@ -824,11 +849,13 @@ const CustomerFormPage: React.FC = () => {
                       </span>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-semibold text-default-900 dark:text-gray-100">
-                          {location.site || "Site not set"}
+                          {location.site || t("Site not set")}
                         </p>
                         {location.location_id && (
                           <p className="text-xs text-default-400">
-                            Location #{location.location_id}
+                            {t("Location #{{id}}", {
+                              id: location.location_id,
+                            })}
                           </p>
                         )}
                       </div>
@@ -837,8 +864,10 @@ const CustomerFormPage: React.FC = () => {
                       type="button"
                       onClick={(): void => handleRemoveLocation(index)}
                       className="rounded-lg p-2 text-default-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/20 dark:hover:text-rose-300"
-                      title="Remove location"
-                      aria-label={`Remove location ${index + 1}`}
+                      title={t("Remove location")}
+                      aria-label={t("Remove location {{n}}", {
+                        n: index + 1,
+                      })}
                     >
                       <IconTrash size={18} />
                     </button>
@@ -846,7 +875,7 @@ const CustomerFormPage: React.FC = () => {
                   <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-default-500 dark:text-gray-400">
-                        Site (optional)
+                        {t("Site (optional)")}
                       </label>
                       <input
                         type="text"
@@ -855,13 +884,13 @@ const CustomerFormPage: React.FC = () => {
                           handleLocationChange(index, "site", event.target.value)
                         }
                         maxLength={100}
-                        placeholder="Site name"
+                        placeholder={t("Site name")}
                         className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 outline-none focus:border-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                       />
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-medium text-default-500 dark:text-gray-400">
-                        Address
+                        {t("Address")}
                       </label>
                       <input
                         type="text"
@@ -876,7 +905,7 @@ const CustomerFormPage: React.FC = () => {
                   </div>
                   <div className="mt-3">
                     <label className="mb-1 flex items-center gap-1 text-xs font-medium text-default-500 dark:text-gray-400">
-                      <IconPhone size={13} /> Location phone (optional)
+                      <IconPhone size={13} /> {t("Location phone (optional)")}
                     </label>
                     <input
                       type="tel"
@@ -885,7 +914,10 @@ const CustomerFormPage: React.FC = () => {
                         handleLocationChange(index, "phone_number", event.target.value)
                       }
                       maxLength={20}
-                      placeholder={`Uses ${formData.phone_number || "customer phone"} when blank`}
+                      placeholder={t("Uses {{phone}} when blank", {
+                        phone:
+                          formData.phone_number || t("Customer phone"),
+                      })}
                       className="w-full rounded-lg border border-default-300 bg-white px-3 py-2 text-sm text-default-900 outline-none focus:border-sky-500 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
                     />
                   </div>
@@ -896,10 +928,10 @@ const CustomerFormPage: React.FC = () => {
             <div className="mt-4 rounded-xl border-2 border-dashed border-default-200 p-8 text-center dark:border-gray-700">
               <IconMap size={28} className="mx-auto text-default-400" />
               <p className="mt-2 text-sm font-medium text-default-700 dark:text-gray-200">
-                No service locations yet
+                {t("No service locations yet")}
               </p>
               <p className="text-xs text-default-500 dark:text-gray-400">
-                Add an address above. Site can be added when needed.
+                {t("Add an address above. Site can be added when needed.")}
               </p>
             </div>
           )}
@@ -913,29 +945,33 @@ const CustomerFormPage: React.FC = () => {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h2 className="font-semibold text-default-900 dark:text-gray-100">
-                  e-Invoice information
+                  {t("e-Invoice information")}
                 </h2>
                 <span className="rounded-full bg-default-100 px-2 py-0.5 text-xs font-medium text-default-500 dark:bg-gray-700 dark:text-gray-300">
-                  Optional
+                  {t("Optional")}
                 </span>
               </div>
               <p className="text-sm text-default-500 dark:text-gray-400">
-                If any identity field is entered, ID Type, ID Number and TIN are validated together.
+                {t(
+                  "If any identity field is entered, ID Type, ID Number and TIN are validated together."
+                )}
               </p>
             </div>
           </div>
           <div className="mb-5 flex items-start gap-2 rounded-lg bg-sky-50 p-3 text-sm text-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
             <IconInfoCircle size={18} className="mt-0.5 shrink-0" />
-            Existing verified identity details are not revalidated unless they change.
+            {t(
+              "Existing verified identity details are not revalidated unless they change."
+            )}
           </div>
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-            {renderListbox("id_type", "ID Type", idTypeOptions)}
-            {renderInput("id_number", "ID Number", "text")}
-            {renderInput("tin_number", "TIN Number", "text", "C21636482050")}
+            {renderListbox("id_type", t("ID Type"), idTypeOptions)}
+            {renderInput("id_number", t("ID Number"), "text")}
+            {renderInput("tin_number", t("TIN Number"), "text", "C21636482050")}
           </div>
           <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
-            {renderInput("email", "Email", "email")}
-            {renderListbox("state", "State", stateOptions)}
+            {renderInput("email", t("Email"), "email")}
+            {renderListbox("state", t("State"), stateOptions)}
           </div>
         </section>
 
@@ -948,13 +984,13 @@ const CustomerFormPage: React.FC = () => {
                 variant="outline"
                 onClick={(): void => setIsDeleteDialogOpen(true)}
               >
-                Delete Customer
+                {t("Delete Customer")}
               </Button>
             )}
           </div>
           <div className="flex items-center justify-end gap-3">
             <Button type="button" variant="outline" onClick={handleBackClick}>
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               type="submit"
@@ -962,7 +998,7 @@ const CustomerFormPage: React.FC = () => {
               size="lg"
               disabled={isSaving || !isFormChanged}
             >
-              {isSaving ? "Saving..." : "Save Customer"}
+              {isSaving ? t("Saving...") : t("Save Customer")}
             </Button>
           </div>
         </div>
@@ -971,9 +1007,9 @@ const CustomerFormPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Changes"
-        message="Are you sure you want to go back? All unsaved changes will be lost."
-        confirmButtonText="Discard"
+        title={t("Discard Changes")}
+        message={t("Are you sure you want to go back? All unsaved changes will be lost.")}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
       {/* Delete Confirmation Dialog */}
@@ -981,9 +1017,12 @@ const CustomerFormPage: React.FC = () => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDeleteCustomer}
-        title="Delete Customer"
-        message={`Are you sure you want to delete ${formData.name}? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Customer")}
+        message={t(
+          "Are you sure you want to delete {{name}}? This action cannot be undone.",
+          { name: formData.name }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

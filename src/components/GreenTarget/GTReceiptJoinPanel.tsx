@@ -12,6 +12,7 @@
 // can see what they are joining and untick to keep the payment separate.
 import React, { useEffect, useRef, useState } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import { IconAlertTriangle, IconLink, IconLoader2 } from "@tabler/icons-react";
 import clsx from "clsx";
 import { greenTargetApi } from "../../routes/greentarget/api";
@@ -200,6 +201,7 @@ const GTReceiptJoinPanel: React.FC<GTReceiptJoinPanelProps> = ({
   disabled = false,
   className,
 }) => {
+  const { t } = useTranslation("greentarget");
   if (lookup.isLooking && !lookup.receipt) {
     return (
       <div
@@ -209,7 +211,7 @@ const GTReceiptJoinPanel: React.FC<GTReceiptJoinPanelProps> = ({
         )}
       >
         <IconLoader2 size={14} className="animate-spin" />
-        Checking this reference number...
+        {t("Checking this reference number...")}
       </div>
     );
   }
@@ -233,12 +235,14 @@ const GTReceiptJoinPanel: React.FC<GTReceiptJoinPanelProps> = ({
           />
           <div className="text-sm text-rose-700 dark:text-rose-300">
             <p className="font-medium">
-              Reference {receipt.display_reference} is already in use.
+              {t("Reference {{reference}} is already in use.", {
+                reference: receipt.display_reference,
+              })}
             </p>
             <p className="mt-1 text-xs">
               {lookup.blockReason
-                ? describeBlockReason(lookup.blockReason)
-                : "That reference cannot take another payment."}
+                ? t(describeBlockReason(lookup.blockReason))
+                : t("That reference cannot take another payment.")}
             </p>
           </div>
         </div>
@@ -260,35 +264,48 @@ const GTReceiptJoinPanel: React.FC<GTReceiptJoinPanelProps> = ({
         />
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
-            Receipt {receipt.display_reference} already exists.
+            {t("Receipt {{reference}} already exists.", {
+              reference: receipt.display_reference,
+            })}
           </p>
           <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-amber-800 dark:text-amber-200 sm:grid-cols-4">
             <div>
-              <dt className="text-amber-600 dark:text-amber-400">Received</dt>
+              <dt className="text-amber-600 dark:text-amber-400">
+                {t("Received")}
+              </dt>
               <dd className="font-medium">
                 {formatReceiptDate(receipt.received_date)}
               </dd>
             </div>
             <div>
-              <dt className="text-amber-600 dark:text-amber-400">Method</dt>
+              <dt className="text-amber-600 dark:text-amber-400">
+                {t("Method")}
+              </dt>
               <dd className="font-medium">
-                {paymentMethodLabels[receipt.payment_method] ||
-                  receipt.payment_method}
+                {t(
+                  paymentMethodLabels[receipt.payment_method] ||
+                    receipt.payment_method
+                )}
               </dd>
             </div>
             <div>
               <dt className="text-amber-600 dark:text-amber-400">
-                Current total
+                {t("Current total")}
               </dt>
               <dd className="font-medium">
                 {formatCurrency(receipt.total_amount)}
               </dd>
             </div>
             <div>
-              <dt className="text-amber-600 dark:text-amber-400">Invoices</dt>
+              <dt className="text-amber-600 dark:text-amber-400">
+                {t("Invoices")}
+              </dt>
               <dd className="font-medium">
-                {receipt.allocation_count}
-                {receipt.status === "pending" ? " (pending cheque)" : ""}
+                {receipt.status === "pending"
+                  ? t("{{count}} (pending cheque)", {
+                      count: receipt.allocation_count,
+                    })
+                  : receipt.allocation_count}
               </dd>
             </div>
           </dl>
@@ -297,20 +314,23 @@ const GTReceiptJoinPanel: React.FC<GTReceiptJoinPanelProps> = ({
               checked={joinConfirmed}
               onChange={onJoinConfirmedChange}
               disabled={disabled}
-              label="Add this payment to that receipt"
+              label={t("Add this payment to that receipt")}
               size={18}
             />
           </div>
           <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
             {receipt.status === "pending"
-              ? "This receipt is an unconfirmed cheque, so the new payment stays pending and the invoice balance is untouched until the receipt is confirmed."
-              : "The receipt's date, method and cheque / transaction reference apply to the whole receipt and are used as they are."}
+              ? t(
+                  "This receipt is an unconfirmed cheque, so the new payment stays pending and the invoice balance is untouched until the receipt is confirmed."
+                )
+              : t(
+                  "The receipt's date, method and cheque / transaction reference apply to the whole receipt and are used as they are."
+                )}
           </p>
           {!joinConfirmed && (
-            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
-              Leave this unticked only if it is a different payment that happens
-              to share the reference — you will then need a reference number
-              that is not already in use.
+            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">              {t(
+                              "Leave this unticked only if it is a different payment that happens to share the reference — you will then need a reference number that is not already in use."
+                            )}
             </p>
           )}
         </div>

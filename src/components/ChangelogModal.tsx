@@ -20,6 +20,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-19",
+    ms: "Green Target dan Jelly Polly: halaman CP8D kini tersedia untuk kedua-dua syarikat (Payroll → CP8D) — pra-isi setahun daripada payroll syarikat masing-masing, laraskan butiran setiap pekerja, kemudian muat turun fail TXT untuk hantaran e-CP8D. Nombor E majikan diambil daripada tetapan e-Caruman syarikat; isikannya di halaman e-Caruman dahulu sebelum eksport.",
+    en: "Green Target and Jelly Polly: the CP8D page is now available for both companies (Payroll → CP8D) — prefill a year from each company's own payroll, adjust each employee's particulars, then download the TXT file for e-CP8D submission. The employer E number is taken from the company's e-Caruman settings; key it in on the e-Caruman page before exporting.",
+  },
+  {
+    date: "2026-08-18",
+    ms: "Payroll: halaman CP8D baharu untuk fail tahunan pekerja LHDN — pra-isi setahun daripada payroll, laraskan butiran cukai setiap pekerja, kemudian muat turun fail TXT (contohnya P9112779708_2026.TXT) untuk hantaran e-CP8D.",
+    en: "Payroll: new CP8D page for the yearly LHDN employee file — prefill a year from payroll, adjust each employee's tax particulars, then download the TXT file (e.g. P9112779708_2026.TXT) for e-CP8D submission.",
+  },
+  {
     date: "2026-08-18",
     ms: "Bayaran invois: wang yang telah diliputi oleh cek yang belum dijelaskan kini dianggap telah diperuntukkan — borang Record Payment memaparkan jumlah yang diliputi cek tersebut dan jumlah yang sama tidak boleh dikutip dua kali. Sebelum ini, bayaran penuh kedua masih boleh direkodkan, menyebabkan cek tersangkut yang tidak dapat disahkan kemudian.",
     en: "Invoice payments: money already covered by an uncleared cheque now counts as spoken for — the Record Payment form shows how much uncleared cheque(s) cover and the same amount cannot be collected twice. Previously a second full payment could still be recorded, leaving a stuck cheque that could never be confirmed.",

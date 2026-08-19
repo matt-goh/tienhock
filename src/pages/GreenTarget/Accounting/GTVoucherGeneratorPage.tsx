@@ -7,6 +7,7 @@
 // driver Lori Habuk branch (BW/SS account family) is configurable below.
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
 import LoadingSpinner from "../../../components/LoadingSpinner";
@@ -78,6 +79,7 @@ const formatAmount = (n: number): string =>
   n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const GTVoucherGeneratorPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
     "gtVoucherGeneratorMonth"
@@ -102,7 +104,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
       setPreview(data);
     } catch (error: any) {
       console.error("Error fetching voucher preview:", error);
-      toast.error(error?.message || "Failed to load voucher preview");
+      toast.error(error?.message || t("Failed to load voucher preview"));
       setPreview(null);
     } finally {
       setLoading(false);
@@ -115,7 +117,9 @@ const GTVoucherGeneratorPage: React.FC = () => {
       setBranches(data);
     } catch (error: any) {
       console.error("Error fetching branch mappings:", error);
-      toast.error(error?.message || "Failed to load driver branch mappings");
+      toast.error(
+        error?.message || t("Failed to load driver branch mappings")
+      );
     }
   }, []);
 
@@ -140,9 +144,20 @@ const GTVoucherGeneratorPage: React.FC = () => {
       Object.entries(results).forEach(([key, r]) => {
         if (r.created) {
           anyCreated = true;
-          toast.success(`${key.toUpperCase()} created: ${r.reference}`);
+          toast.success(
+            t("{{type}} created: {{reference}}", {
+              type: key.toUpperCase(),
+              reference: r.reference,
+            })
+          );
         } else if (r.skipped) {
-          toast(`${key.toUpperCase()}: ${r.message}`, { icon: "ℹ️" });
+          toast(
+            t("{{type}}: {{message}}", {
+              type: key.toUpperCase(),
+              message: r.message,
+            }),
+            { icon: "ℹ️" }
+          );
         }
       });
       if (anyCreated) {
@@ -150,7 +165,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
       }
     } catch (error: any) {
       console.error("Error generating vouchers:", error);
-      toast.error(error?.message || "Failed to generate vouchers");
+      toast.error(error?.message || t("Failed to generate vouchers"));
     } finally {
       setGenerating(false);
       setConfirming(null);
@@ -164,11 +179,16 @@ const GTVoucherGeneratorPage: React.FC = () => {
       setBranches((prev) =>
         prev.map((b) => (b.employee_id === employeeId ? { ...b, branch } : b))
       );
-      toast.success(`Branch for ${employeeId} set to ${branch}`);
+      toast.success(
+        t("Branch for {{employee}} set to {{branch}}", {
+          employee: employeeId,
+          branch,
+        })
+      );
       fetchPreview();
     } catch (error: any) {
       console.error("Error saving branch:", error);
-      toast.error(error?.message || "Failed to save branch");
+      toast.error(error?.message || t("Failed to save branch"));
     } finally {
       setSavingBranch(null);
     }
@@ -201,7 +221,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
           </div>
           {existing ? (
             <span className="inline-flex items-center gap-1 text-sm font-medium text-emerald-700 dark:text-emerald-400">
-              <IconCheck size={16} /> Posted
+              <IconCheck size={16} /> {t("Posted")}
             </span>
           ) : voucher ? (
             balanced && !blocked ? (
@@ -211,16 +231,16 @@ const GTVoucherGeneratorPage: React.FC = () => {
                 disabled={generating}
                 onClick={() => setConfirming(type)}
               >
-                Generate
+                {t("Generate")}
               </Button>
             ) : (
               <span className="inline-flex items-center gap-1 text-sm font-medium text-amber-700 dark:text-amber-400">
-                <IconAlertTriangle size={16} /> Blocked
+                <IconAlertTriangle size={16} /> {t("Blocked")}
               </span>
             )
           ) : (
             <span className="text-sm text-default-400 dark:text-gray-500">
-              No payroll data
+              {t("No payroll data")}
             </span>
           )}
         </div>
@@ -231,7 +251,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
               onClick={() => navigate(`${JOURNAL_DETAILS_PATH}/${existing.id}`)}
               className="inline-flex items-center gap-1 text-sm text-sky-700 dark:text-sky-400 hover:underline"
             >
-              View journal entry <IconExternalLink size={14} />
+              {t("View journal entry")} <IconExternalLink size={14} />
             </button>
           </div>
         )}
@@ -241,10 +261,14 @@ const GTVoucherGeneratorPage: React.FC = () => {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-left text-default-500 dark:text-gray-400 border-b border-default-100 dark:border-gray-700">
-                  <th className="px-4 py-2 font-medium">Account</th>
-                  <th className="px-4 py-2 font-medium">Particulars</th>
-                  <th className="px-4 py-2 font-medium text-right">Debit</th>
-                  <th className="px-4 py-2 font-medium text-right">Credit</th>
+                  <th className="px-4 py-2 font-medium">{t("Account")}</th>
+                  <th className="px-4 py-2 font-medium">{t("Particulars")}</th>
+                  <th className="px-4 py-2 font-medium text-right">
+                    {t("Debit")}
+                  </th>
+                  <th className="px-4 py-2 font-medium text-right">
+                    {t("Credit")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -267,7 +291,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
               <tfoot>
                 <tr className="font-semibold text-default-800 dark:text-gray-100">
                   <td className="px-4 py-2" colSpan={2}>
-                    Total
+                    {t("Total")}
                   </td>
                   <td className="px-4 py-2 text-right tabular-nums">
                     {formatAmount(voucher.totalDebit)}
@@ -281,14 +305,16 @@ const GTVoucherGeneratorPage: React.FC = () => {
             {!balanced && (
               <div className="flex items-center gap-2 px-4 py-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20">
                 <IconAlertCircle size={16} />
-                Voucher is out of balance and cannot be generated.
+                {t("Voucher is out of balance and cannot be generated.")}
               </div>
             )}
             {blocked && (
               <div className="flex items-center gap-2 px-4 py-2 text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20">
                 <IconAlertCircle size={16} />
-                No Lori Habuk branch mapped for: {unmapped.join(", ")}. Set it in
-                Driver Branch Mapping below.
+                {t(
+                  "No Lori Habuk branch mapped for: {{drivers}}. Set it in Driver Branch Mapping below.",
+                  { drivers: unmapped.join(", ") }
+                )}
               </div>
             )}
           </div>
@@ -308,11 +334,12 @@ const GTVoucherGeneratorPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Voucher Generator
+            {t("Voucher Generator")}
           </h1>
           <p className="text-sm text-default-500 dark:text-gray-400">
-            Generate the monthly JBSL (Staff Salary Wages) and JWDR (Director
-            Remuneration) journals from the processed payroll.
+            {t(
+              "Generate the monthly JBSL (Staff Salary Wages) and JWDR (Director Remuneration) journals from the processed payroll."
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -326,7 +353,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
             disabled={generating || loading || bothExist || anyBlocked}
             onClick={() => setConfirming("ALL")}
           >
-            Generate All
+            {t("Generate All")}
           </Button>
         </div>
       </div>
@@ -338,13 +365,13 @@ const GTVoucherGeneratorPage: React.FC = () => {
       ) : (
         <>
           {renderVoucherCard(
-            "Staff Salary Wages (JBSL)",
+            t("Staff Salary Wages (JBSL)"),
             "JBSL",
             preview?.jbsl ?? null,
             preview?.existing.jbsl ?? null
           )}
           {renderVoucherCard(
-            "Director Remuneration (JWDR)",
+            t("Director Remuneration (JWDR)"),
             "JWDR",
             preview?.jwdr ?? null,
             preview?.existing.jwdr ?? null
@@ -356,7 +383,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
               onClick={() => setShowBranches((s) => !s)}
             >
               <span className="font-semibold text-default-800 dark:text-gray-100">
-                Driver Branch Mapping
+                {t("Driver Branch Mapping")}
               </span>
               {showBranches ? (
                 <IconChevronUp size={18} className="text-default-400" />
@@ -367,20 +394,23 @@ const GTVoucherGeneratorPage: React.FC = () => {
             {showBranches && (
               <div className="px-4 pb-4">
                 <p className="text-sm text-default-500 dark:text-gray-400 mb-3">
-                  Lori Habuk (driver) wages post to the BW (Bongawan) or SS
-                  account family. Office staff always post to the Office family.
+                  {t(
+                    "Lori Habuk (driver) wages post to the BW (Bongawan) or SS account family. Office staff always post to the Office family."
+                  )}
                 </p>
                 {branches.length === 0 ? (
                   <p className="text-sm text-default-400 dark:text-gray-500">
-                    No active driver employees.
+                    {t("No active driver employees.")}
                   </p>
                 ) : (
                   <table className="min-w-full text-sm">
                     <thead>
                       <tr className="text-left text-default-500 dark:text-gray-400 border-b border-default-100 dark:border-gray-700">
-                        <th className="py-2 pr-4 font-medium">Employee</th>
-                        <th className="py-2 pr-4 font-medium">Name</th>
-                        <th className="py-2 font-medium">Branch</th>
+                        <th className="py-2 pr-4 font-medium">
+                          {t("Employee")}
+                        </th>
+                        <th className="py-2 pr-4 font-medium">{t("Name")}</th>
+                        <th className="py-2 font-medium">{t("Branch")}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -396,8 +426,10 @@ const GTVoucherGeneratorPage: React.FC = () => {
                               className="w-44"
                               value={b.branch ?? ""}
                               disabled={savingBranch === b.employee_id}
-                              placeholder="Select…"
-                              ariaLabel={`Branch for ${b.employee_id}`}
+                              placeholder={t("Select…")}
+                              ariaLabel={t("Branch for {{employee}}", {
+                                employee: b.employee_id,
+                              })}
                               options={[
                                 { value: "BW", label: "BW (Bongawan)" },
                                 { value: "SS", label: "SS" },
@@ -429,13 +461,19 @@ const GTVoucherGeneratorPage: React.FC = () => {
             confirming === "ALL" ? ["JBSL", "JWDR"] : [confirming as "JBSL" | "JWDR"]
           )
         }
-        title="Generate Voucher"
+        title={t("Generate Voucher")}
         message={
           confirming === "ALL"
-            ? `Post the JBSL and JWDR salary journals for ${month}/${year}? This writes posted journals into the Green Target ledger.`
-            : `Post the ${confirming} salary journal for ${month}/${year}? This writes a posted journal into the Green Target ledger.`
+            ? t(
+                "Post the JBSL and JWDR salary journals for {{month}}/{{year}}? This writes posted journals into the Green Target ledger.",
+                { month, year }
+              )
+            : t(
+                "Post the {{type}} salary journal for {{month}}/{{year}}? This writes a posted journal into the Green Target ledger.",
+                { type: confirming, month, year }
+              )
         }
-        confirmButtonText={generating ? "Generating…" : "Generate"}
+        confirmButtonText={generating ? t("Generating…") : t("Generate")}
         variant="default"
       />
     </div>
