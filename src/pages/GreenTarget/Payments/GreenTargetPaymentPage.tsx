@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { IconPlus, IconSearch } from "@tabler/icons-react";
 import toast from "react-hot-toast";
@@ -92,6 +93,7 @@ const parseReceiptId = (value: string | null): number | null => {
 
 const GreenTargetPaymentPage: React.FC = () => {
   const navigate = useNavigate();
+  const { t } = useTranslation("greentarget");
   const [searchParams, setSearchParams] = useSearchParams();
   const [payments, setPayments] = useState<GreenTargetPayment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -121,7 +123,7 @@ const GreenTargetPaymentPage: React.FC = () => {
       setPayments(Array.isArray(response) ? response : []);
     } catch (error: unknown) {
       console.error("Error fetching payments:", error);
-      toast.error("Failed to fetch payments");
+      toast.error(t("Failed to fetch payments"));
     } finally {
       setLoading(false);
     }
@@ -324,8 +326,10 @@ const GreenTargetPaymentPage: React.FC = () => {
               />
               <input
                 type="text"
-                placeholder="Search"
-                title="Search payments by invoice, GT reference, cheque or transaction reference, customer, or amount"
+                placeholder={t("Search")}
+                title={t(
+                  "Search payments by invoice, GT reference, cheque or transaction reference, customer, or amount"
+                )}
                 className="h-[40px] w-full rounded-lg border border-gray-300 bg-white py-2 pl-10 pr-3 text-default-900 placeholder:text-default-400 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-400"
                 value={filters.searchTerm}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
@@ -359,13 +363,13 @@ const GreenTargetPaymentPage: React.FC = () => {
                   )
                 }
                 options={[
-                  { id: "", name: "All Methods" },
-                  { id: "cash", name: "Cash" },
-                  { id: "cheque", name: "Cheque" },
-                  { id: "bank_transfer", name: "Bank Transfer" },
-                  { id: "online", name: "Online" },
+                  { id: "", name: t("All Methods") },
+                  { id: "cash", name: t("Cash") },
+                  { id: "cheque", name: t("Cheque") },
+                  { id: "bank_transfer", name: t("Bank Transfer") },
+                  { id: "online", name: t("Online") },
                 ]}
-                placeholder="All Methods"
+                placeholder={t("All Methods")}
                 rounded="lg"
               />
             </div>
@@ -382,12 +386,12 @@ const GreenTargetPaymentPage: React.FC = () => {
                   )
                 }
                 options={[
-                  { id: "", name: "All Status" },
-                  { id: "active", name: "Active" },
-                  { id: "pending", name: "Pending" },
-                  { id: "cancelled", name: "Cancelled" },
+                  { id: "", name: t("All Status") },
+                  { id: "active", name: t("Active") },
+                  { id: "pending", name: t("Pending") },
+                  { id: "cancelled", name: t("Cancelled") },
                 ]}
-                placeholder="All Status"
+                placeholder={t("All Status")}
                 rounded="lg"
               />
             </div>
@@ -398,7 +402,7 @@ const GreenTargetPaymentPage: React.FC = () => {
               size="md"
               className="w-full whitespace-nowrap sm:w-auto"
             >
-              New Payment
+              {t("New Payment")}
             </Button>
           </div>
         </div>
