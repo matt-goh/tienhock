@@ -957,6 +957,16 @@ the docs ([this plan](LEGACY_REPORT_VERIFICATION_PLAN.md) §6/§7/§8-7/§9,
 - `GP-202604-0001` is pinned in the harness **by name**. Any further backdated Jan–May entry keyed
   in production will fail the gate loudly — that is the gate working: confirm genuineness, then
   re-pin as another named deviation; never silence it.
+- **Known legacy mis-keying corrected by open-period reclass, not source mutation (19 Aug 2026):**
+  `PBE041/01` (journal 4204) keyed the workers' PCB RM5,785.25 into `ACD_PCB` (the error is in the
+  legacy source row itself); the approved fix is posted JV `JV2608-12` (31/08/2026,
+  DR `ACW_PCB` / CR `ACD_PCB` 5,785.25) — see
+  [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md). It is NOT
+  backdated, so all Jan–May/June gates and pins stay valid; but any future `ACD_PCB`/`ACW_PCB`
+  balance comparison against legacy prints must expect this RM5,785.25 shift from August 2026
+  onward and must not re-flag the imported line as an import/transcription error. Helen's
+  `JV2608-10` (31/08/2026, DR `ACW_PCB` / CR `ACD_PCB` 1,446.35, 03/2024 amendment) is the same
+  class of open-period adjustment.
 - **Overseas-purchase classification — IMPLEMENTED on dev 21 Jul 2026 (§8-7); harness re-pin +
   production pending:** foreign purchases are not linked to any financial-statement note (`OP` and
   `LGP` are now `fs_note = NULL`); the real accounting is the user's separate manual purchase

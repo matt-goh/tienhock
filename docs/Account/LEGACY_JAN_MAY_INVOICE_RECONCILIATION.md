@@ -232,3 +232,21 @@ Except for separately approved and documented repairs such as `63760`, no
 invoice, order, customer, payment, MyInvois, or journal source row is authorized
 for mutation until the remaining items are decided. This does not reduce the
 exact legacy accounting parity already achieved by `IMP`.
+
+## Approved repair: PBE041/01 workers' PCB reclass (2026-08-19)
+
+Legacy journal `4204` (`IMP-20260113-0001`, displayed `PBE041/01`, 13/01/2026,
+LHDN-PCB(12/2025)) debited both the directors' RM124.65 and the workers'
+RM5,785.25 to `ACD_PCB`. The mis-keying is in the legacy source data itself —
+staging row 27 in `import_legacy_rows` reads `ACD_PCB`, and every other month's
+workers' PCB payment (`PBE038/02`, `PBE032/03`, `PBE035/04`, `PBE031/05`)
+correctly debits `ACW_PCB`.
+
+Helen approved the correction on 2026-08-19. Because the imported journal is
+immutable and inside the locked pre-2026-06-01 period, **no source row was
+mutated**: posted reclassification journal `JV2608-12` (31/08/2026,
+DR `ACW_PCB` / CR `ACD_PCB` 5,785.25) corrects both account balances in the
+open period, mirroring Helen's own `JV2608-10` pattern (03/2024 amendment).
+Applied via `dev/migrations/2026-08-19_reclass_pbe04101_workers_pcb.sql`
+(guarded, idempotent; dev applied 2026-08-19, production rollout recorded in
+[MIGRATIONS_LOG.md](../MIGRATIONS_LOG.md)).
