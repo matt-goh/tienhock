@@ -74,7 +74,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
   month = new Date().getMonth(),
   year = new Date().getFullYear(),
 }) => {
-  const { t } = useTranslation("sales");
+  const { t } = useTranslation("greentarget");
   const [startMonthYear, setStartMonthYear] = useState<string>(
     `${month}-${year}`
   );
@@ -120,7 +120,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     for (let m = 0; m < 12; m++) {
       monthYearOptions.push({
         id: `${m}-${y}`,
-        name: `${monthNames[m]} ${y}`,
+        name: `${t(monthNames[m])} ${y}`,
         month: m,
         year: y,
       });
@@ -187,7 +187,9 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
             debtor_account_code?: string | null;
           }) => ({
             id: customer.customer_id.toString(),
-            name: customer.name || `Customer ${customer.customer_id}`,
+            name:
+              customer.name ||
+              t("Customer {{id}}", { id: customer.customer_id }),
             phone_number: customer.phone_number,
             debtor_account_code: customer.debtor_account_code,
             activeInvoiceCount:
@@ -210,7 +212,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         setCustomerOptions(options);
       } catch (error) {
         console.error("Error fetching customers with invoice counts:", error);
-        toast.error("Failed to load customers");
+        toast.error(t("Failed to load customers"));
       }
     };
 
@@ -258,9 +260,11 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
     if (!shouldPreOpenPrintPreview()) return null;
     const printWindow = window.open("", "_blank");
     if (!printWindow) return null;
-    printWindow.document.title = "Preparing Statement";
+    printWindow.document.title = t("Preparing Statement");
     printWindow.document.body.innerHTML =
-      "<p style=\"font-family: sans-serif; padding: 24px;\">Preparing print preview...</p>";
+      `<p style="font-family: sans-serif; padding: 24px;">${t(
+        "Preparing print preview..."
+      )}</p>`;
     return printWindow;
   };
 
@@ -338,11 +342,13 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               cleanup(); // Hide loading dialog, wait for user interaction
             } else if (printResult.opened) {
               setPrintError(null);
-              toast.success("Print preview opened in a new tab.");
+              toast.success(t("Print preview opened in a new tab."));
               cleanup();
             } else {
               setPrintError(
-                "Could not open print preview. Please allow pop-ups for this site."
+                t(
+                  "Could not open print preview. Please allow pop-ups for this site."
+                )
               );
               cleanup(true);
             }
@@ -368,7 +374,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
 
       printFrame.onerror = (e) => {
         console.error("Iframe loading error:", e);
-        setPrintError("Failed to load document for printing.");
+        setPrintError(t("Failed to load document for printing."));
         cleanup(true);
       };
 
@@ -378,15 +384,17 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         fallbackWindow.close();
       }
       console.error("Error generating PDFs for print:", error);
-      setPrintError(error instanceof Error ? error.message : "Unknown error");
-      toast.error("Error preparing documents for print. Please try again.");
+      setPrintError(
+        error instanceof Error ? error.message : t("Unknown error")
+      );
+      toast.error(t("Error preparing documents for print. Please try again."));
       cleanup(true);
     }
   };
 
   const handleGenerate = async () => {
     if (selectedCustomers.length === 0) {
-      toast.error("Please select at least one customer");
+      toast.error(t("Please select at least one customer"));
       return;
     }
 
@@ -400,7 +408,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
       const endTotalMonths = endYear * 12 + endMonth;
 
       if (endTotalMonths < startTotalMonths) {
-        toast.error("End month cannot be before start month");
+        toast.error(t("End month cannot be before start month"));
         return;
       }
     }
@@ -555,8 +563,10 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
         printPreviewWindow.close();
       }
       console.error("Error generating statement:", error);
-      setPrintError(error instanceof Error ? error.message : "Unknown error");
-      toast.error("Error generating statement. Please try again.");
+      setPrintError(
+        error instanceof Error ? error.message : t("Unknown error")
+      );
+      toast.error(t("Error generating statement. Please try again."));
       cleanup(true);
     }
   };
@@ -586,7 +596,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
           <div className="relative bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full mx-4 p-6 shadow-xl">
             <div className="flex justify-between items-center mb-4">
               <DialogTitle as="h3" className="text-lg font-medium text-default-900 dark:text-gray-100">
-                Generate Statement
+                {t("Generate Statement")}
               </DialogTitle>
               <button
                 onClick={onClose}
@@ -600,7 +610,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               {/* Month range selection */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                  Select Month Range
+                  {t("Select Month Range")}
                 </label>
                 <div className="flex items-center space-x-3">
                   <div className="flex-1">
@@ -612,7 +622,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                         setStartMonthYear(value)
                       }
                       options={monthYearOptions}
-                      placeholder="Start month..."
+                      placeholder={t("Start month...")}
                     />
                   </div>
 
@@ -628,30 +638,38 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                       value={endMonthYear || ""}
                       onChange={(value: any) => setEndMonthYear(value || null)}
                       options={[
-                        { id: "", name: "Same as start" },
+                        { id: "", name: t("Same as start") },
                         ...monthYearOptions,
                       ]}
-                      placeholder="End month (optional)..."
+                      placeholder={t("End month (optional)...")}
                     />
                   </div>
                 </div>
                 <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
                   {endMonthYear
-                    ? `Statement will include all transactions from ${
-                        monthYearOptions.find((o) => o.id === startMonthYear)
-                          ?.name
-                      } to ${
-                        monthYearOptions.find((o) => o.id === endMonthYear)
-                          ?.name
-                      }`
-                    : `Statement will include all transactions in ${
-                        monthYearOptions.find((o) => o.id === startMonthYear)
-                          ?.name
-                      }`}
+                    ? t(
+                        "Statement will include all transactions from {{start}} to {{end}}",
+                        {
+                          start: monthYearOptions.find(
+                            (o) => o.id === startMonthYear
+                          )?.name,
+                          end: monthYearOptions.find(
+                            (o) => o.id === endMonthYear
+                          )?.name,
+                        }
+                      )
+                    : t(
+                        "Statement will include all transactions in {{month}}",
+                        {
+                          month: monthYearOptions.find(
+                            (o) => o.id === startMonthYear
+                          )?.name,
+                        }
+                      )}
                 </p>
                 {endMonthYear && !isValidRange && (
                   <p className="text-xs text-rose-600 mt-1">
-                    End month cannot be before start month
+                    {t("End month cannot be before start month")}
                   </p>
                 )}
               </div>
@@ -659,7 +677,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               {/* Customer selection */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                  Select Customer(s)
+                  {t("Select Customer(s)")}
                 </label>
                 <FormCombobox
                   name="customers"
@@ -677,16 +695,23 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                   options={customerOptions.map((option) => ({
                     ...option,
                     // Customize the name to include invoice counts
-                    name: `${option.name} ${
-                      option.phone_number ? `(${option.phone_number})` : ""
-                    } - ${option.activeInvoiceCount} active, ${
-                      option.overdueInvoiceCount
-                    } overdue`,
+                    name: t(
+                      "{{name}} - {{active}} active, {{overdue}} overdue",
+                      {
+                        name: `${option.name} ${
+                          option.phone_number
+                            ? `(${option.phone_number})`
+                            : ""
+                        }`,
+                        active: option.activeInvoiceCount,
+                        overdue: option.overdueInvoiceCount,
+                      }
+                    ),
                   }))}
                   query={customerQuery}
                   setQuery={setCustomerQuery}
                   mode="multiple"
-                  placeholder="Select customers..."
+                  placeholder={t("Select customers...")}
                 />
 
                 {/* Selected customers summary */}
@@ -694,14 +719,15 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                   <div className="mt-2 p-2 bg-sky-50 dark:bg-sky-900/30 border border-sky-100 dark:border-sky-800 rounded-lg">
                     <div className="flex justify-between">
                       <p className="text-sm text-default-700 dark:text-gray-200 font-medium mb-1">
-                        Selected: {selectedCustomers.length} customer
-                        {selectedCustomers.length > 1 ? "s" : ""}
+                        {t("Selected: {{count}} customer/customers", {
+                          count: selectedCustomers.length,
+                        })}
                       </p>
                       <button
                         className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
                         onClick={() => setSelectedCustomers([])}
                       >
-                        Clear selection
+                        {t("Clear selection")}
                       </button>
                     </div>
                     <div className="max-h-36 overflow-y-auto">
@@ -714,11 +740,24 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                             <li key={customerId} className="flex items-center">
                               <span className="w-3 h-3 bg-sky-400 rounded-full mr-2 flex-shrink-0"></span>
                               <span className="truncate">
-                                {customer?.name || `Customer #${customerId}`}
-                                {customer?.phone_number &&
-                                  ` (${customer.phone_number})`}
-                                {customer &&
-                                  ` - ${customer.activeInvoiceCount} active, ${customer.overdueInvoiceCount} overdue`}
+                                {customer
+                                  ? t(
+                                      "{{name}} - {{active}} active, {{overdue}} overdue",
+                                      {
+                                        name:
+                                          customer.name +
+                                          (customer.phone_number
+                                            ? ` (${customer.phone_number})`
+                                            : ""),
+                                        active:
+                                          customer.activeInvoiceCount || 0,
+                                        overdue:
+                                          customer.overdueInvoiceCount || 0,
+                                      }
+                                    )
+                                  : t("Customer #{{id}}", {
+                                      id: customerId,
+                                    })}
                               </span>
                             </li>
                           );
@@ -729,14 +768,14 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                 )}
 
                 <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
-                  Statements will be generated for each selected customer
+                  {t("Statements will be generated for each selected customer")}
                 </p>
               </div>
             </div>
 
             <div className="mt-8 flex space-x-3 justify-end">
               <Button onClick={onClose} variant="outline">
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button
                 onClick={handleGenerate}
@@ -744,7 +783,9 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                 color="sky"
                 disabled={selectedCustomers.length === 0 || !isValidRange}
               >
-                Generate Statement{selectedCustomers.length > 1 ? "s" : ""}
+                {selectedCustomers.length > 1
+                  ? t("Generate Statements")
+                  : t("Generate Statement")}
               </Button>
             </div>
           </div>
@@ -758,12 +799,11 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
               <LoadingSpinner size="sm" hideText />
               <p className="text-base font-medium text-default-900 dark:text-gray-100">
                 {isGenerating
-                  ? `Preparing statement${
-                      selectedCustomers.length > 1 ? "s" : ""
-                    } for ${selectedCustomers.length} customer${
-                      selectedCustomers.length > 1 ? "s" : ""
-                    }...`
-                  : "Opening print dialog..."}
+                  ? t(
+                      "Preparing statement for {{count}} customer/customers...",
+                      { count: selectedCustomers.length }
+                    )
+                  : t("Opening print dialog...")}
               </p>
               {printError && (
                 <p className="text-sm text-rose-600 mt-2 text-center">
@@ -777,7 +817,7 @@ const GTStatementModal: React.FC<GTStatementModalProps> = ({
                 }}
                 className="mt-1 text-sm text-center text-sky-600 dark:text-sky-400 hover:underline"
               >
-                Close
+                {t("Close")}
               </button>
             </div>
           </div>

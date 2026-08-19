@@ -4,6 +4,7 @@
 // greentarget.mid_month_payrolls table.
 import React, { useState, useEffect, useMemo, Fragment } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -118,6 +119,7 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
   employees,
   editingPayroll,
 }) => {
+  const { t } = useTranslation("greentarget");
   const [employeeId, setEmployeeId] = useState<string>("");
   const [amount, setAmount] = useState<number>(500);
   const [paymentMethod, setPaymentMethod] = useState<
@@ -151,11 +153,11 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
 
   const handleSubmit = async () => {
     if (!editingPayroll && !employeeId) {
-      toast.error("Please select an employee");
+      toast.error(t("Please select an employee"));
       return;
     }
     if (amount <= 0) {
-      toast.error("Amount must be greater than 0");
+      toast.error(t("Amount must be greater than 0"));
       return;
     }
 
@@ -166,7 +168,7 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
           `/greentarget/api/mid-month-payrolls/${editingPayroll.id}`,
           { amount, payment_method: paymentMethod }
         );
-        toast.success("Mid-month payroll updated successfully");
+        toast.success(t("Mid-month payroll updated successfully"));
       } else {
         await api.post("/greentarget/api/mid-month-payrolls", {
           employee_id: employeeId,
@@ -175,18 +177,16 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
           amount,
           payment_method: paymentMethod,
         });
-        toast.success("Mid-month payroll created successfully");
+        toast.success(t("Mid-month payroll created successfully"));
       }
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error("Error saving GT mid-month payroll:", error);
       if (error.response?.status === 409 || error?.status === 409) {
-        toast.error(
-          "This employee already has a mid-month payroll for this month"
-        );
+        toast.error(t("This employee already has a mid-month payroll for this month"));
       } else {
-        toast.error("Failed to save mid-month payroll. Please try again.");
+        toast.error(t("Failed to save mid-month payroll. Please try again."));
       }
     } finally {
       setIsSaving(false);
@@ -227,28 +227,31 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100 mb-4"
                 >
-                  {editingPayroll ? "Edit" : "Add"} Mid-month Payroll -{" "}
-                  {getMonthName(currentMonth)} {currentYear}
+                  {t("{{action}} Mid-month Payroll - {{month}} {{year}}", {
+                    action: editingPayroll ? t("Edit") : t("Add"),
+                    month: getMonthName(currentMonth),
+                    year: currentYear,
+                  })}
                 </DialogTitle>
 
                 <div className="space-y-4">
                   {/* Employee Selection (locked when editing) */}
                   {editingPayroll ? (
                     <div className="text-sm text-default-700 dark:text-gray-200">
-                      <span className="font-medium">Employee:</span>{" "}
+                      <span className="font-medium">{t("Employee:")}</span>{" "}
                       {editingPayroll.employee_name} (
                       {editingPayroll.employee_id})
                     </div>
                   ) : (
                     <FormCombobox
                       name="employee"
-                      label="Select Employee"
+                      label={t("Select Employee")}
                       value={employeeId}
                       onChange={(value) => setEmployeeId(value as string)}
                       options={employeeOptions}
                       query={searchQuery}
                       setQuery={setSearchQuery}
-                      placeholder="Search for employee..."
+                      placeholder={t("Search for employee...")}
                       mode="single"
                     />
                   )}
@@ -256,7 +259,7 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
                   {/* Amount */}
                   <FormInput
                     name="amount"
-                    label="Amount (RM)"
+                    label={t("Amount (RM)")}
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(Number(e.target.value))}
@@ -268,15 +271,18 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
                   {/* Payment Method */}
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Payment Method
+                      {t("Payment Method")}
                     </label>
                     <PillSelect<MidMonthPaymentMethod>
                       value={paymentMethod}
                       onChange={(value: MidMonthPaymentMethod) =>
                         setPaymentMethod(value)
                       }
-                      options={PAYMENT_METHOD_OPTIONS}
-                      ariaLabel="Payment method"
+                      options={PAYMENT_METHOD_OPTIONS.map((option) => ({
+                        value: option.value,
+                        label: t(option.label),
+                      }))}
+                      ariaLabel={t("Payment method")}
                       size="md"
                     />
                   </div>
@@ -290,7 +296,7 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
                     onClick={onClose}
                     disabled={isSaving}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </Button>
                   <Button
                     type="button"
@@ -304,10 +310,10 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
                     }
                   >
                     {isSaving
-                      ? "Saving..."
+                      ? t("Saving...")
                       : editingPayroll
-                      ? "Update Payroll"
-                      : "Create Payroll"}
+                      ? t("Update Payroll")
+                      : t("Create Payroll")}
                   </Button>
                 </div>
               </DialogPanel>
@@ -320,6 +326,7 @@ const GTMidMonthPayrollModal: React.FC<GTMidMonthPayrollModalProps> = ({
 };
 
 const GTMidMonthPayrollPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   // State
   const [payrolls, setPayrolls] = useState<GTMidMonthPayroll[]>([]);
   const [gtEmployees, setGtEmployees] = useState<GTPayrollEmployee[]>([]);
@@ -424,7 +431,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
       setPinjamByEmp(pinjamMap);
     } catch (error) {
       console.error("Error fetching GT mid-month payrolls:", error);
-      toast.error("Failed to load mid-month payrolls");
+      toast.error(t("Failed to load mid-month payrolls"));
     } finally {
       setIsLoading(false);
     }
@@ -440,13 +447,13 @@ const GTMidMonthPayrollPage: React.FC = () => {
 
     try {
       await api.delete(`/greentarget/api/mid-month-payrolls/${deletingId}`);
-      toast.success("Payroll deleted successfully");
+      toast.success(t("Payroll deleted successfully"));
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchPayrolls();
     } catch (error) {
       console.error("Error deleting GT mid-month payroll:", error);
-      toast.error("Failed to delete payroll");
+      toast.error(t("Failed to delete payroll"));
     }
   };
 
@@ -491,7 +498,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
   // Mid-month report PDF (mirrors Tien Hock; net = advance - mid-month pinjam)
   const generatePDF = async (action: "download" | "print") => {
     if (payrolls.length === 0) {
-      toast.error("No mid-month payrolls to report");
+      toast.error(t("No mid-month payrolls to report"));
       return;
     }
     setIsGeneratingPDF(true);
@@ -528,13 +535,13 @@ const GTMidMonthPayrollPage: React.FC = () => {
       };
       await generateMidMonthPayrollReportPDF(pdfData, action);
       toast.success(
-        `Mid-month payroll report ${
-          action === "download" ? "downloaded" : "generated for printing"
-        }`
+        action === "download"
+          ? t("Mid-month payroll report downloaded")
+          : t("Mid-month payroll report generated for printing")
       );
     } catch (error) {
       console.error("Error generating GT mid-month PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -544,7 +551,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
   const generateTextExport = async () => {
     const bankPayrolls = payrolls.filter((p) => p.payment_method === "Bank");
     if (bankPayrolls.length === 0) {
-      toast.error("No Bank-payment employees available to export");
+      toast.error(t("No Bank-payment employees available to export"));
       return;
     }
     setIsGeneratingExport(true);
@@ -645,7 +652,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
         ]);
 
       if (dataRows.length === 0) {
-        toast.error("No payable rows after deducting pinjam");
+        toast.error(t("No payable rows after deducting pinjam"));
         return;
       }
 
@@ -685,10 +692,10 @@ const GTMidMonthPayrollPage: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success("Bank file exported");
+      toast.success(t("Bank file exported"));
     } catch (error) {
       console.error("Error generating GT bank export:", error);
-      toast.error("Failed to generate bank file");
+      toast.error(t("Failed to generate bank file"));
     } finally {
       setIsGeneratingExport(false);
     }
@@ -698,7 +705,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Mid-month Payrolls (Green Target)
+          {t("Mid-month Payrolls (Green Target)")}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -706,27 +713,27 @@ const GTMidMonthPayrollPage: React.FC = () => {
             icon={IconPrinter}
             variant="outline"
             disabled={isGeneratingPDF || payrolls.length === 0}
-            title="Print mid-month report"
+            title={t("Print mid-month report")}
           >
-            Print
+            {t("Print")}
           </Button>
           <Button
             onClick={() => generatePDF("download")}
             icon={IconDownload}
             variant="outline"
             disabled={isGeneratingPDF || payrolls.length === 0}
-            title="Download mid-month report PDF"
+            title={t("Download mid-month report PDF")}
           >
-            Download
+            {t("Download")}
           </Button>
           <Button
             onClick={generateTextExport}
             icon={IconFileText}
             variant="outline"
             disabled={isGeneratingExport || payrolls.length === 0}
-            title="Export Public Bank IBG file (Bank-payment employees)"
+            title={t("Export Public Bank IBG file (Bank-payment employees)")}
           >
-            Bank File
+            {t("Bank File")}
           </Button>
           <Button
             onClick={fetchPayrolls}
@@ -734,7 +741,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             onClick={() => {
@@ -745,7 +752,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add Payroll
+            {t("Add Payroll")}
           </Button>
         </div>
       </div>
@@ -763,10 +770,12 @@ const GTMidMonthPayrollPage: React.FC = () => {
           </div>
           <div className="text-sm text-default-600 dark:text-gray-300">
             <div className="font-medium">
-              Total: {payrolls.length} employees
+              {t("Total: {{total}} employees", { total: payrolls.length })}
             </div>
             <div className="font-medium">
-              Amount: {formatCurrency(totalAmount)}
+              {t("Amount: {{amount}}", {
+                amount: formatCurrency(totalAmount),
+              })}
             </div>
           </div>
         </div>
@@ -796,7 +805,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
                       : ""
                   }`}
                 >
-                  {view}
+                  {t(view)}
                 </button>
               )
             )}
@@ -810,7 +819,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
             </div>
           ) : pinjamReportData.length === 0 ? (
             <div className="text-center py-12 text-default-500 dark:text-gray-400">
-              No mid-month payrolls found.
+              {t("No mid-month payrolls found.")}
             </div>
           ) : (
             <div className="px-6 pt-2 pb-2">
@@ -825,8 +834,8 @@ const GTMidMonthPayrollPage: React.FC = () => {
         ) : payrolls.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No payrolls found</p>
-            <p>Click "Add Payroll" to create mid-month payrolls</p>
+            <p className="text-lg font-medium">{t("No payrolls found")}</p>
+            <p>{t('Click "Add Payroll" to create mid-month payrolls')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -834,25 +843,25 @@ const GTMidMonthPayrollPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee ID
+                    {t("Employee ID")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
+                    {t("Name")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Mid-Month Pinjam
+                    {t("Mid-Month Pinjam")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Payment Method
+                    {t("Payment Method")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Created
+                    {t("Created")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -879,7 +888,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
                         : "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
-                      {payroll.payment_method}
+                      {t(payroll.payment_method)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       {format(new Date(payroll.created_at), "dd MMM yyyy")}
@@ -889,7 +898,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(payroll)}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -899,7 +908,7 @@ const GTMidMonthPayrollPage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -935,9 +944,11 @@ const GTMidMonthPayrollPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeletePayroll}
-        title="Delete Mid-month Payroll"
-        message="Are you sure you want to delete this mid-month payroll? This action cannot be undone."
-        confirmButtonText="Delete"
+        title={t("Delete Mid-month Payroll")}
+        message={t(
+          "Are you sure you want to delete this mid-month payroll? This action cannot be undone."
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

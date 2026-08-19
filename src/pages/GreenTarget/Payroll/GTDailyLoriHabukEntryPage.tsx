@@ -5,6 +5,7 @@
 // Monthly processing reads the saved lines (not live rentals).
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   IconRefresh,
   IconPlus,
@@ -71,6 +72,7 @@ const SOURCE_BADGE: Record<SourceType, string> = {
 };
 
 const GTDailyLoriHabukEntryPage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
   const { detailedMappings } = useJobPayCodeMappings();
 
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -152,7 +154,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
       setEntries(loaded);
     } catch (error) {
       console.error("Error loading daily lori habuk:", error);
-      toast.error("Failed to load Daily Lori Habuk");
+      toast.error(t("Failed to load Daily Lori Habuk"));
     } finally {
       setIsLoading(false);
     }
@@ -266,8 +268,10 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
     if (validLines.length === 0) {
       toast.error(
         entry.saved
-          ? "Add at least one trip with a pay code, or use Clear to remove this driver's saved log."
-          : "Add at least one trip with a pay code before saving."
+          ? t(
+              "Add at least one trip with a pay code, or use Clear to remove this driver's saved log."
+            )
+          : t("Add at least one trip with a pay code before saving.")
       );
       return;
     }
@@ -292,7 +296,9 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
           is_manual: l.is_manual,
         })),
       });
-      toast.success(`Saved ${entry.employee_name}'s trips`);
+      toast.success(
+        t("Saved {{name}}'s trips", { name: entry.employee_name })
+      );
       setEntries((prev) =>
         prev.map((e) =>
           e.employee_id === entry.employee_id
@@ -302,7 +308,9 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
       );
     } catch (error) {
       console.error("Error saving daily lori habuk:", error);
-      toast.error(`Failed to save ${entry.employee_name}'s trips`);
+      toast.error(
+        t("Failed to save {{name}}'s trips", { name: entry.employee_name })
+      );
       setEntries((prev) =>
         prev.map((e) =>
           e.employee_id === entry.employee_id ? { ...e, savingState: false } : e
@@ -320,12 +328,16 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
           clearTarget.employee_id
         )}`
       );
-      toast.success(`Cleared ${clearTarget.employee_name}'s saved log`);
+      toast.success(
+        t("Cleared {{name}}'s saved log", {
+          name: clearTarget.employee_name,
+        })
+      );
       setClearTarget(null);
       await fetchEntries();
     } catch (error) {
       console.error("Error clearing daily lori habuk:", error);
-      toast.error("Failed to clear saved log");
+      toast.error(t("Failed to clear saved log"));
     } finally {
       setIsClearing(false);
     }
@@ -344,7 +356,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Daily Lori Habuk
+          {t("Daily Lori Habuk")}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -353,7 +365,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
         </div>
       </div>
@@ -367,9 +379,10 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
             presets={false}
           />
           <p className="text-xs text-default-500 dark:text-gray-400 max-w-md md:text-right">
-            Trip pay is taken from this saved log during monthly processing.
-            Rentals only prefill the lines below — a driver with no saved log for
-            the month earns base salary only.
+            {t(
+              "Trip pay is taken from this saved log during monthly processing. Rentals only prefill the lines below — a driver with no saved log for the month earns base salary only."
+            )}
+
           </p>
         </div>
       </div>
@@ -381,8 +394,10 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
       ) : entries.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm text-center py-12 text-default-500 dark:text-gray-400">
           <IconTruck className="mx-auto h-12 w-12 text-default-300 mb-4" />
-          <p className="text-lg font-medium">No DRIVER employees found</p>
-          <p>Add DRIVER employees to the GT payroll list first.</p>
+          <p className="text-lg font-medium">
+            {t("No DRIVER employees found")}
+          </p>
+          <p>{t("Add DRIVER employees to the GT payroll list first.")}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -402,16 +417,16 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
                   </h2>
                   {entry.saved ? (
                     <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                      Saved
+                      {t("Saved")}
                     </span>
                   ) : (
                     <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                      Prefilled (not saved)
+                      {t("Prefilled (not saved)")}
                     </span>
                   )}
                   {entry.dirty && (
                     <span className="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                      Unsaved changes
+                      {t("Unsaved changes")}
                     </span>
                   )}
                 </div>
@@ -424,18 +439,22 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
               <div className="px-5 py-3">
                 {entry.lines.length === 0 ? (
                   <p className="text-sm text-default-500 dark:text-gray-400 py-2">
-                    No trips for this day.
+                    {t("No trips for this day.")}
                   </p>
                 ) : (
                   <div>
                     <table className="min-w-full text-sm">
                       <thead>
                         <tr className="text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                          <th className="py-2 pr-3 w-2/5">Pay Code</th>
-                          <th className="py-2 px-3">Source</th>
-                          <th className="py-2 px-3 text-right">Rate</th>
-                          <th className="py-2 px-3 text-right">Qty</th>
-                          <th className="py-2 px-3 text-right">Amount</th>
+                          <th className="py-2 pr-3 w-2/5">
+                            {t("Pay Code")}
+                          </th>
+                          <th className="py-2 px-3">{t("Source")}</th>
+                          <th className="py-2 px-3 text-right">{t("Rate")}</th>
+                          <th className="py-2 px-3 text-right">{t("Qty")}</th>
+                          <th className="py-2 px-3 text-right">
+                            {t("Amount")}
+                          </th>
                           <th className="py-2 pl-3 w-8"></th>
                         </tr>
                       </thead>
@@ -458,7 +477,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
                                 options={payCodeOptions}
                                 query={payCodeQueries[line.key] || ""}
                                 setQuery={setLineQuery(line.key)}
-                                placeholder="Select pay code..."
+                                placeholder={t("Select pay code...")}
                               />
                             </td>
                             <td className="py-2 px-3">
@@ -512,7 +531,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
                                   handleRemoveLine(entry.employee_id, line.key)
                                 }
                                 className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                                title="Remove trip"
+                                title={t("Remove trip")}
                               >
                                 <IconTrash size={16} />
                               </button>
@@ -531,7 +550,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
                     variant="outline"
                     size="sm"
                   >
-                    Add trip
+                    {t("Add trip")}
                   </Button>
                   <div className="flex items-center gap-2">
                     {entry.saved && (
@@ -542,7 +561,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
                         variant="outline"
                         size="sm"
                       >
-                        Clear
+                        {t("Clear")}
                       </Button>
                     )}
                     <Button
@@ -552,7 +571,7 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
                       size="sm"
                       disabled={entry.savingState}
                     >
-                      {entry.savingState ? "Saving..." : "Save"}
+                      {entry.savingState ? t("Saving...") : t("Save")}
                     </Button>
                   </div>
                 </div>
@@ -581,11 +600,15 @@ const GTDailyLoriHabukEntryPage: React.FC = () => {
           if (!isClearing) setClearTarget(null);
         }}
         onConfirm={handleClear}
-        title="Clear saved log"
-        message={`Clear ${
-          clearTarget?.employee_name ?? "this driver"
-        }'s saved trips for ${selectedDate}? The card will revert to the rentals-prefilled suggestion. This cannot be undone.`}
-        confirmButtonText={isClearing ? "Clearing..." : "Clear"}
+        title={t("Clear saved log")}
+        message={t(
+          "Clear {{name}}'s saved trips for {{date}}? The card will revert to the rentals-prefilled suggestion. This cannot be undone.",
+          {
+            name: clearTarget?.employee_name ?? t("this driver"),
+            date: selectedDate,
+          }
+        )}
+        confirmButtonText={isClearing ? t("Clearing...") : t("Clear")}
         variant="danger"
       />
     </div>

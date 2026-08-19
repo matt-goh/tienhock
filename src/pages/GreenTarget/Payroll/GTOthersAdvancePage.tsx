@@ -5,6 +5,7 @@
 // deducted as an advance; net effect ~0). GT has no locations.
 import React, { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconEdit,
@@ -30,7 +31,6 @@ import {
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
-const DISPLAY_LABEL = "Others (Advance)";
 const API_BASE = "/greentarget/api/incentives";
 
 interface Advance {
@@ -46,6 +46,8 @@ interface Advance {
 }
 
 const GTOthersAdvancePage: React.FC = () => {
+  const { t } = useTranslation("greentarget");
+  const displayLabel = t("Others (Advance)");
   const { employees: gtEmployees } = useGTPayrollEmployees();
   const allowedEmployeeIds = useMemo(
     () => gtEmployees.map((e) => e.employee_id),
@@ -127,7 +129,7 @@ const GTOthersAdvancePage: React.FC = () => {
       setAdvances(response || []);
     } catch (error) {
       console.error("Error fetching advances:", error);
-      toast.error(`Failed to load ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to load {{label}}", { label: displayLabel }));
     } finally {
       setIsLoading(false);
     }
@@ -142,13 +144,15 @@ const GTOthersAdvancePage: React.FC = () => {
     if (!deletingId) return;
     try {
       await api.delete(`${API_BASE}/${deletingId}`);
-      toast.success(`${DISPLAY_LABEL} record deleted successfully`);
+      toast.success(
+        t("{{label}} record deleted successfully", { label: displayLabel })
+      );
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchAdvances();
     } catch (error) {
       console.error("Error deleting advance:", error);
-      toast.error(`Failed to delete ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to delete {{label}}", { label: displayLabel }));
     }
   };
 
@@ -198,7 +202,7 @@ const GTOthersAdvancePage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          {DISPLAY_LABEL}
+          {displayLabel}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -215,7 +219,7 @@ const GTOthersAdvancePage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add {DISPLAY_LABEL}
+            {t("Add {{label}}", { label: displayLabel })}
           </Button>
         </div>
       </div>
@@ -284,13 +288,15 @@ const GTOthersAdvancePage: React.FC = () => {
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">
               {searchQuery.trim()
-                ? `No matching ${DISPLAY_LABEL} records`
-                : `No ${DISPLAY_LABEL} records found`}
+                ? t("No matching {{label}} records", { label: displayLabel })
+                : t("No {{label}} records found", { label: displayLabel })}
             </p>
             <p>
               {searchQuery.trim()
-                ? "Try a different search term"
-                : `Click "Add ${DISPLAY_LABEL}" to create records`}
+                ? t("Try a different search term")
+                : t('Click "Add {{label}}" to create records', {
+                    label: displayLabel,
+                  })}
             </p>
           </div>
         ) : (
@@ -377,8 +383,8 @@ const GTOthersAdvancePage: React.FC = () => {
           currentYear={currentYear}
           currentMonth={currentMonth}
           incentiveType="Bonus"
-          displayLabel={DISPLAY_LABEL}
-          displayLabelPlural={DISPLAY_LABEL}
+          displayLabel={displayLabel}
+          displayLabelPlural={displayLabel}
           apiBasePath={API_BASE}
           forceIsAdvance={true}
           allowedEmployeeIds={allowedEmployeeIds}
@@ -393,7 +399,7 @@ const GTOthersAdvancePage: React.FC = () => {
         }}
         onSuccess={fetchAdvances}
         incentive={editingAdvance}
-        displayLabel={DISPLAY_LABEL}
+        displayLabel={displayLabel}
         apiBasePath={API_BASE}
         forceIsAdvance={true}
       />
@@ -405,9 +411,12 @@ const GTOthersAdvancePage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDelete}
-        title={`Delete ${DISPLAY_LABEL}`}
-        message={`Are you sure you want to delete this ${DISPLAY_LABEL} record? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete {{label}}", { label: displayLabel })}
+        message={t(
+          "Are you sure you want to delete this {{label}} record? This action cannot be undone.",
+          { label: displayLabel }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>
