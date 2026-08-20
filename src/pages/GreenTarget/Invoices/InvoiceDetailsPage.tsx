@@ -2277,6 +2277,18 @@ const InvoiceDetailsPage: React.FC = () => {
             {invoice.status !== "cancelled" && (
               <>
                 <Button
+                  onClick={(): void =>
+                    navigate(`/greentarget/invoices/${invoice.invoice_id}/edit`)
+                  }
+                  icon={IconPencil}
+                  variant="outline"
+                  color="sky"
+                  className="flex-1 sm:flex-none"
+                  title={t("Edit Invoice")}
+                >
+                  {t("Edit")}
+                </Button>
+                <Button
                   onClick={() =>
                     navigate(
                       `/greentarget/adjustment-docs/new?type=debit&invoiceId=${invoice.invoice_id}`
