@@ -20,6 +20,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-20",
+    ms: "Senarai Penghutang Green Target bagi Julai 2026 kini mengikut angka audit: CD-CASH RM16,054.00, CD-DURA RM1,100.00, CD-LIST RM16,440.00 dan CD-SITI -RM10.00. Penyata Dura Foam kini membawa baki RM900.00 tanpa tanda negatif dan menutup pada RM1,100.00; jumlah ringkasan CD_SD kekal RM83,730.40.",
+    en: "The Green Target Debtor List for July 2026 now follows the audited figures: CD-CASH RM16,054.00, CD-DURA RM1,100.00, CD-LIST RM16,440.00 and CD-SITI -RM10.00. Dura Foam's statement now brings forward RM900.00 without a negative sign and closes at RM1,100.00; the CD_SD summary total remains RM83,730.40.",
+  },
+  {
+    date: "2026-08-20",
+    ms: "Invois Green Target: halaman butiran invois kini mempunyai butang Edit yang jelas untuk membuka borang penuh. Untuk invois dalam tempoh perakaunan yang boleh diedit, anda boleh pergi ke bahagian Accounting dan membetulkan peruntukan hasil TGA, TGB atau WS_OTH tanpa memadam dan membuat semula invois, selagi invois tidak mempunyai sejarah Credit Note, Debit Note atau Refund Note dan jurnalnya belum diedit secara manual.",
+    en: "Green Target invoices: the invoice details page now has a clear Edit button that opens the full form. For invoices in an editable accounting period, you can go to Accounting and correct the TGA, TGB or WS_OTH revenue allocation without deleting and recreating the invoice, provided the invoice has no Credit Note, Debit Note or Refund Note history and its journal has not been manually edited.",
+  },
+  {
+    date: "2026-08-20",
+    ms: "Bayaran invois Tien Hock: kumpulan bayaran cek yang masih belum selesai kini boleh dipinda tanpa dibatalkan terlebih dahulu, termasuk apabila pembatalan tidak dibenarkan kerana invois mempunyai Nota Kredit aktif. Kaedah boleh ditukar kepada Online atau Pindahan Bank dan amaun setiap invois boleh dibetulkan; pertukaran kaedah akan merekodkan bayaran serta-merta pada tarikh diterima dan mengemas kini baki invois. Invois yang hanya diliputi sebahagian oleh cek belum dijelaskan juga kekal tersedia untuk baki yang belum diliputi, dan borang memaparkan amaun yang masih boleh dibayar dengan betul.",
+    en: "Tien Hock invoice payments: a pending cheque payment group can now be amended without cancelling it first, including when cancellation is unavailable because an invoice has an active credit note. Change the method to Online or Bank Transfer and correct each invoice's amount; changing the method records the payment immediately on its received date and updates the invoice balances. An invoice only partly covered by a pending cheque also remains available for its uncovered balance, and the form now shows the amount still available to pay.",
+  },
+  {
     date: "2026-08-19",
     ms: "Green Target dan Jelly Polly: halaman CP8D kini tersedia untuk kedua-dua syarikat (Payroll → CP8D) — pra-isi setahun daripada payroll syarikat masing-masing, laraskan butiran setiap pekerja, kemudian muat turun fail TXT untuk hantaran e-CP8D. Nombor E majikan diambil daripada tetapan e-Caruman syarikat; isikannya di halaman e-Caruman dahulu sebelum eksport.",
     en: "Green Target and Jelly Polly: the CP8D page is now available for both companies (Payroll → CP8D) — prefill a year from each company's own payroll, adjust each employee's particulars, then download the TXT file for e-CP8D submission. The employer E number is taken from the company's e-Caruman settings; key it in on the e-Caruman page before exporting.",
