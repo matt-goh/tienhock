@@ -2714,6 +2714,35 @@ only: no data, endpoint or behaviour changed, so this carries no changelog entry
 `src/pages/GreenTarget/Rentals/RentalFormPage.tsx`. The 13 handover scenarios remain for manual
 verification; no build, TypeScript, lint or database mutation was run during this implementation.
 
+#### July debtor-list audit correction (20 Aug 2026; ✅ DEV, production pending)
+
+The user-confirmed annotated `statement.pdf` (SHA-256
+`15a83afe4617366cdeeeb03befa6d81cc13f6e32bc9bc4aa8dfdc939a4cb4a0`) corrects the July closing
+figures to CD-CASH RM16,054.00, CD-DURA RM1,100.00, CD-LIST RM16,440.00 and CD-SITI -RM10.00.
+Those four changes net to +RM1,860.00, exactly the former unnamed closing residual, so the named
+schedule and unchanged `CD_SD` control now both close at RM83,730.40.
+
+The correction follows the underlying evidence rather than altering PDF formatting:
+
+1. May/June snapshot closes move by +RM220.00 for CASH, +RM1,800.00 for DURA, -RM220.00 for LIST
+   and +RM60.00 for SITI; the synthetic unallocated close moves from RM1,860.00 to zero in both
+   months. Every movement remains unchanged, including the separate -RM160.00 May movement residual.
+2. No July invoice, receipt or journal changes. This preserves the unmarked THIS MONTH figures on the
+   annotated report: CASH RM920.00, DURA RM200.00, LIST RM2,630.00 and SITI RM0.00.
+3. Dura's July account statement now starts at +RM900.00, applies invoice `2026/01097` DR RM200.00,
+   and closes at +RM1,100.00; no minus sign is hidden cosmetically.
+4. The consolidated 1-Jul `CD_SD` anchor remains RM65,705.40. Only its stale explanatory note was
+   updated to reflect that the full close is now assigned to named identities.
+
+Migration: `dev/migrations/2026-08-20_greentarget_july_debtor_audit_correction.sql`. It is
+serializable, guarded, idempotent and fail-closed; the second dev run was a no-op. Direct calls to the
+live report builders confirmed the four target rows with their unchanged July movements,
+RM83,730.40 visible/control totals, zero July reconciliation residual, and Dura's
++RM900.00/+RM1,100.00 opening/closing. The focused verifier now
+applies the explicit audit overlay while retaining the original hash-pinned CSV as source evidence.
+Its full wrapper could not run in this checkout because the gitignored `GT_TRADE_DEBTORS.pdf` source
+scan is absent; both edited `.mjs` files passed `node --check`.
+
 ---
 
 *Update this file with a per-phase execution record as phases complete. Entry point for all

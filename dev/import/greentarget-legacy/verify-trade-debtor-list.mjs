@@ -23,6 +23,8 @@ const CHILD_FIXTURE = path.join(HERE, "cd_sd_subledger_evidence.csv");
 const DEBTOR_MAP = path.join(HERE, "debtor-map.json");
 const SOURCE_SHA256 =
   "fe0b5989e73d11aa7dcfe0b062b4fec0405beefc79b2ad1d18322d52a80a29d0";
+const USER_AUDIT_SHA256 =
+  "15a83afe4617366cdeeeb03befa6d81cc13f6e32bc9bc4aa8dfdc939a4cb4a0";
 const SOURCE_ONLY = process.argv.includes("--source-only");
 const POST_CUTOVER_CODES = new Set([
   "CD-ZEXIE",
@@ -43,6 +45,24 @@ const MOVEMENT_ONLY_CHILDREN = new Set([
   "CD-VOR",
   "CD-WTW",
   "FOREGAL",
+]);
+const USER_CONFIRMED_JUNE_CLOSE_CENTS = new Map([
+  ["CD-CASH", 1_513_400],
+  ["CD-DURA", 90_000],
+  ["CD-LIST", 1_381_000],
+  ["CD-SITI", -1_000],
+]);
+const USER_CONFIRMED_JULY_CLOSE_CENTS = new Map([
+  ["CD-CASH", 1_605_400],
+  ["CD-DURA", 110_000],
+  ["CD-LIST", 1_644_000],
+  ["CD-SITI", -1_000],
+]);
+const USER_CONFIRMED_JULY_MOVEMENT_CENTS = new Map([
+  ["CD-CASH", 92_000],
+  ["CD-DURA", 20_000],
+  ["CD-LIST", 263_000],
+  ["CD-SITI", 0],
 ]);
 
 const pool = createDatabasePool({
@@ -190,20 +210,23 @@ async function main() {
 
   const childMismatchIndex = fixture.findIndex((expected, index) => {
     const actual = full.cd_sd.rows[index];
+    const expectedClosingCents =
+      USER_CONFIRMED_JUNE_CLOSE_CENTS.get(expected.account_code) ??
+      cents(expected.closing_2026_06_30);
     return !(
       actual &&
       actual.account_no === expected.account_code &&
       actual.particular === expected.account_description &&
       actual.source_page === Number(expected.source_page) &&
       actual.source_row === Number(expected.source_row) &&
-      cents(actual.closing_balance) === cents(expected.closing_2026_06_30) &&
+      cents(actual.closing_balance) === expectedClosingCents &&
       cents(actual.current_month) === cents(expected.june_2026_movement) &&
       cents(actual.previous_month) === cents(expected.may_2026_movement)
     );
   });
   assert(
     childMismatchIndex === -1,
-    `all 746 child identities/order/amounts match the source${
+    `all 746 child identities/order/movements match the source, with the user-confirmed close overlay (${USER_AUDIT_SHA256})${
       childMismatchIndex === -1 ? "" : ` (first mismatch row ${childMismatchIndex + 1})`
     }`
   );
@@ -214,7 +237,7 @@ async function main() {
   assert(cents(directTotals.previous_month) === -663_060, "direct May movement is -RM6,630.60");
 
   const visibleTotals = full.cd_sd.visible_totals;
-  assert(cents(visibleTotals.closing_balance) === 6_384_540, "visible child close is RM63,845.40");
+  assert(cents(visibleTotals.closing_balance) === 6_570_540, "visible child close is RM65,705.40");
   assert(cents(visibleTotals.current_month) === -74_000, "visible child June movement is -RM740.00");
   assert(cents(visibleTotals.previous_month) === -535_000, "visible child May movement is -RM5,350.00");
 
@@ -224,7 +247,7 @@ async function main() {
   assert(cents(controlTotals.previous_month) === -551_000, "CD_SD control May movement is -RM5,510.00");
 
   const residual = full.cd_sd.reconciliation_residual;
-  assert(cents(residual.closing_balance) === 186_000, "residual close is RM1,860.00");
+  assert(cents(residual.closing_balance) === 0, "residual close is RM0.00");
   assert(cents(residual.current_month) === 0, "residual June movement is RM0.00");
   assert(cents(residual.previous_month) === -16_000, "residual May movement is -RM160.00");
   assert(
@@ -250,6 +273,24 @@ async function main() {
         row.account_no === "CD_SD (UNALLOCATED)"
     ),
     "July child rows exclude both control and reconciliation identities"
+  );
+  for (const [accountCode, expectedCloseCents] of USER_CONFIRMED_JULY_CLOSE_CENTS) {
+    const row = july.cd_sd.rows.find((candidate) => candidate.account_no === accountCode);
+    assert(
+      row &&
+        cents(row.closing_balance) === expectedCloseCents &&
+        cents(row.current_month) ===
+          USER_CONFIRMED_JULY_MOVEMENT_CENTS.get(accountCode),
+      `${accountCode} July close matches the user-confirmed audit while movement stays unchanged`
+    );
+  }
+  assert(
+    cents(july.cd_sd.visible_totals.closing_balance) === 8_373_040,
+    "July visible child close is RM83,730.40"
+  );
+  assert(
+    cents(july.cd_sd.reconciliation_residual.closing_balance) === 0,
+    "July closing reconciliation residual is RM0.00"
   );
   assert(
     cents(july.cd_sd.reconciliation_residual.current_month) === 0,
