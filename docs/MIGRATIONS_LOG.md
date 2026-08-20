@@ -30,6 +30,16 @@ requires separate approval).
 
 ---
 
+## Applied 20 Aug 2026 — 1 file (Green Target July debtor audit correction)
+
+Applied to production and dev on 2026-08-20 (same script on both), then kept in
+`dev/migrations/` for now — the file is committed at `e8ce67ba` and not yet removed. Once
+removed, recover with `git show e8ce67ba:dev/migrations/2026-08-20_greentarget_july_debtor_audit_correction.sql`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-20_greentarget_july_debtor_audit_correction.sql` | Green Target July 2026 debtor audit correction from the user-approved annotated `statement.pdf` (SHA-256 `15a83afe…`). The pencil annotations correct only the **YEAR-TO-DATE** column of the carried May/June `debtor_subledger_snapshots`: CD-CASH 16,054.00 (was 15,834.00), CD-DURA 1,100.00 (was -700.00), CD-LIST 16,440.00 (was 16,660.00), CD-SITI -10.00 (was -70.00). July movements stay exactly as printed (CD-CASH 920.00, CD-DURA 200.00, CD-LIST 2,630.00, CD-SITI 0.00) and no invoice or journal changes. The four deltas net to +RM1,860.00, exactly allocating the former `CD_SD (UNALLOCATED)` closing residual (1,860.00 → 0.00) while preserving each month's control total; the `CD_SD` 2026-07-01 opening anchor stays RM65,705.40 (note text updated). Updates 10 snapshot rows (5 May + 5 June) and one anchor note. Guarded, idempotent, fail-closed; the verifier re-checks May/June row/close/movement totals (747 rows; 66,445.40 / 65,705.40 closes; -5,510.00 / -740.00 movements), May→June roll-forwards, the four handwritten July closes against unchanged July movement, and the CD_SD control (July movement 18,025.00, close 83,730.40). | dev ✓ (2026-08-20), prod ✓ (2026-08-20) |
+
 ## Removed 19 Aug 2026 — 1 file (PBE041/01 workers' PCB reclassification)
 
 Applied to production and dev on 2026-08-19, then removed per the project convention. The script
