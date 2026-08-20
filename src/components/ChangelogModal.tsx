@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-20",
+    ms: "Senarai Penghutang Green Target bagi Julai 2026 kini mengikut angka audit: CD-CASH RM16,054.00, CD-DURA RM1,100.00, CD-LIST RM16,440.00 dan CD-SITI -RM10.00. Penyata Dura Foam kini membawa baki RM900.00 tanpa tanda negatif dan menutup pada RM1,100.00; jumlah ringkasan CD_SD kekal RM83,730.40.",
+    en: "The Green Target Debtor List for July 2026 now follows the audited figures: CD-CASH RM16,054.00, CD-DURA RM1,100.00, CD-LIST RM16,440.00 and CD-SITI -RM10.00. Dura Foam's statement now brings forward RM900.00 without a negative sign and closes at RM1,100.00; the CD_SD summary total remains RM83,730.40.",
+  },
+  {
+    date: "2026-08-20",
     ms: "Invois Green Target: halaman butiran invois kini mempunyai butang Edit yang jelas untuk membuka borang penuh. Untuk invois dalam tempoh perakaunan yang boleh diedit, anda boleh pergi ke bahagian Accounting dan membetulkan peruntukan hasil TGA, TGB atau WS_OTH tanpa memadam dan membuat semula invois, selagi invois tidak mempunyai sejarah Credit Note, Debit Note atau Refund Note dan jurnalnya belum diedit secara manual.",
     en: "Green Target invoices: the invoice details page now has a clear Edit button that opens the full form. For invoices in an editable accounting period, you can go to Accounting and correct the TGA, TGB or WS_OTH revenue allocation without deleting and recreating the invoice, provided the invoice has no Credit Note, Debit Note or Refund Note history and its journal has not been manually edited.",
   },
