@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-20",
+    ms: "Invois Green Target: halaman butiran invois kini mempunyai butang Edit yang jelas untuk membuka borang penuh. Untuk invois dalam tempoh perakaunan yang boleh diedit, anda boleh pergi ke bahagian Accounting dan membetulkan peruntukan hasil TGA, TGB atau WS_OTH tanpa memadam dan membuat semula invois, selagi invois tidak mempunyai sejarah Credit Note, Debit Note atau Refund Note dan jurnalnya belum diedit secara manual.",
+    en: "Green Target invoices: the invoice details page now has a clear Edit button that opens the full form. For invoices in an editable accounting period, you can go to Accounting and correct the TGA, TGB or WS_OTH revenue allocation without deleting and recreating the invoice, provided the invoice has no Credit Note, Debit Note or Refund Note history and its journal has not been manually edited.",
+  },
+  {
+    date: "2026-08-20",
     ms: "Bayaran invois Tien Hock: kumpulan bayaran cek yang masih belum selesai kini boleh dipinda tanpa dibatalkan terlebih dahulu, termasuk apabila pembatalan tidak dibenarkan kerana invois mempunyai Nota Kredit aktif. Kaedah boleh ditukar kepada Online atau Pindahan Bank dan amaun setiap invois boleh dibetulkan; pertukaran kaedah akan merekodkan bayaran serta-merta pada tarikh diterima dan mengemas kini baki invois. Invois yang hanya diliputi sebahagian oleh cek belum dijelaskan juga kekal tersedia untuk baki yang belum diliputi, dan borang memaparkan amaun yang masih boleh dibayar dengan betul.",
     en: "Tien Hock invoice payments: a pending cheque payment group can now be amended without cancelling it first, including when cancellation is unavailable because an invoice has an active credit note. Change the method to Online or Bank Transfer and correct each invoice's amount; changing the method records the payment immediately on its received date and updates the invoice balances. An invoice only partly covered by a pending cheque also remains available for its uncovered balance, and the form now shows the amount still available to pay.",
   },
