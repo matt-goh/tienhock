@@ -12,6 +12,7 @@ import {
   getReceiptGroup,
   updateReceiptReference,
   updateReceiptDate,
+  amendPendingReceiptGroup,
 } from "../accounting/receipt-service.js";
 import { applyOverpayment } from "../accounting/overpayment-apply.js";
 
@@ -330,6 +331,39 @@ export default function (pool) {
       res.status(error.status || 400).json({
         code: error.code,
         message: error.message || "Error updating receipt date",
+      });
+    } finally {
+      client.release();
+    }
+  });
+
+  // --- PATCH /api/receipts/:id/group ---
+  // Correct an entirely pending cheque group before it posts. Amounts are
+  // keyed per allocation so changing one invoice never redistributes another
+  // invoice's payment. Switching to online/bank transfer posts immediately.
+  router.patch("/:id/group", async (req, res) => {
+    const receiptId = parseInt(req.params.id, 10);
+    if (!Number.isInteger(receiptId) || receiptId <= 0) {
+      return res.status(400).json({ message: "Invalid payment group" });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await amendPendingReceiptGroup(
+        client,
+        receiptId,
+        req.body,
+        req.user?.id || null
+      );
+      await client.query("COMMIT");
+      res.json({ message: "Pending payment group amended", ...result });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error amending pending payment group:", error);
+      res.status(error.status || 400).json({
+        code: error.code,
+        message: error.message || "Error amending pending payment group",
       });
     } finally {
       client.release();

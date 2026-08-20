@@ -531,9 +531,12 @@ const InvoiceDetailsPage: React.FC = () => {
 
       setInvoiceData(invoice);
       // Pre-fill payment amount based on fetched balance
+      const settleableAmount: number = Number(
+        invoice.settleable_amount ?? invoice.balance_due
+      );
       setPaymentFormData((prev) => ({
         ...prev,
-        amount_paid: invoice.balance_due > 0 ? invoice.balance_due : 0, // Ensure non-negative
+        amount_paid: settleableAmount > 0 ? settleableAmount : 0,
       }));
       setPayments(payments);
       setAdjustmentDocs(adjustmentDocs);
@@ -1405,7 +1408,9 @@ const InvoiceDetailsPage: React.FC = () => {
     if (!validatePaymentForm() || !invoiceData || isProcessingPayment) return;
 
     const paymentAmount = paymentFormData.amount_paid;
-    const currentBalance = invoiceData.balance_due;
+    const currentBalance: number = Number(
+      invoiceData.settleable_amount ?? invoiceData.balance_due
+    );
 
     // Check for overpayment
     if (paymentAmount > currentBalance && currentBalance > 0) {
@@ -3299,6 +3304,9 @@ const InvoiceDetailsPage: React.FC = () => {
           await fetchDetails();
         }}
         onDateUpdated={async (): Promise<void> => {
+          await fetchDetails();
+        }}
+        onAmended={async (): Promise<void> => {
           await fetchDetails();
         }}
       />

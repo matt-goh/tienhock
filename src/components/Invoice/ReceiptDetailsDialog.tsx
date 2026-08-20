@@ -25,10 +25,20 @@ import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
 import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
+import PillSelect, { type PillSelectOption } from "../PillSelect";
 import TimeNavigator, { type TimeRange } from "../TimeNavigator";
 
 type PaymentGroupStatus = "pending" | "posted" | "mixed" | "cancelled";
 type ReceiptAllocationType = "invoice" | "excess" | "account";
+type AmendablePaymentMethod = "cheque" | "bank_transfer" | "online";
+
+const AMENDABLE_PAYMENT_METHOD_OPTIONS: ReadonlyArray<
+  PillSelectOption<AmendablePaymentMethod>
+> = [
+  { value: "cheque", label: "Cheque" },
+  { value: "bank_transfer", label: "Bank Transfer" },
+  { value: "online", label: "Online" },
+];
 
 // Default the clearance date to today, or to the received date when the cheque
 // was post-dated — the server rejects a clearance earlier than the received
@@ -105,6 +115,13 @@ interface ReceiptReferenceUpdateResponse {
   updated_payment_count: number;
 }
 
+interface ReceiptAmendmentResponse {
+  payment_group: PaymentGroupDetails;
+  amended_receipt_count: number;
+  amended_payment_count: number;
+  posted_receipt_count: number;
+}
+
 interface ReceiptDetailsDialogProps {
   receiptId: number | null;
   isOpen: boolean;
@@ -113,6 +130,7 @@ interface ReceiptDetailsDialogProps {
   onCancelled: () => void | Promise<void>;
   onReferenceUpdated: () => void | Promise<void>;
   onDateUpdated: () => void | Promise<void>;
+  onAmended: () => void | Promise<void>;
 }
 
 const formatCurrency = (amount: number | string): string => {
@@ -215,6 +233,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   onCancelled,
   onReferenceUpdated,
   onDateUpdated,
+  onAmended,
 }) => {
   const { t } = useTranslation("invoice");
   const [paymentGroup, setPaymentGroup] =
@@ -242,6 +261,16 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   );
   const [isSavingDate, setIsSavingDate] = useState<boolean>(false);
   const [dateError, setDateError] = useState<string | null>(null);
+  const [isAmendDialogOpen, setIsAmendDialogOpen] =
+    useState<boolean>(false);
+  const [amendmentMethod, setAmendmentMethod] =
+    useState<AmendablePaymentMethod>("cheque");
+  const [amendmentAmounts, setAmendmentAmounts] = useState<
+    Record<number, string>
+  >({});
+  const [isSavingAmendment, setIsSavingAmendment] =
+    useState<boolean>(false);
+  const [amendmentError, setAmendmentError] = useState<string | null>(null);
 
   const invoiceAllocations: ReceiptAllocation[] = useMemo(
     (): ReceiptAllocation[] =>
@@ -278,6 +307,24 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       ["cash", "cheque", "bank_transfer", "online"].includes(
         paymentGroup.payment_method
       )
+  );
+  const canAmendGroup: boolean = Boolean(
+    paymentGroup &&
+      paymentGroup.status === "pending" &&
+      paymentGroup.origin === "erp" &&
+      paymentGroup.payment_method === "cheque" &&
+      paymentGroup.allocations.length > 0
+  );
+  const amendmentTotal: number = useMemo(
+    (): number =>
+      paymentGroup?.allocations.reduce(
+        (total: number, allocation: ReceiptAllocation): number => {
+          const amount: number = Number(amendmentAmounts[allocation.id]);
+          return total + (Number.isFinite(amount) ? amount : 0);
+        },
+        0
+      ) ?? 0,
+    [amendmentAmounts, paymentGroup]
   );
 
   const loadPaymentGroup = useCallback(async (): Promise<void> => {
@@ -365,6 +412,11 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       setDateRange(createClearanceRange());
       setIsSavingDate(false);
       setDateError(null);
+      setIsAmendDialogOpen(false);
+      setAmendmentMethod("cheque");
+      setAmendmentAmounts({});
+      setIsSavingAmendment(false);
+      setAmendmentError(null);
     }
   }, [isOpen]);
 
@@ -377,6 +429,11 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     setDateRange(createClearanceRange());
     setIsSavingDate(false);
     setDateError(null);
+    setIsAmendDialogOpen(false);
+    setAmendmentMethod("cheque");
+    setAmendmentAmounts({});
+    setIsSavingAmendment(false);
+    setAmendmentError(null);
   }, [receiptId]);
 
   const handleClose = (): void => {
@@ -384,7 +441,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       !isCancelling &&
       !isConfirming &&
       !isSavingReference &&
-      !isSavingDate
+      !isSavingDate &&
+      !isSavingAmendment
     ) {
       setIsCancelConfirmationOpen(false);
       setIsConfirmConfirmationOpen(false);
@@ -394,6 +452,128 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       setIsSavingDate(false);
       setDateError(null);
       onClose();
+    }
+  };
+
+  const handleStartAmendment = (): void => {
+    if (!paymentGroup || !canAmendGroup || isSavingAmendment) return;
+
+    const initialAmounts: Record<number, string> = {};
+    for (const allocation of paymentGroup.allocations) {
+      initialAmounts[allocation.id] = Number(allocation.amount).toFixed(2);
+    }
+    setAmendmentMethod("cheque");
+    setAmendmentAmounts(initialAmounts);
+    setAmendmentError(null);
+    setIsAmendDialogOpen(true);
+  };
+
+  const handleCloseAmendment = (): void => {
+    if (isSavingAmendment) return;
+    setIsAmendDialogOpen(false);
+    setAmendmentError(null);
+  };
+
+  const handleSaveAmendment = async (): Promise<void> => {
+    if (
+      !paymentGroup ||
+      receiptId === null ||
+      !canAmendGroup ||
+      isSavingAmendment
+    ) {
+      return;
+    }
+
+    const nextAllocations: Array<{
+      id: number;
+      expected_amount: number;
+      amount: number;
+    }> = [];
+
+    for (const allocation of paymentGroup.allocations) {
+      const rawAmount: string = (amendmentAmounts[allocation.id] || "").trim();
+      const amount: number = Number(rawAmount);
+      if (
+        !/^\d+(?:\.\d{1,2})?$/.test(rawAmount) ||
+        !Number.isFinite(amount) ||
+        amount <= 0
+      ) {
+        setAmendmentError(
+          t(
+            "Enter a positive amount with no more than two decimal places for {{item}}.",
+            { item: getAllocationTitle(allocation, t) }
+          )
+        );
+        return;
+      }
+
+      nextAllocations.push({
+        id: allocation.id,
+        expected_amount: Number(allocation.amount),
+        amount,
+      });
+    }
+
+    const methodChanged: boolean =
+      amendmentMethod !== paymentGroup.payment_method;
+    const amountChanged: boolean = nextAllocations.some(
+      (allocation): boolean => {
+        const currentAllocation: ReceiptAllocation | undefined =
+          paymentGroup.allocations.find(
+            (candidate: ReceiptAllocation): boolean =>
+              candidate.id === allocation.id
+          );
+        return (
+          currentAllocation !== undefined &&
+          Math.abs(allocation.amount - Number(currentAllocation.amount)) > 0.0001
+        );
+      }
+    );
+
+    if (!methodChanged && !amountChanged) {
+      handleCloseAmendment();
+      return;
+    }
+
+    setIsSavingAmendment(true);
+    setAmendmentError(null);
+    try {
+      const response: ReceiptAmendmentResponse =
+        await api.patch<ReceiptAmendmentResponse>(
+          `/api/receipts/${receiptId}/group`,
+          {
+            expected_reference: paymentGroup.display_reference,
+            expected_received_date: format(
+              new Date(paymentGroup.received_date),
+              "yyyy-MM-dd"
+            ),
+            expected_payment_method: paymentGroup.payment_method,
+            expected_debit_account: paymentGroup.debit_account,
+            payment_method: amendmentMethod,
+            allocations: nextAllocations,
+          }
+        );
+      setPaymentGroup(response.payment_group);
+      setIsAmendDialogOpen(false);
+      toast.success(t("Payment amended successfully."));
+    } catch (error: unknown) {
+      console.error("Error amending receipt group:", error);
+      setAmendmentError(
+        getErrorMessage(
+          error,
+          t("We couldn't amend this payment. Nothing was changed.")
+        )
+      );
+      setIsSavingAmendment(false);
+      return;
+    }
+
+    try {
+      await onAmended();
+    } catch (error: unknown) {
+      console.error("Error refreshing payments after amendment:", error);
+    } finally {
+      setIsSavingAmendment(false);
     }
   };
 
@@ -788,7 +968,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                 leaveFrom="opacity-100 scale-100"
                 leaveTo="opacity-0 scale-95"
               >
-                <DialogPanel className="my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-3xl transform flex-col overflow-hidden rounded-2xl border border-default-200 bg-white text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
+                <DialogPanel className="my-auto flex max-h-[calc(100vh-3rem)] w-full max-w-4xl transform flex-col overflow-hidden rounded-2xl border border-default-200 bg-white text-left align-middle shadow-xl ring-1 ring-black/5 transition-all dark:border-gray-700 dark:bg-gray-800 dark:shadow-black/40 dark:ring-white/10">
                   <div className="flex items-start justify-between gap-3 border-b border-default-200 bg-default-50 px-5 py-4 dark:border-gray-700 dark:bg-gray-900/60">
                     <div className="flex min-w-0 items-center gap-2.5">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300">
@@ -817,7 +997,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                         isCancelling ||
                         isConfirming ||
                         isSavingReference ||
-                        isSavingDate
+                        isSavingDate ||
+                        isSavingAmendment
                       }
                       className="rounded-lg p-1 text-default-400 transition-colors hover:bg-default-100 hover:text-default-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                       aria-label={t("Close payment group details")}
@@ -937,7 +1118,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                                   disabled={
                                     isConfirming ||
                                     isSavingReference ||
-                                    isSavingDate
+                                    isSavingDate ||
+                                    isSavingAmendment
                                   }
                                   className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-sky-600 hover:bg-sky-50 hover:text-sky-800 disabled:cursor-not-allowed disabled:opacity-50 dark:text-sky-400 dark:hover:bg-sky-900/30 dark:hover:text-sky-300"
                                   title={t("Correct payment date")}
@@ -1176,12 +1358,34 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           isCancelling ||
                           isConfirming ||
                           isSavingReference ||
-                          isSavingDate
+                          isSavingDate ||
+                          isSavingAmendment
                         }
                         className="flex-1 sm:flex-none"
                       >
                         {t("close", { ns: "common" })}
                       </Button>
+                      {canAmendGroup && (
+                        <Button
+                          type="button"
+                          color="sky"
+                          variant="outline"
+                          size="sm"
+                          icon={IconPencil}
+                          onClick={handleStartAmendment}
+                          className="flex-1 sm:flex-none"
+                          disabled={
+                            isLoading ||
+                            isCancelling ||
+                            isConfirming ||
+                            isSavingReference ||
+                            isSavingDate ||
+                            isSavingAmendment
+                          }
+                        >
+                          {t("Amend Payment")}
+                        </Button>
+                      )}
                       {canConfirmGroup && (
                         <Button
                           type="button"
@@ -1201,7 +1405,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                             isCancelling ||
                             isConfirming ||
                             isSavingReference ||
-                            isSavingDate
+                            isSavingDate ||
+                            isSavingAmendment
                           }
                         >
                           {isConfirming
@@ -1224,7 +1429,8 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           isCancelling ||
                           isConfirming ||
                           isSavingReference ||
-                          isSavingDate
+                          isSavingDate ||
+                          isSavingAmendment
                         }
                       >
                         {isCancelling
@@ -1322,6 +1528,140 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         variant="success"
         allowContentOverflow
         isConfirming={isSavingDate}
+      />
+
+      <ConfirmationDialog
+        isOpen={isAmendDialogOpen}
+        onClose={handleCloseAmendment}
+        onConfirm={() => void handleSaveAmendment()}
+        title={t("Amend pending payment {{reference}}", {
+          reference: paymentGroup?.display_reference || "",
+        })}
+        message={
+          <div className="space-y-4">
+            <p>
+              {t(
+                "Edit the method and amount for each invoice before this pending payment is posted."
+              )}
+            </p>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-default-700 dark:text-gray-300">
+                {t("Payment Method")}
+              </label>
+              <PillSelect<AmendablePaymentMethod>
+                value={amendmentMethod}
+                onChange={(value: AmendablePaymentMethod): void => {
+                  setAmendmentMethod(value);
+                  setAmendmentError(null);
+                }}
+                options={AMENDABLE_PAYMENT_METHOD_OPTIONS.map(
+                  (
+                    option: PillSelectOption<AmendablePaymentMethod>
+                  ): PillSelectOption<AmendablePaymentMethod> => ({
+                    ...option,
+                    label: t(option.label),
+                  })
+                )}
+                disabled={isSavingAmendment}
+                ariaLabel={t("Payment method")}
+                size="md"
+              />
+            </div>
+
+            <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+              {paymentGroup?.allocations.map(
+                (allocation: ReceiptAllocation): React.ReactNode => (
+                  <label
+                    key={allocation.id}
+                    htmlFor={`amendment-amount-${allocation.id}`}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-default-200 bg-default-50 p-3 dark:border-gray-700 dark:bg-gray-900/50"
+                  >
+                    <span className="min-w-0 text-sm font-medium text-default-700 dark:text-gray-200">
+                      {getAllocationTitle(allocation, t)}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <span className="text-sm text-default-500 dark:text-gray-400">
+                        RM
+                      </span>
+                      <input
+                        id={`amendment-amount-${allocation.id}`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        value={amendmentAmounts[allocation.id] ?? ""}
+                        onChange={(
+                          event: React.ChangeEvent<HTMLInputElement>
+                        ): void => {
+                          setAmendmentAmounts(
+                            (currentAmounts: Record<number, string>): Record<
+                              number,
+                              string
+                            > => ({
+                              ...currentAmounts,
+                              [allocation.id]: event.target.value,
+                            })
+                          );
+                          setAmendmentError(null);
+                        }}
+                        disabled={isSavingAmendment}
+                        aria-label={t("Payment amount for {{item}}", {
+                          item: getAllocationTitle(allocation, t),
+                        })}
+                        className="h-9 w-28 rounded-lg border border-default-300 bg-white px-3 text-right text-sm font-semibold text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+                      />
+                    </span>
+                  </label>
+                )
+              )}
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg bg-sky-50 px-3 py-2 text-sky-900 dark:bg-sky-900/30 dark:text-sky-100">
+              <span className="text-sm font-medium">{t("New total")}</span>
+              <span className="text-sm font-semibold">
+                {formatCurrency(amendmentTotal)}
+              </span>
+            </div>
+
+            {amendmentMethod === "cheque" ? (
+              <p className="text-xs text-default-500 dark:text-gray-400">
+                {t(
+                  "The amended amounts will remain pending until the cheque is confirmed."
+                )}
+              </p>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                {t(
+                  "Changing this cheque to {{method}} will post every payment in this group immediately on {{date}}. The existing bank account will be kept.",
+                  {
+                    method: t(formatPaymentMethod(amendmentMethod)),
+                    date: formatReceiptDate(
+                      paymentGroup?.received_date || null,
+                      t
+                    ),
+                  }
+                )}
+              </div>
+            )}
+
+            {amendmentError && (
+              <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-900/30 dark:text-rose-300">
+                {amendmentError}
+              </div>
+            )}
+          </div>
+        }
+        confirmButtonText={
+          isSavingAmendment
+            ? t("Saving...")
+            : amendmentMethod === "cheque"
+            ? t("Save Changes", { ns: "common" })
+            : t("Save and Post Payment")
+        }
+        variant="default"
+        allowContentOverflow
+        isConfirming={isSavingAmendment}
       />
 
       <ConfirmationDialog
