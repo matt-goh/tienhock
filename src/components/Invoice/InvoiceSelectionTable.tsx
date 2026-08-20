@@ -65,9 +65,6 @@ const InvoiceSelectionTable: React.FC<InvoiceSelectionTableProps> = ({
                 {t("Find unpaid invoices")}
               </h4>
             </div>
-            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-              {t("Invoices with pending payments are not shown.")}
-            </p>
           </div>
           <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300">
             {isLoading
@@ -151,6 +148,9 @@ const InvoiceSelectionTable: React.FC<InvoiceSelectionTableProps> = ({
             ) : (
               invoices.map((invoice) => {
                 const isSelected = selectedInvoiceIds.includes(invoice.id);
+                const settleableAmount: number = Number(
+                  invoice.settleable_amount ?? invoice.balance_due
+                );
                 return (
                   <tr
                     key={invoice.id}
@@ -193,7 +193,7 @@ const InvoiceSelectionTable: React.FC<InvoiceSelectionTableProps> = ({
                         amount: formatCurrency(invoice.totalamountpayable),
                       })}
                     >
-                      {formatCurrency(invoice.balance_due)}
+                      {formatCurrency(settleableAmount)}
                     </td>
                     <td className="whitespace-nowrap border-b border-gray-200 px-4 py-3 text-center dark:border-gray-800">
                       {isSelected ? (

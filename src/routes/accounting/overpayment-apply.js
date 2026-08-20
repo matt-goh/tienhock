@@ -12,7 +12,10 @@
 
 import { generateReceiptReference } from "./payment-journal.js";
 import { getCustomerDebtorAccountCode } from "./debtorSync.js";
-import { toLocalDateString } from "./receipt-service.js";
+import {
+  PENDING_SETTLEMENT_SQL,
+  toLocalDateString,
+} from "./receipt-service.js";
 import { assertTienHockAccountingDateUnlocked } from "./posting-lock.js";
 import { assertNoUnrepresentedImportedPaymentEvidence } from "./imported-payment-reconciliation.js";
 
@@ -70,12 +73,33 @@ export async function applyOverpayment(client, payload, userId) {
   // 2. Lock invoices; require one customer and per-invoice balance caps
   const invoiceIds = allocs.map((a) => a.invoice_id).sort();
   const invoiceResult = await client.query(
-    `SELECT id, customerid, paymenttype, balance_due, invoice_status
-       FROM invoices WHERE id = ANY($1::varchar[]) ORDER BY id FOR UPDATE`,
+    `SELECT i.id, i.customerid, i.paymenttype, i.balance_due, i.invoice_status
+       FROM invoices i
+      WHERE i.id = ANY($1::varchar[])
+      ORDER BY i.id
+      FOR UPDATE`,
     [invoiceIds]
   );
+  // Take the pending-receipt snapshot only after every invoice lock is held.
+  // If a receipt creator owned one of those locks first, this second statement
+  // sees the receipt it committed while we waited; if we owned the lock first,
+  // that creator revalidates against our reduced balance after we commit.
+  const pendingResult = await client.query(
+    `SELECT i.id, ${PENDING_SETTLEMENT_SQL} AS pending_settlement
+       FROM invoices i
+      WHERE i.id = ANY($1::varchar[])`,
+    [invoiceIds]
+  );
+  const pendingByInvoice = Object.fromEntries(
+    pendingResult.rows.map((row) => [row.id, round2(row.pending_settlement)])
+  );
   const invoiceMap = {};
-  for (const row of invoiceResult.rows) invoiceMap[row.id] = row;
+  for (const row of invoiceResult.rows) {
+    invoiceMap[row.id] = {
+      ...row,
+      pending_settlement: pendingByInvoice[row.id] || 0,
+    };
+  }
   let customerId = null;
   for (const a of allocs) {
     const inv = invoiceMap[a.invoice_id];
@@ -109,13 +133,17 @@ export async function applyOverpayment(client, payload, userId) {
         { status: 400 }
       );
     }
-    const balance = round2(inv.balance_due);
-    if (a.amount > balance + 0.005) {
+    const settleable = round2(
+      Math.max(0, round2(inv.balance_due) - round2(inv.pending_settlement))
+    );
+    if (a.amount > settleable + 0.005) {
       throw Object.assign(
         new Error(
           `Invoice ${a.invoice_id}: apply amount RM${a.amount.toFixed(
             2
-          )} exceeds balance due RM${balance.toFixed(2)}`
+          )} exceeds the RM${settleable.toFixed(
+            2
+          )} remaining after pending cheque payments`
         ),
         { status: 400 }
       );

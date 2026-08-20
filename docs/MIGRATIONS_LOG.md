@@ -30,26 +30,39 @@ requires separate approval).
 
 ---
 
+## Removed 19 Aug 2026 — 1 file (PBE041/01 workers' PCB reclassification)
+
+Applied to production and dev on 2026-08-19, then removed per the project convention. The script
+was committed before removal, so the exact SQL is recoverable directly:
+
+Recover with `git show 684ff75e:dev/migrations/2026-08-19_reclass_pbe04101_workers_pcb.sql`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-19_reclass_pbe04101_workers_pcb.sql` | Posted reclassification journal `JV2608-12` (type J, 31/08/2026: DR `ACW_PCB` / CR `ACD_PCB` RM5,785.25) moving the workers' PCB out of the directors' accrual account. The immutable legacy import `4204` (`PBE041/01`, 13/01/2026) mis-keyed both directors' and workers' PCB into `ACD_PCB` in the legacy source itself; the import is left untouched and the fix mirrors Helen's own `JV2608-10` pattern (approved via WhatsApp 2026-08-19). Guarded (verifies journal 4204's identity and the mis-keyed line, and both target accounts), idempotent, fail-closed. | dev ✓ (2026-08-19), prod ✓ (2026-08-19) |
+
+---
+
 ## Removed 19 Aug 2026 — 1 file (GT + JP CP8D yearly employee particulars)
 
-Applied to dev on 2026-08-19, then removed per the project convention. Recover via git history
+Applied to production and dev on 2026-08-19, then removed per the project convention. Recover via git history
 (`git log -- dev/migrations/2026-08-19_gt_jp_cp8d_records.sql`). Design: `docs/CP8D_HANDOVER.md`.
 
 | File | What it did | Status |
 |------|-------------|--------|
-| `2026-08-19_gt_jp_cp8d_records.sql` | Created `greentarget.cp8d_records` (employee_id FK `public.staffs`) and `jellypolly.cp8d_records` (employee_id FK `jellypolly.staffs`) — schema-isolated clones of the TH `public.cp8d_records` yearly CP8D dataset. Guarded and idempotent; no data seeded. | dev ✓ (2026-08-19), prod PENDING |
+| `2026-08-19_gt_jp_cp8d_records.sql` | Created `greentarget.cp8d_records` (employee_id FK `public.staffs`) and `jellypolly.cp8d_records` (employee_id FK `jellypolly.staffs`) — schema-isolated clones of the TH `public.cp8d_records` yearly CP8D dataset. Guarded and idempotent; no data seeded. | dev ✓ (2026-08-19), prod ✓ (2026-08-19) |
 
 ---
 
 ## Removed 18 Aug 2026 — 1 file (CP8D yearly employee particulars)
 
-Applied to dev on 2026-08-18, then removed per the project convention. Recover via git history
+Applied to dev on 2026-08-18 and to production on 2026-08-19, then removed per the project convention. Recover via git history
 (`git log -- dev/migrations/2026-08-18_cp8d_records.sql`). Design + layout transcription +
 GT/JP plan: `docs/CP8D_HANDOVER.md`.
 
 | File | What it did | Status |
 |------|-------------|--------|
-| `2026-08-18_cp8d_records.sql` | Created `public.cp8d_records` — the Tien Hock CP8D yearly per-employee dataset (unique year+employee; editable snapshot of staff particulars, CP8D category/status codes, and 14 money columns, of which gross/EPF/SOCSO/MTD are payroll-derived at prefill time). Guarded and idempotent; no data seeded. | dev ✓ (2026-08-18), prod PENDING |
+| `2026-08-18_cp8d_records.sql` | Created `public.cp8d_records` — the Tien Hock CP8D yearly per-employee dataset (unique year+employee; editable snapshot of staff particulars, CP8D category/status codes, and 14 money columns, of which gross/EPF/SOCSO/MTD are payroll-derived at prefill time). Guarded and idempotent; no data seeded. | dev ✓ (2026-08-18), prod ✓ (2026-08-19) |
 
 ---
 

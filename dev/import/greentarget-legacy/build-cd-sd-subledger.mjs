@@ -15,6 +15,12 @@
  *
  * The migration is generated because 746 evidence rows are safer to prove and
  * reproduce mechanically than to maintain as hand-written SQL values.
+ *
+ * Historical rebuild note (2026-08-20): this generator intentionally preserves
+ * the original hash-pinned source transcription, including its RM1,860 closing
+ * residual. Any rebuilt database must subsequently apply
+ * dev/migrations/2026-08-20_greentarget_july_debtor_audit_correction.sql,
+ * which records the later user-confirmed annotated-statement corrections.
  */
 
 import crypto from "node:crypto";

@@ -112,13 +112,17 @@ export const SETTLEABLE_AMOUNT_SQL = `
  *
  * Mirrors SETTLEABLE_AMOUNT_SQL (which cannot express an exclusion): money an
  * uncleared cheque already covers is subtracted, EXCLUDING the receipt being
- * confirmed (`excludeReceiptId`) so a pending receipt never vetoes itself.
+ * confirmed/amended (`excludeReceiptIds`) so pending receipts never veto
+ * themselves.
  * Returns { settleable, pending } maps so callers can explain a refusal.
  */
-async function getSettleableAmounts(client, rows, excludeReceiptId = null) {
+async function getSettleableAmounts(client, rows, excludeReceiptIds = []) {
   const map = {};
   const pending = {};
   const cashIds = [];
+  const excludedReceiptIds = (
+    Array.isArray(excludeReceiptIds) ? excludeReceiptIds : [excludeReceiptIds]
+  ).filter((id) => Number.isInteger(id) && id > 0);
   for (const row of rows) {
     map[row.id] = round2(row.balance_due);
     if (row.paymenttype === "CASH") cashIds.push(row.id);
@@ -149,7 +153,7 @@ async function getSettleableAmounts(client, rows, excludeReceiptId = null) {
           WHERE ra.allocation_type = 'invoice'
             AND ra.invoice_id = ANY($1::varchar[])
             AND r.status = 'pending'
-            AND ($2::int IS NULL OR r.id <> $2)
+            AND NOT (r.id = ANY($2::int[]))
          UNION ALL
          SELECT p.invoice_id, p.amount_paid
            FROM payments p
@@ -159,7 +163,7 @@ async function getSettleableAmounts(client, rows, excludeReceiptId = null) {
             AND p.is_auto_collection = false
        ) spoken_for
        GROUP BY invoice_id`,
-      [ids, excludeReceiptId]
+      [ids, excludedReceiptIds]
     );
     for (const row of pendingResult.rows) {
       pending[row.invoice_id] = round2(row.pending_amount);
@@ -342,6 +346,30 @@ function normalizeAllocations(allocations) {
   });
 }
 
+/**
+ * Normalizes a user-entered amendment amount without silently rounding away
+ * extra decimal places.
+ *
+ * @param {unknown} value
+ * @param {string} label
+ * @returns {number}
+ */
+function normalizeAmendmentAmount(value, label) {
+  const amount =
+    typeof value === "number" ? value : Number(String(value ?? "").trim());
+  if (!Number.isFinite(amount) || !(amount > 0)) {
+    throw new Error(`${label}: amount must be a positive number`);
+  }
+  const cents = amount * 100;
+  if (
+    !Number.isSafeInteger(Math.round(cents)) ||
+    Math.abs(cents - Math.round(cents)) > 0.000001
+  ) {
+    throw new Error(`${label}: amount must have no more than 2 decimal places`);
+  }
+  return Math.round(cents) / 100;
+}
+
 /** Builds the default receipt description from the allocation groups (customer IDs, not names). */
 function defaultDescription(allocs) {
   const invoiceAllocs = allocs.filter((a) => a.type === "invoice");
@@ -368,7 +396,7 @@ function defaultDescription(allocs) {
  * Locks and validates the allocated invoices inside the current transaction.
  * Returns a map invoice_id -> { balance_due, paymenttype, customerid, invoice_status }.
  */
-async function lockInvoices(client, allocs, excludeReceiptId = null) {
+async function lockInvoices(client, allocs, excludeReceiptIds = []) {
   const ids = [...new Set(allocs.filter((a) => a.type === "invoice").map((a) => a.invoice_id))].sort();
   const map = {};
   if (ids.length === 0) return map;
@@ -393,7 +421,7 @@ async function lockInvoices(client, allocs, excludeReceiptId = null) {
   const { settleable, pending } = await getSettleableAmounts(
     client,
     result.rows,
-    excludeReceiptId
+    excludeReceiptIds
   );
   for (const id of ids) map[id].settleable_amount = settleable[id] || 0;
   const perInvoice = {};
@@ -1298,6 +1326,445 @@ export async function updateReceiptDate(
     received_date: nextDate,
     updated_receipt_count: receiptIds.length,
     updated_payment_count: paymentUpdate.rowCount,
+  };
+}
+
+/**
+ * Amends every member of one still-pending cheque group atomically. Allocation
+ * identities stay fixed; only their amounts and the group payment method may
+ * change. Switching to bank transfer or online posts the corrected receipts on
+ * their received date immediately. Cash is deliberately excluded because its
+ * CH_REV1/CH_REV2 and bank-in lifecycle needs a separate workflow.
+ *
+ * @param {import('pg').PoolClient} client
+ * @param {number} receiptId
+ * @param {{
+ *   expected_reference?: unknown,
+ *   expected_received_date?: unknown,
+ *   expected_payment_method?: unknown,
+ *   expected_debit_account?: unknown,
+ *   payment_method?: unknown,
+ *   allocations?: Array<{id?: unknown, expected_amount?: unknown, amount?: unknown}>
+ * }} payload
+ * @param {string|null} userId
+ * @returns {Promise<{
+ *   amended_receipt_count: number,
+ *   amended_payment_count: number,
+ *   posted_receipt_count: number,
+ *   payment_group: object
+ * }>}
+ */
+export async function amendPendingReceiptGroup(
+  client,
+  receiptId,
+  payload,
+  userId
+) {
+  const request = payload && typeof payload === "object" ? payload : {};
+  const nextMethod = String(request.payment_method || "").trim();
+  if (!["cheque", "bank_transfer", "online"].includes(nextMethod)) {
+    throw new Error(
+      "Payment method must be cheque, bank transfer, or online"
+    );
+  }
+  if (!Array.isArray(request.allocations) || request.allocations.length === 0) {
+    throw new Error("Every payment amount in this group is required");
+  }
+
+  const changedError = () => {
+    const error = new Error(
+      "This payment group changed after you opened it. Reload and try again."
+    );
+    error.status = 409;
+    error.code = "PAYMENT_GROUP_CHANGED";
+    return error;
+  };
+
+  const requestedByAllocationId = new Map();
+  for (let index = 0; index < request.allocations.length; index += 1) {
+    const candidate = request.allocations[index] || {};
+    const allocationId = Number(candidate.id);
+    if (!Number.isInteger(allocationId) || allocationId <= 0) {
+      throw new Error(`Payment ${index + 1}: invalid allocation`);
+    }
+    if (requestedByAllocationId.has(allocationId)) {
+      throw new Error(`Payment allocation ${allocationId} was included twice`);
+    }
+    requestedByAllocationId.set(allocationId, {
+      expected_amount: normalizeAmendmentAmount(
+        candidate.expected_amount,
+        `Payment allocation ${allocationId}`
+      ),
+      amount: normalizeAmendmentAmount(
+        candidate.amount,
+        `Payment allocation ${allocationId}`
+      ),
+    });
+  }
+
+  const anchorResult = await client.query(
+    `SELECT * FROM receipts WHERE id = $1 FOR UPDATE`,
+    [receiptId]
+  );
+  if (anchorResult.rows.length === 0) {
+    const error = new Error("Payment group not found");
+    error.status = 404;
+    throw error;
+  }
+  const anchor = anchorResult.rows[0];
+  if (anchor.origin !== "erp") {
+    throw new Error("Imported opening payment groups cannot be changed");
+  }
+  if (anchor.status !== "pending") {
+    throw new Error("Only a fully pending payment group can be amended");
+  }
+  if (anchor.payment_method !== "cheque") {
+    throw new Error("Only a pending cheque payment group can be amended");
+  }
+  if (
+    String(request.expected_payment_method || "").trim() !==
+    anchor.payment_method
+  ) {
+    throw changedError();
+  }
+  const expectedReference =
+    request.expected_reference === null ||
+    request.expected_reference === undefined
+      ? null
+      : String(request.expected_reference).trim();
+  const expectedReceivedDate = String(
+    request.expected_received_date || ""
+  ).trim();
+  const expectedDebitAccount = String(
+    request.expected_debit_account || ""
+  ).trim();
+  if (
+    expectedReference !== anchor.display_reference ||
+    expectedReceivedDate !== toLocalDateString(anchor.received_date) ||
+    expectedDebitAccount !== anchor.debit_account
+  ) {
+    throw changedError();
+  }
+  assertReceiptDatesUnlocked(anchor, `Payment group ${receiptId}`);
+
+  const groupResult = await client.query(
+    `SELECT *
+       FROM receipts
+      WHERE display_reference IS NOT DISTINCT FROM $1
+        AND received_date = $2
+        AND payment_method = $3
+        AND debit_account = $4
+        AND origin = 'erp'
+        AND status IN ('pending', 'posted')
+      ORDER BY id
+      FOR UPDATE`,
+    [
+      anchor.display_reference,
+      anchor.received_date,
+      anchor.payment_method,
+      anchor.debit_account,
+    ]
+  );
+  const receiptIds = groupResult.rows.map((receipt) => receipt.id);
+  if (!receiptIds.includes(receiptId)) throw changedError();
+  if (
+    groupResult.rows.some(
+      (receipt) =>
+        receipt.status !== "pending" || receipt.journal_entry_id !== null
+    )
+  ) {
+    throw new Error(
+      "This payment group has already been partly posted and can no longer be amended"
+    );
+  }
+  for (const receipt of groupResult.rows) {
+    assertReceiptDatesUnlocked(
+      receipt,
+      `Payment group ${anchor.display_reference || receiptId}`
+    );
+  }
+
+  const allocationResult = await client.query(
+    `SELECT *
+       FROM receipt_allocations
+      WHERE receipt_id = ANY($1::int[])
+      ORDER BY receipt_id, line_number
+      FOR UPDATE`,
+    [receiptIds]
+  );
+  if (allocationResult.rows.length !== requestedByAllocationId.size) {
+    throw changedError();
+  }
+
+  const amendedAllocations = [];
+  for (const allocation of allocationResult.rows) {
+    const requested = requestedByAllocationId.get(allocation.id);
+    if (!requested) throw changedError();
+    if (
+      Math.abs(requested.expected_amount - round2(allocation.amount)) > 0.005
+    ) {
+      throw changedError();
+    }
+    if (
+      round2(allocation.applied_amount) > 0 ||
+      round2(allocation.refunded_amount) > 0
+    ) {
+      throw new Error(
+        `Payment allocation ${allocation.id} has already been applied or refunded and cannot be amended`
+      );
+    }
+    amendedAllocations.push({
+      receipt_id: allocation.receipt_id,
+      type: allocation.allocation_type,
+      invoice_id: allocation.invoice_id,
+      customer_id: allocation.customer_id,
+      target_account: allocation.target_account,
+      external_reference: allocation.external_reference,
+      amount: requested.amount,
+      allocation_id: allocation.id,
+    });
+  }
+
+  const projectionCandidateIds = amendedAllocations
+    .filter((allocation) => allocation.type !== "account")
+    .map((allocation) => allocation.allocation_id)
+    .sort((left, right) => left - right);
+  const projectionResult = await client.query(
+    `SELECT payment_id, receipt_allocation_id
+       FROM payments
+      WHERE receipt_allocation_id = ANY($1::int[])
+        AND status = 'pending'
+      ORDER BY receipt_allocation_id, payment_id
+      FOR UPDATE`,
+    [projectionCandidateIds]
+  );
+  const projectionByAllocationId = new Map();
+  for (const payment of projectionResult.rows) {
+    if (projectionByAllocationId.has(payment.receipt_allocation_id)) {
+      throw new Error(
+        "The payment-history records for this group changed. Reload and try again."
+      );
+    }
+    projectionByAllocationId.set(payment.receipt_allocation_id, payment);
+  }
+  for (const allocation of amendedAllocations) {
+    // Invoice allocations always have a payment-history projection. A pure
+    // excess receipt can legitimately have none because there is no invoice to
+    // attach that compatibility row to.
+    if (
+      allocation.type === "invoice" &&
+      !projectionByAllocationId.has(allocation.allocation_id)
+    ) {
+      throw new Error(
+        "The payment-history records for this group changed. Reload and try again."
+      );
+    }
+  }
+
+  // Exclude every member of the group being replaced, but retain all other
+  // pending receipts in the settleable check. Active credit/debit notes are
+  // already reflected in the locked invoices' current balance_due.
+  const invoiceMap = await lockInvoices(
+    client,
+    amendedAllocations,
+    receiptIds
+  );
+  const nextDebitAccount = anchor.debit_account;
+
+  if (nextMethod !== "cheque") {
+    // Changing the method must not silently merge this corrected group into a
+    // separate live banking event that already has the target identity.
+    const collisionResult = await client.query(
+      `SELECT id
+         FROM receipts
+        WHERE display_reference IS NOT DISTINCT FROM $1
+          AND received_date = $2
+          AND payment_method = $3
+          AND debit_account = $4
+          AND origin = 'erp'
+          AND status IN ('pending', 'posted')
+          AND NOT (id = ANY($5::int[]))
+        LIMIT 1
+        FOR UPDATE`,
+      [
+        anchor.display_reference,
+        anchor.received_date,
+        nextMethod,
+        nextDebitAccount,
+        receiptIds,
+      ]
+    );
+    if (collisionResult.rows.length > 0) {
+      const error = new Error(
+        "Another live payment group already uses this reference, date, method, and bank account"
+      );
+      error.status = 409;
+      error.code = "PAYMENT_GROUP_TARGET_EXISTS";
+      throw error;
+    }
+
+    for (const receipt of groupResult.rows) {
+      const receiptAllocations = amendedAllocations.filter(
+        (allocation) => allocation.receipt_id === receipt.id
+      );
+      for (const allocation of receiptAllocations.filter(
+        (candidate) => candidate.type === "invoice"
+      )) {
+        await assertNoUnrepresentedImportedPaymentEvidence(
+          client,
+          {
+            allocations: [
+              {
+                type: "invoice",
+                invoice_id: allocation.invoice_id,
+                amount: allocation.amount,
+              },
+            ],
+            payment_reference: String(receipt.display_reference || "").trim(),
+            received_date: receipt.received_date,
+            payment_method: nextMethod,
+            bank_account: nextDebitAccount,
+          },
+          `Payment group ${anchor.display_reference || receiptId} amendment`
+        );
+      }
+      for (const allocation of receiptAllocations.filter(
+        (candidate) => candidate.type === "account"
+      )) {
+        await assertNoExactImportedAccountCredit(
+          client,
+          allocation.target_account,
+          allocation.amount,
+          receipt.display_reference
+        );
+      }
+      await assertNoExactImportedDebitMovement(
+        client,
+        nextDebitAccount,
+        round2(
+          receiptAllocations.reduce(
+            (total, allocation) => total + allocation.amount,
+            0
+          )
+        ),
+        receipt.display_reference
+      );
+    }
+  }
+
+  const totalByReceiptId = new Map();
+  for (const allocation of amendedAllocations) {
+    totalByReceiptId.set(
+      allocation.receipt_id,
+      round2(
+        (totalByReceiptId.get(allocation.receipt_id) || 0) + allocation.amount
+      )
+    );
+  }
+  if (groupResult.rows.some((receipt) => !totalByReceiptId.has(receipt.id))) {
+    throw changedError();
+  }
+  for (const allocation of amendedAllocations) {
+    await client.query(
+      `UPDATE receipt_allocations SET amount = $2 WHERE id = $1`,
+      [allocation.allocation_id, allocation.amount]
+    );
+  }
+
+  for (const receipt of groupResult.rows) {
+    const postingDate =
+      nextMethod === "cheque"
+        ? null
+        : toLocalAccountingDateString(receipt.received_date);
+    await client.query(
+      `UPDATE receipts
+          SET payment_method = $2::varchar,
+              debit_account = $3,
+              total_amount = $4,
+              cheque_reference = CASE WHEN $2::varchar = 'cheque' THEN cheque_reference ELSE NULL END,
+              posting_date = NULL,
+              updated_at = NOW(),
+              updated_by = $5
+        WHERE id = $1`,
+      [
+        receipt.id,
+        nextMethod,
+        nextDebitAccount,
+        totalByReceiptId.get(receipt.id),
+        userId || null,
+      ]
+    );
+    receipt.payment_method = nextMethod;
+    receipt.debit_account = nextDebitAccount;
+    receipt.total_amount = totalByReceiptId.get(receipt.id);
+    receipt.cheque_reference = nextMethod === "cheque" ? receipt.cheque_reference : null;
+    receipt.posting_date = postingDate;
+  }
+
+  let amendedPaymentCount = 0;
+  for (const allocation of amendedAllocations.filter(
+    (candidate) => projectionByAllocationId.has(candidate.allocation_id)
+  )) {
+    const paymentUpdate = await client.query(
+      `UPDATE payments
+          SET amount_paid = $2,
+              payment_method = $3,
+              bank_account = $4
+        WHERE receipt_allocation_id = $1
+          AND status = 'pending'`,
+      [
+        allocation.allocation_id,
+        allocation.amount,
+        nextMethod,
+        nextDebitAccount,
+      ]
+    );
+    if (paymentUpdate.rowCount !== 1) throw changedError();
+    amendedPaymentCount += paymentUpdate.rowCount;
+  }
+
+  let postedReceiptCount = 0;
+  if (nextMethod !== "cheque") {
+    for (const receipt of groupResult.rows) {
+      const receiptAllocations = amendedAllocations.filter(
+        (allocation) => allocation.receipt_id === receipt.id
+      );
+      await postReceiptJournal(
+        client,
+        receipt,
+        receiptAllocations,
+        invoiceMap,
+        userId
+      );
+      await client.query(
+        `UPDATE payments
+            SET status = CASE
+                  WHEN receipt_alloc.allocation_type = 'excess' THEN 'overpaid'
+                  ELSE 'active'
+                END
+           FROM receipt_allocations receipt_alloc
+          WHERE payments.receipt_allocation_id = receipt_alloc.id
+            AND receipt_alloc.receipt_id = $1
+            AND payments.status = 'pending'`,
+        [receipt.id]
+      );
+      postedReceiptCount += 1;
+    }
+
+    await resyncCashBillSalesJournals(
+      client,
+      Object.values(invoiceMap)
+        .filter((invoice) => invoice.paymenttype === "CASH")
+        .map((invoice) => invoice.id),
+      userId
+    );
+  }
+
+  return {
+    amended_receipt_count: receiptIds.length,
+    amended_payment_count: amendedPaymentCount,
+    posted_receipt_count: postedReceiptCount,
+    payment_group: await getReceiptGroup(client, receiptId),
   };
 }
 
