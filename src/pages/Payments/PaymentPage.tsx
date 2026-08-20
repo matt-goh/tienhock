@@ -468,6 +468,9 @@ const PaymentPage: React.FC = () => {
         onDateUpdated={async (): Promise<void> => {
           await fetchPayments();
         }}
+        onAmended={async (): Promise<void> => {
+          await fetchPayments();
+        }}
       />
 
       {/* Payment Form Modal */}

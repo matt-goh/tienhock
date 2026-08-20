@@ -331,7 +331,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         ? paymentsResponse
         : [];
 
-      // Filter out invoices that have pending payments
+      // Tien Hock's settleable amount already subtracts pending receipts, so a
+      // partly covered invoice must remain available for its uncovered balance.
+      // Other companies still hide an invoice carrying a pending payment.
       const invoicesWithPendingPayments = new Set(
         payments
           .filter((payment) => payment.status === "pending")
@@ -340,7 +342,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
       const filteredInvoices = invoices.filter(
         (invoice) =>
-          !invoicesWithPendingPayments.has(invoice.id) &&
+          (useGroupedReceipt || !invoicesWithPendingPayments.has(invoice.id)) &&
           (invoice.settleable_amount !== undefined
             ? Number(invoice.settleable_amount)
             : Number(invoice.balance_due)) > 0
@@ -360,7 +362,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         setLoadingInvoices(false);
       }
     }
-  }, [apiEndpoint, invoiceDateRange, invoicesEndpoint]);
+  }, [apiEndpoint, invoiceDateRange, invoicesEndpoint, useGroupedReceipt]);
 
   // Debounced "is this reference already in use?" check. Tien Hock looks at
   // receipts (its reference is repeatable, so a match is reported, never
@@ -575,7 +577,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
    */
   const isOverpaymentAllocation = (item: InvoicePaymentAllocation): boolean =>
     !isCashBill(item.invoice) &&
-    item.amountToPay > Number(item.invoice.balance_due);
+    item.amountToPay > settleableOf(item.invoice);
 
   // Against a cash bill only banked money says something new: cash is already
   // what the bill recorded, and a cheque keyed here is always pending, which
@@ -632,7 +634,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         );
       for (const { invoice, amountToPay } of customerSelections) {
         if (remaining <= 0.005) break;
-        const settle = Math.min(amountToPay, Number(invoice.balance_due));
+        const settle = Math.min(amountToPay, settleableOf(invoice));
         const take = roundMoney(Math.min(remaining, settle));
         if (take > 0.005) {
           appliedByInvoice.set(invoice.id, take);
@@ -793,7 +795,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     // Check for ALL overpayments
     const overpaymentInvoices = selectedInvoices.filter(
       ({ invoice, amountToPay }) =>
-        !isCashBill(invoice) && amountToPay > invoice.balance_due
+        !isCashBill(invoice) && amountToPay > settleableOf(invoice)
     );
 
     if (overpaymentInvoices.length > 0 && !useGroupedReceipt) {
@@ -803,7 +805,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           "Payment for invoice {{id}} cannot exceed its {{amount}} balance",
           {
             id: firstOverpayment.invoice.id,
-            amount: formatCurrency(firstOverpayment.invoice.balance_due),
+            amount: formatCurrency(settleableOf(firstOverpayment.invoice)),
           }
         )
       );
@@ -816,8 +818,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           invoiceId: invoice.id,
           customerName: invoice.customerName || invoice.customerid,
           totalAmount: amountToPay,
-          regularAmount: invoice.balance_due,
-          overpaidAmount: amountToPay - invoice.balance_due,
+          regularAmount: settleableOf(invoice),
+          overpaidAmount: amountToPay - settleableOf(invoice),
         })
       );
 
@@ -1495,7 +1497,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                         const isUnsupportedOverpayment: boolean =
                           isOverpayment && !useGroupedReceipt;
                         const overpaidAmount: number = isOverpayment
-                          ? amountToPay - invoice.balance_due
+                          ? amountToPay - settleableOf(invoice)
                           : 0;
 
                         return (
@@ -1644,7 +1646,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                                     sum +
                                     (isOverpaymentAllocation(item)
                                       ? item.amountToPay -
-                                        Number(item.invoice.balance_due)
+                                        settleableOf(item.invoice)
                                       : 0),
                                   0
                                 )

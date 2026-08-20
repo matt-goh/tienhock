@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-20",
+    ms: "Bayaran invois Tien Hock: kumpulan bayaran cek yang masih belum selesai kini boleh dipinda tanpa dibatalkan terlebih dahulu, termasuk apabila pembatalan tidak dibenarkan kerana invois mempunyai Nota Kredit aktif. Kaedah boleh ditukar kepada Online atau Pindahan Bank dan amaun setiap invois boleh dibetulkan; pertukaran kaedah akan merekodkan bayaran serta-merta pada tarikh diterima dan mengemas kini baki invois. Invois yang hanya diliputi sebahagian oleh cek belum dijelaskan juga kekal tersedia untuk baki yang belum diliputi, dan borang memaparkan amaun yang masih boleh dibayar dengan betul.",
+    en: "Tien Hock invoice payments: a pending cheque payment group can now be amended without cancelling it first, including when cancellation is unavailable because an invoice has an active credit note. Change the method to Online or Bank Transfer and correct each invoice's amount; changing the method records the payment immediately on its received date and updates the invoice balances. An invoice only partly covered by a pending cheque also remains available for its uncovered balance, and the form now shows the amount still available to pay.",
+  },
+  {
     date: "2026-08-19",
     ms: "Green Target dan Jelly Polly: halaman CP8D kini tersedia untuk kedua-dua syarikat (Payroll → CP8D) — pra-isi setahun daripada payroll syarikat masing-masing, laraskan butiran setiap pekerja, kemudian muat turun fail TXT untuk hantaran e-CP8D. Nombor E majikan diambil daripada tetapan e-Caruman syarikat; isikannya di halaman e-Caruman dahulu sebelum eksport.",
     en: "Green Target and Jelly Polly: the CP8D page is now available for both companies (Payroll → CP8D) — prefill a year from each company's own payroll, adjust each employee's particulars, then download the TXT file for e-CP8D submission. The employer E number is taken from the company's e-Caruman settings; key it in on the e-Caruman page before exporting.",
