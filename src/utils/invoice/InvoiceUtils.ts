@@ -1,5 +1,6 @@
 // src/utils/invoice/InvoiceUtils.ts
 import toast from "react-hot-toast";
+import i18n from "../../i18n";
 import {
   ExtendedInvoiceData,
   InvoiceFilters,
@@ -128,7 +129,12 @@ export const createInvoice = async (
     console.error("Error creating invoice:", error);
     const errorMessage =
       error instanceof Error ? error.message : "An unknown error occurred";
-    toast.error(`Failed to create invoice: ${errorMessage}`);
+    toast.error(
+      i18n.t("Failed to create invoice: {{errorMessage}}", {
+        errorMessage,
+        ns: "misc",
+      })
+    );
     throw new Error(errorMessage); // Re-throw for component handling
   }
 };
@@ -234,7 +240,11 @@ export const cancelInvoice = async (
     // Check for specific backend messages like "already cancelled"
     const errorMessage =
       error instanceof Error ? error.message : "Failed to cancel invoice";
-    toast.error(errorMessage);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : i18n.t("Failed to cancel invoice", { ns: "misc" })
+    );
     throw new Error(errorMessage); // Re-throw
   }
 };
@@ -266,7 +276,11 @@ export const getInvoiceById = async (
     console.error(`Error fetching invoice ${id}:`, error);
     const errorMessage =
       error instanceof Error ? error.message : `Failed to fetch invoice ${id}`;
-    toast.error(errorMessage);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : i18n.t("Failed to fetch invoice {{id}}", { id, ns: "misc" })
+    );
     throw new Error(errorMessage); // Re-throw
   }
 };
@@ -320,7 +334,11 @@ export const getInvoiceDetailsBundle = async (
     console.error(`Error fetching invoice details for ${id}:`, error);
     const errorMessage =
       error instanceof Error ? error.message : `Failed to fetch invoice ${id}`;
-    toast.error(errorMessage);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : i18n.t("Failed to fetch invoice {{id}}", { id, ns: "misc" })
+    );
     throw new Error(errorMessage);
   }
 };
@@ -358,7 +376,11 @@ export const getInvoicesByIds = async (
     console.error(`Error batch fetching invoices:`, error);
     const errorMessage =
       error instanceof Error ? error.message : `Failed to fetch invoices`;
-    toast.error(errorMessage);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : i18n.t("Failed to fetch invoices", { ns: "misc" })
+    );
     throw new Error(errorMessage);
   }
 };
@@ -421,7 +443,12 @@ export const createPayment = async (
     const errorMessage =
       error.response?.data?.message || // Use backend error message if available
       (error instanceof Error ? error.message : "Failed to record payment");
-    toast.error(errorMessage);
+    toast.error(
+      error.response?.data?.message ||
+        (error instanceof Error
+          ? error.message
+          : i18n.t("Failed to record payment", { ns: "misc" }))
+    );
     throw new Error(errorMessage);
   }
 };
@@ -473,7 +500,11 @@ export const confirmPayment = async (
     console.error(`Error confirming payment ${paymentId}:`, error);
     const errorMessage =
       (error instanceof Error ? error.message : "Failed to confirm payment(s)");
-    toast.error(errorMessage);
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : i18n.t("Failed to confirm payment(s)", { ns: "misc" })
+    );
     throw new Error(errorMessage);
   }
 };
@@ -497,7 +528,12 @@ export const getPaymentsForInvoice = async (
       (error instanceof Error
         ? error.message
         : "Failed to fetch payment history");
-    toast.error(errorMessage);
+    toast.error(
+      error.response?.data?.message ||
+        (error instanceof Error
+          ? error.message
+          : i18n.t("Failed to fetch payment history", { ns: "misc" }))
+    );
     throw new Error(errorMessage);
   }
 };
@@ -582,7 +618,14 @@ export const cancelPayment = async (
       (error instanceof Error ? error.message : "Failed to cancel payment");
 
     if (options.showErrorToast !== false) {
-      toast.error(errorMessage);
+      toast.error(
+        errorData?.detail ||
+          errorData?.error ||
+          errorData?.message ||
+          (error instanceof Error
+            ? error.message
+            : i18n.t("Failed to cancel payment", { ns: "misc" }))
+      );
     }
 
     const cancellationError = new Error(errorMessage) as Error & {

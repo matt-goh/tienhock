@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { EPFRate, SOCSORRate, SIPRate, IncomeTaxRate } from "../../types/types";
 
 export interface ContributionRatesData {
@@ -57,6 +58,7 @@ if (typeof window !== "undefined") {
 }
 
 export const useContributionRatesCache = () => {
+  const { t } = useTranslation("misc");
   const [epfRates, setEpfRates] = useState<EPFRate[]>([]);
   const [socsoRates, setSocsoRates] = useState<SOCSORRate[]>([]);
   const [sipRates, setSipRates] = useState<SIPRate[]>([]);
@@ -126,13 +128,13 @@ export const useContributionRatesCache = () => {
           : new Error("Failed to fetch contribution rates");
       setError(err);
       if (!forceRefresh) {
-        toast.error("Error fetching contribution rates");
+        toast.error(t("Error fetching contribution rates"));
       }
       throw err;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Initial load
   useEffect(() => {

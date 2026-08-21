@@ -289,7 +289,7 @@ const GTECarumanPage: React.FC = () => {
             onChange={(e) =>
               setCodes((c) => ({ ...c, perkeso_employer_code: e.target.value }))
             }
-            placeholder="e.g. F1234567890Z"
+            placeholder={t("e.g. F1234567890Z")}
           />
           <FormInput
             name="mycoid"
@@ -298,7 +298,7 @@ const GTECarumanPage: React.FC = () => {
             onChange={(e) =>
               setCodes((c) => ({ ...c, mycoid_ssm: e.target.value }))
             }
-            placeholder="e.g. 123456-X"
+            placeholder={t("e.g. 123456-X")}
           />
           <FormInput
             name="lhdn"
@@ -307,7 +307,7 @@ const GTECarumanPage: React.FC = () => {
             onChange={(e) =>
               setCodes((c) => ({ ...c, lhdn_e_number: e.target.value }))
             }
-            placeholder="e.g. 1234567890"
+            placeholder={t("e.g. 1234567890")}
           />
         </div>
         <p className="mt-2 text-[11px] text-default-400 dark:text-gray-500">
