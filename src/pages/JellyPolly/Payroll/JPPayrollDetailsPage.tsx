@@ -1,6 +1,7 @@
 // src/pages/JellyPolly/Payroll/JPPayrollDetailsPage.tsx
 import React, { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconTrash,
@@ -167,13 +168,13 @@ const getDeductionSortOrder = (type: string): number => {
 const getLeaveTypeLabel = (type: string): string => {
   switch (type) {
     case "cuti_umum":
-      return "Cuti Umum";
+      return "Public Holiday";
     case "cuti_sakit":
-      return "Cuti Sakit";
+      return "Sick Leave";
     case "cuti_tahunan":
-      return "Cuti Tahunan";
+      return "Annual Leave";
     case "cuti_rawatan":
-      return "Cuti Rawatan";
+      return "Medical Leave";
     default:
       return type;
   }
@@ -190,6 +191,7 @@ const getJobTypeSlug = (jobType: string): string =>
   jobType.toLowerCase().replace(/_/g, "-");
 
 const JPPayrollDetailsPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -211,7 +213,7 @@ const JPPayrollDetailsPage: React.FC = () => {
       setPayroll(response);
     } catch (error) {
       console.error("Error fetching JP employee payroll:", error);
-      toast.error("Failed to load payroll details");
+      toast.error(t("Failed to load payroll details"));
     } finally {
       setIsLoading(false);
     }
@@ -230,11 +232,11 @@ const JPPayrollDetailsPage: React.FC = () => {
       await api.delete(
         `/jellypolly/api/employee-payrolls/items/${itemToDelete.id}`
       );
-      toast.success("Item deleted successfully");
+      toast.success(t("Item deleted successfully"));
       await fetchPayrollDetails();
     } catch (error) {
       console.error("Error deleting payroll item:", error);
-      toast.error("Failed to delete payroll item");
+      toast.error(t("Failed to delete payroll item"));
     } finally {
       setIsDeleting(false);
       setShowDeleteDialog(false);
@@ -255,7 +257,7 @@ const JPPayrollDetailsPage: React.FC = () => {
       <div className="p-6">
         <BackButton fallbackPath="/jellypolly/payroll/monthly-payrolls" />
         <div className="mt-4 text-center text-default-500 dark:text-gray-400">
-          Payroll not found
+          {t("Payroll not found")}
         </div>
       </div>
     );
@@ -450,9 +452,9 @@ const JPPayrollDetailsPage: React.FC = () => {
           <div className="min-w-0">
             <h1
               className="max-w-48 truncate text-xl font-semibold text-default-800 dark:text-gray-100 sm:max-w-72"
-              title={payroll.employee_name || "Unknown employee"}
+              title={payroll.employee_name || t("Unknown employee")}
             >
-              {payroll.employee_name || "Unknown employee"}
+              {payroll.employee_name || t("Unknown employee")}
             </h1>
             <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
               {getMonthName(payroll.month)} {payroll.year}
@@ -466,7 +468,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
             companyName="JELLY-POLLY FOOD INDUSTRIES"
-            buttonText="Pay Slip"
+            buttonText={t("Pay Slip")}
             variant="filled"
             color="sky"
             className="flex-1 md:flex-none shadow-sm"
@@ -477,7 +479,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             staffDetails={staffDetails}
             midMonthPayroll={midMonthForPdf}
             companyName="JELLY-POLLY FOOD INDUSTRIES"
-            buttonText="PDF"
+            buttonText={t("PDF")}
             variant="default"
             color="sky"
             className="flex-1 md:flex-none"
@@ -489,7 +491,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             color="default"
             className="flex-1 md:flex-none"
           >
-            Manual Item
+            {t("Manual Item")}
           </Button>
         </div>
       </div>
@@ -498,20 +500,20 @@ const JPPayrollDetailsPage: React.FC = () => {
         <div className="border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800 transition-shadow hover:shadow-md">
           <div className="px-4 py-3 bg-default-50 dark:bg-gray-900/50 border-b border-default-100 dark:border-gray-700">
             <h3 className="text-md font-semibold text-default-700 dark:text-gray-200">
-              Employee Information
+              {t("Employee Information")}
             </h3>
           </div>
           <div className="p-4 space-y-4">
             <div>
               <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-400 mb-1">
-                Employee
+                {t("Employee")}
               </p>
               <p className="font-semibold text-default-800 dark:text-gray-100">
                 <Link
                   to={`/jellypolly/catalogue/staff/${payroll.employee_id}`}
                   className="text-sky-600 dark:text-sky-400 hover:underline"
                 >
-                  {payroll.employee_name || "Unknown"}
+                  {payroll.employee_name || t("Unknown")}
                 </Link>
               </p>
               <p className="text-sm text-default-500 dark:text-gray-400 mt-1">
@@ -520,7 +522,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             </div>
             <div>
               <p className="text-xs uppercase tracking-wide text-default-400 dark:text-gray-400 mb-1">
-                Job Type
+                {t("Job Type")}
               </p>
               <p className="font-semibold text-default-800 dark:text-gray-100 flex items-center gap-2">
                 {payroll.job_type === "SALESMAN" ? (
@@ -544,14 +546,14 @@ const JPPayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-emerald-600 dark:text-emerald-400"
               />
-              Earnings
+              {t("Earnings")}
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
             <div className="space-y-2 flex-grow">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Work Pay
+                  {t("Work Pay")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(baseWorkTotal)}
@@ -560,7 +562,7 @@ const JPPayrollDetailsPage: React.FC = () => {
               {leaveTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Cuti Pay
+                    {t("Cuti Pay")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(leaveTotal)}
@@ -570,7 +572,7 @@ const JPPayrollDetailsPage: React.FC = () => {
               {bonusTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Bonus
+                    {t("Bonus")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(bonusTotal)}
@@ -580,7 +582,7 @@ const JPPayrollDetailsPage: React.FC = () => {
               {othersTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Others
+                    {t("Others")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(othersTotal)}
@@ -590,7 +592,7 @@ const JPPayrollDetailsPage: React.FC = () => {
               {commissionAdvanceTotal > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300">
-                    Advance
+                    {t("Advance")}
                   </span>
                   <span className="font-medium text-default-800 dark:text-gray-100">
                     {formatCurrency(commissionAdvanceTotal)}
@@ -601,7 +603,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             <div className="border-t border-default-200 dark:border-gray-600 mt-auto pt-3">
               <div className="flex justify-between font-semibold">
                 <span className="text-default-800 dark:text-gray-100">
-                  Gross Pay
+                  {t("Gross Pay")}
                 </span>
                 <span className="text-emerald-700 dark:text-emerald-400 text-lg">
                   {formatCurrency(payroll.gross_pay)}
@@ -618,14 +620,14 @@ const JPPayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-sky-600 dark:text-sky-400"
               />
-              Deductions & Final Pay
+              {t("Deductions & Final Pay")}
             </h3>
           </div>
           <div className="p-4 flex flex-col flex-grow">
             <div className="space-y-2 flex-grow">
               <div className="flex justify-between text-sm">
                 <span className="text-default-600 dark:text-gray-300">
-                  Gross Pay
+                  {t("Gross Pay")}
                 </span>
                 <span className="font-medium text-default-800 dark:text-gray-100">
                   {formatCurrency(payroll.gross_pay)}
@@ -667,7 +669,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                       className="group relative flex justify-between text-sm"
                     >
                       <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                        {deductionName}
+                        {t(deductionName)}
                         <IconInfoCircle
                           size={14}
                           className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
@@ -683,37 +685,37 @@ const JPPayrollDetailsPage: React.FC = () => {
                         <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
                           <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800" />
                           <div className="font-semibold mb-2 text-default-100">
-                            {deductionName} Breakdown
+                            {t("{{name}} Breakdown", { name: t(deductionName) })}
                           </div>
                           <div className="space-y-1">
                             <div className="flex justify-between">
                               <span className="text-default-300">
-                                Employee:
+                                {t("Employee:")}
                               </span>
                               <span>{formatCurrency(employeeAmount)}</span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-default-300">
-                                Employer:
+                                {t("Employer:")}
                               </span>
                               <span>{formatCurrency(employerAmount)}</span>
                             </div>
                             <div className="border-t border-default-600 mt-2 pt-2">
                               <div className="flex justify-between text-default-400">
-                                <span>Employee Rate:</span>
+                                <span>{t("Employee Rate:")}</span>
                                 <span>
                                   {deduction.rate_info?.employee_rate || "-"}
                                 </span>
                               </div>
                               <div className="flex justify-between text-default-400">
-                                <span>Employer Rate:</span>
+                                <span>{t("Employer Rate:")}</span>
                                 <span>
                                   {deduction.rate_info?.employer_rate || "-"}
                                 </span>
                               </div>
                               {deduction.rate_info?.age_group && (
                                 <div className="flex justify-between text-default-400">
-                                  <span>Age Group:</span>
+                                  <span>{t("Age Group:")}</span>
                                   <span className="capitalize">
                                     {deduction.rate_info.age_group.replace(
                                       /_/g,
@@ -732,7 +734,7 @@ const JPPayrollDetailsPage: React.FC = () => {
               {commissionAdvanceTotal > 0 && (
                 <div className="group relative flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300 flex items-center gap-1 cursor-help">
-                    Advance
+                    {t("Advance")}
                     <IconInfoCircle
                       size={14}
                       className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
@@ -745,18 +747,18 @@ const JPPayrollDetailsPage: React.FC = () => {
                     <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
                       <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800" />
                       <div className="font-semibold mb-2 text-default-100">
-                        Advance
+                        {t("Advance")}
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between">
                           <span className="text-default-300">
-                            Total Amount:
+                            {t("Total Amount:")}
                           </span>
                           <span>{formatCurrency(commissionAdvanceTotal)}</span>
                         </div>
                       </div>
                       <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
-                        Payments made in advance, deducted from final pay.
+                        {t("Payments made in advance, deducted from final pay.")}
                       </div>
                     </div>
                   </div>
@@ -769,7 +771,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                     className="flex flex-1 items-center justify-between rounded text-default-600 hover:text-sky-600 dark:text-gray-300 dark:hover:text-sky-400"
                   >
                     <span className="flex items-center gap-1 cursor-help">
-                      Mid-month Advance
+                      {t("Mid-month Advance")}
                       <IconInfoCircle
                         size={14}
                         className="text-default-400 dark:text-gray-400 opacity-60 group-hover:opacity-100"
@@ -783,16 +785,20 @@ const JPPayrollDetailsPage: React.FC = () => {
                     <div className="bg-default-800 text-white text-xs rounded-lg p-3 shadow-lg relative">
                       <div className="absolute left-4 bottom-full w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[6px] border-b-default-800" />
                       <div className="font-semibold mb-2 text-default-100">
-                        Mid-month Advance
+                        {t("Mid-month Advance")}
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between">
-                          <span className="text-default-300">Amount:</span>
+                          <span className="text-default-300">
+                            {t("Amount:")}
+                          </span>
                           <span>{formatCurrency(midMonthAmount)}</span>
                         </div>
                         {payroll.mid_month_payroll?.created_at && (
                           <div className="flex justify-between">
-                            <span className="text-default-300">Date:</span>
+                            <span className="text-default-300">
+                              {t("Date:")}
+                            </span>
                             <span>
                               {formatDisplayDate(
                                 payroll.mid_month_payroll.created_at
@@ -802,7 +808,9 @@ const JPPayrollDetailsPage: React.FC = () => {
                         )}
                       </div>
                       <div className="border-t border-default-600 mt-2 pt-2 text-default-400">
-                        Advance payment made mid-month, deducted from final pay.
+                        {t(
+                          "Advance payment made mid-month, deducted from final pay."
+                        )}
                       </div>
                     </div>
                   </div>
@@ -811,7 +819,7 @@ const JPPayrollDetailsPage: React.FC = () => {
               <div className="border-t border-default-200 dark:border-gray-600 mt-2 pt-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300 font-medium">
-                    Total Deductions
+                    {t("Total Deductions")}
                   </span>
                   <span className="font-semibold text-rose-600 dark:text-rose-400">
                     - {formatCurrency(totalFinalDeductions)}
@@ -821,7 +829,7 @@ const JPPayrollDetailsPage: React.FC = () => {
               <div className="border-t border-default-200 dark:border-gray-600 mt-2 pt-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-default-600 dark:text-gray-300 font-medium">
-                    Net Pay
+                    {t("Net Pay")}
                   </span>
                   <span className="font-semibold text-default-800 dark:text-gray-100">
                     {formatCurrency(payroll.net_pay)}
@@ -832,7 +840,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             {digenapkan > 0.001 && (
               <div className="flex justify-between text-sm mt-2">
                 <span className="text-default-600 dark:text-gray-300">
-                  Digenapkan
+                  {t("Rounding")}
                 </span>
                 <span className="font-medium text-emerald-600 dark:text-emerald-400">
                   + {formatCurrency(digenapkan)}
@@ -842,7 +850,7 @@ const JPPayrollDetailsPage: React.FC = () => {
             <div className="bg-sky-100 dark:bg-sky-900/30 -mx-4 -mb-4 mt-4 px-4 py-4 border-t border-sky-200 dark:border-sky-800/50 rounded-b-lg">
               <div className="flex justify-between items-center">
                 <span className="text-sky-800 dark:text-sky-300 font-bold text-base">
-                  Jumlah Digenapkan
+                  {t("Rounded Total")}
                 </span>
                 <span className="text-sky-900 dark:text-sky-200 text-2xl font-bold">
                   {formatCurrency(setelahDigenapkan)}
@@ -866,32 +874,32 @@ const JPPayrollDetailsPage: React.FC = () => {
             icon={IconPlus}
             iconSize={16}
           >
-            Manual Item
+            {t("Manual Item")}
           </Button>
         </div>
         <div className="overflow-x-auto">
           {payroll.items.length === 0 ? (
             <p className="text-center text-default-400 dark:text-gray-500 py-6">
-              No earnings recorded
+              {t("No earnings recorded")}
             </p>
           ) : (
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700">
               <thead className="bg-default-50 dark:bg-gray-800">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
-                    Rate
+                    {t("Rate")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-20">
-                    Qty
+                    {t("Qty")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-3 py-2 w-10" />
                 </tr>
@@ -904,7 +912,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                         colSpan={6}
                         className="px-3 py-2 text-xs font-semibold text-default-500 dark:text-gray-400 uppercase tracking-wide"
                       >
-                        {type}
+                        {t(type)}
                       </td>
                     </tr>
                     {items.map((item: PayrollItem, index: number) => {
@@ -920,7 +928,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                                 <Link
                                   to={workLogUrl}
                                   className="font-medium text-sky-600 dark:text-sky-400 hover:underline truncate"
-                                  title="Open source log"
+                                  title={t("Open source log")}
                                 >
                                   {item.description}
                                 </Link>
@@ -935,7 +943,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                               )}
                               {item.is_manual && (
                                 <span className="px-1.5 py-0.5 text-xs bg-sky-100 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded">
-                                  Manual
+                                  {t("Manual")}
                                 </span>
                               )}
                             </div>
@@ -961,7 +969,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                                   setShowDeleteDialog(true);
                                 }}
                                 className="p-1 text-red-500 hover:text-red-700 dark:hover:text-red-400"
-                                title="Delete manual item"
+                                title={t("Delete manual item")}
                               >
                                 <IconTrash size={16} />
                               </button>
@@ -979,7 +987,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                     colSpan={4}
                     className="px-3 py-2 font-semibold text-default-800 dark:text-gray-200"
                   >
-                    Total Earnings
+                    {t("Total Earnings")}
                   </td>
                   <td className="px-3 py-2 text-right font-bold text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(payroll.gross_pay)}
@@ -1000,7 +1008,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                 size={18}
                 className="text-teal-600 dark:text-teal-400"
               />
-              Leave Pay
+              {t("Leave Pay")}
             </h3>
           </div>
           <div className="overflow-x-auto">
@@ -1008,16 +1016,16 @@ const JPPayrollDetailsPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-800">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Days
+                    {t("Days")}
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                    Amount
+                    {t("Amount")}
                   </th>
                 </tr>
               </thead>
@@ -1029,7 +1037,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                         {formatDisplayDate(record.date || record.leave_date)}
                       </td>
                       <td className="px-3 py-2 text-sm text-default-800 dark:text-gray-200">
-                        {getLeaveTypeLabel(record.leave_type)}
+                        {t(getLeaveTypeLabel(record.leave_type))}
                       </td>
                       <td className="px-3 py-2 text-right text-sm text-default-600 dark:text-gray-400">
                         {record.days_taken}
@@ -1047,7 +1055,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                     colSpan={3}
                     className="px-3 py-2 font-semibold text-default-800 dark:text-gray-200"
                   >
-                    Total Leave Pay
+                    {t("Total Leave Pay")}
                   </td>
                   <td className="px-3 py-2 text-right font-bold text-teal-700 dark:text-teal-300">
                     {formatCurrency(leaveTotal)}
@@ -1067,14 +1075,16 @@ const JPPayrollDetailsPage: React.FC = () => {
           <Link
             to={pinjamUrl}
             className="group flex items-center justify-between gap-3 border-b border-red-100 bg-red-50 px-4 py-2 transition-colors hover:bg-red-100/70 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-red-400 dark:border-red-800/50 dark:bg-red-900/20 dark:hover:bg-red-900/35"
-            title={`Open Pinjam for ${payroll.employee_name || payroll.employee_id}`}
+            title={t("Open Pinjam for {{name}}", {
+              name: payroll.employee_name || payroll.employee_id,
+            })}
           >
             <h3 className="text-md font-semibold text-red-800 dark:text-red-300 flex items-center gap-2">
               <IconWallet size={18} className="text-red-600 dark:text-red-400" />
-              <span>Pinjam</span>
+              <span>{t("Pinjam")}</span>
             </h3>
             <span className="flex items-center gap-1 text-xs font-semibold text-red-700 group-hover:underline dark:text-red-300">
-              Open Pinjam
+              {t("Open Pinjam")}
               <IconChevronRight size={16} aria-hidden="true" />
             </span>
           </Link>
@@ -1094,7 +1104,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                 >
                   <div className="mb-3">
                     <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
-                      Mid-Month Pay (Before Pinjam)
+                      {t("Mid-Month Pay (Before Pinjam)")}
                     </p>
                     <p
                       className={`text-xl font-bold ${pinjamAmountColor(
@@ -1107,7 +1117,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                   </div>
                   <div className="mb-3">
                     <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                      Pinjam Items:
+                      {t("Pinjam Items:")}
                     </p>
                     <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                       {midMonthPinjamRecords.map((record: JPPinjamRecord) => (
@@ -1126,7 +1136,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                   <div className="mt-auto text-sm">
                     <div className="flex justify-between mb-2">
                       <span className="text-default-600 dark:text-gray-300">
-                        Jumlah Pinjam:
+                        {t("Total Pinjam:")}
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
                         - {formatCurrency(midMonthPinjamTotal)}
@@ -1134,7 +1144,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                     </div>
                     <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
                       <span className="text-default-800 dark:text-gray-100">
-                        Final Mid-Month Pay
+                        {t("Final Mid-Month Pay")}
                       </span>
                       <span
                         className={`text-lg font-bold ${pinjamAmountColor(
@@ -1157,7 +1167,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                 >
                   <div className="mb-3">
                     <p className="text-sm text-default-500 dark:text-gray-400 mb-1">
-                      Gaji Genap (Before Pinjam)
+                      {t("Gaji Genap (Before Pinjam)")}
                     </p>
                     <p
                       className={`text-xl font-bold ${pinjamAmountColor(
@@ -1170,7 +1180,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                   </div>
                   <div className="mb-3">
                     <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                      Pinjam Items:
+                      {t("Pinjam Items:")}
                     </p>
                     <div className="space-y-1 text-sm text-default-600 dark:text-gray-300">
                       {monthlyPinjamRecords.map((record: JPPinjamRecord) => (
@@ -1189,7 +1199,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                   <div className="mt-auto text-sm">
                     <div className="flex justify-between mb-2">
                       <span className="text-default-600 dark:text-gray-300">
-                        Jumlah Pinjam:
+                        {t("Total Pinjam:")}
                       </span>
                       <span className="font-semibold text-red-600 dark:text-red-400">
                         - {formatCurrency(monthlyPinjamTotal)}
@@ -1198,7 +1208,7 @@ const JPPayrollDetailsPage: React.FC = () => {
                     <div className="flex justify-between items-center font-semibold border-t border-default-200 dark:border-gray-600 pt-2">
                       <span className="text-default-800 dark:text-gray-100 flex items-center gap-1.5">
                         <IconBuildingBank className="w-4 h-4 flex-shrink-0" />
-                        Jumlah Masuk Bank
+                        {t("Total Banked In")}
                       </span>
                       <span
                         className={`text-lg font-bold ${pinjamAmountColor(
@@ -1241,9 +1251,12 @@ const JPPayrollDetailsPage: React.FC = () => {
           setItemToDelete(null);
         }}
         onConfirm={handleDeleteItem}
-        title="Delete Payroll Item"
-        message={`Are you sure you want to delete "${itemToDelete?.description}"? This action cannot be undone.`}
-        confirmButtonText={isDeleting ? "Deleting..." : "Delete"}
+        title={t("Delete Payroll Item")}
+        message={t(
+          'Are you sure you want to delete "{{description}}"? This action cannot be undone.',
+          { description: itemToDelete?.description }
+        )}
+        confirmButtonText={isDeleting ? t("Deleting...") : t("Delete")}
         variant="danger"
       />
     </div>

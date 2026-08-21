@@ -6,6 +6,7 @@
 // each quantity flows into that specific pay code during JP payroll and all
 // columns sum to the product's total stock.
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { IconLink, IconPackage } from "@tabler/icons-react";
 import toast from "react-hot-toast";
@@ -33,6 +34,7 @@ const cloneEntries = (source: PayCodeEntries): PayCodeEntries =>
   );
 
 const JPProductionEntryPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const { products } = useProductsCache("all");
   const { productMappings, refreshData: refreshMappings } =
     useJPJobPayCodeMappings();
@@ -85,7 +87,7 @@ const JPProductionEntryPage: React.FC = () => {
         setWorkers(response);
       } catch (error) {
         console.error("Error fetching JP production workers:", error);
-        toast.error("Failed to load production workers");
+        toast.error(t("Failed to load production workers"));
       }
     };
     fetchWorkers();
@@ -127,7 +129,7 @@ const JPProductionEntryPage: React.FC = () => {
         setIsMachineBroken(machineResponse.machine_broken || false);
       } catch (error) {
         console.error("Error fetching JP production entries:", error);
-        toast.error("Failed to load production entries");
+        toast.error(t("Failed to load production entries"));
       } finally {
         if (!cancelled) setIsLoading(false);
       }
@@ -180,21 +182,23 @@ const JPProductionEntryPage: React.FC = () => {
       });
       setIsMachineBroken(newValue);
       toast.success(
-        newValue ? "Machine marked as broken" : "Machine marked as working"
+        newValue
+          ? t("Machine marked as broken")
+          : t("Machine marked as working")
       );
     } catch (error) {
       console.error("Error updating machine status:", error);
-      toast.error("Failed to update machine status");
+      toast.error(t("Failed to update machine status"));
     }
   };
 
   const handleSave = async (): Promise<void> => {
     if (!selectedDate || !selectedProductId) {
-      toast.error("Please select a date and product first");
+      toast.error(t("Please select a date and product first"));
       return;
     }
     if (payCodeColumns.length === 0) {
-      toast.error("Map at least one pay code to this product first");
+      toast.error(t("Map at least one pay code to this product first"));
       return;
     }
 
@@ -227,12 +231,20 @@ const JPProductionEntryPage: React.FC = () => {
       );
 
       toast.success(
-        `Production saved: ${response.total_bags} total ctn across ${response.entry_count} pay code entries`
+        t(
+          "Production saved: {{bags}} total ctn across {{count}} pay code entries",
+          {
+            bags: response.total_bags,
+            count: response.entry_count,
+          }
+        )
       );
       setOriginalEntries(cloneEntries(entries));
     } catch (error: any) {
       console.error("Error saving JP production entries:", error);
-      toast.error(error?.message || "Failed to save production entries");
+      toast.error(
+        error?.message || t("Failed to save production entries")
+      );
     } finally {
       setIsSaving(false);
     }
@@ -253,7 +265,7 @@ const JPProductionEntryPage: React.FC = () => {
   const handleProductSelect = (productId: string): void => {
     if (hasUnsavedChanges) {
       const confirmed = window.confirm(
-        "You have unsaved changes. Discard them and switch product?"
+        t("You have unsaved changes. Discard them and switch product?")
       );
       if (!confirmed) return;
     }
@@ -266,11 +278,12 @@ const JPProductionEntryPage: React.FC = () => {
       <div className="flex flex-col lg:flex-row justify-between lg:items-center gap-3">
         <div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            JP Production Entry
+            {t("JP Production Entry")}
           </h1>
           <p className="text-sm text-default-500 dark:text-gray-400">
-            Daily cartons packed per worker, per pay code, for Jelly Polly
-            products
+            {t(
+              "Daily cartons packed per worker, per pay code, for Jelly Polly products"
+            )}
           </p>
         </div>
         <div className="flex items-center flex-wrap gap-3">
@@ -290,7 +303,7 @@ const JPProductionEntryPage: React.FC = () => {
             iconSize={16}
             onClick={() => setShowMappingModal(true)}
           >
-            Mappings
+            {t("Mappings")}
           </Button>
           {selectedProduct && (
             <div className="flex items-center gap-2">
@@ -301,7 +314,7 @@ const JPProductionEntryPage: React.FC = () => {
                     : "text-default-500 dark:text-gray-400"
                 }`}
               >
-                Machine Rosak
+                {t("Machine Broken")}
               </span>
               <button
                 type="button"
@@ -324,11 +337,11 @@ const JPProductionEntryPage: React.FC = () => {
       {/* JP product selector */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
         <h2 className="text-sm font-medium text-default-700 dark:text-gray-200 mb-3">
-          Jelly Polly Products
+          {t("Jelly Polly Products")}
         </h2>
         {jpProducts.length === 0 ? (
           <p className="text-sm text-default-400 dark:text-gray-500">
-            No JP products found in the product catalogue.
+            {t("No JP products found in the product catalogue.")}
           </p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
@@ -362,7 +375,9 @@ const JPProductionEntryPage: React.FC = () => {
                         ? "bg-default-100 text-default-600 dark:bg-gray-600 dark:text-gray-300"
                         : "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
                     }`}
-                    title={`${mappingCount} pay code(s) mapped`}
+                    title={t("{{count}} pay code(s) mapped", {
+                      count: mappingCount,
+                    })}
                   >
                     {mappingCount}
                   </span>

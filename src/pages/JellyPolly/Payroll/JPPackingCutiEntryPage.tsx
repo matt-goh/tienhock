@@ -5,6 +5,7 @@
 // PACKING_CUTI:JP_PACKING note; the JP payroll processor pays amount_paid into
 // gross and the backend re-runs the affected workers' payroll on save.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconDeviceFloppy,
   IconRefresh,
@@ -67,10 +68,10 @@ interface RowState {
 }
 
 const LEAVE_OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
-  { value: "cuti_sakit", label: "Cuti Sakit" },
-  { value: "cuti_tahunan", label: "Cuti Tahunan" },
-  { value: "cuti_umum", label: "Cuti Umum" },
-  { value: "cuti_rawatan", label: "Cuti Rawatan" },
+  { value: "cuti_sakit", label: "Sick Leave" },
+  { value: "cuti_tahunan", label: "Annual Leave" },
+  { value: "cuti_umum", label: "Public Holiday" },
+  { value: "cuti_rawatan", label: "Medical Leave" },
 ];
 
 const DEFAULT_LEAVE_TYPE: LeaveType = "cuti_sakit";
@@ -149,6 +150,7 @@ const isInteractiveClickTarget = (target: EventTarget | null): boolean => {
 };
 
 const JPPackingCutiEntryPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const [searchParams] = useSearchParams();
   const queryDateParam: string | null = searchParams.get("date");
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -238,7 +240,7 @@ const JPPackingCutiEntryPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error loading JP packing cuti entries:", error);
-      toast.error("Failed to load packing cuti entries");
+      toast.error(t("Failed to load packing cuti entries"));
     } finally {
       setIsLoading(false);
     }
@@ -392,7 +394,11 @@ const JPPackingCutiEntryPage: React.FC = () => {
       (entry) => !Number.isFinite(entry.amount_paid) || entry.amount_paid < 0
     );
     if (invalidEntry) {
-      toast.error(`Invalid amount for ${invalidEntry.employee_id}`);
+      toast.error(
+        t("Invalid amount for {{employeeId}}", {
+          employeeId: invalidEntry.employee_id,
+        })
+      );
       return;
     }
 
@@ -403,11 +409,13 @@ const JPPackingCutiEntryPage: React.FC = () => {
         date: selectedDate,
         entries: payloadEntries,
       });
-      toast.success("Packing cuti saved");
+      toast.success(t("Packing cuti saved"));
       await fetchData();
     } catch (error) {
       console.error("Error saving JP packing cuti:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to save");
+      toast.error(
+        error instanceof Error ? error.message : t("Failed to save")
+      );
     } finally {
       setIsSaving(false);
     }
@@ -435,7 +443,7 @@ const JPPackingCutiEntryPage: React.FC = () => {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Packing Cuti
+            {t("Packing Cuti")}
           </h1>
           <p className="mt-1 text-sm text-default-600 dark:text-gray-300">
             Ice Polly &amp; Jelly Cup Packing
@@ -461,7 +469,7 @@ const JPPackingCutiEntryPage: React.FC = () => {
               <input
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Search workers"
+                placeholder={t("Search workers")}
                 className="h-10 w-full rounded-lg border border-default-300 bg-white pl-10 pr-9 text-sm text-default-900 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100"
               />
               {searchQuery && (
@@ -478,9 +486,12 @@ const JPPackingCutiEntryPage: React.FC = () => {
             <PillSelect<LeaveType>
               value={bulkLeaveType}
               onChange={(value: LeaveType) => setBulkLeaveType(value)}
-              options={LEAVE_OPTIONS}
+              options={LEAVE_OPTIONS.map((o) => ({
+                ...o,
+                label: t(o.label),
+              }))}
               disabled={isSaving}
-              ariaLabel="Leave type to apply to the selected workers"
+              ariaLabel={t("Leave type to apply to the selected workers")}
             />
 
             <Button
@@ -489,19 +500,18 @@ const JPPackingCutiEntryPage: React.FC = () => {
               onClick={handleApplyBulkLeaveType}
               disabled={selectedRows.length === 0 || isSaving}
             >
-              Apply
+              {t("Apply")}
             </Button>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-default-600 dark:text-gray-300">
               <span className="font-medium text-default-900 dark:text-gray-100">
-                {selectedRows.length}
+                {t("{{count}} selected / {{amount}}", {
+                  count: selectedRows.length,
+                  amount: formatCurrency(selectedTotal),
+                })}
               </span>{" "}
-              selected /{" "}
-              <span className="font-medium text-default-900 dark:text-gray-100">
-                {formatCurrency(selectedTotal)}
-              </span>
             </div>
             <Button
               icon={IconRefresh}
@@ -510,7 +520,7 @@ const JPPackingCutiEntryPage: React.FC = () => {
               onClick={handleReset}
               disabled={!hasUnsavedChanges || isSaving}
             >
-              Reset
+              {t("Reset")}
             </Button>
             <Button
               icon={IconDeviceFloppy}
@@ -519,7 +529,7 @@ const JPPackingCutiEntryPage: React.FC = () => {
               onClick={handleSave}
               disabled={!hasUnsavedChanges || isSaving}
             >
-              {isSaving ? "Saving..." : "Save"}
+              {isSaving ? t("Saving...") : t("Save")}
             </Button>
           </div>
         </div>
@@ -533,21 +543,21 @@ const JPPackingCutiEntryPage: React.FC = () => {
                     checked={allFilteredSelected}
                     onChange={() => handleToggleFiltered()}
                     disabled={filteredWorkers.length === 0 || isSaving}
-                    ariaLabel="Select filtered workers"
+                    ariaLabel={t("Select filtered workers")}
                     className="translate-y-0.5"
                   />
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Worker
+                  {t("Worker")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Leave Type
+                  {t("Leave Type")}
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Balance
+                  {t("Balance")}
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-500 dark:text-gray-400">
-                  Amount
+                  {t("Amount")}
                 </th>
               </tr>
             </thead>
@@ -558,7 +568,7 @@ const JPPackingCutiEntryPage: React.FC = () => {
                     colSpan={5}
                     className="px-4 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                   >
-                    No workers found
+                    {t("No workers found")}
                   </td>
                 </tr>
               ) : (
@@ -592,7 +602,9 @@ const JPPackingCutiEntryPage: React.FC = () => {
                           }
                           disabled={isSaving}
                           checkedColor="text-amber-600 dark:text-amber-400"
-                          ariaLabel={`Select ${worker.name}`}
+                          ariaLabel={t("Select {{name}}", {
+                            name: worker.name,
+                          })}
                           className="translate-y-0.5"
                         />
                       </td>
@@ -610,9 +622,14 @@ const JPPackingCutiEntryPage: React.FC = () => {
                           onChange={(value: LeaveType) =>
                             handleLeaveTypeChange(worker.id, value)
                           }
-                          options={LEAVE_OPTIONS}
+                          options={LEAVE_OPTIONS.map((o) => ({
+                            ...o,
+                            label: t(o.label),
+                          }))}
                           disabled={isSaving}
-                          ariaLabel={`Leave type for ${worker.name}`}
+                          ariaLabel={t("Leave type for {{name}}", {
+                            name: worker.name,
+                          })}
                         />
                       </td>
                       <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">

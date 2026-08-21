@@ -4,6 +4,7 @@
 // jellypolly.mid_month_payrolls table.
 import React, { useState, useEffect, useMemo, Fragment } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogPanel,
@@ -120,6 +121,7 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
   employees,
   editingPayroll,
 }) => {
+  const { t } = useTranslation("jellypolly");
   const [employeeId, setEmployeeId] = useState<string>("");
   const [amount, setAmount] = useState<number>(500);
   const [paymentMethod, setPaymentMethod] = useState<
@@ -153,11 +155,11 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
 
   const handleSubmit = async () => {
     if (!editingPayroll && !employeeId) {
-      toast.error("Please select an employee");
+      toast.error(t("Please select an employee"));
       return;
     }
     if (amount <= 0) {
-      toast.error("Amount must be greater than 0");
+      toast.error(t("Amount must be greater than 0"));
       return;
     }
 
@@ -168,7 +170,7 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
           `/jellypolly/api/mid-month-payrolls/${editingPayroll.id}`,
           { amount, payment_method: paymentMethod }
         );
-        toast.success("Mid-month payroll updated successfully");
+        toast.success(t("Mid-month payroll updated successfully"));
       } else {
         await api.post("/jellypolly/api/mid-month-payrolls", {
           employee_id: employeeId,
@@ -177,7 +179,7 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
           amount,
           payment_method: paymentMethod,
         });
-        toast.success("Mid-month payroll created successfully");
+        toast.success(t("Mid-month payroll created successfully"));
       }
       onSuccess();
       onClose();
@@ -185,10 +187,10 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
       console.error("Error saving JP mid-month payroll:", error);
       if (error.response?.status === 409 || error?.status === 409) {
         toast.error(
-          "This employee already has a mid-month payroll for this month"
+          t("This employee already has a mid-month payroll for this month")
         );
       } else {
-        toast.error("Failed to save mid-month payroll. Please try again.");
+        toast.error(t("Failed to save mid-month payroll. Please try again."));
       }
     } finally {
       setIsSaving(false);
@@ -229,28 +231,35 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
                   as="h3"
                   className="text-lg font-medium leading-6 text-default-800 dark:text-gray-100 mb-4"
                 >
-                  {editingPayroll ? "Edit" : "Add"} Mid-month Payroll -{" "}
-                  {getMonthName(currentMonth)} {currentYear}
+                  {t(
+                    editingPayroll
+                      ? "Edit Mid-month Payroll - {{month}} {{year}}"
+                      : "Add Mid-month Payroll - {{month}} {{year}}",
+                    {
+                      month: t(getMonthName(currentMonth)),
+                      year: currentYear,
+                    }
+                  )}
                 </DialogTitle>
 
                 <div className="space-y-4">
                   {/* Employee Selection (locked when editing) */}
                   {editingPayroll ? (
                     <div className="text-sm text-default-700 dark:text-gray-200">
-                      <span className="font-medium">Employee:</span>{" "}
+                      <span className="font-medium">{t("Employee:")}</span>{" "}
                       {editingPayroll.employee_name} (
                       {editingPayroll.employee_id})
                     </div>
                   ) : (
                     <FormCombobox
                       name="employee"
-                      label="Select Employee"
+                      label={t("Select Employee")}
                       value={employeeId}
                       onChange={(value) => setEmployeeId(value as string)}
                       options={employeeOptions}
                       query={searchQuery}
                       setQuery={setSearchQuery}
-                      placeholder="Search for employee..."
+                      placeholder={t("Search for employee...")}
                       mode="single"
                     />
                   )}
@@ -258,7 +267,7 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
                   {/* Amount */}
                   <FormInput
                     name="amount"
-                    label="Amount (RM)"
+                    label={t("Amount (RM)")}
                     type="number"
                     value={amount}
                     onChange={(e) => setAmount(Number(e.target.value))}
@@ -270,15 +279,18 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
                   {/* Payment Method */}
                   <div className="space-y-2">
                     <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                      Payment Method
+                      {t("Payment Method")}
                     </label>
                     <PillSelect<MidMonthPaymentMethod>
                       value={paymentMethod}
                       onChange={(value: MidMonthPaymentMethod) =>
                         setPaymentMethod(value)
                       }
-                      options={PAYMENT_METHOD_OPTIONS}
-                      ariaLabel="Payment method"
+                      options={PAYMENT_METHOD_OPTIONS.map((o) => ({
+                        ...o,
+                        label: t(o.label),
+                      }))}
+                      ariaLabel={t("Payment method")}
                       size="md"
                     />
                   </div>
@@ -292,7 +304,7 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
                     onClick={onClose}
                     disabled={isSaving}
                   >
-                    Cancel
+                    {t("Cancel")}
                   </Button>
                   <Button
                     type="button"
@@ -306,10 +318,10 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
                     }
                   >
                     {isSaving
-                      ? "Saving..."
+                      ? t("Saving...")
                       : editingPayroll
-                      ? "Update Payroll"
-                      : "Create Payroll"}
+                      ? t("Update Payroll")
+                      : t("Create Payroll")}
                   </Button>
                 </div>
               </DialogPanel>
@@ -322,6 +334,7 @@ const JPMidMonthPayrollModal: React.FC<JPMidMonthPayrollModalProps> = ({
 };
 
 const JPMidMonthPayrollPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   // State
   const [payrolls, setPayrolls] = useState<JPMidMonthPayroll[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -435,7 +448,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
       setPinjamByEmp(pinjamMap);
     } catch (error) {
       console.error("Error fetching JP mid-month payrolls:", error);
-      toast.error("Failed to load mid-month payrolls");
+      toast.error(t("Failed to load mid-month payrolls"));
     } finally {
       setIsLoading(false);
     }
@@ -451,13 +464,13 @@ const JPMidMonthPayrollPage: React.FC = () => {
 
     try {
       await api.delete(`/jellypolly/api/mid-month-payrolls/${deletingId}`);
-      toast.success("Payroll deleted successfully");
+      toast.success(t("Payroll deleted successfully"));
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchPayrolls();
     } catch (error) {
       console.error("Error deleting JP mid-month payroll:", error);
-      toast.error("Failed to delete payroll");
+      toast.error(t("Failed to delete payroll"));
     }
   };
 
@@ -502,7 +515,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
   // Mid-month report PDF (mirrors Tien Hock; net = advance - mid-month pinjam)
   const generatePDF = async (action: "download" | "print") => {
     if (payrolls.length === 0) {
-      toast.error("No mid-month payrolls to report");
+      toast.error(t("No mid-month payrolls to report"));
       return;
     }
     setIsGeneratingPDF(true);
@@ -538,13 +551,15 @@ const JPMidMonthPayrollPage: React.FC = () => {
       };
       await generateMidMonthPayrollReportPDF(pdfData, action);
       toast.success(
-        `Mid-month payroll report ${
-          action === "download" ? "downloaded" : "generated for printing"
-        }`
+        t(
+          action === "download"
+            ? "Mid-month payroll report downloaded"
+            : "Mid-month payroll report generated for printing"
+        )
       );
     } catch (error) {
       console.error("Error generating JP mid-month PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -695,10 +710,10 @@ const JPMidMonthPayrollPage: React.FC = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      toast.success("Bank file exported");
+      toast.success(t("Bank file exported"));
     } catch (error) {
       console.error("Error generating JP bank export:", error);
-      toast.error("Failed to generate bank file");
+      toast.error(t("Failed to generate bank file"));
     } finally {
       setIsGeneratingExport(false);
     }
@@ -708,7 +723,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          Mid-month Payrolls (Jelly Polly)
+          {t("Mid-month Payrolls (Jelly Polly)")}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -716,27 +731,27 @@ const JPMidMonthPayrollPage: React.FC = () => {
             icon={IconPrinter}
             variant="outline"
             disabled={isGeneratingPDF || payrolls.length === 0}
-            title="Print mid-month report"
+            title={t("Print mid-month report")}
           >
-            Print
+            {t("Print")}
           </Button>
           <Button
             onClick={() => generatePDF("download")}
             icon={IconDownload}
             variant="outline"
             disabled={isGeneratingPDF || payrolls.length === 0}
-            title="Download mid-month report PDF"
+            title={t("Download mid-month report PDF")}
           >
-            Download
+            {t("Download")}
           </Button>
           <Button
             onClick={generateTextExport}
             icon={IconFileText}
             variant="outline"
             disabled={isGeneratingExport || payrolls.length === 0}
-            title="Export Public Bank IBG file (Bank-payment employees)"
+            title={t("Export Public Bank IBG file (Bank-payment employees)")}
           >
-            Bank File
+            {t("Bank File")}
           </Button>
           <Button
             onClick={fetchPayrolls}
@@ -744,7 +759,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             onClick={() => {
@@ -755,7 +770,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add Payroll
+            {t("Add Payroll")}
           </Button>
         </div>
       </div>
@@ -773,10 +788,12 @@ const JPMidMonthPayrollPage: React.FC = () => {
           </div>
           <div className="text-sm text-default-600 dark:text-gray-300">
             <div className="font-medium">
-              Total: {payrolls.length} employees
+              {t("Total: {{count}} employees", { count: payrolls.length })}
             </div>
             <div className="font-medium">
-              Amount: {formatCurrency(totalAmount)}
+              {t("Amount: {{amount}}", {
+                amount: formatCurrency(totalAmount),
+              })}
             </div>
           </div>
         </div>
@@ -806,7 +823,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
                       : ""
                   }`}
                 >
-                  {view}
+                  {t(view)}
                 </button>
               )
             )}
@@ -820,7 +837,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
             </div>
           ) : pinjamReportData.length === 0 ? (
             <div className="text-center py-12 text-default-500 dark:text-gray-400">
-              No mid-month payrolls found.
+              {t("No mid-month payrolls found.")}
             </div>
           ) : (
             <div className="px-6 pt-2 pb-2">
@@ -835,8 +852,10 @@ const JPMidMonthPayrollPage: React.FC = () => {
         ) : payrolls.length === 0 ? (
           <div className="text-center py-12 text-default-500 dark:text-gray-400">
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-            <p className="text-lg font-medium">No payrolls found</p>
-            <p>Click "Add Payroll" to create mid-month payrolls</p>
+            <p className="text-lg font-medium">
+              {t("No payrolls found")}
+            </p>
+            <p>{t('Click "Add Payroll" to create mid-month payrolls')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -844,25 +863,25 @@ const JPMidMonthPayrollPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee ID
+                    {t("Employee ID")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
+                    {t("Name")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Mid-Month Pinjam
+                    {t("Mid-Month Pinjam")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Payment Method
+                    {t("Payment Method")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Created
+                    {t("Created")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -889,7 +908,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
                         : "-"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-900 dark:text-gray-100">
-                      {payroll.payment_method}
+                      {t(payroll.payment_method)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-default-500 dark:text-gray-400">
                       {format(new Date(payroll.created_at), "dd MMM yyyy")}
@@ -899,7 +918,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(payroll)}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -909,7 +928,7 @@ const JPMidMonthPayrollPage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -945,9 +964,11 @@ const JPMidMonthPayrollPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeletePayroll}
-        title="Delete Mid-month Payroll"
-        message="Are you sure you want to delete this mid-month payroll? This action cannot be undone."
-        confirmButtonText="Delete"
+        title={t("Delete Mid-month Payroll")}
+        message={t(
+          "Are you sure you want to delete this mid-month payroll? This action cannot be undone."
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

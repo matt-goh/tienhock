@@ -44,13 +44,19 @@ or a field restored to its evidence value do not disable the comparisons. `verif
 `verify-import.mjs` continue to prove the immutable 503-code payload, imported ledger and historical
 closes independently, while the `ledger`, `bridge` and `regressions` stages still run normally.
 
+Since 2026-08-21 the live June reports also include the separately approved `JV2606-01` bank-charge
+correction (DR `BWBC` / CR `PBB_1` RM2.70). The source CSVs and manifest remain the untouched scans;
+the G5 harness exact-validates that journal, overlays its two known account/statement deltas on the
+June expectations, and continues comparing ledger row order/month-end paths against
+`source_type='legacy_import'` only. Any other pre-cutover organic journal still fails R8's mirror gate.
+
 | Stage | What it proves | Gates |
 |---|---|---:|
 | `tb` | `buildTrialBalance` vs all six printed Trial Balances — every printed line, **in printed order**, the netted DEBTOR control, and grand totals | 54 |
 | `statements` | `buildIncomeStatement` + `buildBalanceSheet` vs the printed June statements, line by line, incl. the three APPX overrides and each line's account composition | 17 |
-| `ledger` | `buildAccountLedger` for **all 501 accounts**: printed row order, month-end running balances, derived-row flagging, the five bank statements | 17 |
+| `ledger` | `buildAccountLedger` for **all 500 Jan–Jun anchored/imported accounts**: printed row order, month-end running balances, derived-row flagging, the five bank statements, and the corrected live BWBC/PBB_1 closes | 18 |
 | `bridge` | the §3d operational-bridge counts, so [`GT_OPERATIONAL_BRIDGE.md`](../../../docs/Account/GT_OPERATIONAL_BRIDGE.md) cannot rot | 12 |
-| `regressions` | the engines + the G7 posting services are schema-isolated (static scan), the LEGACY population is unmoved (organic journals may accrue beside it), no organic journal predates the 2026-07-01 open date, Tien Hock is untouched | 24 |
+| `regressions` | the engines + the G7 posting services are schema-isolated (static scan), the LEGACY population is unmoved (organic journals may accrue beside it), no unexplained organic journal predates the 2026-07-01 open date, the exact `JV2606-01` exception is intact, Tien Hock is untouched | 25 |
 
 Two gates are worth knowing about because they look surprising:
 

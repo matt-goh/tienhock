@@ -7,10 +7,12 @@
  * completely independent: that the imported ledger reproduces the SIX PRINTED
  * TRIAL BALANCE SCANS, account by account, month by month.
  *
- * It never looks at staging. Balances come out of the database exactly the way
- * a report engine will read them - the 2026-01-01 anchor plus every posted
- * journal line up to the month end - and are compared against the G1 fixtures
- * transcribed from the scans. About 2,850 exact per-account comparisons.
+ * It never looks at staging. Legacy balances come out of the database as the
+ * 2026-01-01 anchor plus the posted `legacy_import` lines up to each month end
+ * and are compared against the G1 fixtures transcribed from the scans. Approved
+ * later corrections (currently JV2606-01) are verified separately rather than
+ * being mistaken for part of the immutable source import. Exactly 2,844
+ * per-account comparisons.
  *
  *   source  dev/import/greentarget-report-fixtures/data/gt-tb-2026-{01..06}.csv
  *   source  dev/import/greentarget-report-fixtures/source-manifest.json
@@ -51,6 +53,9 @@ const BLANK_PRINTED = new Set(["BTFS"]);
 
 /** DEBTOR is a printed control line, not a postable account. */
 const CONTROL_LINE = "DEBTOR";
+
+/** The one approved manual correction inside the otherwise locked import. */
+const APPROVED_LOCKED_PERIOD_JV_REFERENCE = "JV2606-01";
 
 let failures = 0;
 let checks = 0;
@@ -257,6 +262,7 @@ for (const period of PERIODS) {
                    JOIN greentarget.journal_entry_lines lines
                      ON lines.journal_entry_id = headers.id
                   WHERE headers.status = 'posted'
+                    AND headers.source_type = 'legacy_import'
                     AND lines.account_code = anchors.account_code
                     AND headers.entry_date >= anchors.as_of_date
                     AND headers.entry_date <= DATE '${asOf}'
@@ -556,11 +562,115 @@ console.log("\n-- 5. provenance and print order --------------------------------
   );
   check(outside === "0", "no imported journal posts outside 2026-01-01..2026-06-30 (R2 cutover)", `found ${outside}`);
 
-  // G7's mirror rule: organic journals only ever live on/after the open date.
-  const organicEarly = scalar(
-    "SELECT count(*) FROM greentarget.journal_entries WHERE source_type IS DISTINCT FROM 'legacy_import' AND entry_date < DATE '2026-07-01'"
+  // G7's mirror rule remains intact for ordinary screens. The one approved
+  // June correction is source-less because it is genuinely a manual JV, but
+  // it entered through the documented guarded-migration bypass. Validate its
+  // full fingerprint before excluding that exact reference from the gate.
+  const approvedCorrectionReferences = scalar(`
+    SELECT count(*)
+      FROM greentarget.journal_entries
+     WHERE UPPER(BTRIM(reference_no)) = '${APPROVED_LOCKED_PERIOD_JV_REFERENCE}'`);
+  const exactApprovedCorrections = scalar(`
+    SELECT count(*)
+      FROM greentarget.journal_entries header
+     WHERE header.reference_no = '${APPROVED_LOCKED_PERIOD_JV_REFERENCE}'
+       AND header.entry_type = 'JV'
+       AND header.entry_date = DATE '2026-06-30'
+       AND header.description = 'BANK CHARGES MONTH OF JUNE 2026'
+       AND header.total_debit = 2.70
+       AND header.total_credit = 2.70
+       AND header.status = 'posted'
+       AND header.display_reference IS NULL
+       AND header.posting_sequence = 279
+       AND header.source_type IS NULL
+       AND header.source_id IS NULL
+       AND header.legacy_entry_type IS NULL
+       AND header.manual_override IS false
+       AND header.cheque_no IS NULL
+       AND header.created_by = 'GT_JUNE_BANK_CHARGE_20260821'
+       AND header.updated_by = 'GT_JUNE_BANK_CHARGE_20260821'
+       AND header.posted_by = 'GT_JUNE_BANK_CHARGE_20260821'
+       AND header.posted_at IS NOT NULL
+       AND (SELECT count(*) FROM greentarget.journal_entry_lines line
+             WHERE line.journal_entry_id = header.id) = 2
+       AND EXISTS (
+         SELECT 1 FROM greentarget.journal_entry_lines line
+          WHERE line.journal_entry_id = header.id
+            AND line.line_number = 1
+            AND line.account_code = 'BWBC'
+            AND line.debit_amount = 2.70
+            AND line.credit_amount = 0
+            AND line.reference IS NULL
+            AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+            AND line.cheque_reference IS NULL
+            AND line.display_order = 1
+            AND line.display_reference IS NULL
+            AND line.debtor_subledger_code IS NULL
+       )
+       AND EXISTS (
+         SELECT 1 FROM greentarget.journal_entry_lines line
+          WHERE line.journal_entry_id = header.id
+            AND line.line_number = 2
+            AND line.account_code = 'PBB_1'
+            AND line.debit_amount = 0
+            AND line.credit_amount = 2.70
+            AND line.reference IS NULL
+            AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+            AND line.cheque_reference IS NULL
+            AND line.display_order = 2
+            AND line.display_reference IS NULL
+            AND line.debtor_subledger_code IS NULL
+       )`);
+  check(
+    (approvedCorrectionReferences === "0" && exactApprovedCorrections === "0") ||
+      (approvedCorrectionReferences === "1" && exactApprovedCorrections === "1"),
+    "JV2606-01 is absent or exactly matches the approved 30-Jun bank-charge correction",
+    `references ${approvedCorrectionReferences}, exact ${exactApprovedCorrections}`
   );
-  check(organicEarly === "0", "no organic journal posts before the 2026-07-01 open date (R8)", `found ${organicEarly}`);
+
+  const organicEarly = scalar(
+    `SELECT count(*) FROM greentarget.journal_entries
+      WHERE source_type IS DISTINCT FROM 'legacy_import'
+        AND entry_date < DATE '2026-07-01'
+        AND UPPER(BTRIM(reference_no)) IS DISTINCT FROM '${APPROVED_LOCKED_PERIOD_JV_REFERENCE}'`
+  );
+  check(
+    organicEarly === "0",
+    "no unexplained organic journal posts before the 2026-07-01 open date (R8)",
+    `found ${organicEarly}`
+  );
+
+  if (exactApprovedCorrections === "1") {
+    const correctedBalances = query(
+      `SELECT anchors.account_code,
+              (ROUND(anchors.amount * 100) + COALESCE((
+                SELECT SUM(ROUND(lines.debit_amount * 100)
+                           - ROUND(lines.credit_amount * 100))
+                  FROM greentarget.journal_entries headers
+                  JOIN greentarget.journal_entry_lines lines
+                    ON lines.journal_entry_id = headers.id
+                 WHERE headers.status = 'posted'
+                   AND headers.entry_date BETWEEN anchors.as_of_date AND DATE '2026-06-30'
+                   AND lines.account_code = anchors.account_code
+              ), 0))::bigint AS cents
+         FROM greentarget.account_opening_balances anchors
+        WHERE anchors.as_of_date = DATE '2026-01-01'
+          AND anchors.account_code IN ('BWBC', 'PBB_1')
+        ORDER BY anchors.account_code`,
+      ["code", "cents"]
+    );
+    const correctedByCode = new Map(
+      correctedBalances.map((row) => [row.code, Number(row.cents)])
+    );
+    check(
+      correctedByCode.get("BWBC") === 12010 &&
+        correctedByCode.get("PBB_1") === 2846567,
+      "the approved JV leaves June BWBC at 120.10 and PBB_1 at 28,465.67",
+      `BWBC ${money(correctedByCode.get("BWBC"))}, PBB_1 ${money(
+        correctedByCode.get("PBB_1")
+      )}`
+    );
+  }
 }
 
 console.log("\n-- 6. Tien Hock isolation ------------------------------------------");

@@ -3,6 +3,7 @@
 // keeping JP's simpler process-all workflow.
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconCash,
   IconUsers,
@@ -93,6 +94,7 @@ const formatAmount = (amount: number): string =>
   }).format(amount);
 
 const JPPayrollPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const { staffs } = useJPStaffsCache();
@@ -168,7 +170,7 @@ const JPPayrollPage: React.FC = () => {
       }
     } catch (error) {
       console.error("Error fetching JP payroll:", error);
-      toast.error("Failed to load payroll data");
+      toast.error(t("Failed to load payroll data"));
     } finally {
       setIsLoading(false);
     }
@@ -185,12 +187,17 @@ const JPPayrollPage: React.FC = () => {
     setIsCreating(true);
     try {
       await api.post("/jellypolly/api/monthly-payrolls", { year, month });
-      toast.success(`Created payroll for ${getMonthName(month)} ${year}`);
+      toast.success(
+        t("Created payroll for {{month}} {{year}}", {
+          month: t(getMonthName(month)),
+          year,
+        })
+      );
       await fetchPayrollData();
     } catch (error: unknown) {
       console.error("Error creating payroll:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to create payroll";
+        error instanceof Error ? error.message : t("Failed to create payroll");
       toast.error(errorMessage);
     } finally {
       setIsCreating(false);
@@ -202,7 +209,7 @@ const JPPayrollPage: React.FC = () => {
 
     if (assignedStaffCount === 0) {
       toast.error(
-        "No staff hold a JP payroll job. Assign jobs on the Job page first."
+        t("No staff hold a JP payroll job. Assign jobs on the Job page first.")
       );
       return;
     }
@@ -215,7 +222,11 @@ const JPPayrollPage: React.FC = () => {
       );
 
       if (result.success) {
-        toast.success(`Processed ${result.processed_count} employee(s)`);
+        toast.success(
+          t("Processed {{count}} employee(s)", {
+            count: result.processed_count,
+          })
+        );
         if ((result.missing_income_tax_employees?.length || 0) > 0) {
           setMissingIncomeTaxEmployees(
             result.missing_income_tax_employees || []
@@ -224,11 +235,11 @@ const JPPayrollPage: React.FC = () => {
         }
         await fetchPayrollData();
       } else {
-        toast.error(result.message || "Processing failed");
+        toast.error(result.message || t("Processing failed"));
       }
     } catch (error) {
       console.error("Error processing payroll:", error);
-      toast.error("Failed to process payroll");
+      toast.error(t("Failed to process payroll"));
     } finally {
       setIsProcessing(false);
     }
@@ -307,10 +318,10 @@ const JPPayrollPage: React.FC = () => {
             />
             <div className="flex-1">
               <h3 className="font-medium text-sky-800 dark:text-sky-200">
-                Processing Payroll
+                {t("Processing Payroll")}
               </h3>
               <p className="text-sm text-sky-600 dark:text-sky-400">
-                Rebuilding Jelly Polly payroll for the selected month...
+                {t("Rebuilding Jelly Polly payroll for the selected month...")}
               </p>
             </div>
           </div>
@@ -346,9 +357,10 @@ const JPPayrollPage: React.FC = () => {
                   />
                   <span
                     className="font-semibold text-emerald-700 dark:text-emerald-300"
-                    title={`Jumlah Digenapkan: ${formatCurrency(
-                      totalRounded
-                    )}. Net Pay: ${formatCurrency(totalNet)}.`}
+                    title={t("Rounded Total: {{total}}. Net Pay: {{net}}.", {
+                      total: formatCurrency(totalRounded),
+                      net: formatCurrency(totalNet),
+                    })}
                   >
                     {formatAmount(totalRounded)}
                   </span>
@@ -358,13 +370,15 @@ const JPPayrollPage: React.FC = () => {
                   onClick={handleProcessPayroll}
                   disabled={isProcessing}
                   className="inline-flex items-center gap-1.5 text-default-400 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors disabled:opacity-50"
-                  title="Re-process Jelly Polly payroll"
+                  title={t("Re-process Jelly Polly payroll")}
                 >
                   <IconRefresh
                     size={14}
                     className={isProcessing ? "animate-spin" : ""}
                   />
-                  <span>{isProcessing ? "Processing..." : "Process"}</span>
+                  <span>
+                    {isProcessing ? t("Processing...") : t("Process")}
+                  </span>
                 </button>
               </div>
             )}
@@ -378,7 +392,7 @@ const JPPayrollPage: React.FC = () => {
                   payrolls={batchPayrolls}
                   companyName="JELLY-POLLY FOOD INDUSTRIES"
                   size="sm"
-                  buttonLabel="Payslips"
+                  buttonLabel={t("Payslips")}
                 />
                 <DownloadBatchPayslipsButton
                   company="jellypolly"
@@ -387,7 +401,9 @@ const JPPayrollPage: React.FC = () => {
                   size="sm"
                   variant="outline"
                   color="sky"
-                  buttonText={`${batchPayrolls.length} PDFs`}
+                  buttonText={t("{{total}} PDFs", {
+                    total: batchPayrolls.length,
+                  })}
                 />
               </>
             )}
@@ -405,14 +421,13 @@ const JPPayrollPage: React.FC = () => {
                 />
               </div>
               <h3 className="text-lg font-semibold text-default-700 dark:text-gray-200 mb-2">
-                No Payroll Yet
+                {t("No Payroll Yet")}
               </h3>
               <p className="text-default-400 dark:text-gray-400 text-center max-w-sm mb-6">
-                There is no Jelly Polly payroll record for{" "}
-                <span className="font-medium text-default-600 dark:text-gray-300">
-                  {getMonthName(month)} {year}
-                </span>
-                . Create one to start processing employee payments.
+                {t("There is no Jelly Polly payroll record for {{month}} {{year}}. Create one to start processing employee payments.", {
+                  month: t(getMonthName(month)),
+                  year,
+                })}
               </p>
               <Button
                 color="sky"
@@ -422,11 +437,13 @@ const JPPayrollPage: React.FC = () => {
                 iconSize={18}
                 size="md"
               >
-                {isCreating ? "Creating..." : "Create Payroll"}
+                {isCreating ? t("Creating...") : t("Create Payroll")}
               </Button>
               {assignedStaffCount === 0 && (
                 <p className="text-sm text-amber-600 dark:text-amber-400 mt-3">
-                  Assign JP jobs to staff first (Catalogue - Job or the staff form)
+                  {t(
+                    "Assign JP jobs to staff first (Catalogue - Job or the staff form)"
+                  )}
                 </p>
               )}
             </div>
@@ -438,7 +455,7 @@ const JPPayrollPage: React.FC = () => {
             {orderedJobTypes.length === 0 ? (
               <div className="text-center py-8 border border-default-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
                 <p className="text-default-500 dark:text-gray-400">
-                  No employee payrolls found.
+                  {t("No employee payrolls found.")}
                 </p>
                 <Button
                   onClick={handleProcessPayroll}
@@ -447,7 +464,7 @@ const JPPayrollPage: React.FC = () => {
                   className="mt-4"
                   disabled={isProcessing}
                 >
-                  {isProcessing ? "Processing..." : "Process Payroll"}
+                  {isProcessing ? t("Processing...") : t("Process Payroll")}
                 </Button>
               </div>
             ) : (
@@ -456,19 +473,19 @@ const JPPayrollPage: React.FC = () => {
                   <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                     <tr>
                       <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase">
-                        Name
+                        {t("Name")}
                       </th>
                       <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-28">
-                        ID
+                        {t("ID")}
                       </th>
                       <th className="px-3 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-32">
-                        Section
+                        {t("Section")}
                       </th>
                       <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-32">
-                        Gross
+                        {t("Gross")}
                       </th>
                       <th className="px-3 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase w-32">
-                        Net
+                        {t("Net")}
                       </th>
                     </tr>
                   </thead>
@@ -512,8 +529,9 @@ const JPPayrollPage: React.FC = () => {
                                   {jobTypeLabel(jobType)}
                                 </span>
                                 <span className="text-sm text-default-500 dark:text-gray-400">
-                                  ({rows.length}{" "}
-                                  {rows.length === 1 ? "employee" : "employees"})
+                                  {t("({{count}} employee/employees)", {
+                                    count: rows.length,
+                                  })}
                                 </span>
                               </div>
                             </td>
@@ -553,9 +571,13 @@ const JPPayrollPage: React.FC = () => {
                                 <td className="px-3 py-2">
                                   <div
                                     className="truncate font-medium text-default-700 dark:text-gray-200"
-                                    title={employeePayroll.employee_name || "Unknown"}
+                                    title={
+                                      employeePayroll.employee_name ||
+                                      t("Unknown")
+                                    }
                                   >
-                                    {employeePayroll.employee_name || "Unknown"}
+                                    {employeePayroll.employee_name ||
+                                      t("Unknown")}
                                   </div>
                                 </td>
                                 <td className="px-3 py-2 text-default-500 dark:text-gray-400 text-sm">

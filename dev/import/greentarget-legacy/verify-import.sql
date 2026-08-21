@@ -273,6 +273,7 @@ SELECT months.as_of,
             JOIN greentarget.journal_entry_lines lines
               ON lines.journal_entry_id = headers.id
            WHERE headers.status = 'posted'
+             AND headers.source_type = 'legacy_import'
              AND lines.account_code = anchors.account_code
              AND headers.entry_date >= anchors.as_of_date
              AND headers.entry_date <= months.as_of
@@ -594,12 +595,75 @@ BEGIN
     RAISE EXCEPTION 'An imported journal falls outside the 2026-01-01..2026-06-30 import window';
   END IF;
 
+  -- Ordinary screens still obey R8. JV2606-01 is the one approved source-less
+  -- correction inside the imported period, applied through a guarded
+  -- migration; validate its complete shape before excluding that exact
+  -- reference from the no-organic-history gate.
   IF EXISTS (
     SELECT 1 FROM greentarget.journal_entries
      WHERE source_type IS DISTINCT FROM 'legacy_import'
        AND entry_date < DATE '2026-07-01'
+       AND UPPER(BTRIM(reference_no)) IS DISTINCT FROM 'JV2606-01'
   ) THEN
-    RAISE EXCEPTION 'An organic journal predates the 2026-07-01 open date (R8)';
+    RAISE EXCEPTION 'An unexplained organic journal predates the 2026-07-01 open date (R8)';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM greentarget.journal_entries header
+     WHERE UPPER(BTRIM(header.reference_no)) = 'JV2606-01'
+       AND (
+         header.reference_no = 'JV2606-01'
+         AND header.entry_type = 'JV'
+         AND header.entry_date = DATE '2026-06-30'
+         AND header.description = 'BANK CHARGES MONTH OF JUNE 2026'
+         AND header.total_debit = 2.70
+         AND header.total_credit = 2.70
+         AND header.status = 'posted'
+         AND header.display_reference IS NULL
+         AND header.posting_sequence = 279
+         AND header.source_type IS NULL
+         AND header.source_id IS NULL
+         AND header.legacy_entry_type IS NULL
+         AND header.manual_override IS false
+         AND header.cheque_no IS NULL
+         AND header.created_by = 'GT_JUNE_BANK_CHARGE_20260821'
+         AND header.updated_by = 'GT_JUNE_BANK_CHARGE_20260821'
+         AND header.posted_by = 'GT_JUNE_BANK_CHARGE_20260821'
+         AND header.posted_at IS NOT NULL
+         AND (SELECT COUNT(*) FROM greentarget.journal_entry_lines line
+               WHERE line.journal_entry_id = header.id) = 2
+         AND EXISTS (
+           SELECT 1 FROM greentarget.journal_entry_lines line
+            WHERE line.journal_entry_id = header.id
+              AND line.line_number = 1
+              AND line.account_code = 'BWBC'
+              AND line.debit_amount = 2.70
+              AND line.credit_amount = 0
+              AND line.reference IS NULL
+              AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+              AND line.cheque_reference IS NULL
+              AND line.display_order = 1
+              AND line.display_reference IS NULL
+              AND line.debtor_subledger_code IS NULL
+         )
+         AND EXISTS (
+           SELECT 1 FROM greentarget.journal_entry_lines line
+            WHERE line.journal_entry_id = header.id
+              AND line.line_number = 2
+              AND line.account_code = 'PBB_1'
+              AND line.debit_amount = 0
+              AND line.credit_amount = 2.70
+              AND line.reference IS NULL
+              AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+              AND line.cheque_reference IS NULL
+              AND line.display_order = 2
+              AND line.display_reference IS NULL
+              AND line.debtor_subledger_code IS NULL
+         )
+       ) IS NOT TRUE
+  ) THEN
+    RAISE EXCEPTION 'JV2606-01 exists but does not match the approved June bank-charge correction';
   END IF;
 
   -- 9. Opening anchors ------------------------------------------------------
@@ -788,6 +852,7 @@ SELECT TO_CHAR(header.entry_date, 'YYYY-MM')            AS import_month,
   FROM greentarget.journal_entries header
   JOIN greentarget.journal_entry_lines lines
     ON lines.journal_entry_id = header.id
+ WHERE header.source_type = 'legacy_import'
  GROUP BY TO_CHAR(header.entry_date, 'YYYY-MM')
  ORDER BY 1;
 
@@ -798,6 +863,7 @@ SELECT header.legacy_entry_type                AS legacy_family,
   FROM greentarget.journal_entries header
   JOIN greentarget.journal_entry_lines lines
     ON lines.journal_entry_id = header.id
+ WHERE header.source_type = 'legacy_import'
  GROUP BY header.legacy_entry_type
  ORDER BY 3 DESC;
 

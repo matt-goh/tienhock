@@ -5,6 +5,7 @@
 // deducted as an advance; net effect ~0). JP has no locations.
 import React, { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconEdit,
@@ -50,6 +51,8 @@ interface Advance {
 }
 
 const JPOthersAdvancePage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
+  const displayLabel = t("Others (Advance)");
   const { staffs } = useJPStaffsCache();
   // Staff holding at least one JP payroll job in staffs.job
   const allowedEmployeeIds = useMemo(
@@ -135,7 +138,7 @@ const JPOthersAdvancePage: React.FC = () => {
       setAdvances(response || []);
     } catch (error) {
       console.error("Error fetching advances:", error);
-      toast.error(`Failed to load ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to load {{label}}", { label: displayLabel }));
     } finally {
       setIsLoading(false);
     }
@@ -150,13 +153,15 @@ const JPOthersAdvancePage: React.FC = () => {
     if (!deletingId) return;
     try {
       await api.delete(`${API_BASE}/${deletingId}`);
-      toast.success(`${DISPLAY_LABEL} record deleted successfully`);
+      toast.success(
+        t("{{label}} record deleted successfully", { label: displayLabel })
+      );
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchAdvances();
     } catch (error) {
       console.error("Error deleting advance:", error);
-      toast.error(`Failed to delete ${DISPLAY_LABEL}`);
+      toast.error(t("Failed to delete {{label}}", { label: displayLabel }));
     }
   };
 
@@ -206,7 +211,7 @@ const JPOthersAdvancePage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          {DISPLAY_LABEL}
+          {displayLabel}
         </h1>
         <div className="flex space-x-3 mt-4 md:mt-0">
           <Button
@@ -215,7 +220,7 @@ const JPOthersAdvancePage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
           <Button
             onClick={() => setShowAddModal(true)}
@@ -223,7 +228,7 @@ const JPOthersAdvancePage: React.FC = () => {
             color="sky"
             variant="filled"
           >
-            Add {DISPLAY_LABEL}
+            {t("Add {{label}}", { label: displayLabel })}
           </Button>
         </div>
       </div>
@@ -249,7 +254,7 @@ const JPOthersAdvancePage: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search name, amount, description..."
+                placeholder={t("Search name, amount, description...")}
                 className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-1.5 pl-8 pr-8 text-sm text-default-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
               />
               {searchQuery && (
@@ -257,7 +262,7 @@ const JPOthersAdvancePage: React.FC = () => {
                   type="button"
                   onClick={() => setSearchQuery("")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-gray-400 hover:bg-default-100 dark:text-gray-500 dark:hover:bg-gray-700"
-                  title="Clear search"
+                  title={t("Clear search")}
                 >
                   <IconX size={13} />
                 </button>
@@ -266,10 +271,12 @@ const JPOthersAdvancePage: React.FC = () => {
             <div className="hidden h-6 w-px bg-default-300 dark:bg-gray-600 sm:block" />
             <div className="text-right text-sm text-default-600 dark:text-gray-300">
               <div className="font-medium">
-                Total: {filteredAdvances.length} records
+                {t("Total: {{total}} records", {
+                  total: filteredAdvances.length,
+                })}
               </div>
               <div className="font-medium">
-                Amount: {formatCurrency(totalAmount)}
+                {t("Amount: {{amount}}", { amount: formatCurrency(totalAmount) })}
               </div>
             </div>
           </div>
@@ -292,13 +299,15 @@ const JPOthersAdvancePage: React.FC = () => {
             <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
             <p className="text-lg font-medium">
               {searchQuery.trim()
-                ? `No matching ${DISPLAY_LABEL} records`
-                : `No ${DISPLAY_LABEL} records found`}
+                ? t("No matching {{label}} records", { label: displayLabel })
+                : t("No {{label}} records found", { label: displayLabel })}
             </p>
             <p>
               {searchQuery.trim()
-                ? "Try a different search term"
-                : `Click "Add ${DISPLAY_LABEL}" to create records`}
+                ? t("Try a different search term")
+                : t('Click "Add {{label}}" to create records', {
+                    label: displayLabel,
+                  })}
             </p>
           </div>
         ) : (
@@ -307,22 +316,22 @@ const JPOthersAdvancePage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee ID
+                    {t("Employee ID")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Name
+                    {t("Name")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -352,7 +361,7 @@ const JPOthersAdvancePage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(advance)}
                           className="p-1.5 rounded-full text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors duration-150"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -362,7 +371,7 @@ const JPOthersAdvancePage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="p-1.5 rounded-full text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 transition-colors duration-150"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -386,8 +395,8 @@ const JPOthersAdvancePage: React.FC = () => {
           currentYear={currentYear}
           currentMonth={currentMonth}
           incentiveType="Bonus"
-          displayLabel={DISPLAY_LABEL}
-          displayLabelPlural={DISPLAY_LABEL}
+          displayLabel={displayLabel}
+          displayLabelPlural={displayLabel}
           apiBasePath={API_BASE}
           forceIsAdvance={true}
           allowedEmployeeIds={allowedEmployeeIds}
@@ -402,7 +411,7 @@ const JPOthersAdvancePage: React.FC = () => {
         }}
         onSuccess={fetchAdvances}
         incentive={editingAdvance}
-        displayLabel={DISPLAY_LABEL}
+        displayLabel={displayLabel}
         apiBasePath={API_BASE}
         forceIsAdvance={true}
       />
@@ -414,9 +423,12 @@ const JPOthersAdvancePage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDelete}
-        title={`Delete ${DISPLAY_LABEL}`}
-        message={`Are you sure you want to delete this ${DISPLAY_LABEL} record? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete {{label}}", { label: displayLabel })}
+        message={t(
+          "Are you sure you want to delete this {{label}} record? This action cannot be undone.",
+          { label: displayLabel }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

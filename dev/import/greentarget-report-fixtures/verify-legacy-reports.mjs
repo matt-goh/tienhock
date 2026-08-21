@@ -78,6 +78,10 @@ const PERIOD_END = "2026-06-30";
  */
 const BLANK_PRINTED = new Set(["BTFS"]);
 const CONTROL_LINE = "DEBTOR";
+const APPROVED_LOCKED_PERIOD_JV_REFERENCE = "JV2606-01";
+const REMOVED_ZERO_FENCES = new Set([
+  "PBB1", // removed 2026-07-30 - dev/migrations/2026-07-30_greentarget_remove_pbb1.sql
+]);
 
 // ---------------------------------------------------------------------------
 let failures = 0;
@@ -235,6 +239,7 @@ const pool = new Pool({
 });
 
 let legacyReportOverridesPromise;
+let approvedLockedPeriodCorrectionPromise;
 
 /**
  * Return intentional G3 seed edits that can change an engine's historical
@@ -276,14 +281,130 @@ const describeLegacyReportOverrides = (rows) =>
     .map((row) => row.code)
     .join(", ") + (rows.length > 8 ? ` (+${rows.length - 8} more)` : "");
 
+/**
+ * The imported fixtures remain immutable. A later approved manual correction
+ * is allowed inside the locked period only when its complete accounting shape
+ * still matches the user-supplied JV2606-01 evidence.
+ */
+async function getApprovedLockedPeriodCorrectionState() {
+  if (!approvedLockedPeriodCorrectionPromise) {
+    approvedLockedPeriodCorrectionPromise = pool
+      .query(
+        `SELECT COUNT(*)::int AS reference_count,
+                COUNT(*) FILTER (
+                  WHERE header.reference_no = 'JV2606-01'
+                    AND header.entry_type = 'JV'
+                    AND header.entry_date = DATE '2026-06-30'
+                    AND header.description = 'BANK CHARGES MONTH OF JUNE 2026'
+                    AND header.total_debit = 2.70
+                    AND header.total_credit = 2.70
+                    AND header.status = 'posted'
+                    AND header.display_reference IS NULL
+                    AND header.posting_sequence = 279
+                    AND header.source_type IS NULL
+                    AND header.source_id IS NULL
+                    AND header.legacy_entry_type IS NULL
+                    AND header.manual_override IS false
+                    AND header.cheque_no IS NULL
+                    AND header.created_by = 'GT_JUNE_BANK_CHARGE_20260821'
+                    AND header.updated_by = 'GT_JUNE_BANK_CHARGE_20260821'
+                    AND header.posted_by = 'GT_JUNE_BANK_CHARGE_20260821'
+                    AND header.posted_at IS NOT NULL
+                    AND (SELECT COUNT(*) FROM greentarget.journal_entry_lines line
+                          WHERE line.journal_entry_id = header.id) = 2
+                    AND EXISTS (
+                      SELECT 1 FROM greentarget.journal_entry_lines line
+                       WHERE line.journal_entry_id = header.id
+                         AND line.line_number = 1
+                         AND line.account_code = 'BWBC'
+                         AND line.debit_amount = 2.70
+                         AND line.credit_amount = 0
+                         AND line.reference IS NULL
+                         AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+                         AND line.cheque_reference IS NULL
+                         AND line.display_order = 1
+                         AND line.display_reference IS NULL
+                         AND line.debtor_subledger_code IS NULL
+                    )
+                    AND EXISTS (
+                      SELECT 1 FROM greentarget.journal_entry_lines line
+                       WHERE line.journal_entry_id = header.id
+                         AND line.line_number = 2
+                         AND line.account_code = 'PBB_1'
+                         AND line.debit_amount = 0
+                         AND line.credit_amount = 2.70
+                         AND line.reference IS NULL
+                         AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+                         AND line.cheque_reference IS NULL
+                         AND line.display_order = 2
+                         AND line.display_reference IS NULL
+                         AND line.debtor_subledger_code IS NULL
+                    )
+                )::int AS exact_count
+           FROM greentarget.journal_entries header
+          WHERE UPPER(BTRIM(header.reference_no)) = $1`,
+        [APPROVED_LOCKED_PERIOD_JV_REFERENCE]
+      )
+      .then((result) => {
+        const row = result.rows[0];
+        const referenceCount = Number(row.reference_count);
+        const exactCount = Number(row.exact_count);
+        return {
+          referenceCount,
+          exactCount,
+          isApplied: referenceCount === 1 && exactCount === 1,
+          isValid:
+            (referenceCount === 0 && exactCount === 0) ||
+            (referenceCount === 1 && exactCount === 1),
+        };
+      });
+  }
+  return approvedLockedPeriodCorrectionPromise;
+}
+
+function validateApprovedLockedPeriodCorrectionState(correctionState) {
+  if (correctionState.isValid) return true;
+  fail(
+    `JV2606-01 is present but does not match the approved correction ` +
+      `(references ${correctionState.referenceCount}, exact ${correctionState.exactCount})`
+  );
+  return false;
+}
+
 // ===========================================================================
 // STAGE: tb
 // ===========================================================================
 async function stageTb() {
+  const correctionState = await getApprovedLockedPeriodCorrectionState();
+  if (!validateApprovedLockedPeriodCorrectionState(correctionState)) return;
+
   console.log("\n== stage tb — buildTrialBalance vs the six printed Trial Balances ==");
 
   const reportOverrides = await findLegacyReportOverrides();
   if (reportOverrides.length > 0) {
+    if (correctionState.isApplied) {
+      const currentJune = await buildTrialBalance(pool, { year: YEAR, month: 6 });
+      const currentByCode = new Map(
+        currentJune.accounts.map((account) => [account.code, account])
+      );
+      const bwbc = currentByCode.get("BWBC");
+      const pbb1 = currentByCode.get("PBB_1");
+      check(
+        bwbc !== undefined &&
+          pbb1 !== undefined &&
+          cents(bwbc.debit) - cents(bwbc.credit) === 12010 &&
+          cents(pbb1.debit) - cents(pbb1.credit) === 2846567 &&
+          cents(currentJune.totals.debit) === 289680853 &&
+          cents(currentJune.totals.credit) === 289680853 &&
+          currentJune.totals.is_balanced,
+        "approved JV2606-01 produces the corrected live June Trial Balance figures",
+        `BWBC ${bwbc ? money(cents(bwbc.debit) - cents(bwbc.credit)) : "missing"}, ` +
+          `PBB_1 ${pbb1 ? money(cents(pbb1.debit) - cents(pbb1.credit)) : "missing"}, ` +
+          `totals ${money(cents(currentJune.totals.debit))} / ${money(
+            cents(currentJune.totals.credit)
+          )}`
+      );
+    }
     pass(
       `exact historical Trial Balance comparison is not applicable after ${reportOverrides.length} intentional G3 seed override(s)`
     );
@@ -291,6 +412,13 @@ async function stageTb() {
     note("the immutable 503-code source payload and imported ledger remain covered by verify-chart.mjs and verify-import.mjs");
     return;
   }
+
+  const juneCorrectionDeltas = correctionState.isApplied
+    ? new Map([
+        ["BWBC", 270],
+        ["PBB_1", -270],
+      ])
+    : new Map();
 
   let comparisons = 0;
 
@@ -306,7 +434,9 @@ async function stageTb() {
     // minus the ones the scan prints blank/blank (they have no balance at all).
     const expectedCodes = printedRows
       .map((row) => normalizePrinted(row.acc_code))
-      .filter((code) => !BLANK_PRINTED.has(code));
+      .filter(
+        (code) => !BLANK_PRINTED.has(code) && !REMOVED_ZERO_FENCES.has(code)
+      );
     const actualCodes = report.accounts.map((account) => account.code);
 
     check(
@@ -336,6 +466,7 @@ async function stageTb() {
 
     for (const row of printedRows) {
       const code = normalizePrinted(row.acc_code);
+      if (REMOVED_ZERO_FENCES.has(code)) continue;
       const printedDebit = printedCents(row.debit);
       const printedCredit = printedCents(row.credit);
       const account = byCode.get(code);
@@ -358,10 +489,14 @@ async function stageTb() {
       }
 
       const printedNet = (printedDebit ?? 0) - (printedCredit ?? 0);
+      const approvedDelta =
+        period === "06" ? juneCorrectionDeltas.get(code) ?? 0 : 0;
+      const expectedNet = printedNet + approvedDelta;
       const engineNet = cents(account.debit) - cents(account.credit);
-      if (engineNet !== printedNet) {
+      if (engineNet !== expectedNet) {
         mismatches.push(
-          `${code}: printed ${money(printedNet)} vs engine ${money(engineNet)} (residual ${money(engineNet - printedNet)})`
+          `${code}: expected ${money(expectedNet)} after approved corrections vs engine ` +
+            `${money(engineNet)} (residual ${money(engineNet - expectedNet)})`
         );
       }
       if (code === CONTROL_LINE && printedNet !== expectation.debtorControlCents) {
@@ -427,6 +562,12 @@ async function stageTb() {
     );
   }
 
+  if (correctionState.isApplied) {
+    note(
+      "2026-06 includes approved post-import JV2606-01: BWBC +2.70 / PBB_1 -2.70; " +
+        "the balanced Trial Balance grand total is unchanged"
+    );
+  }
   note(`${comparisons} exact per-account comparisons across the six Trial Balances`);
 }
 
@@ -466,7 +607,15 @@ const BS_DERIVED_LINES = { "NET CURRENT ASSETS/(LIABILITIES)": "net_current_asse
  * catalogue stores Title Case names while the scan prints ALL CAPS and
  * sometimes different wording ("(SCHEDULE 5)" vs "Administrative Expenses").
  */
-function compareStatement(label, fixture, report, subtotalRefs, subtotalLabels, derivedLines) {
+function compareStatement(
+  label,
+  fixture,
+  report,
+  subtotalRefs,
+  subtotalLabels,
+  derivedLines,
+  approvedOffsets = {}
+) {
   const items = [];
   const headings = new Set();
   for (const block of report.blocks) {
@@ -508,10 +657,15 @@ function compareStatement(label, fixture, report, subtotalRefs, subtotalLabels, 
         }
       } else if (derivedLines[row.particular]) {
         const key = derivedLines[row.particular];
+        const expected =
+          printed === null
+            ? null
+            : printed + (approvedOffsets.derived?.[key] ?? 0);
         compared++;
-        if (cents(report.subtotals[key]) !== printed) {
+        if (cents(report.subtotals[key]) !== expected) {
           problems.push(
-            `${row.particular}: printed ${money(printed)} vs engine ${money(cents(report.subtotals[key]))}`
+            `${row.particular}: expected ${money(expected)} after approved corrections vs engine ` +
+              `${money(cents(report.subtotals[key]))}`
           );
         }
         continue;
@@ -525,10 +679,18 @@ function compareStatement(label, fixture, report, subtotalRefs, subtotalLabels, 
 
       consumed.add(item);
       compared++;
-      if (cents(item.amount) !== printed) {
+      const lineOffset =
+        row.note && row.note !== "DN"
+          ? approvedOffsets.lineNotes?.[row.note] ?? 0
+          : row.note === "DN"
+            ? approvedOffsets.lineMarkers?.DN ?? 0
+            : approvedOffsets.lineNames?.[row.particular] ?? 0;
+      const expected = printed === null ? null : printed + lineOffset;
+      if (cents(item.amount) !== expected) {
         problems.push(
           `${row.particular} (note ${row.note || "—"}): printed ${money(printed)} vs engine ` +
-            `${money(cents(item.amount))} (residual ${money(cents(item.amount) - printed)})`
+            `${money(cents(item.amount))} (adjusted expected ${money(expected)}, ` +
+            `residual ${money(cents(item.amount) - expected)})`
         );
       }
       continue;
@@ -541,10 +703,15 @@ function compareStatement(label, fixture, report, subtotalRefs, subtotalLabels, 
       continue;
     }
     compared++;
-    if (cents(report.subtotals[key]) !== printed) {
+    const expected =
+      printed === null
+        ? null
+        : printed + (approvedOffsets.subtotals?.[key] ?? 0);
+    if (cents(report.subtotals[key]) !== expected) {
       problems.push(
         `subtotal ${row.ref || row.particular}: printed ${money(printed)} vs engine ` +
-          `${money(cents(report.subtotals[key]))} (residual ${money(cents(report.subtotals[key]) - printed)})`
+          `${money(cents(report.subtotals[key]))} (adjusted expected ${money(expected)}, ` +
+          `residual ${money(cents(report.subtotals[key]) - expected)})`
       );
     }
   }
@@ -562,10 +729,42 @@ function compareStatement(label, fixture, report, subtotalRefs, subtotalLabels, 
 }
 
 async function stageStatements() {
+  const correctionState = await getApprovedLockedPeriodCorrectionState();
+  if (!validateApprovedLockedPeriodCorrectionState(correctionState)) return;
+
   console.log("\n== stage statements — buildIncomeStatement / buildBalanceSheet vs the scans ==");
 
   const reportOverrides = await findLegacyReportOverrides();
   if (reportOverrides.length > 0) {
+    if (correctionState.isApplied) {
+      const [currentIncome, currentBalance] = await Promise.all([
+        buildIncomeStatement(pool, { year: YEAR, month: 6 }),
+        buildBalanceSheet(pool, { year: YEAR, month: 6 }),
+      ]);
+      const schedule5 = currentIncome.blocks
+        .flatMap((block) => block.items)
+        .find((item) => item.note === "5");
+      const cashAtBank = currentBalance.blocks
+        .flatMap((block) => block.items)
+        .find((item) => item.note === "19");
+      check(
+        schedule5 !== undefined &&
+          cashAtBank !== undefined &&
+          cents(schedule5.amount) === 7211404 &&
+          cents(currentIncome.subtotals.profit_for_the_financial_year) === 1636691 &&
+          cents(cashAtBank.amount) === 2846567 &&
+          cents(currentBalance.subtotals.net_assets) === 28038344 &&
+          cents(currentBalance.subtotals.financed_by) === 28038344 &&
+          currentBalance.is_balanced,
+        "approved JV2606-01 produces the corrected live June statement figures",
+        `Schedule 5 ${schedule5 ? money(cents(schedule5.amount)) : "missing"}, ` +
+          `profit ${money(cents(currentIncome.subtotals.profit_for_the_financial_year))}, ` +
+          `Cash at Bank ${cashAtBank ? money(cents(cashAtBank.amount)) : "missing"}, ` +
+          `net/financed ${money(cents(currentBalance.subtotals.net_assets))} / ${money(
+            cents(currentBalance.subtotals.financed_by)
+          )}`
+      );
+    }
     pass(
       `exact historical statement comparison is not applicable after ${reportOverrides.length} intentional G3 seed override(s)`
     );
@@ -574,14 +773,56 @@ async function stageStatements() {
     return;
   }
 
+  const incomeOffsets = correctionState.isApplied
+    ? {
+        lineNotes: { 5: 270 },
+        subtotals: {
+          operating_profit: -270,
+          profit_before_taxation: -270,
+          profit_for_the_financial_year: -270,
+        },
+      }
+    : {};
+  const balanceOffsets = correctionState.isApplied
+    ? {
+        lineNotes: { 19: -270 },
+        lineMarkers: { DN: -270 },
+        derived: { net_current_assets: -270 },
+        subtotals: {
+          current_assets_total: -270,
+          net_assets: -270,
+          shareholders_funds_total: -270,
+          financed_by: -270,
+        },
+      }
+    : {};
+
   const income = await buildIncomeStatement(pool, { year: YEAR, month: 6 });
   const balance = await buildBalanceSheet(pool, { year: YEAR, month: 6 });
 
-  compareStatement("Income Statement 06/2026 (YTD)", isFixture, income, IS_SUBTOTAL_REFS, IS_SUBTOTAL_LABELS, {});
-  compareStatement("Balance Sheet 30/06/2026", bsFixture, balance, BS_SUBTOTAL_REFS, {}, BS_DERIVED_LINES);
+  compareStatement(
+    "Income Statement 06/2026 (YTD)",
+    isFixture,
+    income,
+    IS_SUBTOTAL_REFS,
+    IS_SUBTOTAL_LABELS,
+    {},
+    incomeOffsets
+  );
+  compareStatement(
+    "Balance Sheet 30/06/2026",
+    bsFixture,
+    balance,
+    BS_SUBTOTAL_REFS,
+    {},
+    BS_DERIVED_LINES,
+    balanceOffsets
+  );
 
   // --- The headline arithmetic
-  const expectedNetAssets = manifest.printedBalanceSheetExpectations.netAssetsCents;
+  const expectedNetAssets =
+    manifest.printedBalanceSheetExpectations.netAssetsCents -
+    (correctionState.isApplied ? 270 : 0);
   check(
     cents(balance.subtotals.net_assets) === expectedNetAssets &&
       cents(balance.subtotals.financed_by) === expectedNetAssets,
@@ -635,9 +876,11 @@ async function stageStatements() {
       .flatMap((block) => block.items)
       .find((item) => item.note === "5");
     const expected = manifest.printedIncomeStatementExpectations.lines.find((line) => line.key === "(SCHEDULE 5)");
+    const expectedAmount =
+      expected.amountCents + (correctionState.isApplied ? 270 : 0);
     check(
-      schedule5 !== undefined && cents(schedule5.amount) === expected.amountCents,
-      `Schedule 5 (APPX 5, ${schedule5 ? schedule5.accounts.length : 0} accounts) = ${money(expected.amountCents)}`,
+      schedule5 !== undefined && cents(schedule5.amount) === expectedAmount,
+      `Schedule 5 (APPX 5, ${schedule5 ? schedule5.accounts.length : 0} accounts) = ${money(expectedAmount)}`,
       schedule5 ? money(cents(schedule5.amount)) : "missing"
     );
   }
@@ -659,7 +902,8 @@ async function stageStatements() {
       `SELECT ac.code, ac.fs_note, COALESCE(ac.notes,'') AS notes,
               COALESCE(ac.updated_by,'') AS updated_by,
               COALESCE((SELECT ROUND(o.amount*100) FROM greentarget.account_opening_balances o
-                         WHERE o.account_code = ac.code), 0)::bigint AS anchor_cents,
+                         WHERE o.account_code = ac.code
+                           AND o.as_of_date = DATE '2026-01-01'), 0)::bigint AS anchor_cents,
               (SELECT count(*) FROM greentarget.journal_entry_lines l
                 WHERE l.account_code = ac.code)::int AS line_count
          FROM greentarget.account_codes ac
@@ -730,6 +974,7 @@ async function stageStatements() {
          JOIN greentarget.account_opening_balances o ON o.account_code = ac.code
          JOIN greentarget.financial_statement_notes fsn ON fsn.code = ac.fs_note
         WHERE fsn.report_section = 'income_statement'
+          AND o.as_of_date = DATE '2026-01-01'
           AND ROUND(o.amount * 100) <> 0`
     );
     check(
@@ -759,6 +1004,8 @@ async function stageStatements() {
 // STAGE: ledger
 // ===========================================================================
 async function stageLedger() {
+  const correctionState = await getApprovedLockedPeriodCorrectionState();
+  if (!validateApprovedLockedPeriodCorrectionState(correctionState)) return;
   console.log("\n== stage ledger — buildAccountLedger row order and running balances ==");
 
   // Printed row order, from the hash-pinned staging population. Within one
@@ -782,7 +1029,9 @@ async function stageLedger() {
 
   const anchors = await pool.query(
     `SELECT account_code, ROUND(amount * 100)::bigint AS cents
-       FROM greentarget.account_opening_balances ORDER BY account_code`
+       FROM greentarget.account_opening_balances
+      WHERE as_of_date = DATE '2026-01-01'
+      ORDER BY account_code`
   );
   const anchorCents = new Map(anchors.rows.map((row) => [row.account_code, Number(row.cents)]));
 
@@ -827,7 +1076,7 @@ async function stageLedger() {
 
     // 2. Printed ROW ORDER — the gate that proves posting_sequence is used.
     const printedRows = ledger.transactions
-      .filter((tx) => !tx.is_derived)
+      .filter((tx) => tx.source_type === "legacy_import" && !tx.is_derived)
       .map((tx) => `${tx.source_id}|${cents(tx.debit)}|${cents(tx.credit)}`);
     const staged = stagedByAccount.get(code) ?? [];
     rowsOrdered += printedRows.length;
@@ -850,7 +1099,10 @@ async function stageLedger() {
       for (let index = 0; index < PERIODS.length; index++) {
         const asOf = MONTH_ENDS[PERIODS[index]];
         const balance = ledger.transactions
-          .filter((tx) => tx.entry_date <= asOf)
+          .filter(
+            (tx) =>
+              tx.source_type === "legacy_import" && tx.entry_date <= asOf
+          )
           .reduce((total, tx) => total + cents(tx.debit) - cents(tx.credit), cents(ledger.opening_balance));
         if (path[index] !== null && balance !== path[index]) {
           pathBreaks.push(
@@ -860,8 +1112,16 @@ async function stageLedger() {
         }
       }
       const june = path[PERIODS.length - 1];
-      if (june !== null && cents(ledger.closing_balance) !== june) {
-        closingBreaks.push(`${code}: closing ${money(cents(ledger.closing_balance))} vs printed ${money(june)}`);
+      const legacyClosing = ledger.transactions
+        .filter((tx) => tx.source_type === "legacy_import")
+        .reduce(
+          (total, tx) => total + cents(tx.debit) - cents(tx.credit),
+          cents(ledger.opening_balance)
+        );
+      if (june !== null && legacyClosing !== june) {
+        closingBreaks.push(
+          `${code}: imported closing ${money(legacyClosing)} vs printed ${money(june)}`
+        );
       }
     }
 
@@ -901,13 +1161,33 @@ async function stageLedger() {
   let bankTotal = 0;
   for (const row of bankAccounts.rows) {
     const ledger = await buildAccountLedger(pool, row.code, PERIOD_START, PERIOD_END);
-    bankTotal += cents(ledger.closing_balance);
+    bankTotal += ledger.transactions
+      .filter((tx) => tx.source_type === "legacy_import")
+      .reduce(
+        (total, tx) => total + cents(tx.debit) - cents(tx.credit),
+        cents(ledger.opening_balance)
+      );
   }
   check(
     bankTotal === cashAtBank.amountCents,
     `the five bank statements close at the printed CASH AT BANK ${money(cashAtBank.amountCents)}`,
     money(bankTotal)
   );
+
+  if (correctionState.isApplied) {
+    const [pbb1, bwbc] = await Promise.all([
+      buildAccountLedger(pool, "PBB_1", PERIOD_START, PERIOD_END),
+      buildAccountLedger(pool, "BWBC", PERIOD_START, PERIOD_END),
+    ]);
+    check(
+      cents(pbb1.closing_balance) === 2846567 &&
+        cents(bwbc.closing_balance) === 12010,
+      "approved JV2606-01 leaves PBB_1 at 28,465.67 and BWBC at 120.10",
+      `PBB_1 ${money(cents(pbb1.closing_balance))}, BWBC ${money(
+        cents(bwbc.closing_balance)
+      )}`
+    );
+  }
 
   // --- Month-mode and range-mode agree at a boundary, and BTFS/DEBTOR behave
   {
@@ -1202,7 +1482,10 @@ async function stageRegressions() {
        WHERE je.source_type = 'legacy_import'`,
       "4401",
     ],
-    ["greentarget.account_opening_balances", "501"],
+    [
+      "greentarget.account_opening_balances WHERE as_of_date = DATE '2026-01-01'",
+      "500",
+    ],
     ["greentarget.import_legacy_rows", "4903"],
     ["greentarget.financial_statement_notes", "34"],
     ["public.account_codes", "2827"],
@@ -1225,8 +1508,8 @@ async function stageRegressions() {
     ).rows[0].value
   );
   check(
-    legacyAccountCount === "503",
-    "greentarget.account_codes retains all 503 evidence-derived identities; post-cutover accounts are allowed beside them",
+    legacyAccountCount === String(503 - REMOVED_ZERO_FENCES.size),
+    `greentarget.account_codes retains ${503 - REMOVED_ZERO_FENCES.size} live evidence-derived identities after ${REMOVED_ZERO_FENCES.size} approved removal; post-cutover accounts are allowed beside them`,
     `found ${legacyAccountCount}`
   );
 
@@ -1238,13 +1521,26 @@ async function stageRegressions() {
   );
   check(mutated === "0", "every legacy import journal is still an untouched posted import", `found ${mutated}`);
 
-  // G7's R8 posting lock: nothing organic may be dated before the open date.
+  const correctionState = await getApprovedLockedPeriodCorrectionState();
+  check(
+    correctionState.isValid,
+    "JV2606-01 is absent or exactly matches the approved 30-Jun bank-charge correction",
+    `references ${correctionState.referenceCount}, exact ${correctionState.exactCount}`
+  );
+
+  // G7's R8 lock still blocks every ordinary historical mutation. The exact
+  // JV above is the sole approved guarded-migration correction.
   const preCutover = await scalar(
     `SELECT count(*)::text AS value FROM greentarget.journal_entries
       WHERE source_type IS DISTINCT FROM 'legacy_import'
-        AND entry_date < DATE '2026-07-01'`
+        AND entry_date < DATE '2026-07-01'
+        AND UPPER(BTRIM(reference_no)) IS DISTINCT FROM '${APPROVED_LOCKED_PERIOD_JV_REFERENCE}'`
   );
-  check(preCutover === "0", "no organic journal is dated before the 2026-07-01 open date", `found ${preCutover}`);
+  check(
+    preCutover === "0",
+    "no unexplained organic journal is dated before the 2026-07-01 open date",
+    `found ${preCutover}`
+  );
 }
 
 // ===========================================================================

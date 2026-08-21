@@ -2,6 +2,7 @@
 // Jelly Polly Daily Machine Plastic entry. One card per plastic staff member,
 // with saved pay-code lines stored in JP daily work-log activities.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import {
   IconDeviceFloppy,
@@ -156,6 +157,7 @@ const dayRate = (payCode: PlasticPayCode, dayType: DayType): number => {
 };
 
 const JPDailyPlasticEntryPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const {
     detailedMappings,
     employeeMappings,
@@ -235,7 +237,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
       setPayCodeQueries({});
     } catch (error: unknown) {
       console.error("Error loading daily plastic:", error);
-      toast.error("Failed to load Daily Machine Plastic");
+      toast.error(t("Failed to load Daily Machine Plastic"));
     } finally {
       setIsLoading(false);
     }
@@ -466,8 +468,10 @@ const JPDailyPlasticEntryPage: React.FC = () => {
     if (validLines.length === 0) {
       toast.error(
         entry.saved
-          ? "Add at least one pay code, or use Clear to remove this staff's saved log."
-          : "Add at least one pay code before saving."
+          ? t(
+              "Add at least one pay code, or use Clear to remove this staff's saved log."
+            )
+          : t("Add at least one pay code before saving.")
       );
       return;
     }
@@ -493,7 +497,11 @@ const JPDailyPlasticEntryPage: React.FC = () => {
         })),
       });
 
-      toast.success(`Saved ${entry.employee_name}'s plastic entry`);
+      toast.success(
+        t("Saved {{name}}'s plastic entry", {
+          name: entry.employee_name,
+        })
+      );
       setEntries((prev: PlasticEntry[]) =>
         prev.map((currentEntry: PlasticEntry): PlasticEntry =>
           currentEntry.employee_id === entry.employee_id
@@ -511,7 +519,9 @@ const JPDailyPlasticEntryPage: React.FC = () => {
     } catch (error: unknown) {
       console.error("Error saving daily plastic:", error);
       const message: string =
-        error instanceof Error ? error.message : "Failed to save plastic entry";
+        error instanceof Error
+          ? error.message
+          : t("Failed to save plastic entry");
       toast.error(message);
       setEntries((prev: PlasticEntry[]) =>
         prev.map((currentEntry: PlasticEntry): PlasticEntry =>
@@ -532,12 +542,16 @@ const JPDailyPlasticEntryPage: React.FC = () => {
           clearTarget.employee_id
         )}`
       );
-      toast.success(`Cleared ${clearTarget.employee_name}'s plastic entry`);
+      toast.success(
+        t("Cleared {{name}}'s plastic entry", {
+          name: clearTarget.employee_name,
+        })
+      );
       setClearTarget(null);
       await fetchEntries();
     } catch (error: unknown) {
       console.error("Error clearing daily plastic:", error);
-      toast.error("Failed to clear saved plastic entry");
+      toast.error(t("Failed to clear saved plastic entry"));
     } finally {
       setIsClearing(false);
     }
@@ -563,13 +577,13 @@ const JPDailyPlasticEntryPage: React.FC = () => {
       <div className="flex flex-col md:flex-row justify-between md:items-end gap-3">
         <div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Daily Machine Plastic
+        {t("Daily Machine Plastic")}
           </h1>
         </div>
         <div className="flex items-end flex-wrap gap-3">
           <div>
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-              Date
+              {t("Date")}
             </label>
             <TimeNavigator
               range={dayRange}
@@ -583,7 +597,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
           <span
             className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${dayTypeClassName}`}
           >
-            {dayType}
+            {t(dayType)}
             {dayType === "Umum" &&
               getHolidayDescription(selectedDateValue) && (
                 <span className="ml-1 text-xs font-normal">
@@ -597,7 +611,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
             variant="outline"
             disabled={isLoading}
           >
-            Refresh
+            {t("Refresh")}
           </Button>
         </div>
       </div>
@@ -609,7 +623,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
       ) : entries.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-8 text-center">
           <p className="text-default-500 dark:text-gray-400">
-            No staff assigned to Daily Machine Plastic.
+            {t("No staff assigned to Daily Machine Plastic.")}
           </p>
         </div>
       ) : (
@@ -640,16 +654,16 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                     </h2>
                     {entry.saved ? (
                       <span className="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                        Saved
+                        {t("Saved")}
                       </span>
                     ) : (
                       <span className="inline-flex rounded-full bg-default-100 px-2 py-0.5 text-[11px] font-medium text-default-600 dark:bg-gray-700 dark:text-gray-300">
-                        Unsaved
+                        {t("Unsaved")}
                       </span>
                     )}
                     {entry.dirty && (
                       <span className="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                        Unsaved changes
+                        {t("Unsaved changes")}
                       </span>
                     )}
                   </div>
@@ -661,15 +675,15 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                 <div className="px-5 py-3">
                   {entry.lines.length === 0 ? (
                     <p className="text-sm text-default-500 dark:text-gray-400 py-2">
-                      No codes for this day.
+                      {t("No codes for this day.")}
                     </p>
                   ) : (
                     <div className="space-y-2 overflow-visible">
                       <div className="hidden md:grid grid-cols-[minmax(220px,1fr)_96px_80px_130px_32px] gap-3 text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider items-end">
-                        <div>Pay Code</div>
-                        <div className="text-right">Rate</div>
-                        <div className="text-right">Qty</div>
-                        <div className="text-right">Amount</div>
+                        <div>{t("Pay Code")}</div>
+                        <div className="text-right">{t("Rate")}</div>
+                        <div className="text-right">{t("Qty")}</div>
+                        <div className="text-right">{t("Amount")}</div>
                         <div></div>
                       </div>
                       <div className="divide-y divide-default-100 dark:divide-gray-700/70 overflow-visible">
@@ -680,7 +694,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                           >
                             <div className="relative">
                               <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
-                                Pay Code
+                                {t("Pay Code")}
                               </label>
                               <div className="[&_.overflow-hidden]:h-10 [&_.overflow-hidden]:box-border [&_input]:h-full [&_input]:py-0">
                                 <FormCombobox
@@ -700,13 +714,13 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                                   options={payCodeOptions}
                                   query={payCodeQueries[line.key] || ""}
                                   setQuery={setLineQuery(line.key)}
-                                  placeholder="Code"
+                                  placeholder={t("Code")}
                                 />
                               </div>
                             </div>
                             <div>
                               <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
-                                Rate
+                                {t("Rate")}
                               </label>
                               <input
                                 type="number"
@@ -728,7 +742,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                             </div>
                             <div>
                               <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
-                                Qty
+                                {t("Qty")}
                               </label>
                               <input
                                 type="number"
@@ -750,7 +764,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                             </div>
                             <div className="text-right font-medium text-default-900 dark:text-gray-100">
                               <label className="md:hidden block text-xs font-medium text-default-500 dark:text-gray-400 uppercase mb-1">
-                                Amount
+                                {t("Amount")}
                               </label>
                               <div className="h-10 flex items-center justify-end">
                                 {formatCurrency(line.amount)}
@@ -766,7 +780,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                                   handleRemoveLine(entry.employee_id, line.key)
                                 }
                                 className="h-8 w-8 inline-flex items-center justify-center rounded-full text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/50"
-                                title="Remove code"
+                                title={t("Remove code")}
                               >
                                 <IconTrash size={16} />
                               </button>
@@ -784,7 +798,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                       variant="outline"
                       size="sm"
                     >
-                      Add Code
+                      {t("Add Code")}
                     </Button>
                     <div className="flex items-center gap-2">
                       {entry.saved && (
@@ -795,7 +809,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                           variant="outline"
                           size="sm"
                         >
-                          Clear
+                          {t("Clear")}
                         </Button>
                       )}
                       <Button
@@ -805,7 +819,7 @@ const JPDailyPlasticEntryPage: React.FC = () => {
                         size="sm"
                         disabled={entry.savingState}
                       >
-                        {entry.savingState ? "Saving..." : "Save"}
+                        {entry.savingState ? t("Saving...") : t("Save")}
                       </Button>
                     </div>
                   </div>
@@ -834,11 +848,15 @@ const JPDailyPlasticEntryPage: React.FC = () => {
           if (!isClearing) setClearTarget(null);
         }}
         onConfirm={handleClear}
-        title="Clear saved plastic entry"
-        message={`Clear ${
-          clearTarget?.employee_name ?? "this staff"
-        }'s saved plastic entry for ${selectedDate}? This cannot be undone.`}
-        confirmButtonText={isClearing ? "Clearing..." : "Clear"}
+        title={t("Clear saved plastic entry")}
+        message={t(
+          "Clear {{name}}'s saved plastic entry for {{date}}? This cannot be undone.",
+          {
+            name: clearTarget?.employee_name ?? t("this staff"),
+            date: selectedDate,
+          }
+        )}
+        confirmButtonText={isClearing ? t("Clearing...") : t("Clear")}
         variant="danger"
       />
     </div>

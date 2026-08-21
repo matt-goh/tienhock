@@ -4,6 +4,7 @@
 // employer registration codes editable on the page and persisted in the DB
 // (jellypolly.payroll_settings).
 import React, { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconRefresh,
   IconDownload,
@@ -68,6 +69,7 @@ const downloadExportFiles = (files: ExportFile[]) => {
 };
 
 const JPECarumanPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const now = new Date();
   const [selectedYear, setSelectedYear] = usePersistedNumber(
     "jpECarumanYear",
@@ -106,7 +108,7 @@ const JPECarumanPage: React.FC = () => {
       setPreview(res);
     } catch (error) {
       console.error("Error loading e-caruman preview:", error);
-      toast.error("Failed to load contribution data");
+      toast.error(t("Failed to load contribution data"));
     } finally {
       setIsLoading(false);
     }
@@ -141,10 +143,10 @@ const JPECarumanPage: React.FC = () => {
     setSavingCodes(true);
     try {
       await api.put(`${API_BASE}/settings`, codes);
-      toast.success("Registration codes saved");
+      toast.success(t("Registration codes saved"));
     } catch (error) {
       console.error("Error saving codes:", error);
-      toast.error("Failed to save codes");
+      toast.error(t("Failed to save codes"));
     } finally {
       setSavingCodes(false);
     }
@@ -161,7 +163,7 @@ const JPECarumanPage: React.FC = () => {
         url = `${API_BASE}/epf/export?month=${selectedMonth}&year=${selectedYear}`;
       } else if (type === "socso") {
         if (!codes.perkeso_employer_code) {
-          toast.error("Enter and save the PERKESO employer code first");
+          toast.error(t("Enter and save the PERKESO employer code first"));
           return;
         }
         url = `${API_BASE}/socso-sip/export?month=${selectedMonth}&year=${selectedYear}&employerCode=${encodeURIComponent(
@@ -169,7 +171,7 @@ const JPECarumanPage: React.FC = () => {
         )}&myCoId=${encodeURIComponent(codes.mycoid_ssm)}`;
       } else {
         if (!codes.lhdn_e_number) {
-          toast.error("Enter and save the LHDN E-number first");
+          toast.error(t("Enter and save the LHDN E-number first"));
           return;
         }
         url = `${API_BASE}/income-tax/export?month=${selectedMonth}&year=${selectedYear}&eNumber=${encodeURIComponent(
@@ -178,15 +180,15 @@ const JPECarumanPage: React.FC = () => {
       }
       const res = await api.get(url);
       if (!res.files || res.files.length === 0) {
-        toast.error("No data found for the specified period");
+        toast.error(t("No data found for the specified period"));
         return;
       }
       downloadExportFiles(res.files);
-      toast.success("File(s) downloaded");
+      toast.success(t("File(s) downloaded"));
     } catch (error: any) {
       console.error("Error generating export:", error);
       toast.error(
-        error?.response?.data?.message || "Failed to generate export file"
+        error?.response?.data?.message || t("Failed to generate export file")
       );
     } finally {
       setLoadingType(null);
@@ -213,7 +215,7 @@ const JPECarumanPage: React.FC = () => {
       </div>
       <div className="text-sm text-default-600 dark:text-gray-300 space-y-1 flex-1">
         <div className="flex justify-between">
-          <span>Employees</span>
+          <span>{t("Employees")}</span>
           <span className="font-medium text-default-800 dark:text-gray-100">
             {count}
           </span>
@@ -238,7 +240,7 @@ const JPECarumanPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row justify-between items-center gap-3">
         <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-          E-Caruman (Jelly Polly)
+          {t("E-Caruman (Jelly Polly)")}
         </h1>
         <Button
           onClick={fetchPreview}
@@ -246,7 +248,7 @@ const JPECarumanPage: React.FC = () => {
           variant="outline"
           disabled={isLoading}
         >
-          Refresh
+            {t("Refresh")}
         </Button>
       </div>
 
@@ -262,9 +264,9 @@ const JPECarumanPage: React.FC = () => {
 
       {/* Employer registration codes */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm p-4">
-        <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-semibold text-default-700 dark:text-gray-200">
-            Employer Registration Codes
+            {t("Employer Registration Codes")}
           </h2>
           <Button
             onClick={handleSaveCodes}
@@ -273,41 +275,42 @@ const JPECarumanPage: React.FC = () => {
             size="sm"
             disabled={savingCodes}
           >
-            {savingCodes ? "Saving..." : "Save"}
+            {savingCodes ? t("Saving...") : t("Save")}
           </Button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormInput
             name="perkeso"
-            label="PERKESO Employer Code"
+            label={t("PERKESO Employer Code")}
             value={codes.perkeso_employer_code}
             onChange={(e) =>
               setCodes((c) => ({ ...c, perkeso_employer_code: e.target.value }))
             }
-            placeholder="e.g. F1234567890Z"
+            placeholder={t("e.g. F1234567890Z")}
           />
           <FormInput
             name="mycoid"
-            label="MyCoID / SSM"
+            label={t("MyCoID / SSM")}
             value={codes.mycoid_ssm}
             onChange={(e) =>
               setCodes((c) => ({ ...c, mycoid_ssm: e.target.value }))
             }
-            placeholder="e.g. 123456-X"
+            placeholder={t("e.g. 123456-X")}
           />
           <FormInput
             name="lhdn"
-            label="LHDN E-Number"
+            label={t("LHDN E-Number")}
             value={codes.lhdn_e_number}
             onChange={(e) =>
               setCodes((c) => ({ ...c, lhdn_e_number: e.target.value }))
             }
-            placeholder="e.g. 1234567890"
+            placeholder={t("e.g. 1234567890")}
           />
         </div>
         <p className="mt-2 text-[11px] text-default-400 dark:text-gray-500">
-          Saved to the database and reused for the SOCSO/EIS and PCB exports.
-          EPF needs no code.
+          {t(
+            "Saved to the database and reused for the SOCSO/EIS and PCB exports. EPF needs no code."
+          )}
         </p>
       </div>
 
@@ -317,12 +320,19 @@ const JPECarumanPage: React.FC = () => {
           <IconAlertTriangle size={18} className="mt-0.5 flex-shrink-0" />
           <div>
             <span className="font-semibold">
-              {preview.missing_epf_no.count} employee(s) with EPF contributions
-              but no EPF number
+              {t(
+                "{{count}} employee(s) with EPF contributions but no EPF number",
+                { count: preview.missing_epf_no.count }
+              )}
             </span>{" "}
-            — they are excluded from the EPF file:{" "}
-            {preview.missing_epf_no.data.map((e) => e.name).join(", ")}. Add
-            their EPF number in Staff details.
+            {t(
+              "— they are excluded from the EPF file: {{names}}. Add their EPF number in Staff details.",
+              {
+                names: preview.missing_epf_no.data
+                  .map((e) => e.name)
+                  .join(", "),
+              }
+            )}
           </div>
         </div>
       )}
@@ -335,28 +345,28 @@ const JPECarumanPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card
-            title="EPF (KWSP)"
+            title={t("EPF (KWSP)")}
             badge="CSV"
             count={preview?.epf?.count || 0}
             onDownload={() => handleDownload("epf")}
             downloading={loadingType === "epf"}
           >
             <div className="flex justify-between">
-              <span>Employer</span>
+              <span>{t("Employer")}</span>
               <span>{fmt(preview?.epf?.totals?.em_share)}</span>
             </div>
             <div className="flex justify-between">
-              <span>Employee</span>
+              <span>{t("Employee")}</span>
               <span>{fmt(preview?.epf?.totals?.emp_share)}</span>
             </div>
             <div className="flex justify-between font-medium text-default-800 dark:text-gray-100">
-              <span>Total</span>
+              <span>{t("Total")}</span>
               <span>{fmt(preview?.epf?.totals?.total_contribution)}</span>
             </div>
           </Card>
 
           <Card
-            title="SOCSO + EIS"
+            title={t("SOCSO + EIS")}
             badge="TXT"
             count={preview?.socso?.count || 0}
             onDownload={() => handleDownload("socso")}
@@ -364,21 +374,21 @@ const JPECarumanPage: React.FC = () => {
             disabled={!codes.perkeso_employer_code}
           >
             <div className="flex justify-between">
-              <span>SOCSO</span>
+              <span>{t("SOCSO")}</span>
               <span>{fmt(preview?.socso?.totals?.socso_total)}</span>
             </div>
             <div className="flex justify-between">
-              <span>EIS/SIP</span>
+              <span>{t("EIS/SIP")}</span>
               <span>{fmt(preview?.sip?.totals?.sip_total)}</span>
             </div>
             <div className="flex justify-between">
-              <span>SKBBK</span>
+              <span>{t("SKBBK")}</span>
               <span>{fmt(preview?.socso?.totals?.skbbk_amount)}</span>
             </div>
           </Card>
 
           <Card
-            title="PCB (LHDN)"
+            title={t("PCB (LHDN)")}
             badge="TXT"
             count={preview?.income_tax?.count || 0}
             onDownload={() => handleDownload("income_tax")}
@@ -386,7 +396,7 @@ const JPECarumanPage: React.FC = () => {
             disabled={!codes.lhdn_e_number}
           >
             <div className="flex justify-between font-medium text-default-800 dark:text-gray-100">
-              <span>Total PCB</span>
+              <span>{t("Total PCB")}</span>
               <span>{fmt(preview?.income_tax?.totals?.pcb_amount)}</span>
             </div>
           </Card>

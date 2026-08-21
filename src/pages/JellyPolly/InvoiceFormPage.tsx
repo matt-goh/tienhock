@@ -66,7 +66,7 @@ const PAYMENT_METHOD_OPTIONS: ReadonlyArray<PillSelectOption<string>> = [
 const InvoiceFormPage: React.FC = () => {
   const navigate = useNavigate();
   const goBack = useSmartBack("/jellypolly/sales/invoice");
-  const { t } = useTranslation("invoice");
+  const { t } = useTranslation("jellypolly");
 
   // --- State ---
   const [invoiceData, setInvoiceData] = useState<ExtendedInvoiceData | null>(
@@ -281,7 +281,7 @@ const InvoiceFormPage: React.FC = () => {
         }
       } catch (error) {
         console.error("Error fetching customer products:", error);
-        toast.error("Could not load custom product prices.");
+        toast.error(t("Could not load custom product prices."));
         setCustomerProducts([]);
         setCustomerTinNumber(null);
         setCustomerIdNumber(null);
@@ -590,28 +590,36 @@ const InvoiceFormPage: React.FC = () => {
     // --- Validation (remains the same) ---
     let errors: string[] = [];
     const numberPartId = invoiceData.id;
-    if (!numberPartId) errors.push("Invoice Number is required.");
-    if (!invoiceData.customerid) errors.push("Customer is required.");
-    if (!invoiceData.salespersonid) errors.push("Salesman is required.");
+    if (!numberPartId) errors.push(t("Invoice Number is required."));
+    if (!invoiceData.customerid) errors.push(t("Customer is required."));
+    if (!invoiceData.salespersonid) errors.push(t("Salesman is required."));
     if (!invoiceData.createddate || isNaN(parseInt(invoiceData.createddate)))
-      errors.push("Valid Date/Time is required.");
+      errors.push(t("Valid Date/Time is required."));
     const itemsToValidate = lineItems.filter(
       (li) => !li.issubtotal && !li.istotal
     );
     if (itemsToValidate.length === 0) {
-      errors.push("Invoice must have at least one product item.");
+      errors.push(t("Invoice must have at least one product item."));
     } else {
       itemsToValidate.forEach((item, index) => {
         if (!item.code || !item.description)
           errors.push(
-            `Item #${index + 1}: Product code and description required.`
+            t("Item #{{number}}: Product code and description required.", {
+              number: index + 1,
+            })
           );
         if (item.code !== "LESS" && Number(item.price || 0) < 0)
-          errors.push(`Item #${index + 1}: Price cannot be negative.`);
+          errors.push(
+            t("Item #{{number}}: Price cannot be negative.", {
+              number: index + 1,
+            })
+          );
       });
     }
     if (isPaid) {
-      errors.push(...validateTenders(tenders, billTotal, allowPartialTender));
+      errors.push(
+        ...validateTenders(tenders, billTotal, allowPartialTender, t)
+      );
     }
     if (errors.length > 0) {
       errors.forEach((err) => toast.error(err, { duration: 4000 }));
@@ -621,7 +629,7 @@ const InvoiceFormPage: React.FC = () => {
     // --- Start Saving Process ---
     setIsSaving(true); // Set overall saving state
     let invoiceIdForNavigation: string | null = null; // To store the ID for potential navigation later
-    const toastId = toast.loading("Checking invoice number...");
+    const toastId = toast.loading(t("Checking invoice number..."));
 
     try {
       // 1. Check for duplicates
@@ -631,7 +639,7 @@ const InvoiceFormPage: React.FC = () => {
       }
 
       // 2. Create Invoice
-      toast.loading("Creating invoice...", { id: toastId });
+      toast.loading(t("Creating invoice..."), { id: toastId });
 
       // Everything tendered for this bill, one entry per way it was paid.
       const tenderPayload = toTenderPayload(tenders, billTotal);
@@ -647,13 +655,16 @@ const InvoiceFormPage: React.FC = () => {
 
       const savedInvoice = await createInvoice(invoiceDataToSubmit);
       invoiceIdForNavigation = savedInvoice.id; // Store the successfully created ID
-      toast.success(`Invoice ${invoiceIdForNavigation} created!`, {
-        id: toastId,
-      }); // Initial success toast
+      toast.success(
+        t("Invoice {{id}} created!", { id: invoiceIdForNavigation }),
+        {
+          id: toastId,
+        }
+      ); // Initial success toast
 
       // 3. Create Payment (if needed)
       if (isPaid) {
-        toast.loading("Recording payment...", { id: toastId });
+        toast.loading(t("Recording payment..."), { id: toastId });
 
         // Don't attempt to create a payment for CASH invoices - they are automatically paid by the backend
         if (invoiceData.paymenttype !== "CASH") {
@@ -671,8 +682,13 @@ const InvoiceFormPage: React.FC = () => {
             }
             toast.success(
               tenderRemaining > 0.005
-                ? `Invoice ${invoiceIdForNavigation} created — RM${tenderRemaining.toFixed(2)} still outstanding.`
-                : `Invoice ${invoiceIdForNavigation} created and paid!`,
+                ? t("Invoice {{id}} created — RM{{remaining}} still outstanding.", {
+                    id: invoiceIdForNavigation,
+                    remaining: tenderRemaining.toFixed(2),
+                  })
+                : t("Invoice {{id}} created and paid!", {
+                    id: invoiceIdForNavigation,
+                  }),
               {
                 id: toastId,
               }
@@ -680,7 +696,13 @@ const InvoiceFormPage: React.FC = () => {
           } catch (paymentError: any) {
             // Payment failed, but invoice created. Show error, but proceed maybe?
             toast.error(
-              `Invoice ${invoiceIdForNavigation} created, but payment failed: ${paymentError.message}. E-invoice submission skipped.`,
+              t(
+                "Invoice {{id}} created, but payment failed: {{message}}. E-invoice submission skipped.",
+                {
+                  id: invoiceIdForNavigation,
+                  message: paymentError.message,
+                }
+              ),
               { id: toastId, duration: 6000 }
             );
             // Decide if you want to stop here or still attempt e-invoice if checked?
@@ -690,9 +712,14 @@ const InvoiceFormPage: React.FC = () => {
           }
         } else {
           // For CASH invoices, they are already paid by backend with our specified payment method
-          toast.success(`CASH Invoice ${invoiceIdForNavigation} created!`, {
-            id: toastId,
-          });
+          toast.success(
+            t("CASH Invoice {{id}} created!", {
+              id: invoiceIdForNavigation,
+            }),
+            {
+              id: toastId,
+            }
+          );
         }
       }
 
@@ -725,11 +752,12 @@ const InvoiceFormPage: React.FC = () => {
           // Create a synthetic error response for the modal
           setEinvoiceResults({
             success: false,
-            message: `E-invoice submission failed: ${
-              einvoiceError?.response?.data?.message ||
-              einvoiceError.message ||
-              "Network error"
-            }`,
+            message: t("E-invoice submission failed: {{message}}", {
+              message:
+                einvoiceError?.response?.data?.message ||
+                einvoiceError.message ||
+                t("Network error"),
+            }),
             rejectedDocuments: [], // Ensure arrays exist
             acceptedDocuments: [],
             overallStatus: "Error",
@@ -747,7 +775,7 @@ const InvoiceFormPage: React.FC = () => {
       }
     } catch (error: any) {
       // Handle errors from duplicate check or createInvoice
-      toast.error(`${error.message || "Error creating invoice"}`, {
+      toast.error(error.message || t("Error creating invoice"), {
         id: toastId,
         duration: 5000,
       });
@@ -834,7 +862,7 @@ const InvoiceFormPage: React.FC = () => {
               <BackButton onClick={handleBackClick} disabled={isSaving} />
               <div className="h-6 w-px bg-default-300"></div>
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                New Invoice
+                {t("New Invoice")}
               </h1>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -846,10 +874,10 @@ const InvoiceFormPage: React.FC = () => {
                 disabled={isSaving}
               >
                 {isSaving
-                  ? "Saving..."
+                  ? t("Saving...")
                   : isPaid
-                  ? "Create & Mark Paid"
-                  : "Create Invoice"}
+                  ? t("Create & Mark Paid")
+                  : t("Create Invoice")}
               </Button>
             </div>
           </div>
@@ -877,7 +905,7 @@ const InvoiceFormPage: React.FC = () => {
         {/* Line Items Section */}
         <div className="p-4 border-b border-default-200 dark:border-gray-700">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-lg font-semibold">Line Items</h2>
+            <h2 className="text-lg font-semibold">{t("Line Items")}</h2>
             <div>
               <Button
                 onClick={handleAddSubtotal}
@@ -886,7 +914,7 @@ const InvoiceFormPage: React.FC = () => {
                 className="mr-2"
                 disabled={isSaving}
               >
-                Add Subtotal
+                {t("Add Subtotal")}
               </Button>
               <Button
                 onClick={handleAddRow}
@@ -894,7 +922,7 @@ const InvoiceFormPage: React.FC = () => {
                 size="sm"
                 disabled={isSaving}
               >
-                Add Item
+                {t("Add Item")}
               </Button>
             </div>
           </div>
@@ -931,7 +959,7 @@ const InvoiceFormPage: React.FC = () => {
                   disabled={isSaving || invoiceData?.paymenttype === "CASH"}
                   title={
                     invoiceData?.paymenttype === "CASH"
-                      ? "Cash invoices are always paid"
+                      ? t("Cash invoices are always paid")
                       : ""
                   }
                 >
@@ -945,8 +973,8 @@ const InvoiceFormPage: React.FC = () => {
                   )}
                   <span className="ml-2 font-medium text-sm">
                     {invoiceData?.paymenttype === "CASH"
-                      ? "Cash Payment"
-                      : "Mark as Paid"}
+                      ? t("Cash Payment")
+                      : t("Mark as Paid")}
                   </span>
                 </button>
               </div>
@@ -960,8 +988,10 @@ const InvoiceFormPage: React.FC = () => {
                       <div className="space-y-2">
                         <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
                           {isSplitTender
-                            ? `Payment ${index + 1}`
-                            : "Payment Method"}
+                            ? t("Payment {{number}}", {
+                                number: index + 1,
+                              })
+                            : t("Payment Method")}
                         </label>
                         <PillSelect<string>
                           value={tender.payment_method}
@@ -971,9 +1001,14 @@ const InvoiceFormPage: React.FC = () => {
                                 value as Payment["payment_method"],
                             })
                           }
-                          options={PAYMENT_METHOD_OPTIONS}
+                          options={PAYMENT_METHOD_OPTIONS.map((o) => ({
+                            ...o,
+                            label: t(o.label),
+                          }))}
                           disabled={isSaving}
-                          ariaLabel={`Payment method ${index + 1}`}
+                          ariaLabel={t("Payment method {{number}}", {
+                            number: index + 1,
+                          })}
                           size="md"
                         />
                       </div>
@@ -1017,7 +1052,7 @@ const InvoiceFormPage: React.FC = () => {
                       <div className="w-full sm:w-40">
                         <FormInput
                           name={`tenderAmount-${tender.key}`}
-                          label="Amount"
+                          label={t("Amount")}
                           type="number"
                           step="0.01"
                           value={tender.amount}
@@ -1033,14 +1068,16 @@ const InvoiceFormPage: React.FC = () => {
                       {tenderNeedsReference(tender.payment_method) && (
                         <FormInput
                           name={`tenderReference-${tender.key}`}
-                          label={tenderReferenceLabel(tender.payment_method)}
+                          label={t(
+                            tenderReferenceLabel(tender.payment_method)
+                          )}
                           value={tender.payment_reference}
                           onChange={(e) =>
                             handleTenderChange(tender.key, {
                               payment_reference: e.target.value,
                             })
                           }
-                          placeholder="Enter reference"
+                          placeholder={t("Enter reference")}
                           disabled={isSaving}
                         />
                       )}
@@ -1050,7 +1087,9 @@ const InvoiceFormPage: React.FC = () => {
                           onClick={() => handleTenderRemove(tender.key)}
                           disabled={isSaving}
                           className="mb-1.5 rounded-md p-1.5 text-default-500 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50 dark:text-gray-400 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
-                          title={`Remove payment ${index + 1}`}
+                          title={t("Remove payment {{number}}", {
+                            number: index + 1,
+                          })}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -1065,7 +1104,11 @@ const InvoiceFormPage: React.FC = () => {
                       className="inline-flex items-center gap-1 text-sm font-medium text-sky-600 transition-colors hover:text-sky-700 disabled:opacity-50 dark:text-sky-400 dark:hover:text-sky-300"
                     >
                       <IconPlus size={16} />
-                      {isSplitTender ? "Add another payment" : "Split payment"}
+                      {t(
+                        isSplitTender
+                          ? "Add another payment"
+                          : "Split payment"
+                      )}
                     </button>
                     {billTotal > 0.005 && !tendersBalance && (
                       <span
@@ -1076,10 +1119,25 @@ const InvoiceFormPage: React.FC = () => {
                         }`}
                       >
                         {tenderRemaining < 0
-                          ? `RM${Math.abs(tenderRemaining).toFixed(2)} over the RM${billTotal.toFixed(2)} bill`
+                          ? t("RM{{amount}} over the RM{{total}} bill", {
+                              amount: Math.abs(tenderRemaining).toFixed(2),
+                              total: billTotal.toFixed(2),
+                            })
                           : allowPartialTender
-                          ? `RM${tenderRemaining.toFixed(2)} of RM${billTotal.toFixed(2)} stays outstanding — collect it later`
-                          : `RM${tenderRemaining.toFixed(2)} left of RM${billTotal.toFixed(2)} — a cash bill must be paid in full`}
+                          ? t(
+                              "RM{{amount}} of RM{{total}} stays outstanding — collect it later",
+                              {
+                                amount: tenderRemaining.toFixed(2),
+                                total: billTotal.toFixed(2),
+                              }
+                            )
+                          : t(
+                              "RM{{amount}} left of RM{{total}} — a cash bill must be paid in full",
+                              {
+                                amount: tenderRemaining.toFixed(2),
+                                total: billTotal.toFixed(2),
+                              }
+                            )}
                       </span>
                     )}
                   </div>
@@ -1100,9 +1158,11 @@ const InvoiceFormPage: React.FC = () => {
                 disabled={!canSubmitEinvoice || isSaving}
                 title={
                   isNoValueBill
-                    ? "This bill totals RM0.00 and has no sales value, so it does not need its own e-Invoice"
+                    ? t(
+                        "This bill totals RM0.00 and has no sales value, so it does not need its own e-Invoice"
+                      )
                     : !canSubmitEinvoice
-                    ? "Customer must have TIN and ID number for e-invoicing"
+                    ? t("Customer must have TIN and ID number for e-invoicing")
                     : ""
                 }
               >
@@ -1112,7 +1172,7 @@ const InvoiceFormPage: React.FC = () => {
                   <IconSquare className="text-default-400" size={20} />
                 )}
                 <span className="ml-2 font-medium text-sm truncate">
-                  Submit e-Invoice upon saving
+                  {t("Submit e-Invoice upon saving")}
                 </span>
               </button>
             </div>
@@ -1137,9 +1197,9 @@ const InvoiceFormPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Invoice"
-        message="Are you sure you want to leave? This new invoice will be discarded."
-        confirmButtonText="Discard"
+        title={t("Discard Invoice")}
+        message={t("Are you sure you want to leave? This new invoice will be discarded.")}
+        confirmButtonText={t("Discard")}
         variant="danger"
       />
 

@@ -1,5 +1,6 @@
 // src/pages/Payroll/JPMonthlyLogListPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import {
   IconPlus,
@@ -48,6 +49,7 @@ interface MonthlyWorkLog {
 }
 
 const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) => {
+  const { t } = useTranslation("jellypolly");
   const [workLogs, setWorkLogs] = useState<MonthlyWorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
@@ -151,7 +153,7 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
       setWorkLogs(response.logs);
     } catch (error) {
       console.error("Error fetching monthly work logs:", error);
-      toast.error("Failed to fetch monthly work logs");
+      toast.error(t("Failed to fetch monthly work logs"));
     } finally {
       setIsLoading(false);
     }
@@ -224,12 +226,13 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
 
     try {
       await api.delete(`/jellypolly/api/monthly-work-logs/${logToDelete.id}`);
-      toast.success("Monthly work log deleted successfully");
+      toast.success(t("Monthly work log deleted successfully"));
       fetchWorkLogs();
     } catch (error: any) {
       console.error("Error deleting monthly work log:", error);
       toast.error(
-        error?.response?.data?.message || "Failed to delete monthly work log"
+        error?.response?.data?.message ||
+          t("Failed to delete monthly work log")
       );
     } finally {
       setShowDeleteDialog(false);
@@ -242,13 +245,13 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
           <IconLock size={12} className="mr-1" />
-          {status}
+          {t(status)}
         </span>
       );
     }
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
-        {status}
+        {t(status)}
       </span>
     );
   };
@@ -279,7 +282,7 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
           {/* Left: Title + Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-              {jobConfig?.name} Monthly Records
+              {t("{{name}} Monthly Records", { name: jobConfig?.name })}
             </h1>
             {!isLoading && workLogs.length > 0 && (
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
@@ -289,7 +292,9 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
                   <span className="font-medium text-default-700 dark:text-gray-200">
                     {summaryStats.totalRecords}
                   </span>
-                  <span className="text-default-400 dark:text-gray-400">records</span>
+                  <span className="text-default-400 dark:text-gray-400">
+                    {t("records")}
+                  </span>
                 </div>
               </div>
             )}
@@ -314,7 +319,7 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
               />
             </div>
             <Button onClick={handleAddEntry} icon={IconPlus} color="sky">
-              New Entry
+              {t("New Entry")}
             </Button>
           </div>
         </div>
@@ -335,32 +340,32 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
               <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-40">
-                    Month
+                    {t("Month")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-24">
-                    Year
+                    {t("Year")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
-                    Workers
+                    {t("Workers")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                    Biasa
+                    {t("Biasa")}
                   </th>
                   {supportsDayTypeHours && (
                     <>
                       <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                        Ahad
+                        {t("Ahad")}
                       </th>
                       <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                        Umum
+                        {t("Umum")}
                       </th>
                     </>
                   )}
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
-                    Status
+                    {t("Status")}
                   </th>
                   <th className="w-24 px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -372,7 +377,7 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
                     onClick={() => handleViewLog(log)}
                   >
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200 font-medium">
-                      {getMonthName(log.log_month)}
+                      {t(getMonthName(log.log_month))}
                     </td>
                     <td className="px-4 py-2 text-sm text-center text-default-700 dark:text-gray-200">
                       {log.log_year}
@@ -421,7 +426,7 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
                             <button
                               onClick={() => handleEditLog(log)}
                               className="p-1.5 text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded transition-colors"
-                              title="Edit"
+                              title={t("Edit")}
                             >
                               <IconPencil size={16} />
                             </button>
@@ -431,7 +436,7 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
                                 setShowDeleteDialog(true);
                               }}
                               className="p-1.5 text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded transition-colors"
-                              title="Delete"
+                              title={t("Delete")}
                             >
                               <IconTrash size={16} />
                             </button>
@@ -452,11 +457,13 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
               <IconClipboardList size={32} className="text-default-400 dark:text-gray-500" />
             </div>
             <p className="text-default-600 dark:text-gray-300 font-medium mb-1">
-              No records found
+              {t("No records found")}
             </p>
             <p className="text-default-400 dark:text-gray-500 text-sm text-center max-w-md">
-              No {jobConfig?.name.toLowerCase()} monthly records found for the
-              selected period. Click "New Entry" to add a monthly work log.
+              {t(
+                'No {{name}} monthly records found for the selected period. Click "New Entry" to add a monthly work log.',
+                { name: jobConfig?.name.toLowerCase() }
+              )}
             </p>
           </div>
         </div>
@@ -469,8 +476,10 @@ const JPMonthlyLogListPage: React.FC<JPMonthlyLogListPageProps> = ({ jobType }) 
           setLogToDelete(null);
         }}
         onConfirm={handleDeleteLog}
-        title="Delete Monthly Work Log"
-        message={`Are you sure you want to delete this monthly work log? This action cannot be undone.`}
+        title={t("Delete Monthly Work Log")}
+        message={t(
+          "Are you sure you want to delete this monthly work log? This action cannot be undone."
+        )}
         variant="danger"
       />
     </div>

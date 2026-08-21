@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Tab from "../../../components/Tab";
 import toast from "react-hot-toast";
 import ConfirmationDialog from "../../../components/ConfirmationDialog";
@@ -30,27 +31,28 @@ const JPStaffAddPage: React.FC = () => {
   const navigate = useNavigate();
   const goBack = useSmartBack("/jellypolly/catalogue/staff");
   const location = useLocation();
+  const { t } = useTranslation("jellypolly");
   const maritalStatusOptions = [
-    { id: "Single", name: "Single" },
-    { id: "Married", name: "Married" },
+    { id: "Single", name: t("Single") },
+    { id: "Married", name: t("Married") },
   ];
 
   const spouseEmploymentOptions = [
-    { id: "Employed", name: "Employed" },
-    { id: "Unemployed", name: "Unemployed" },
+    { id: "Employed", name: t("Employed") },
+    { id: "Unemployed", name: t("Unemployed") },
   ];
 
   // Per-staff statutory contribution overrides ("auto" sentinel maps to ""/NULL on save)
   const contributionAgeOptions = [
-    { id: "auto", name: "Auto (from birthdate)" },
-    { id: "under_60", name: "Treat as Under 60" },
-    { id: "over_60", name: "Treat as 60 & Above" },
-    { id: "none", name: "Not Eligible" },
+    { id: "auto", name: t("Auto (from birthdate)") },
+    { id: "under_60", name: t("Treat as Under 60") },
+    { id: "over_60", name: t("Treat as 60 & Above") },
+    { id: "none", name: t("Not Eligible") },
   ];
   const epfNationalityOptions = [
-    { id: "auto", name: "Auto (from nationality)" },
-    { id: "local", name: "Local" },
-    { id: "foreign", name: "Foreign" },
+    { id: "auto", name: t("Auto (from nationality)") },
+    { id: "local", name: t("Local") },
+    { id: "foreign", name: t("Foreign") },
   ];
 
   const [formData, setFormData] = useState<Employee>({
@@ -100,27 +102,27 @@ const JPStaffAddPage: React.FC = () => {
   const { locations: jpLocations } = useJPLocationMappingsCache();
 
   const genderOptions = [
-    { id: "Male", name: "Male" },
-    { id: "Female", name: "Female" },
+    { id: "Male", name: t("Male") },
+    { id: "Female", name: t("Female") },
   ];
 
   const documentOptions = [
-    { id: "NI", name: "NI" },
-    { id: "OI", name: "OI" },
-    { id: "PP", name: "PP" },
-    { id: "IM", name: "IM" },
+    { id: "NI", name: t("NI") },
+    { id: "OI", name: t("OI") },
+    { id: "PP", name: t("PP") },
+    { id: "IM", name: t("IM") },
   ];
 
   const paymentTypeOptions = [
-    { id: "Delivery", name: "Delivery" },
-    { id: "Money", name: "Money" },
-    { id: "Commission", name: "Commission" },
+    { id: "Delivery", name: t("Delivery") },
+    { id: "Money", name: t("Money") },
+    { id: "Commission", name: t("Commission") },
   ];
 
   const paymentPreferenceOptions = [
-    { id: "Bank", name: "Bank" },
-    { id: "Cash", name: "Cash" },
-    { id: "Cheque", name: "Cheque" },
+    { id: "Bank", name: t("Bank") },
+    { id: "Cash", name: t("Cash") },
+    { id: "Cheque", name: t("Cheque") },
   ];
 
   const getDepartmentOptions = (
@@ -286,14 +288,16 @@ const JPStaffAddPage: React.FC = () => {
     for (const field of requiredFields) {
       if (!formData[field]) {
         toast.error(
-          `${field.charAt(0).toUpperCase() + field.slice(1)} is required.`
+          t(
+            `${field.charAt(0).toUpperCase() + field.slice(1)} is required.`
+          )
         );
         return false;
       }
     }
 
     if (STAFF_ID_WHITESPACE_REGEX.test(formData.id)) {
-      toast.error("Staff ID cannot contain whitespace.");
+      toast.error(t("Staff ID cannot contain whitespace."));
       const idField = document.getElementById("id");
       if (idField) {
         idField.focus();
@@ -306,10 +310,12 @@ const JPStaffAddPage: React.FC = () => {
     if (existingStaff) {
       if (existingStaff.dateResigned) {
         toast.error(
-          `A staff member with this ID already exists (Resigned: ${existingStaff.dateResigned})`
+          t("A staff member with this ID already exists (Resigned: {{date}})", {
+            date: existingStaff.dateResigned,
+          })
         );
       } else {
-        toast.error("A staff member with this ID already exists");
+        toast.error(t("A staff member with this ID already exists"));
       }
 
       // Focus on the ID field
@@ -325,7 +331,9 @@ const JPStaffAddPage: React.FC = () => {
     if (formData.email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(formData.email)) {
-        toast.error("Please enter a valid email address or leave it empty.");
+        toast.error(
+          t("Please enter a valid email address or leave it empty.")
+        );
         return false;
       }
     }
@@ -376,13 +384,15 @@ const JPStaffAddPage: React.FC = () => {
       // Refresh the cache after successful creation
       await refreshStaffs();
 
-      toast.success("Staff member created successfully!");
+      toast.success(t("Staff member created successfully!"));
       // Show the staff member just created. `replace` drops this form from
       // history, so Back returns to wherever the user started.
       navigate(`/jellypolly/catalogue/staff/${formData.id}`, { replace: true });
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "An unexpected error occurred"
+        error instanceof Error
+          ? error.message
+          : t("An unexpected error occurred")
       );
     } finally {
       setIsSaving(false);
@@ -499,116 +509,124 @@ const JPStaffAddPage: React.FC = () => {
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <div>
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                Add New Staff
+                {t("Add New Staff")}
               </h1>
               <p className="mt-1 text-sm text-default-500 dark:text-gray-400">
-                Masukkan maklumat kakitangan baharu di sini. Klik "Save" apabila
-                anda selesai.
+                {t(
+                  'Enter new staff details here. Click "Save" when you are done.'
+                )}
               </p>
             </div>
           </div>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="p-6">
-            <Tab labels={["Personal", "Work", "Documents", "Additional"]}>
+            <Tab
+              labels={["Personal", "Work", "Documents", "Additional"].map(
+                (label) => t(label)
+              )}
+            >
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  {renderInput("id", "ID")}
-                  {renderInput("name", "Name")}
+                  {renderInput("id", t("ID"))}
+                  {renderInput("name", t("Name"))}
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                  {renderInput("telephoneNo", "Telephone Number")}
-                  {renderInput("email", "Email", "email")}
+                  {renderInput("telephoneNo", t("Telephone Number"))}
+                  {renderInput("email", t("Email"), "email")}
                 </div>
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderListbox("gender", "Gender", genderOptions)}
+                  {renderListbox("gender", t("Gender"), genderOptions)}
                   {renderListbox(
                     "nationality",
-                    "Nationality",
+                    t("Nationality"),
                     options.nationalities
                   )}
-                  {renderInput("birthdate", "Birthdate", "date")}
+                  {renderInput("birthdate", t("Birthdate"), "date")}
                 </div>
                 <div className="grid grid-cols-1 gap-6">
-                  {renderInput("address", "Address")}
+                  {renderInput("address", t("Address"))}
                 </div>
               </div>
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderCombobox("job", "Job", jobs, jobQuery, setJobQuery)}
+                  {renderCombobox("job", t("Job"), jobs, jobQuery, setJobQuery)}
                   {renderCombobox(
                     "location",
-                    "Location",
+                    t("Location"),
                     jpLocations.map((l) => ({ id: l.id, name: l.name })),
                     locationQuery,
                     setLocationQuery
                   )}
-                  {renderInput("dateJoined", "Date Joined", "date")}
+                  {renderInput("dateJoined", t("Date Joined"), "date")}
                 </div>
               </div>
               <div className="space-y-6 mt-5">
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
-                  {renderInput("icNo", "IC Number")}
-                  {renderInput("bankAccountNumber", "Bank Account Number")}
-                  {renderInput("epfNo", "EPF Number")}
-                  {renderInput("incomeTaxNo", "Income Tax Number")}
-                  {renderInput("socsoNo", "SOCSO Number")}
-                  {renderListbox("document", "Document", documentOptions)}
-                  {renderListbox("department", "Department", departmentOptions)}
-                  {renderInput("kwspNumber", "KWSP Number")}
+                  {renderInput("icNo", t("IC Number"))}
+                  {renderInput("bankAccountNumber", t("Bank Account Number"))}
+                  {renderInput("epfNo", t("EPF Number"))}
+                  {renderInput("incomeTaxNo", t("Income Tax Number"))}
+                  {renderInput("socsoNo", t("SOCSO Number"))}
+                  {renderListbox("document", t("Document"), documentOptions)}
+                  {renderListbox(
+                    "department",
+                    t("Department"),
+                    departmentOptions
+                  )}
+                  {renderInput("kwspNumber", t("KWSP Number"))}
                 </div>
                 <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
                   <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-4">
-                    Income Tax Information
+                    {t("Income Tax Information")}
                   </h3>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                     {renderListbox(
                       "maritalStatus",
-                      "Marital Status",
+                      t("Marital Status"),
                       maritalStatusOptions
                     )}
                     {formData.maritalStatus === "Married" &&
                       renderListbox(
                         "spouseEmploymentStatus",
-                        "Spouse Employment Status",
+                        t("Spouse Employment Status"),
                         spouseEmploymentOptions
                       )}
                     {renderInput(
                       "numberOfChildren",
-                      "Number of Children",
+                      t("Number of Children"),
                       "number"
                     )}
                   </div>
                 </div>
                 <div className="border-t border-default-200 dark:border-gray-700 pt-6 mt-6">
                   <h3 className="text-base font-medium text-default-800 dark:text-gray-100 mb-1">
-                    Contribution Settings
+                    {t("Contribution Settings")}
                   </h3>
                   <p className="text-sm text-default-500 dark:text-gray-400 mb-4">
-                    Override how EPF, SOCSO and SIP are applied for this staff.
-                    Leave as Auto to follow the staff's birthdate and
-                    nationality. "Not Eligible" removes that contribution
-                    entirely.
+                    {t(
+                      'Override how EPF, SOCSO and SIP are applied for this staff. Leave as Auto to follow the staff\'s birthdate and nationality. "Not Eligible" removes that contribution entirely.'
+                    )}
                   </p>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                     {renderContributionSelect(
                       "epfAgeOverride",
-                      "EPF Age",
+                      t("EPF Age"),
                       contributionAgeOptions
                     )}
                     {renderContributionSelect(
                       "epfNationalityOverride",
-                      "EPF Rate Type",
+                      t("EPF Rate Type"),
                       epfNationalityOptions
                     )}
                     {renderContributionSelect(
                       "socsoAgeOverride",
-                      "SOCSO Age",
+                      t("SOCSO Age"),
                       contributionAgeOptions
                     )}
                     {renderContributionSelect(
                       "sipAgeOverride",
-                      "SIP Age",
+                      t("SIP Age"),
                       contributionAgeOptions
                     )}
                   </div>
@@ -618,17 +636,17 @@ const JPStaffAddPage: React.FC = () => {
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
                   {renderListbox(
                     "paymentType",
-                    "Payment Type",
+                    t("Payment Type"),
                     paymentTypeOptions
                   )}
                   {renderListbox(
                     "paymentPreference",
-                    "Payment Preference",
+                    t("Payment Preference"),
                     paymentPreferenceOptions
                   )}
-                  {renderListbox("race", "Race", options.races)}
-                  {renderListbox("agama", "Agama", options.agama)}
-                  {renderInput("dateResigned", "Date Resigned", "date")}
+                  {renderListbox("race", t("Race"), options.races)}
+                  {renderListbox("agama", t("Agama"), options.agama)}
+                  {renderInput("dateResigned", t("Date Resigned"), "date")}
                 </div>
               </div>
             </Tab>
@@ -640,7 +658,7 @@ const JPStaffAddPage: React.FC = () => {
               size="lg"
               disabled={isSaving || !isFormChanged}
             >
-              Save
+              {t("Save")}
             </Button>
           </div>
         </form>
@@ -649,9 +667,9 @@ const JPStaffAddPage: React.FC = () => {
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
         onConfirm={handleConfirmBack}
-        title="Discard Changes"
-        message="Are you sure you want to go back? All unsaved changes will be lost."
-        confirmButtonText="Confirm"
+        title={t("Discard Changes")}
+        message={t("Are you sure you want to go back? All unsaved changes will be lost.")}
+        confirmButtonText={t("Confirm")}
       />
     </div>
   );

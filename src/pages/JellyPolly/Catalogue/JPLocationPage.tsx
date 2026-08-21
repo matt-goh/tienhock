@@ -3,6 +3,7 @@
 // (/jellypolly/api endpoints + JP cache hooks). JP has no journal vouchers, so
 // there are no account-mapping dependencies.
 import React, { useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconPencil,
@@ -54,6 +55,7 @@ interface DependencyInfo {
 }
 
 const JPLocationPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   // Use cached location mappings
   const {
     locations,
@@ -188,10 +190,10 @@ const JPLocationPage: React.FC = () => {
                 ? locationData.id
                 : undefined,
           });
-          toast.success("Location updated successfully");
+          toast.success(t("Location updated successfully"));
         } else {
           await api.post(`${JP_API_BASE}/locations`, locationData);
-          toast.success("Location created successfully");
+          toast.success(t("Location created successfully"));
         }
         // Don't refresh here - let onComplete handle it after modal closes
       } catch (err: any) {
@@ -206,14 +208,14 @@ const JPLocationPage: React.FC = () => {
     if (!locationToDelete) return;
 
     if (dependencyInfo?.hasDependencies) {
-      toast.error("Cannot delete location with dependencies");
+      toast.error(t("Cannot delete location with dependencies"));
       setShowDeleteDialog(false);
       return;
     }
 
     try {
       await api.delete(`${JP_API_BASE}/locations`, [locationToDelete.id]);
-      toast.success("Location deleted successfully");
+      toast.success(t("Location deleted successfully"));
       setShowDeleteDialog(false);
       setLocationToDelete(null);
       setDependencyInfo(null);
@@ -221,7 +223,7 @@ const JPLocationPage: React.FC = () => {
     } catch (err: unknown) {
       console.error("Error deleting location:", err);
       toast.error(
-        err instanceof Error ? err.message : "Failed to delete location"
+        err instanceof Error ? err.message : t("Failed to delete location")
       );
     }
   }, [locationToDelete, dependencyInfo, refreshData]);
@@ -237,7 +239,7 @@ const JPLocationPage: React.FC = () => {
   if (error) {
     return (
       <div className="mt-20 flex w-full items-center justify-center text-rose-600 dark:text-rose-400">
-        Error loading locations: {error}
+        {t("Error loading locations: {{message}}", { message: error })}
       </div>
     );
   }
@@ -249,7 +251,7 @@ const JPLocationPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <IconMapPin className="text-sky-500 dark:text-sky-400" size={22} />
           <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-            Location Catalogue
+            {t("Location Catalogue")}
           </h1>
           <span className="text-sm text-default-500 dark:text-gray-400">
             ({locations.length})
@@ -261,11 +263,11 @@ const JPLocationPage: React.FC = () => {
               className="text-default-400 dark:text-gray-500 hover:text-sky-500 dark:hover:text-sky-400 cursor-help transition-colors"
             />
             <div className="absolute left-0 top-full mt-2 w-72 p-3 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-              <p className="font-medium mb-1">Location Management</p>
+              <p className="font-medium mb-1">{t("Location Management")}</p>
               <p className="text-gray-300 dark:text-gray-200">
-                Locations organize payroll data in salary reports. Edit a
-                location to assign jobs and employees to it. Mapped jobs and
-                employees appear under the correct location in salary reports.
+                {t(
+                  "Locations organize payroll data in salary reports. Edit a location to assign jobs and employees to it. Mapped jobs and employees appear under the correct location in salary reports."
+                )}
               </p>
               <div className="absolute -top-1.5 left-2 w-3 h-3 bg-gray-900 dark:bg-gray-700 rotate-45"></div>
             </div>
@@ -281,7 +283,7 @@ const JPLocationPage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder={t("Search...")}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 py-1.5 pl-8 pr-3 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 placeholder:text-default-400 dark:placeholder:text-gray-400"
@@ -296,7 +298,7 @@ const JPLocationPage: React.FC = () => {
             iconPosition="left"
             size="sm"
           >
-            Add
+            {t("Add")}
           </Button>
         </div>
       </div>
@@ -307,19 +309,19 @@ const JPLocationPage: React.FC = () => {
           <thead className="bg-default-50 dark:bg-gray-800/50 border-b border-default-200 dark:border-gray-700">
             <tr>
               <th className="w-16 px-3 py-2 text-left text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
-                ID
+                {t("ID")}
               </th>
               <th className="w-48 px-3 py-2 text-left text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
-                Name
+                {t("Name")}
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
-                Mapped Jobs
+                {t("Mapped Jobs")}
               </th>
               <th className="px-3 py-2 text-left text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
-                Mapped Employees
+                {t("Mapped Employees")}
               </th>
               <th className="w-20 px-3 py-2 text-center text-xs font-semibold uppercase text-default-600 dark:text-gray-300">
-                Actions
+                {t("Actions")}
               </th>
             </tr>
           </thead>
@@ -353,7 +355,7 @@ const JPLocationPage: React.FC = () => {
                       </div>
                     ) : (
                       <span className="text-xs text-default-400 dark:text-gray-500 italic">
-                        No jobs mapped
+                        {t("No jobs mapped")}
                       </span>
                     )}
                   </td>
@@ -389,14 +391,16 @@ const JPLocationPage: React.FC = () => {
                             className="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
                           >
                             {expandedEmployees.has(location.id)
-                              ? "Show less"
-                              : `+${location.employeeCount - 5} more`}
+                              ? t("Show less")
+                              : t("+{{total}} more", {
+                                  total: location.employeeCount - 5,
+                                })}
                           </button>
                         )}
                       </div>
                     ) : (
                       <span className="text-xs text-default-400 dark:text-gray-500 italic">
-                        No employees mapped
+                        {t("No employees mapped")}
                       </span>
                     )}
                   </td>
@@ -405,14 +409,14 @@ const JPLocationPage: React.FC = () => {
                       <button
                         onClick={() => handleEditClick(location)}
                         className="p-1 rounded hover:bg-sky-100 dark:hover:bg-sky-900/30 text-sky-600 dark:text-sky-400 transition-colors"
-                        title="Edit"
+                        title={t("Edit")}
                       >
                         <IconPencil size={16} />
                       </button>
                       <button
                         onClick={() => handleDeleteClick(location)}
                         className="p-1 rounded hover:bg-rose-100 dark:hover:bg-rose-900/30 text-rose-600 dark:text-rose-400 transition-colors"
-                        title="Delete"
+                        title={t("Delete")}
                       >
                         <IconTrash size={16} />
                       </button>
@@ -427,8 +431,8 @@ const JPLocationPage: React.FC = () => {
                   className="px-3 py-8 text-center text-sm text-default-500 dark:text-gray-400"
                 >
                   {searchTerm
-                    ? "No locations match your search."
-                    : "No locations found. Add one to get started."}
+                    ? t("No locations match your search.")
+                    : t("No locations found. Add one to get started.")}
                 </td>
               </tr>
             )}
@@ -479,24 +483,26 @@ const JPLocationPage: React.FC = () => {
         }
         title={
           dependencyInfo?.hasDependencies
-            ? "Cannot Delete Location"
-            : "Delete Location"
+            ? t("Cannot Delete Location")
+            : t("Delete Location")
         }
         message={
           isCheckingDependencies ? (
             <div className="flex items-center gap-2">
               <LoadingSpinner />
-              <span>Checking dependencies...</span>
+              <span>{t("Checking dependencies...")}</span>
             </div>
           ) : dependencyInfo?.hasDependencies ? (
             <div className="space-y-2">
               <p className="text-rose-600 dark:text-rose-400 font-medium text-sm">
-                This location has dependencies:
+                {t("This location has dependencies:")}
               </p>
               {dependencyInfo.jobs.length > 0 && (
                 <div className="text-sm">
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    Jobs ({dependencyInfo.jobs.length}):
+                    {t("Jobs ({{count}}):", {
+                      count: dependencyInfo.jobs.length,
+                    })}
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
                     {dependencyInfo.jobs
@@ -504,14 +510,18 @@ const JPLocationPage: React.FC = () => {
                       .map((j) => j.job_name)
                       .join(", ")}
                     {dependencyInfo.jobs.length > 3 &&
-                      ` +${dependencyInfo.jobs.length - 3} more`}
+                      t(" +{{count}} more", {
+                        count: dependencyInfo.jobs.length - 3,
+                      })}
                   </span>
                 </div>
               )}
               {dependencyInfo.staffs.length > 0 && (
                 <div className="text-sm">
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    Staff ({dependencyInfo.staffs.length}):
+                    {t("Staff ({{count}}):", {
+                      count: dependencyInfo.staffs.length,
+                    })}
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
                     {dependencyInfo.staffs
@@ -519,19 +529,26 @@ const JPLocationPage: React.FC = () => {
                       .map((s) => s.name)
                       .join(", ")}
                     {dependencyInfo.staffs.length > 3 &&
-                      ` +${dependencyInfo.staffs.length - 3} more`}
+                      t(" +{{count}} more", {
+                        count: dependencyInfo.staffs.length - 3,
+                      })}
                   </span>
                 </div>
               )}
               <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
-                Remove dependencies before deleting.
+                {t("Remove dependencies before deleting.")}
               </p>
             </div>
           ) : (
-            `Delete "${locationToDelete?.name}" (${locationToDelete?.id})?`
+            t('Delete "{{name}}" ({{id}})?', {
+              name: locationToDelete?.name,
+              id: locationToDelete?.id,
+            })
           )
         }
-        confirmButtonText={dependencyInfo?.hasDependencies ? "OK" : "Delete"}
+        confirmButtonText={
+          dependencyInfo?.hasDependencies ? t("OK") : t("Delete")
+        }
         variant={dependencyInfo?.hasDependencies ? "default" : "danger"}
         hideCancelButton={dependencyInfo?.hasDependencies}
       />

@@ -1,6 +1,7 @@
 // src/pages/Payroll/ProductionListPage.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconPencil,
@@ -49,6 +50,7 @@ interface WorkLog {
 }
 
 const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
+  const { t } = useTranslation("jellypolly");
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
@@ -123,17 +125,17 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
   }, [filters.dateRange, dateRangeCacheKey]);
 
   const shiftOptions = [
-    { id: "all", name: "All Shifts" },
+    { id: "all", name: t("All Shifts") },
     ...(jobConfig?.defaultShifts?.map((shift) => ({
       id: shift.toString(),
-      name: shift === 1 ? "Day Shift" : "Night Shift",
+      name: shift === 1 ? t("Day Shift") : t("Night Shift"),
     })) || []),
   ];
 
   const statusOptions = [
-    { id: "all", name: "All Status" },
-    { id: "Submitted", name: "Submitted" },
-    { id: "Processed", name: "Processed" },
+    { id: "all", name: t("All Status") },
+    { id: "Submitted", name: t("Submitted") },
+    { id: "Processed", name: t("Processed") },
   ];
 
   const fetchWorkLogs = async () => {
@@ -166,7 +168,7 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
       setWorkLogs(response.logs);
     } catch (error) {
       console.error("Error fetching work logs:", error);
-      toast.error("Failed to fetch work logs");
+      toast.error(t("Failed to fetch work logs"));
     } finally {
       setIsLoading(false);
     }
@@ -210,12 +212,12 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
 
     try {
       await api.delete(`/jellypolly/api/daily-work-logs/${logToDelete.id}`);
-      toast.success("Work log deleted successfully");
+      toast.success(t("Work log deleted successfully"));
       fetchWorkLogs();
     } catch (error: any) {
       console.error("Error deleting work log:", error);
       toast.error(
-        error?.response?.data?.message || "Failed to delete work log"
+        error?.response?.data?.message || t("Failed to delete work log")
       );
     } finally {
       setShowDeleteDialog(false);
@@ -228,13 +230,13 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
       return (
         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
           <IconLock size={12} className="mr-1" />
-          {status}
+          {t(status)}
         </span>
       );
     }
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
-        {status}
+        {t(status)}
       </span>
     );
   };
@@ -266,7 +268,7 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
           {/* Left: Title + Stats */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-              {jobConfig?.name} Records
+              {t("{{name}} Records", { name: jobConfig?.name })}
             </h1>
             {!isLoading && workLogs.length > 0 && (
               <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-sm">
@@ -276,7 +278,9 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
                   <span className="font-medium text-default-700 dark:text-gray-200">
                     {summaryStats.totalRecords}
                   </span>
-                  <span className="text-default-400 dark:text-gray-400">records</span>
+                  <span className="text-default-400 dark:text-gray-400">
+                    {t("records")}
+                  </span>
                 </div>
               </div>
             )}
@@ -309,7 +313,7 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
               />
             </div>
             <Button onClick={handleAddEntry} icon={IconPlus} color="sky">
-              New Entry
+              {t("New Entry")}
             </Button>
           </div>
         </div>
@@ -327,13 +331,13 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
               <thead className="bg-default-100 dark:bg-gray-800 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-32">
-                    Date
+                    {t("Date")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-24">
-                    Shift
+                    {t("Shift")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-24">
-                    Day Type
+                    {t("Day Type")}
                   </th>
                   {/* Dynamic context columns */}
                   {jobConfig?.contextFields
@@ -347,16 +351,16 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
                       </th>
                     ))}
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
-                    Workers
+                    {t("Workers")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-24">
-                    Hours
+                    {t("Hours")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 w-28">
-                    Status
+                    {t("Status")}
                   </th>
                   <th className="w-24 px-4 py-2.5 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -371,7 +375,7 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
                       {format(new Date(log.log_date), "dd MMM yyyy")}
                     </td>
                     <td className="px-4 py-2 text-sm text-default-700 dark:text-gray-200">
-                      {log.shift === 1 ? "Day" : "Night"}
+                      {log.shift === 1 ? t("Day") : t("Night")}
                     </td>
                     <td
                       className={`px-4 py-2 text-sm text-center font-medium ${getDayTypeColor(
@@ -379,7 +383,7 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
                         log.log_date
                       )}`}
                     >
-                      {getDisplayDayType(log.day_type, log.log_date)}
+                      {t(getDisplayDayType(log.day_type, log.log_date))}
                     </td>
                     {/* Dynamic context values */}
                     {jobConfig?.contextFields
@@ -411,7 +415,7 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
                             <button
                               onClick={() => handleEditLog(log)}
                               className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-900/30 rounded transition-colors"
-                              title="Edit"
+                              title={t("Edit")}
                             >
                               <IconPencil size={16} />
                             </button>
@@ -421,7 +425,7 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
                                 setShowDeleteDialog(true);
                               }}
                               className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 dark:text-rose-400 dark:hover:text-rose-300 dark:hover:bg-rose-900/30 rounded transition-colors"
-                              title="Delete"
+                              title={t("Delete")}
                             >
                               <IconTrash size={16} />
                             </button>
@@ -442,11 +446,13 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
               <IconClipboardList size={32} className="text-default-400" />
             </div>
             <p className="text-default-600 dark:text-gray-300 font-medium mb-1">
-              No records found
+              {t("No records found")}
             </p>
             <p className="text-default-400 text-sm text-center max-w-md">
-              No {jobConfig?.name.toLowerCase()} records found for the selected
-              date range. Click "New Entry" to add a work log.
+              {t(
+                'No {{name}} records found for the selected date range. Click "New Entry" to add a work log.',
+                { name: jobConfig?.name.toLowerCase() }
+              )}
             </p>
           </div>
         </div>
@@ -459,8 +465,10 @@ const JPDailyLogListPage: React.FC<JPDailyLogListPageProps> = ({ jobType }) => {
           setLogToDelete(null);
         }}
         onConfirm={handleDeleteLog}
-        title="Delete Work Log"
-        message={`Are you sure you want to delete this work log? This action cannot be undone.`}
+        title={t("Delete Work Log")}
+        message={t(
+          "Are you sure you want to delete this work log? This action cannot be undone."
+        )}
         variant="danger"
       />
     </div>

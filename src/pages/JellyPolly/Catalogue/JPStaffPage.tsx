@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import {
   IconSearch,
   IconChevronLeft,
@@ -60,6 +61,7 @@ const EmployeeCard = ({
   employee: Employee;
   onDeleteClick: (employee: Employee) => void;
 }) => {
+  const { t } = useTranslation("jellypolly");
   const [isCardHovered, setIsCardHovered] = useState(false);
   const [expandedJobs, setExpandedJobs] = useState(false);
   const navigate = useNavigate();
@@ -117,14 +119,14 @@ const EmployeeCard = ({
             <button
               onClick={handleEditClick}
               className="p-1.5 rounded-lg bg-white dark:bg-gray-800 hover:bg-sky-50 dark:hover:bg-sky-900/50 text-default-500 dark:text-gray-400 hover:text-sky-600 dark:hover:text-sky-400 transition-colors duration-150 shadow-sm"
-              title="Edit employee"
+              title={t("Edit employee")}
             >
               <IconPencil size={16} stroke={1.5} />
             </button>
             <button
               onClick={handleDeleteClick}
               className="p-1.5 rounded-lg bg-white dark:bg-gray-800 hover:bg-rose-50 text-default-500 dark:text-gray-400 hover:text-rose-600 transition-colors duration-150 shadow-sm"
-              title="Delete employee"
+              title={t("Delete employee")}
             >
               <IconTrash size={16} stroke={1.5} />
             </button>
@@ -160,7 +162,9 @@ const EmployeeCard = ({
                   onClick={handleMoreJobsClick}
                   className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 dark:bg-gray-800 text-default-700 dark:text-gray-200 hover:bg-default-200 transition-colors"
                 >
-                  +{employee.job.length - 2} more
+                  {t("+{{total}} more", {
+                    total: employee.job.length - 2,
+                  })}
                 </button>
               )}
               {expandedJobs && (
@@ -168,7 +172,7 @@ const EmployeeCard = ({
                   onClick={handleMoreJobsClick}
                   className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-default-100 dark:bg-gray-800 text-default-700 dark:text-gray-200 hover:bg-default-200 transition-colors"
                 >
-                  Show less
+                  {t("Show less")}
                 </button>
               )}
             </div>
@@ -198,7 +202,9 @@ const EmployeeCard = ({
       {/* Card Footer - Status indication like resignation */}
       {employee.dateResigned && (
         <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/30 border-t border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-medium">
-          Resigned: {new Date(employee.dateResigned).toLocaleDateString()}
+          {t("Resigned: {{date}}", {
+            date: new Date(employee.dateResigned).toLocaleDateString(),
+          })}
         </div>
       )}
     </div>
@@ -206,6 +212,7 @@ const EmployeeCard = ({
 };
 
 const JPStaffPage = () => {
+  const { t } = useTranslation("jellypolly");
   const {
     allStaffs: employees,
     loading,
@@ -242,9 +249,9 @@ const JPStaffPage = () => {
     setIsRefreshing(true);
     try {
       await refreshStaffs();
-      toast.success("Staff list refreshed");
+      toast.success(t("Staff list refreshed"));
     } catch (err) {
-      toast.error("Failed to refresh staff list");
+      toast.error(t("Failed to refresh staff list"));
     } finally {
       setIsRefreshing(false);
     }
@@ -258,13 +265,13 @@ const JPStaffPage = () => {
         await api.delete(`/jellypolly/api/staffs/${employeeToDelete.id}`);
         setIsDeleteDialogOpen(false);
         setEmployeeToDelete(null);
-        toast.success("Employee deleted successfully");
+        toast.success(t("Employee deleted successfully"));
 
         // Refresh the cache instead of updating local state
         await refreshStaffs();
       } catch (err) {
         console.error("Error deleting employee:", err);
-        toast.error("Failed to delete employee. Please try again.");
+        toast.error(t("Failed to delete employee. Please try again."));
       }
     }
   };
@@ -441,7 +448,11 @@ const JPStaffPage = () => {
   }
 
   if (error) {
-    return <div>Error: {error.message}</div>;
+    return (
+      <div>
+        {t("Error:")} {error.message}
+      </div>
+    );
   }
 
   return (
@@ -449,20 +460,22 @@ const JPStaffPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="flex items-center text-2xl text-default-700 dark:text-gray-200 font-bold gap-2.5">
           <IconBriefcase size={28} stroke={2.5} className="text-default-700 dark:text-gray-200" />
-          Staff Directory ({filteredEmployees.length})
+          {t("Staff Directory ({{total}})", {
+            total: filteredEmployees.length,
+          })}
         </h1>
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
             className="px-3 py-2 flex items-center gap-2 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-            title="Refresh staff list"
+            title={t("Refresh staff list")}
           >
             <IconRefresh
               size={18}
               className={isRefreshing ? "animate-spin" : ""}
             />
-            Refresh
+            {t("Refresh")}
           </button>
           <div className="relative flex items-center sm:max-w-xs">
             <IconSearch
@@ -472,7 +485,7 @@ const JPStaffPage = () => {
             <input
               ref={searchInputRef}
               type="text"
-              placeholder="Search name, ID or phone..."
+              placeholder={t("Search name, ID or phone...")}
               className="w-full pl-10 pr-10 py-2.5 border border-default-300 dark:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm dark:bg-transparent dark:text-gray-100"
               value={searchTerm}
               onChange={handleSearchChange}
@@ -481,7 +494,7 @@ const JPStaffPage = () => {
               <button
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                 onClick={() => setSearchTerm("")}
-                title="Clear search"
+                title={t("Clear search")}
               >
                 ×
               </button>
@@ -498,7 +511,7 @@ const JPStaffPage = () => {
               icon={IconPlus}
               color="sky"
             >
-              Add Staff
+              {t("Add Staff")}
             </Button>
           </div>
         </div>
@@ -508,7 +521,7 @@ const JPStaffPage = () => {
         <div className="text-center py-16 bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700">
           <IconBriefcase size={48} className="mx-auto text-default-300 mb-4" />
           <h3 className="text-lg font-medium text-default-800 dark:text-gray-100 mb-1">
-            No staff members found
+            {t("No staff members found")}
           </h3>
           <p className="text-default-500 dark:text-gray-400 max-w-md mx-auto">
             {searchTerm ||
@@ -516,8 +529,8 @@ const JPStaffPage = () => {
             (filters.applyJobFilter &&
               filters.jobFilter &&
               filters.jobFilter.length > 0)
-              ? "Try adjusting your search or filter criteria"
-              : "Get started by adding your first staff member"}
+              ? t("Try adjusting your search or filter criteria")
+              : t("Get started by adding your first staff member")}
           </p>
           {!searchTerm &&
             !(
@@ -532,7 +545,7 @@ const JPStaffPage = () => {
                 variant="outline"
                 className="mt-4"
               >
-                Add Staff Member
+                {t("Add Staff Member")}
               </Button>
             )}
         </div>
@@ -555,20 +568,23 @@ const JPStaffPage = () => {
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
               >
-                <IconChevronLeft className="w-4 h-4 mr-1" /> Previous
+                <IconChevronLeft className="w-4 h-4 mr-1" /> {t("Previous")}
               </button>
               <div className="hidden md:flex space-x-1">
                 {renderPaginationButtons()}
               </div>
               <div className="md:hidden text-sm text-default-600 dark:text-gray-300">
-                Page {currentPage} of {totalPages}
+                {t("Page {{current}} of {{total}}", {
+                  current: currentPage,
+                  total: totalPages,
+                })}
               </div>
               <button
                 className="pl-4 pr-2.5 py-2 inline-flex items-center justify-center rounded-full font-medium text-sm transition-colors duration-200 focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 hover:bg-default-50 dark:hover:bg-gray-700 active:bg-default-100 dark:active:bg-gray-600"
                 onClick={() => handlePageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
               >
-                Next <IconChevronRight className="w-4 h-4 ml-1" />
+                {t("Next")} <IconChevronRight className="w-4 h-4 ml-1" />
               </button>
             </div>
           )}
@@ -579,9 +595,12 @@ const JPStaffPage = () => {
         isOpen={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Staff Member"
-        message={`Are you sure you want to remove ${employeeToDelete?.name} from the staff directory? This action cannot be undone.`}
-        confirmButtonText="Delete"
+        title={t("Delete Staff Member")}
+        message={t(
+          "Are you sure you want to remove {{name}} from the staff directory? This action cannot be undone.",
+          { name: employeeToDelete?.name }
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

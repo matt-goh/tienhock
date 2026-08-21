@@ -3,6 +3,7 @@
 // but scoped to JP payroll employees and the jellypolly.pinjam_records table.
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   IconPlus,
   IconEdit,
@@ -98,6 +99,7 @@ const getDefaultPinjamMonth = (
 };
 
 const JPPinjamListPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const navigate = useNavigate();
 
   // State
@@ -167,7 +169,7 @@ const JPPinjamListPage: React.FC = () => {
       setEmployeePayrolls(dashboard.employeePayrolls || []);
     } catch (error) {
       console.error("Error fetching JP pinjam data:", error);
-      toast.error("Failed to load pinjam data");
+      toast.error(t("Failed to load pinjam data"));
     } finally {
       setIsLoading(false);
     }
@@ -183,13 +185,13 @@ const JPPinjamListPage: React.FC = () => {
 
     try {
       await api.delete(`/jellypolly/api/pinjam-records/${deletingId}`);
-      toast.success("Pinjam record deleted successfully");
+      toast.success(t("Pinjam record deleted successfully"));
       setShowDeleteDialog(false);
       setDeletingId(null);
       await fetchAllData();
     } catch (error) {
       console.error("Error deleting JP pinjam record:", error);
-      toast.error("Failed to delete pinjam record");
+      toast.error(t("Failed to delete pinjam record"));
     }
   };
 
@@ -267,7 +269,7 @@ const JPPinjamListPage: React.FC = () => {
 
   const generatePinjamPDFForAll = async (action: "download" | "print") => {
     if (employeeData.length === 0) {
-      toast.error("No pinjam data to generate");
+      toast.error(t("No pinjam data to generate"));
       return;
     }
     setIsGeneratingPDF(true);
@@ -291,11 +293,15 @@ const JPPinjamListPage: React.FC = () => {
       };
       await generatePinjamPDF(pdfData, action);
       toast.success(
-        `Pinjam summary ${action === "download" ? "downloaded" : "generated"}`
+        t(
+          action === "download"
+            ? "Pinjam summary downloaded"
+            : "Pinjam summary generated"
+        )
       );
     } catch (error) {
       console.error("Error generating pinjam PDF:", error);
-      toast.error("Failed to generate PDF");
+      toast.error(t("Failed to generate PDF"));
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -316,7 +322,7 @@ const JPPinjamListPage: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-4 items-end justify-between">
           <div className="flex gap-4 items-end">
             <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100 self-center">
-              Pinjam (Jelly Polly)
+              {t("Pinjam (Jelly Polly)")}
             </h1>
             <div className="self-center h-8 border-l border-default-300 dark:border-gray-600" />
             <TimeNavigator
@@ -329,7 +335,7 @@ const JPPinjamListPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 whitespace-nowrap">
               <span className="text-sm font-medium text-default-700 dark:text-gray-200">
-                Total Pinjam:
+                {t("Total Pinjam:")}
               </span>
               <span className="font-semibold text-lg text-default-800 dark:text-gray-100">
                 {formatCurrency(totalMidMonthPinjam + totalMonthlyPinjam)}
@@ -340,18 +346,18 @@ const JPPinjamListPage: React.FC = () => {
               icon={IconPrinter}
               variant="outline"
               disabled={isGeneratingPDF || employeeData.length === 0}
-              title="Print Pinjam summary"
+              title={t("Print Pinjam summary")}
             >
-              Print
+              {t("Print")}
             </Button>
             <Button
               onClick={() => generatePinjamPDFForAll("download")}
               icon={IconDownload}
               variant="outline"
               disabled={isGeneratingPDF || employeeData.length === 0}
-              title="Download Pinjam summary PDF"
+              title={t("Download Pinjam summary PDF")}
             >
-              Download
+              {t("Download")}
             </Button>
             <Button
               onClick={fetchAllData}
@@ -359,7 +365,7 @@ const JPPinjamListPage: React.FC = () => {
               variant="outline"
               disabled={isLoading}
             >
-              Refresh
+              {t("Refresh")}
             </Button>
             <Button
               onClick={() => setShowAddModal(true)}
@@ -367,7 +373,7 @@ const JPPinjamListPage: React.FC = () => {
               color="sky"
               variant="filled"
             >
-              Record Pinjam
+              {t("Record Pinjam")}
             </Button>
           </div>
         </div>
@@ -377,8 +383,10 @@ const JPPinjamListPage: React.FC = () => {
       {employeeData.length === 0 ? (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm text-center py-12 text-default-500 dark:text-gray-400">
           <IconCash className="mx-auto h-12 w-12 text-default-300 mb-4" />
-          <p className="text-lg font-medium">No pinjam records found</p>
-          <p>Click "Record Pinjam" to add pinjam for JP employees</p>
+          <p className="text-lg font-medium">
+            {t("No pinjam records found")}
+          </p>
+          <p>{t('Click "Record Pinjam" to add pinjam for JP employees')}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -409,7 +417,7 @@ const JPPinjamListPage: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-default-500 dark:text-gray-400">
-                    Gaji Genap
+                    {t("Gaji Genap")}
                   </p>
                   <p className="font-semibold text-default-800 dark:text-gray-100">
                     {formatCurrency(emp.gajiGenap)}
@@ -419,7 +427,7 @@ const JPPinjamListPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded p-2">
                   <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-1">
-                    Mid-Month Pinjam
+                    {t("Mid-Month Pinjam")}
                   </p>
                   <p className="font-semibold text-blue-800 dark:text-blue-200">
                     {formatCurrency(emp.midMonthPinjam)}
@@ -432,7 +440,7 @@ const JPPinjamListPage: React.FC = () => {
                 </div>
                 <div className="bg-green-50 dark:bg-green-900/20 rounded p-2">
                   <p className="text-xs font-medium text-green-700 dark:text-green-300 mb-1">
-                    Monthly Pinjam
+                    {t("Monthly Pinjam")}
                   </p>
                   <p className="font-semibold text-green-800 dark:text-green-200">
                     {formatCurrency(emp.monthlyPinjam)}
@@ -446,7 +454,7 @@ const JPPinjamListPage: React.FC = () => {
               </div>
               <div className="mt-3 pt-2 border-t border-default-100 dark:border-gray-700 flex justify-between items-center text-sm">
                 <span className="text-default-500 dark:text-gray-400">
-                  Final Pay (after monthly pinjam)
+                  {t("Final Pay (after monthly pinjam)")}
                 </span>
                 <span
                   className={`font-semibold ${
@@ -468,7 +476,7 @@ const JPPinjamListPage: React.FC = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
           <div className="px-6 py-4 border-b border-default-200 dark:border-gray-700">
             <h2 className="text-lg font-medium text-default-800 dark:text-gray-100">
-              Pinjam Records
+              {t("Pinjam Records")}
             </h2>
           </div>
           <div className="overflow-x-auto">
@@ -476,19 +484,19 @@ const JPPinjamListPage: React.FC = () => {
               <thead className="bg-default-50 dark:bg-gray-900/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Employee
+                    {t("Employee")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Description
+                    {t("Description")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Type
+                    {t("Type")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Amount
+                    {t("Amount")}
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -516,8 +524,8 @@ const JPPinjamListPage: React.FC = () => {
                         }`}
                       >
                         {record.pinjam_type === "mid_month"
-                          ? "Mid-Month"
-                          : "Monthly"}
+                          ? t("Mid-Month")
+                          : t("Monthly")}
                       </span>
                     </td>
                     <td className="px-6 py-3 whitespace-nowrap text-right text-sm font-medium text-default-900 dark:text-gray-100">
@@ -528,7 +536,7 @@ const JPPinjamListPage: React.FC = () => {
                         <button
                           onClick={() => handleEdit(record)}
                           className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                          title="Edit"
+                          title={t("Edit")}
                         >
                           <IconEdit size={18} />
                         </button>
@@ -538,7 +546,7 @@ const JPPinjamListPage: React.FC = () => {
                             setShowDeleteDialog(true);
                           }}
                           className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                          title="Delete"
+                          title={t("Delete")}
                         >
                           <IconTrash size={18} />
                         </button>
@@ -572,9 +580,11 @@ const JPPinjamListPage: React.FC = () => {
           setDeletingId(null);
         }}
         onConfirm={handleDeleteRecord}
-        title="Delete Pinjam Record"
-        message="Are you sure you want to delete this pinjam record? This action cannot be undone."
-        confirmButtonText="Delete"
+        title={t("Delete Pinjam Record")}
+        message={t(
+          "Are you sure you want to delete this pinjam record? This action cannot be undone."
+        )}
+        confirmButtonText={t("Delete")}
         variant="danger"
       />
     </div>

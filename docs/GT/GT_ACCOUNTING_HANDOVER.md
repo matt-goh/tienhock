@@ -1329,9 +1329,11 @@ the GT IS/BS PDF print output against the scans (data path verified; visual chec
 **2026-07-01** owns a balanced journal in the `greentarget` schema, synced from the operational
 lifecycle; manual journals are created/edited/cancelled/restored from the shared Journal pages; and a
 hard posting lock (R8) rejects every GT **accounting** mutation dated before 2026-07-01 with HTTP
-409 (`ACCOUNTING_PERIOD_LOCKED`). The narrow exception is a non-posting historical payment-history
-entry described below; it cannot alter the ledger. The Jan–Jun import stays immutable — proven by
-all three harnesses, re-pinned to the legacy subset and green. Changelog entry shipped (rule 16).
+409 (`ACCOUNTING_PERIOD_LOCKED`). The ordinary-screen exception is a non-posting historical
+payment-history entry described below; it cannot alter the ledger. A later, evidence-backed
+locked-period correction may use the deliberately documented guarded-migration bypass (see
+`JV2606-01` below), without modifying any imported row. The Jan–Jun import subset stays immutable —
+proven by all three harnesses, re-pinned to that subset. Changelog entry shipped (rule 16).
 
 #### The two pre-G7 decisions, settled
 
@@ -1369,9 +1371,10 @@ settles an older invoice. A Date Received before the cutover is accepted only wh
 invoice is also pre-cutover; that row is operational history only and posts no journal, so it cannot
 alter the locked ledger. Pending cheques post nothing until the full receipt is confirmed; each
 allocation journal then dates to `payment_date`. **The lock is stricter than Tien Hock's**: it guards
-all GT **accounting** mutations including hand-keyed journals. The historical exception exists only
-for the non-posting path; the imported books and opening activity remain authoritative without
-claiming that every operational payment has a one-to-one imported receipt.
+all GT **accounting** mutations including hand-keyed journals. Ordinary application workflows have
+only the non-posting historical path; an evidenced ledger correction must be a separately reviewed,
+exactly fingerprinted migration. The imported rows and opening activity remain authoritative
+without claiming that every operational payment has a one-to-one imported receipt.
 `posting_sequence` for organic journals is MAX+1 within the entry month, keeping the dense
 1..N invariant the ledger's (month, sequence, display_order) ordering relies on.
 
@@ -1441,6 +1444,39 @@ documents exist yet — first live CN/DN/RN will be the user's).
    joins the production apply list, and production's post-cutover documents need the same backfill —
    re-run `backfill-g7-organic.mjs` there AFTER the schema migration (it calls the shipped services,
    so it needs the server code deployed, or run it on the server).
+
+---
+
+### Post-G7 — approved June bank-charge correction — dev applied (21 Aug 2026), prod pending
+
+The user supplied `JV2606-01` and the supporting voucher after the Jan–Jun legacy import had been
+locked. The missing 30 June bank charge is RM2.70: cheque-process fee RM1.50 plus bank-handling
+charges on 5 and 15 June RM1.20. January–May already contain the same month-end journal pattern; June
+had no `BWBC` posting, leaving the June bank statement RM2.70 high.
+
+The R8 application lock remains unchanged. Reopening June would expose invoices, receipts,
+adjustments, generated vouchers and arbitrary manual journals, while removing only the create guard
+would leave a backdated journal impossible to edit/cancel/restore. The correction therefore uses
+the lock's intended direct-migration bypass:
+
+- `dev/migrations/2026-08-21_greentarget_june_bank_charges_jv.sql`
+- posted source-less `JV`, reference `JV2606-01`, date `2026-06-30`, June `posting_sequence=279`;
+- DR `BWBC` RM2.70 / CR `PBB_1` RM2.70, two lines with `display_order` 1/2 and particulars
+  `BANK CHARGES MONTH OF JUNE 2026`;
+- SERIALIZABLE, advisory-locked, fail-closed and idempotent only against the exact final fingerprint;
+  the 1,705 imported headers, 4,401 imported lines, staging rows and source hashes are untouched.
+
+Live June effects: `BWBC` RM117.40 → **RM120.10**; `PBB_1` / Cash at Bank RM28,468.37 →
+**RM28,465.67**; Schedule 5 RM72,111.34 → **RM72,114.04**; FY profit RM16,369.61 →
+**RM16,366.91**; net assets and financed by RM280,386.14 → **RM280,383.44**. The June Trial
+Balance remains balanced and its printed-control grand total stays RM2,896,808.53.
+
+The original scan fixtures/manifests remain immutable. `verify-import.{mjs,sql}` now reconstruct
+the source comparison from `source_type='legacy_import'` only, while all import/report verifiers and
+the monthly import rerun accept only the exact `JV2606-01` fingerprint and separately gate the live
+corrected figures. Because this is honestly a source-less manual JV, its details page can still show
+Edit/Cancel; the backend correctly returns the period-lock 409, so any later amendment needs another
+reviewed migration.
 
 ---
 

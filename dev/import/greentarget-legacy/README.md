@@ -69,7 +69,7 @@ node dev/import/greentarget-legacy/verify-import.mjs
 `verify-import.sql` proves the database is a faithful projection of staging — header and line
 fidelity, per-journal balance, anchors, per-account month-end closes, Tien Hock isolation.
 `verify-import.mjs` proves something independent: that the imported ledger reproduces the **six
-printed Trial Balance scans**, account by account, 2,850 exact comparisons. Run both; they catch
+printed Trial Balance scans**, account by account, 2,844 exact comparisons. Run both; they catch
 different classes of error, and during G4's own fault injection the SQL verifier caught a per-line
 regression the JS one did not.
 
@@ -137,8 +137,8 @@ ledger by `(DATE_TRUNC('month', entry_date), posting_sequence, journal_entry_lin
 | `build-import-staging.mjs` | yes | **G4.** Derives the 1,434 CD_SD rows from the pinned G0 staging and writes `generated/greentarget_import_staging.csv`, the derivation report, and `dev/migrations/2026-07-27_greentarget_opening_anchors.sql`. |
 | `load-staging.mjs` | yes | **G4.** Hash-validated `\copy` into `greentarget.import_legacy_rows`, in one transaction, with a validation block that refuses to commit an unapproved population. |
 | `post-monthly-journals.sql` | yes | **G4.** One idempotent monthly batch, parameterised by `-v month_start=`. Run six times. |
-| `verify-import.sql` | yes | **G4.** Written *before* the loader. Proves the database is a faithful projection of staging; read-only. Since G7 every population/provenance gate is scoped to `source_type='legacy_import'`, with a mirror gate that no organic journal predates the 2026-07-01 open date. |
-| `verify-import.mjs` | yes | **G4.** Strict gates and 2,850 per-account comparisons against the six printed Trial Balance scans. The balance expectations do not come from database staging; legacy debtor/note membership comes from hash-validated source artifacts, so later live metadata overrides do not rewrite history. (G7 re-pinned the population gates to the legacy subset.) |
+| `verify-import.sql` | yes | **G4.** Written *before* the loader. Proves the database is a faithful projection of staging; read-only. Since G7 every population/provenance and scan-comparison gate is scoped to `source_type='legacy_import'`. The R8 mirror rejects every unexplained organic journal before 2026-07-01; the sole exception is the exact-fingerprinted `JV2606-01` June bank-charge correction applied later by guarded migration. |
+| `verify-import.mjs` | yes | **G4.** Strict gates and 2,844 per-account comparisons against the six printed Trial Balance scans. The balance expectations do not come from database staging; legacy debtor/note membership comes from hash-validated source artifacts, so later live metadata overrides do not rewrite history. G7 re-pinned the population/balance gates to the legacy subset; since 2026-08-21 it separately verifies the live `JV2606-01` overlay and corrected BWBC/PBB_1 closes without changing the scan fixtures. |
 | `backfill-g7-organic.mjs` | yes | **G7.** Posts the pre-G7 post-cutover documents (invoices 325/326, payment 197 → journals 3712–3714) through the shipped G7 services; idempotent. Re-run on production during G8 after the G7 schema migration. |
 
 ## ⚠ Do not hand-edit the generated legacy payload or its migration
