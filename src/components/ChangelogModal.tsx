@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-21",
+    ms: "Penyata bank Green Target bagi Jun 2026 kini termasuk caj bank RM2.70 yang tertinggal: Journal Voucher JV2606-01 merekodkan caj proses cek RM1.50 dan caj pengendalian bank RM1.20 pada 30 Jun. Baki PBB_1 kini RM28,465.67 dan jumlah Bank Charges RM120.10; Trial Balance dan Balance Sheet kekal seimbang, manakala rekod import Jan–Jun yang lain masih dikunci.",
+    en: "Green Target's June 2026 bank statement now includes the missing RM2.70 bank charge: Journal Voucher JV2606-01 records the RM1.50 cheque-process fee and RM1.20 bank-handling charges on 30 June. PBB_1 now closes at RM28,465.67 and total Bank Charges at RM120.10; the Trial Balance and Balance Sheet remain balanced, while the rest of the imported Jan–Jun records stay locked.",
+  },
+  {
     date: "2026-08-20",
     ms: "Senarai Penghutang Green Target bagi Julai 2026 kini mengikut angka audit: CD-CASH RM16,054.00, CD-DURA RM1,100.00, CD-LIST RM16,440.00 dan CD-SITI -RM10.00. Penyata Dura Foam kini membawa baki RM900.00 tanpa tanda negatif dan menutup pada RM1,100.00; jumlah ringkasan CD_SD kekal RM83,730.40.",
     en: "The Green Target Debtor List for July 2026 now follows the audited figures: CD-CASH RM16,054.00, CD-DURA RM1,100.00, CD-LIST RM16,440.00 and CD-SITI -RM10.00. Dura Foam's statement now brings forward RM900.00 without a negative sign and closes at RM1,100.00; the CD_SD summary total remains RM83,730.40.",

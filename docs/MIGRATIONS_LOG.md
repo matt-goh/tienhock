@@ -30,6 +30,17 @@ requires separate approval).
 
 ---
 
+## Applied 21 Aug 2026 — 1 file (Green Target June bank charges)
+
+Applied to dev on 2026-08-21; production application is pending. The migration remains in
+`dev/migrations/` until the same guarded file has been applied and verified in production.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-21_greentarget_june_bank_charges_jv.sql` | Posts the user-supplied missing Green Target journal `JV2606-01` (type JV, 30/06/2026): DR `BWBC` / CR `PBB_1` RM2.70 for the June cheque-process fee RM1.50 plus bank-handling charges RM1.20. The application cutoff stays at 1 July; this exact source-less correction uses the documented guarded-migration bypass and appends June `posting_sequence` 279 without changing any of the 1,705 imported journals or 4,401 imported lines. Corrected June figures: BWBC RM120.10, PBB_1/Cash at Bank RM28,465.67, Schedule 5 RM72,114.04, FY profit RM16,366.91, net assets/financed by RM280,383.44; the Trial Balance stays balanced with the same RM2,896,808.53 printed-control total. SERIALIZABLE, advisory-locked, idempotent only against the exact header/two-line fingerprint, and fail-closed on account/import/balance drift or an equivalent duplicate. | dev ✓ (2026-08-21), prod PENDING |
+
+---
+
 ## Applied 20 Aug 2026 — 1 file (Green Target July debtor audit correction)
 
 Applied to production and dev on 2026-08-20 (same script on both), then kept in

@@ -140,12 +140,74 @@ BEGIN
 
   -- Green Target posts organically only from 2026-07-01 (R2). A post-cutover
   -- journal is legitimate beside a rerun; only unexplained historical rows
-  -- must stop the immutable Jan-Jun import.
+  -- must stop the immutable Jan-Jun import. JV2606-01 is the sole approved
+  -- source-less correction inside the locked period and is accepted only with
+  -- its exact guarded-migration fingerprint.
   IF EXISTS (
     SELECT 1 FROM greentarget.journal_entries
-     WHERE entry_type <> 'IMP' AND entry_date < DATE '2026-07-01'
+     WHERE entry_type <> 'IMP'
+       AND entry_date < DATE '2026-07-01'
+       AND UPPER(BTRIM(reference_no)) IS DISTINCT FROM 'JV2606-01'
   ) THEN
-    RAISE EXCEPTION 'A non-IMP journal exists before the 2026-07-01 cutover';
+    RAISE EXCEPTION 'An unexplained non-IMP journal exists before the 2026-07-01 cutover';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+      FROM greentarget.journal_entries header
+     WHERE UPPER(BTRIM(header.reference_no)) = 'JV2606-01'
+       AND (
+         header.reference_no = 'JV2606-01'
+         AND header.entry_type = 'JV'
+         AND header.entry_date = DATE '2026-06-30'
+         AND header.description = 'BANK CHARGES MONTH OF JUNE 2026'
+         AND header.total_debit = 2.70
+         AND header.total_credit = 2.70
+         AND header.status = 'posted'
+         AND header.display_reference IS NULL
+         AND header.posting_sequence = 279
+         AND header.source_type IS NULL
+         AND header.source_id IS NULL
+         AND header.legacy_entry_type IS NULL
+         AND header.manual_override IS false
+         AND header.cheque_no IS NULL
+         AND header.created_by = 'GT_JUNE_BANK_CHARGE_20260821'
+         AND header.updated_by = 'GT_JUNE_BANK_CHARGE_20260821'
+         AND header.posted_by = 'GT_JUNE_BANK_CHARGE_20260821'
+         AND header.posted_at IS NOT NULL
+         AND (SELECT COUNT(*) FROM greentarget.journal_entry_lines line
+               WHERE line.journal_entry_id = header.id) = 2
+         AND EXISTS (
+           SELECT 1 FROM greentarget.journal_entry_lines line
+            WHERE line.journal_entry_id = header.id
+              AND line.line_number = 1
+              AND line.account_code = 'BWBC'
+              AND line.debit_amount = 2.70
+              AND line.credit_amount = 0
+              AND line.reference IS NULL
+              AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+              AND line.cheque_reference IS NULL
+              AND line.display_order = 1
+              AND line.display_reference IS NULL
+              AND line.debtor_subledger_code IS NULL
+         )
+         AND EXISTS (
+           SELECT 1 FROM greentarget.journal_entry_lines line
+            WHERE line.journal_entry_id = header.id
+              AND line.line_number = 2
+              AND line.account_code = 'PBB_1'
+              AND line.debit_amount = 0
+              AND line.credit_amount = 2.70
+              AND line.reference IS NULL
+              AND line.particulars = 'BANK CHARGES MONTH OF JUNE 2026'
+              AND line.cheque_reference IS NULL
+              AND line.display_order = 2
+              AND line.display_reference IS NULL
+              AND line.debtor_subledger_code IS NULL
+         )
+       ) IS NOT TRUE
+  ) THEN
+    RAISE EXCEPTION 'JV2606-01 exists but does not match the approved June bank-charge correction';
   END IF;
 END
 $preflight$;
