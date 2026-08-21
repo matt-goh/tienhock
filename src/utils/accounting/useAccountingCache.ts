@@ -1,6 +1,7 @@
 // src/utils/accounting/useAccountingCache.ts
 import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { AccountCode, LedgerType, JournalEntryTypeInfo } from "../../types/types";
 
@@ -132,6 +133,7 @@ export const useAccountCodesCache = (
   company: AccountingCacheCompany = "tienhock",
   enabled: boolean = true
 ) => {
+  const { t } = useTranslation("misc");
   const [accountCodes, setAccountCodes] = useState<AccountCode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -191,13 +193,13 @@ export const useAccountCodesCache = (
       const error = err instanceof Error ? err : new Error("Failed to fetch account codes");
       setError(error);
       if (!forceRefresh) {
-        toast.error("Error fetching account codes");
+        toast.error(t("Error fetching account codes"));
       }
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [company, cacheKey, enabled, endpoint]);
+  }, [company, cacheKey, enabled, endpoint, t]);
 
   useEffect(() => {
     void fetchAccountCodes();
@@ -288,6 +290,7 @@ export const invalidateLedgerTypesCache = (): void => {
 export const useLedgerTypesCache = (
   company: AccountingCacheCompany = "tienhock"
 ) => {
+  const { t } = useTranslation("misc");
   const [ledgerTypes, setLedgerTypes] = useState<LedgerType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -340,13 +343,13 @@ export const useLedgerTypesCache = (
       const error = err instanceof Error ? err : new Error("Failed to fetch ledger types");
       setError(error);
       if (!forceRefresh) {
-        toast.error("Error fetching ledger types");
+        toast.error(t("Error fetching ledger types"));
       }
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [company, cacheKey, endpoint]);
+  }, [company, cacheKey, endpoint, t]);
 
   useEffect(() => {
     fetchLedgerTypes();
@@ -431,6 +434,7 @@ export const invalidateJournalEntryTypesCache = (): void => {
  * Hook for journal entry types with caching
  */
 export const useJournalEntryTypesCache = () => {
+  const { t } = useTranslation("misc");
   const [entryTypes, setEntryTypes] = useState<JournalEntryTypeInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -479,13 +483,13 @@ export const useJournalEntryTypesCache = () => {
       const error = err instanceof Error ? err : new Error("Failed to fetch journal entry types");
       setError(error);
       if (!forceRefresh) {
-        toast.error("Error fetching journal entry types");
+        toast.error(t("Error fetching journal entry types"));
       }
       throw error;
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchEntryTypes();

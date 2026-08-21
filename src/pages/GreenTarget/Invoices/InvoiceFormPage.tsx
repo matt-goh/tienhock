@@ -2119,7 +2119,7 @@ const InvoiceFormPage: React.FC = () => {
                     name="internal_reference_paid"
                     value={paymentInternalReference}
                     onChange={handlePaymentInternalReferenceChange}
-                    placeholder="e.g. RV26/06/62"
+                    placeholder={t("e.g. RV26/06/62")}
                     maxLength={50}
                     required
                     className={clsx(

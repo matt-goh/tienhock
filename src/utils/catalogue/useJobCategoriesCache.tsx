@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { JobCategory } from "../../types/types";
 
@@ -44,6 +45,7 @@ if (typeof window !== "undefined") {
 }
 
 export const useJobCategoriesCache = () => {
+  const { t } = useTranslation("misc");
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -91,7 +93,7 @@ export const useJobCategoriesCache = () => {
       setError(err);
       if (!forceRefresh) {
         // Only show toast for initial loads, not background refreshes
-        toast.error("Error fetching job categories");
+        toast.error(t("Error fetching job categories"));
       }
       throw err;
     } finally {

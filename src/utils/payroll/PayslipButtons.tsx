@@ -1,6 +1,7 @@
 // src/utils/payroll/PayslipButtons.tsx
 import React, { useState } from "react";
 import { IconDownload, IconPrinter } from "@tabler/icons-react";
+import { useTranslation } from "react-i18next";
 import { EmployeePayroll } from "../../types/types";
 import { MidMonthPayroll } from "./midMonthPayrollUtils";
 import {
@@ -65,7 +66,7 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
   payroll,
   companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
   fileName,
-  buttonText = "Download PDF",
+  buttonText,
   disabled = false,
   icon = true,
   className = "",
@@ -77,6 +78,7 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
   company = "tienhock",
   onComplete,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isDownloading, setIsDownloading] = useState(false);
   const { staffs: thStaffs } = useStaffsCache();
   const { staffs: jpStaffs } = useJPStaffsCache();
@@ -122,7 +124,7 @@ export const DownloadPayslipButton: React.FC<PayslipButtonProps> = ({
       color={color}
       size={size}
     >
-      {isDownloading ? "Preparing..." : buttonText}
+      {isDownloading ? t("Preparing...") : buttonText ?? t("Download PDF")}
     </Button>
   );
 };
@@ -146,6 +148,7 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   company = "tienhock",
   onComplete,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isDownloading, setIsDownloading] = useState(false);
   const { staffs: thStaffs } = useStaffsCache();
   const { staffs: jpStaffs } = useJPStaffsCache();
@@ -160,7 +163,9 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
 
   // Set default button text based on number of payrolls
   const defaultButtonText =
-    payrolls.length === 1 ? "Download PDF" : `Download ${payrolls.length} PDFs`;
+    payrolls.length === 1
+      ? t("Download PDF")
+      : t("Download {{count}} PDFs", { count: payrolls.length });
 
   const finalButtonText = buttonText || defaultButtonText;
 
@@ -196,7 +201,7 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
       color={color}
       size={size}
     >
-      {isDownloading ? "Preparing..." : finalButtonText}
+      {isDownloading ? t("Preparing...") : finalButtonText}
     </Button>
   );
 };
@@ -207,7 +212,7 @@ export const DownloadBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
 export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
   payroll,
   companyName = "TIEN HOCK FOOD INDUSTRIES SDN BHD",
-  buttonText = "Print Payslip",
+  buttonText,
   disabled = false,
   icon = true,
   className = "",
@@ -220,6 +225,7 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
   company = "tienhock",
   onComplete,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isPrinting, setIsPrinting] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const { staffs: thStaffs } = useStaffsCache();
@@ -273,13 +279,13 @@ export const PrintPayslipButton: React.FC<PayslipButtonProps> = ({
         color={color}
         size={size}
       >
-        {isPrinting ? "Printing..." : buttonText}
+        {isPrinting ? t("Printing...") : buttonText ?? t("Print Payslip")}
       </Button>
 
       {showOverlay && (
         <LoadingOverlay
-          message="Preparing payslip for printing..."
-          processingMessage="Opening print dialog..."
+          message={t("Preparing payslip for printing...")}
+          processingMessage={t("Opening print dialog...")}
           onClose={() => setShowOverlay(false)}
         />
       )}
@@ -305,6 +311,7 @@ export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   company = "tienhock",
   onComplete,
 }) => {
+  const { t } = useTranslation("payroll");
   const [isPrinting, setIsPrinting] = useState(false);
   const [showOverlay, setShowOverlay] = useState(false);
   const { staffs: thStaffs } = useStaffsCache();
@@ -317,8 +324,8 @@ export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
   // Set default button text based on number of payrolls
   const defaultButtonText =
     payrolls.length === 1
-      ? "Print Payslip"
-      : `Print ${payrolls.length} Payslips`;
+      ? t("Print Payslip")
+      : t("Print {{count}} Payslips", { count: payrolls.length });
 
   const finalButtonText = buttonText || defaultButtonText;
 
@@ -360,15 +367,18 @@ export const PrintBatchPayslipsButton: React.FC<BatchPayslipButtonProps> = ({
         color={color}
         size={size}
       >
-        {isPrinting ? "Printing..." : finalButtonText}
+        {isPrinting ? t("Printing...") : finalButtonText}
       </Button>
 
       {showOverlay && (
         <LoadingOverlay
-          message={`Preparing ${payrolls.length} payslip${
-            payrolls.length !== 1 ? "s" : ""
-          } for printing...`}
-          processingMessage="Opening print dialog..."
+          message={t(
+            payrolls.length === 1
+              ? "Preparing {{count}} payslip for printing..."
+              : "Preparing {{count}} payslips for printing...",
+            { count: payrolls.length }
+          )}
+          processingMessage={t("Opening print dialog...")}
           onClose={() => setShowOverlay(false)}
         />
       )}

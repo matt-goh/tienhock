@@ -8,6 +8,8 @@ import {
 } from "react-router-dom";
 import React from "react";
 import { Toaster } from "react-hot-toast";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import { routes, type RouteItem } from "./pages/pagesRoute";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CompanyProvider } from "./contexts/CompanyContext";
@@ -35,11 +37,13 @@ const getCompanyNameFromPath = (pathname: string): string => {
   return "Tien Hock";
 };
 
-const getDocumentTitle = (pathname: string): string => {
+const getDocumentTitle = (pathname: string, t: TFunction): string => {
   const companyName: string = getCompanyNameFromPath(pathname);
+  const title = (page: string): string =>
+    t("{{page}} | {{company}} ERP", { page: t(page), company: companyName });
 
   if (pathname === "/login") {
-    return "Login | Tien Hock ERP";
+    return title("Login");
   }
 
   if (
@@ -47,11 +51,11 @@ const getDocumentTitle = (pathname: string): string => {
     pathname === "/greentarget" ||
     pathname === "/jellypolly"
   ) {
-    return `Dashboard | ${companyName} ERP`;
+    return title("Dashboard");
   }
 
   if (pathname === "/pdf-viewer") {
-    return `PDF Viewer | ${companyName} ERP`;
+    return title("PDF Viewer");
   }
 
   const matchingRoute: RouteItem | undefined = routes.find(
@@ -59,14 +63,13 @@ const getDocumentTitle = (pathname: string): string => {
       matchPath({ path: route.path, end: true }, pathname) !== null
   );
 
-  return matchingRoute
-    ? `${matchingRoute.name} | ${companyName} ERP`
-    : `${companyName} ERP`;
+  return matchingRoute ? title(matchingRoute.name) : `${companyName} ERP`;
 };
 
 const Layout: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();
   const { isDarkMode } = useTheme();
+  const { t } = useTranslation("nav");
   const location = useLocation();
   const isPDFRoute = location.pathname === "/pdf-viewer";
   const isLoginRoute = location.pathname === "/login";
@@ -76,9 +79,9 @@ const Layout: React.FC = () => {
 
   React.useEffect((): void => {
     if (!isPublicFormRoute) {
-      document.title = getDocumentTitle(location.pathname);
+      document.title = getDocumentTitle(location.pathname, t);
     }
-  }, [isPublicFormRoute, location.pathname]);
+  }, [isPublicFormRoute, location.pathname, t]);
 
   if (isLoading) {
     return (
