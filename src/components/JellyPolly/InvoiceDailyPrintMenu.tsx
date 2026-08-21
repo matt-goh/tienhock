@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import Checkbox from "../Checkbox";
 import Button from "../Button";
 import { IconCalendarEvent, IconPrinter } from "@tabler/icons-react";
@@ -36,6 +37,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
   filters,
   size = "md",
 }) => {
+  const { t } = useTranslation("jellypolly");
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const [selectedSalesmen, setSelectedSalesmen] = useState<
@@ -133,7 +135,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
   const formatDateRange = (): string => {
     if (!filters.dateRange.start || !filters.dateRange.end) {
-      return "No date range selected";
+      return t("No date range selected");
     }
     const start = new Date(filters.dateRange.start);
     const end = new Date(filters.dateRange.end);
@@ -155,18 +157,18 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
   const handleGenerate = async (action: "download" | "print"): Promise<void> => {
     if (selectedCount === 0) {
-      toast.error("Please select at least one salesman");
+      toast.error(t("Please select at least one salesman"));
       return;
     }
 
     if (!filters.dateRange.start || !filters.dateRange.end) {
-      toast.error("Please select a valid date range");
+      toast.error(t("Please select a valid date range"));
       return;
     }
 
     setIsGenerating(true);
     setIsVisible(false);
-    setLoadingStep("Preparing invoice search...");
+    setLoadingStep(t("Preparing invoice search..."));
 
     try {
       // Build query parameters for invoice fetching
@@ -188,14 +190,14 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       // Add limit to ensure we get all invoices
       params.append("limit", "1000");
 
-      setLoadingStep("Searching for invoices...");
+      setLoadingStep(t("Searching for invoices..."));
       // Fetch invoices from JellyPolly endpoint
       const response: InvoiceSearchResponse = await api.get(
         `/jellypolly/api/invoices?${params.toString()}`
       );
 
       if (!response || !response.data || response.data.length === 0) {
-        toast.error("No invoices found for the selected criteria");
+        toast.error(t("No invoices found for the selected criteria"));
         return;
       }
 
@@ -204,7 +206,11 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       );
       const invoicesWithProducts: ExtendedInvoiceData[] = [];
 
-      setLoadingStep(`Loading details for ${invoiceIds.length} invoices...`);
+      setLoadingStep(
+        t("Loading details for {{count}} invoices...", {
+          count: invoiceIds.length,
+        })
+      );
       for (
         let index: number = 0;
         index < invoiceIds.length;
@@ -220,9 +226,11 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         );
 
         setLoadingStep(
-          `Loading invoice details (${index + 1}-${batchEnd}/${
-            invoiceIds.length
-          })...`
+          t("Loading invoice details ({{start}}-{{end}}/{{total}})...", {
+            start: index + 1,
+            end: batchEnd,
+            total: invoiceIds.length,
+          })
         );
 
         const batchInvoices: ExtendedInvoiceData[] = await getInvoicesByIds(
@@ -231,7 +239,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         invoicesWithProducts.push(...batchInvoices);
       }
 
-      setLoadingStep("Organizing invoices by salesman...");
+      setLoadingStep(t("Organizing invoices by salesman..."));
       // Sort invoices by salesman and then by date
       const sortedInvoices: ExtendedInvoiceData[] = invoicesWithProducts.sort(
         (a: ExtendedInvoiceData, b: ExtendedInvoiceData): number => {
@@ -247,16 +255,21 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
       setInvoicesToPrint(sortedInvoices);
 
       if (action === "print") {
-        setLoadingStep("Preparing print view...");
+        setLoadingStep(t("Preparing print view..."));
         // Small delay to show the final step
         await new Promise((resolve) => setTimeout(resolve, 500));
         setShowPrintOverlay(true);
       }
 
-      toast.success(`Found ${sortedInvoices.length} invoices to ${action}`);
+      toast.success(
+        t("Found {{count}} invoices to {{action}}", {
+          count: sortedInvoices.length,
+          action,
+        })
+      );
     } catch (error) {
       console.error("Error fetching invoices:", error);
-      toast.error("Failed to fetch invoices");
+      toast.error(t("Failed to fetch invoices"));
     } finally {
       setIsGenerating(false);
       setLoadingStep("");
@@ -284,10 +297,10 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
         onClick={() => setIsVisible(true)}
         className={buttonClasses}
         type="button"
-        title="Daily Invoice Print Menu"
+        title={t("Daily Invoice Print Menu")}
       >
         <IconCalendarEvent size={iconSize} className="mr-2" />
-        Daily
+        {t("Daily")}
       </button>
 
       {isVisible &&
@@ -312,7 +325,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
             >
               <div className="flex justify-between items-center">
                 <h3 className="text-base font-medium text-default-800 dark:text-gray-100">
-                  Daily Invoice Print Selection
+                  {t("Daily Invoice Print Selection")}
                 </h3>
                 <div className="px-2 py-0.5 bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300 rounded-full text-xs font-medium">
                   {selectedCount}/{salesmenOptions.length}
@@ -326,7 +339,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
                   className="mr-1.5"
                   checkedColor="text-sky-700"
                 />
-                {allSelected ? "Deselect All" : "Select All"}
+                {allSelected ? t("Deselect All") : t("Select All")}
               </div>
             </div>
 
@@ -364,7 +377,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
             {/* Actions */}
             <div className="flex-shrink-0 border-t border-default-200 dark:border-gray-700 px-4 py-3 bg-default-50 dark:bg-gray-900/50 rounded-b-lg">
               <div className="text-sm text-default-600 dark:text-gray-400 mb-2">
-                <span className="font-medium">Date Range:</span>{" "}
+                <span className="font-medium">{t("Date Range:")}</span>{" "}
                 {formatDateRange()}
               </div>
               <div className="flex gap-2">
@@ -377,7 +390,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
                   size="sm"
                   className="flex-1"
                 >
-                  Print
+                  {t("Print")}
                 </Button>
               </div>
             </div>
@@ -410,13 +423,13 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
 
                 <div className="text-center space-y-3 w-full">
                   <h3 className="text-xl font-semibold text-default-900 dark:text-gray-100">
-                    Processing Daily Invoices
+                    {t("Processing Daily Invoices")}
                   </h3>
 
                   {/* Loading Steps */}
                   <div className="space-y-2">
                     <p className="text-sm font-medium text-sky-700 dark:text-sky-300 min-h-[20px]">
-                      {loadingStep || "Initializing..."}
+                      {loadingStep || t("Initializing...")}
                     </p>
 
                     {/* Progress Bar */}
@@ -426,7 +439,7 @@ const InvoiceDailyPrintMenu: React.FC<InvoiceDailyPrintMenuProps> = ({
                   </div>
 
                   <p className="text-xs text-default-500 dark:text-gray-400 mt-2">
-                    Please wait while we gather the invoice data...
+                    {t("Please wait while we gather the invoice data...")}
                   </p>
                 </div>
               </div>

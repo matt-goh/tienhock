@@ -8,6 +8,7 @@
 // pages.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   IconCalendar,
@@ -30,10 +31,10 @@ export type JPLeaveType =
   | "cuti_rawatan";
 
 const JP_LEAVE_TYPES: { value: JPLeaveType; label: string }[] = [
-  { value: "cuti_tahunan", label: "Cuti Tahunan" },
-  { value: "cuti_sakit", label: "Cuti Sakit" },
-  { value: "cuti_umum", label: "Cuti Umum" },
-  { value: "cuti_rawatan", label: "Cuti Rawatan" },
+  { value: "cuti_tahunan", label: "Annual Leave" },
+  { value: "cuti_sakit", label: "Sick Leave" },
+  { value: "cuti_umum", label: "Public Holiday" },
+  { value: "cuti_rawatan", label: "Medical Leave" },
 ];
 
 export const getJPLeaveTypeLabel = (type: string): string =>
@@ -122,6 +123,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
   disabled = false,
   onSaved,
 }) => {
+  const { t } = useTranslation("jellypolly");
   const [existingLeave, setExistingLeave] = useState<JPLeaveEntry[]>([]);
   const [newLeave, setNewLeave] = useState<JPLeaveEntry[]>([]);
   const [deletedIds, setDeletedIds] = useState<number[]>([]);
@@ -179,7 +181,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
       setUpdatedAmounts({});
     } catch (error: unknown) {
       console.error("Error loading JP leave records:", error);
-      toast.error("Failed to load leave records");
+      toast.error(t("Failed to load leave records"));
     }
   }, [loadEndpoint]);
 
@@ -208,7 +210,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
       setBalances(next);
     } catch (error: unknown) {
       console.error("Error fetching JP leave balances:", error);
-      toast.error("Failed to fetch leave balances");
+      toast.error(t("Failed to fetch leave balances"));
     }
   }, [employeeIdsKey, year]);
 
@@ -279,7 +281,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
       .map(([employeeId]) => employeeId);
 
     if (targetIds.length === 0) {
-      toast.error("Please select at least one employee");
+      toast.error(t("Please select at least one employee"));
       return;
     }
 
@@ -295,9 +297,10 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
         )
         .join(", ");
       toast.error(
-        `${names} have insufficient ${getJPLeaveTypeLabel(
-          formLeaveType
-        )} balance`
+        t("{{names}} have insufficient {{leaveType}} balance", {
+          names,
+          leaveType: t(getJPLeaveTypeLabel(formLeaveType)),
+        })
       );
       return;
     }
@@ -305,7 +308,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
     const trimmed: string = formAmount.trim();
     const parsed: number = trimmed === "" ? 0 : Number(trimmed);
     if (!Number.isFinite(parsed) || parsed < 0) {
-      toast.error("Please enter a valid non-negative leave amount");
+      toast.error(t("Please enter a valid non-negative leave amount"));
       return;
     }
     const amountPaid: number = Math.round(parsed * 100) / 100;
@@ -323,8 +326,10 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
     setNewLeave((prev: JPLeaveEntry[]) => [...prev, ...additions]);
     toast.success(
       additions.length === 1
-        ? "Leave entry added"
-        : `Added leave for ${additions.length} employees`
+        ? t("Leave entry added")
+        : t("Added leave for {{count}} employees", {
+            count: additions.length,
+          })
     );
     setShowModal(false);
   };
@@ -391,14 +396,14 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
         ),
         deletedLeaveIds: deletedIds,
       });
-      toast.success("Leave saved successfully");
+      toast.success(t("Leave saved successfully"));
       await loadLeave();
       await loadBalances();
       onSaved?.();
     } catch (error: unknown) {
       console.error("Error saving JP leave:", error);
       const message: string =
-        error instanceof Error ? error.message : "Failed to save leave";
+        error instanceof Error ? error.message : t("Failed to save leave");
       toast.error(message);
     } finally {
       setIsSaving(false);
@@ -416,14 +421,14 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
             className="text-default-500 dark:text-gray-400"
           />
           <h3 className="text-sm font-semibold text-default-800 dark:text-gray-100">
-            Leave &amp; Absence Recording
+            {t("Leave & Absence Recording")}
           </h3>
           <span className="text-xs text-default-400 dark:text-gray-500">
             ({rowCount})
           </span>
           {hasPendingChanges && (
             <span className="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-medium text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-              Unsaved changes
+              {t("Unsaved changes")}
             </span>
           )}
         </div>
@@ -434,7 +439,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
             disabled={disabled || employees.length === 0}
             className="inline-flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 px-3 py-1 text-xs font-medium text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <IconPlus size={14} /> Add Leave
+            <IconPlus size={14} /> {t("Add Leave")}
           </button>
           <Button
             color="sky"
@@ -442,14 +447,14 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
             onClick={handleSave}
             disabled={disabled || isSaving}
           >
-            {isSaving ? "Saving..." : "Save Leave"}
+            {isSaving ? t("Saving...") : t("Save Leave")}
           </Button>
         </div>
       </div>
 
       {rowCount === 0 ? (
         <div className="p-6 text-center text-sm text-default-400 dark:text-gray-500">
-          No leave recorded.
+          {t("No leave recorded.")}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -457,16 +462,16 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-4 py-1.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                  Employee
+                  {t("Employee")}
                 </th>
                 <th className="px-4 py-1.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                  Date
+                  {t("Date")}
                 </th>
                 <th className="px-4 py-1.5 text-left text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                  Type
+                  {t("Type")}
                 </th>
                 <th className="px-4 py-1.5 text-right text-xs font-medium uppercase text-default-500 dark:text-gray-400">
-                  Amount (RM)
+                  {t("Amount (RM)")}
                 </th>
                 <th className="px-4 py-1.5 w-12" />
               </tr>
@@ -484,7 +489,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                     {leave.leaveDate}
                   </td>
                   <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
-                    {getJPLeaveTypeLabel(leave.leaveType)}
+                    {t(getJPLeaveTypeLabel(leave.leaveType))}
                   </td>
                   <td className="px-4 py-2 text-right">
                     <input
@@ -505,7 +510,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                       onClick={() => removeExisting(leave.id!)}
                       disabled={disabled}
                       className="text-rose-500 hover:text-rose-700 disabled:opacity-40"
-                      title="Remove leave"
+                      title={t("Remove leave")}
                     >
                       <IconTrash size={16} />
                     </button>
@@ -520,14 +525,14 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                       {leave.employeeId}
                     </span>
                     <span className="ml-2 rounded-full bg-sky-100 dark:bg-sky-900/40 px-2 py-0.5 text-[10px] font-medium text-sky-700 dark:text-sky-300">
-                      New
+                      {t("New")}
                     </span>
                   </td>
                   <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
                     {leave.leaveDate}
                   </td>
                   <td className="px-4 py-2 text-sm text-default-600 dark:text-gray-300">
-                    {getJPLeaveTypeLabel(leave.leaveType)}
+                    {t(getJPLeaveTypeLabel(leave.leaveType))}
                   </td>
                   <td className="px-4 py-2 text-right">
                     <input
@@ -548,7 +553,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                       onClick={() => removeNew(index)}
                       disabled={disabled}
                       className="text-rose-500 hover:text-rose-700 disabled:opacity-40"
-                      title="Remove leave"
+                      title={t("Remove leave")}
                     >
                       <IconTrash size={16} />
                     </button>
@@ -565,18 +570,18 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
           <div className="w-full max-w-lg rounded-lg bg-white dark:bg-gray-800 shadow-xl">
             <div className="px-5 py-3 border-b border-default-200 dark:border-gray-700">
               <h3 className="text-base font-semibold text-default-800 dark:text-gray-100">
-                Add Leave
+                {t("Add Leave")}
               </h3>
             </div>
             <div className="px-5 py-4 space-y-4">
               <div className="grid grid-cols-2 gap-3 items-start">
                 <div>
                   <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                    Date
+                    {t("Date")}
                   </label>
                   <div
                     className="flex h-[38px] items-center gap-2 rounded-lg border border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 px-2.5 text-sm text-default-900 dark:text-gray-100"
-                    title="Leave is recorded for the day you are viewing"
+                    title={t("Leave is recorded for the day you are viewing")}
                   >
                     <IconCalendar
                       size={16}
@@ -589,7 +594,7 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                    Amount (RM)
+                    {t("Amount (RM)")}
                   </label>
                   <input
                     type="number"
@@ -605,8 +610,8 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
-                  Type
+                  <label className="block text-xs font-medium text-default-500 dark:text-gray-400 mb-1">
+                    {t("Type")}
                 </label>
                 <PillSelect<JPLeaveType>
                   value={formLeaveType}
@@ -614,21 +619,31 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                     setFormLeaveType(value);
                     setSelections({});
                   }}
-                  options={leaveTypeOptions}
-                  ariaLabel="Leave type"
+                  options={leaveTypeOptions.map((o) => ({
+                    ...o,
+                    label: t(o.label),
+                  }))}
+                  ariaLabel={t("Leave type")}
                 size="md"
                 />
               </div>
               <p className="-mt-2 text-xs text-default-400 dark:text-gray-500">
-                Leave is recorded for the day currently selected on the page.
-                Change the date using the day navigator above the staff cards.
+                {t(
+                  "Leave is recorded for the day currently selected on the page. Change the date using the day navigator above the staff cards."
+                )}
               </p>
 
               {blockedEmployees.length > 0 && (
                 <p className="text-xs text-rose-500">
-                  Cannot select:{" "}
-                  {blockedEmployees.map((employee) => employee.name).join(", ")}{" "}
-                  have insufficient {getJPLeaveTypeLabel(formLeaveType)} balance.
+                  {t(
+                    "Cannot select: {{names}} have insufficient {{leaveType}} balance.",
+                    {
+                      names: blockedEmployees
+                        .map((employee) => employee.name)
+                        .join(", "),
+                      leaveType: t(getJPLeaveTypeLabel(formLeaveType)),
+                    }
+                  )}
                 </p>
               )}
 
@@ -665,8 +680,12 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                       </div>
                       <span className="text-xs text-default-400 dark:text-gray-500">
                         {hasLeave
-                          ? "Already on leave this date"
-                          : `${remaining} left (${taken}/${total})`}
+                          ? t("Already on leave this date")
+                          : t("{{remaining}} left ({{taken}}/{{total}})", {
+                              remaining,
+                              taken,
+                              total,
+                            })}
                       </span>
                     </div>
                   );
@@ -679,10 +698,10 @@ const JPLeaveSection: React.FC<JPLeaveSectionProps> = ({
                 size="sm"
                 onClick={() => setShowModal(false)}
               >
-                Cancel
+                {t("Cancel")}
               </Button>
               <Button color="sky" size="sm" onClick={handleAddLeave}>
-                Add
+                {t("Add")}
               </Button>
             </div>
           </div>
