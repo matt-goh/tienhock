@@ -1,5 +1,6 @@
 // src/pages/Payroll/JPMonthlyLogDetailsPage.tsx
 import React, { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   IconPencil,
@@ -85,6 +86,7 @@ const getInitialEmployeeSearch = (): string => {
 const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
   jobType,
 }) => {
+  const { t } = useTranslation("jellypolly");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const goBack = useSmartBack(
@@ -113,7 +115,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
         setWorkLog(response);
       } catch (error) {
         console.error("Error fetching monthly work log:", error);
-        toast.error("Failed to load monthly work log");
+        toast.error(t("Failed to load monthly work log"));
         navigate(
           `/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`
         );
@@ -140,12 +142,13 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
 
     try {
       await api.delete(`/jellypolly/api/monthly-work-logs/${id}`);
-      toast.success("Monthly work log deleted successfully");
+      toast.success(t("Monthly work log deleted successfully"));
       navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } catch (error: any) {
       console.error("Error deleting monthly work log:", error);
       toast.error(
-        error?.response?.data?.message || "Failed to delete monthly work log"
+        error?.response?.data?.message ||
+          t("Failed to delete monthly work log")
       );
     } finally {
       setShowDeleteDialog(false);
@@ -179,7 +182,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
       case "cuti_umum":
         return "Public Holiday";
       case "cuti_rawatan":
-        return "Hospital Leave";
+        return "Medical Leave";
       default:
         return type;
     }
@@ -244,7 +247,9 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
   if (!workLog) {
     return (
       <div className="flex justify-center items-center h-96">
-        <p className="text-default-500 dark:text-gray-400">Work log not found</p>
+        <p className="text-default-500 dark:text-gray-400">
+          {t("Work log not found")}
+        </p>
       </div>
     );
   }
@@ -318,11 +323,14 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
               <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
               <div>
                 <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-                  {jobConfig?.name} - {getMonthName(workLog.log_month)}{" "}
-                  {workLog.log_year}
+                  {t("{{name}} - {{month}} {{year}}", {
+                    name: jobConfig?.name,
+                    month: t(getMonthName(workLog.log_month)),
+                    year: workLog.log_year,
+                  })}
                 </h1>
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  Section: {workLog.section}
+                  {t("Section: {{section}}", { section: workLog.section })}
                 </p>
               </div>
             </div>
@@ -335,7 +343,9 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {workLog.employeeEntries.length}
                 </span>
-                <span className="text-default-400 dark:text-gray-400">employees</span>
+                <span className="text-default-400 dark:text-gray-400">
+                  {t("employees")}
+                </span>
               </div>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
@@ -343,7 +353,9 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {totalRegularHours.toFixed(1)}
                 </span>
-                <span className="text-default-400 dark:text-gray-400">hrs</span>
+                <span className="text-default-400 dark:text-gray-400">
+                  {t("hrs")}
+                </span>
               </div>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <div className="flex items-center gap-1.5">
@@ -351,7 +363,9 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {totalOvertimeHours.toFixed(1)}
                 </span>
-                <span className="text-default-400 dark:text-gray-400">OT hrs</span>
+                <span className="text-default-400 dark:text-gray-400">
+                  {t("OT hrs")}
+                </span>
               </div>
               {supportsDayTypeHours && (
                 <>
@@ -361,7 +375,9 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                     <span className="font-medium text-default-700 dark:text-gray-200">
                       {totalAhadHours.toFixed(1)}
                     </span>
-                    <span className="text-default-400 dark:text-gray-400">Ahad</span>
+                    <span className="text-default-400 dark:text-gray-400">
+                      {t("Ahad")}
+                    </span>
                   </div>
                   <span className="text-default-300 dark:text-gray-600">•</span>
                   <div className="flex items-center gap-1.5">
@@ -369,7 +385,9 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                     <span className="font-medium text-default-700 dark:text-gray-200">
                       {totalUmumHours.toFixed(1)}
                     </span>
-                    <span className="text-default-400 dark:text-gray-400">Umum</span>
+                    <span className="text-default-400 dark:text-gray-400">
+                      {t("Umum")}
+                    </span>
                   </div>
                 </>
               )}
@@ -379,7 +397,9 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                 <span className="font-medium text-default-700 dark:text-gray-200">
                   {filteredLeaveRecords.length}
                 </span>
-                <span className="text-default-400 dark:text-gray-400">leave days</span>
+                <span className="text-default-400 dark:text-gray-400">
+                  {t("leave days")}
+                </span>
               </div>
               <span className="text-default-300 dark:text-gray-600">•</span>
               <span
@@ -392,7 +412,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                 {workLog.status === "Processed" && (
                   <IconLock size={12} className="mr-1" />
                 )}
-                {workLog.status}
+                {t(workLog.status)}
               </span>
             </div>
           </div>
@@ -410,14 +430,14 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setEmployeeSearchQuery(event.target.value)
                 }
-                placeholder="Search employee..."
+                placeholder={t("Search employee...")}
                 className="w-36 rounded-md border border-default-300 bg-white py-1.5 pl-7 pr-7 text-xs text-default-900 placeholder:text-default-400 focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 dark:border-gray-600 dark:bg-gray-900/50 dark:text-gray-100 dark:placeholder:text-gray-400 sm:w-44"
               />
               {employeeSearchQuery && (
                 <button
                   type="button"
                   onClick={() => setEmployeeSearchQuery("")}
-                  aria-label="Clear employee search"
+                  aria-label={t("Clear employee search")}
                   className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600 dark:text-gray-400 dark:hover:text-gray-200"
                 >
                   <IconX size={12} />
@@ -428,7 +448,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
               <>
                 <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
               <Button onClick={handleEdit} icon={IconPencil} color="sky">
-                Edit
+                {t("Edit")}
               </Button>
               <Button
                 onClick={() => setShowDeleteDialog(true)}
@@ -436,7 +456,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                 variant="outline"
                 color="rose"
               >
-                Delete
+                {t("Delete")}
               </Button>
               </>
             )}
@@ -451,29 +471,41 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-sky-800 dark:text-sky-300 flex items-center gap-2">
               <IconUsers size={16} className="text-sky-600 dark:text-sky-400" />
-              Employee Work Hours
+              {t("Employee Work Hours")}
             </h3>
             <div className="flex items-center gap-3 text-xs text-sky-700 dark:text-sky-300">
               <span className="font-medium">
-                {workLog.employeeEntries.length} employees
+                {t("{{count}} employees", {
+                  count: workLog.employeeEntries.length,
+                })}
               </span>
               <span className="text-sky-300 dark:text-sky-600">•</span>
               <span className="font-medium">
-                {totalRegularHours.toFixed(1)} reg hrs
+                {t("{{count}} reg hrs", {
+                  count: totalRegularHours.toFixed(1),
+                })}
               </span>
               <span className="text-sky-300 dark:text-sky-600">•</span>
               <span className="font-medium">
-                {totalOvertimeHours.toFixed(1)} OT hrs
+                {t("{{count}} OT hrs", {
+                  count: totalOvertimeHours.toFixed(1),
+                })}
               </span>
               {supportsDayTypeHours && (
                 <>
                   <span className="text-sky-300 dark:text-sky-600">•</span>
                   <span className="font-medium">
-                    {totalAhadHours.toFixed(1)} Ahad / {totalAhadOvertimeHours.toFixed(1)} OT
+                    {t("{{count}} Ahad / {{ot}} OT", {
+                      count: totalAhadHours.toFixed(1),
+                      ot: totalAhadOvertimeHours.toFixed(1),
+                    })}
                   </span>
                   <span className="text-sky-300 dark:text-sky-600">•</span>
                   <span className="font-medium">
-                    {totalUmumHours.toFixed(1)} Umum / {totalUmumOvertimeHours.toFixed(1)} OT
+                    {t("{{count}} Umum / {{ot}} OT", {
+                      count: totalUmumHours.toFixed(1),
+                      ot: totalUmumOvertimeHours.toFixed(1),
+                    })}
                   </span>
                 </>
               )}
@@ -487,16 +519,16 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
               <thead className="bg-default-50 dark:bg-gray-900/50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase">
-                    Employee
+                    {t("Employee")}
                   </th>
                   <th className="px-4 py-2.5 text-center text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-24">
-                    Hours
+                    {t("Hours")}
                   </th>
                   <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase">
-                    Activities
+                    {t("Activities")}
                   </th>
                   <th className="px-4 py-2.5 text-right text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-28">
-                    Amount
+                    {t("Amount")}
                   </th>
                 </tr>
               </thead>
@@ -595,7 +627,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                           {displayContextLinked.length > 0 && (
                             <div>
                               <p className="text-xs font-medium text-sky-600 dark:text-sky-400 mb-1">
-                                Production Activities
+                                  {t("Production Activities")}
                               </p>
                               <div className="space-y-1">
                                 {displayContextLinked.map((activity) => (
@@ -642,7 +674,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                             <div>
                               {displayContextLinked.length > 0 && (
                                 <p className="text-xs font-medium text-default-600 dark:text-gray-300 mb-1 mt-2">
-                                  Standard Activities
+                                  {t("Standard Activities")}
                                 </p>
                               )}
                               <div className="space-y-1">
@@ -660,12 +692,12 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                                       </span>
                                       {activity.source === "employee" && (
                                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300">
-                                          Staff
+                                          {t("Staff")}
                                         </span>
                                       )}
                                       {activity.source === "job" && (
                                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
-                                          Job
+                                          {t("Job")}
                                         </span>
                                       )}
                                       {activity.rate_unit !== "Fixed" && (
@@ -678,12 +710,14 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                                       )}
                                       {activity.rate_unit === "Fixed" && (
                                         <span className="text-default-500 dark:text-gray-400 ml-2">
-                                          • Fixed
+                                          {t("• Fixed")}
                                         </span>
                                       )}
                                       {activity.hours_applied !== null && activity.rate_unit !== "Fixed" && (
                                         <span className="text-default-500 dark:text-gray-400 ml-2">
-                                          • {activity.hours_applied} hrs
+                                          {t("• {{count}} hrs", {
+                                            count: activity.hours_applied,
+                                          })}
                                         </span>
                                       )}
                                     </div>
@@ -702,18 +736,19 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                               className="text-sm font-medium text-sky-600 dark:text-sky-400 hover:text-sky-800 flex items-center"
                             >
                               {isExpanded
-                                ? "Show Less"
-                                : `Show ${
-                                    totalActivities -
-                                    (displayContextLinked.length +
-                                      displayRegular.length)
-                                  } More...`}
+                                ? t("Show Less")
+                                : t("Show {{count}} More...", {
+                                    count:
+                                      totalActivities -
+                                      (displayContextLinked.length +
+                                        displayRegular.length),
+                                  })}
                             </button>
                           )}
 
                           {entry.activities.length === 0 && (
                             <span className="text-sm text-default-400 dark:text-gray-500">
-                              No activities
+                              {t("No activities")}
                             </span>
                           )}
                         </div>
@@ -731,7 +766,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                     colSpan={3}
                     className="px-4 py-3 text-right font-semibold text-sky-800 dark:text-sky-300"
                   >
-                    Total Employee Pay
+                    {t("Total Employee Pay")}
                   </td>
                   <td className="px-4 py-3 text-right font-bold text-sky-900 dark:text-sky-200">
                     {formatCurrency(totalAmount)}
@@ -742,7 +777,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
           </div>
         ) : (
           <div className="p-8 text-center text-default-500 dark:text-gray-400">
-            No employee entries found.
+            {t("No employee entries found.")}
           </div>
         )}
       </div>
@@ -754,10 +789,12 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-rose-800 dark:text-rose-300 flex items-center gap-2">
               <IconBeach size={16} className="text-rose-600 dark:text-rose-400" />
-              Leave Records
+              {t("Leave Records")}
             </h3>
             <span className="text-xs font-medium text-rose-700 dark:text-rose-300">
-              {filteredLeaveRecords.length} leave days
+              {t("{{count}} leave days", {
+                count: filteredLeaveRecords.length,
+              })}
             </span>
           </div>
         </div>
@@ -767,16 +804,16 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
             <thead className="bg-default-50 dark:bg-gray-900/50">
               <tr>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase">
-                  Employee
+                  {t("Employee")}
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-32">
-                  Date
+                  {t("Date")}
                 </th>
                 <th className="px-4 py-2.5 text-left text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-32">
-                  Type
+                  {t("Type")}
                 </th>
                 <th className="px-4 py-2.5 text-right text-xs font-medium text-default-600 dark:text-gray-300 uppercase w-32">
-                  Amount
+                  {t("Amount")}
                 </th>
               </tr>
             </thead>
@@ -806,7 +843,7 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
                         record.leave_type
                       )}`}
                     >
-                      {getLeaveTypeLabel(record.leave_type)}
+                      {t(getLeaveTypeLabel(record.leave_type))}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right text-sm font-medium text-default-700 dark:text-gray-200">
@@ -823,8 +860,8 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
             </div>
             <p className="text-default-500 dark:text-gray-400 text-sm">
               {employeeSearchQuery
-                ? "No leave records match your search"
-                : "No leave records for this month"}
+                ? t("No leave records match your search")
+                : t("No leave records for this month")}
             </p>
           </div>
         )}
@@ -833,11 +870,15 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
       {/* Metadata - Smaller, less prominent */}
       <div className="text-xs text-default-400 flex items-center justify-end gap-3">
         <span>
-          Created: {format(new Date(workLog.created_at), "dd MMM yyyy hh:mm a")}
+          {t("Created: {{date}}", {
+            date: format(new Date(workLog.created_at), "dd MMM yyyy hh:mm a"),
+          })}
         </span>
         <span>•</span>
         <span>
-          Updated: {format(new Date(workLog.updated_at), "dd MMM yyyy hh:mm a")}
+          {t("Updated: {{date}}", {
+            date: format(new Date(workLog.updated_at), "dd MMM yyyy hh:mm a"),
+          })}
         </span>
       </div>
 
@@ -846,8 +887,10 @@ const JPMonthlyLogDetailsPage: React.FC<JPMonthlyLogDetailsPageProps> = ({
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDelete}
-        title="Delete Monthly Work Log"
-        message="Are you sure you want to delete this monthly work log? This action cannot be undone."
+        title={t("Delete Monthly Work Log")}
+        message={t(
+          "Are you sure you want to delete this monthly work log? This action cannot be undone."
+        )}
         variant="danger"
       />
     </div>

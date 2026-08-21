@@ -1,6 +1,7 @@
 // src/pages/Payroll/JPMonthlyLogEditPage.tsx
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
 import toast from "react-hot-toast";
@@ -13,6 +14,7 @@ interface JPMonthlyLogEditPageProps {
 }
 
 const JPMonthlyLogEditPage: React.FC<JPMonthlyLogEditPageProps> = ({ jobType }) => {
+  const { t } = useTranslation("jellypolly");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
@@ -30,14 +32,14 @@ const JPMonthlyLogEditPage: React.FC<JPMonthlyLogEditPageProps> = ({ jobType }) 
     try {
       const response = await api.get(`/jellypolly/api/monthly-work-logs/${id}`);
       if (response.status === "Processed") {
-        toast.error("Cannot edit processed work log");
+        toast.error(t("Cannot edit processed work log"));
         navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly/${id}`);
         return;
       }
       setWorkLog(response);
     } catch (error) {
       console.error("Error fetching monthly work log details:", error);
-      toast.error("Failed to fetch monthly work log details");
+      toast.error(t("Failed to fetch monthly work log details"));
       navigate(`/jellypolly/payroll/${jobType.toLowerCase().replace("_", "-")}-monthly`);
     } finally {
       setIsLoading(false);
@@ -59,9 +61,11 @@ const JPMonthlyLogEditPage: React.FC<JPMonthlyLogEditPageProps> = ({ jobType }) 
   if (!workLog) {
     return (
       <div className="text-center py-12">
-        <p className="text-default-500 dark:text-gray-400">Monthly work log not found</p>
+        <p className="text-default-500 dark:text-gray-400">
+          {t("Monthly work log not found")}
+        </p>
         <Button onClick={handleBack} className="mt-4" variant="outline">
-          Back to List
+          {t("Back to List")}
         </Button>
       </div>
     );

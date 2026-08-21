@@ -2,6 +2,7 @@
 // Jelly Polly clone of src/pages/Catalogue/JobPage.tsx on the JP catalogue
 // (/jellypolly/api endpoints + JP cache hooks).
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Combobox,
   ComboboxButton,
@@ -71,6 +72,7 @@ interface JobCardProps {
 }
 
 const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
+  const { t } = useTranslation("jellypolly");
   const sectionDisplay = Array.isArray(job.section)
     ? job.section.join(", ")
     : job.section || "N/A";
@@ -86,12 +88,14 @@ const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
       >
         {job.name}
       </h3>
-      <p className="text-xs text-default-500 dark:text-gray-400 uppercase mb-2">ID: {job.id}</p>
+      <p className="text-xs text-default-500 dark:text-gray-400 uppercase mb-2">
+        {t("ID: {{id}}", { id: job.id })}
+      </p>
       <p
         className="text-sm text-default-600 dark:text-gray-300 line-clamp-2"
         title={sectionDisplay}
       >
-        <span className="font-medium">Section:</span> {sectionDisplay}
+        <span className="font-medium">{t("Section:")}</span> {sectionDisplay}
       </p>
     </button>
   );
@@ -99,6 +103,7 @@ const JobCard: React.FC<JobCardProps> = ({ job, onClick }) => {
 
 // --- Main JPJobPage Component ---
 const JPJobPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   // --- State ---
   const location = useLocation();
   const navigate = useNavigate();
@@ -182,12 +187,12 @@ const JPJobPage: React.FC = () => {
         pay_code_id: payCodeId,
         is_default: true, // Or determine this differently
       });
-      toast.success("Pay code added to job successfully");
+      toast.success(t("Pay code added to job successfully"));
       await refreshPayCodeMappings(); // Refresh the general map
     } catch (error: any) {
       console.error("Error adding pay code to job:", error);
       const message =
-        error?.response?.data?.message || "Failed to add pay code to job";
+        error?.response?.data?.message || t("Failed to add pay code to job");
       toast.error(message);
       throw new Error(message); // Re-throw for modal error handling if needed
     }
@@ -197,11 +202,11 @@ const JPJobPage: React.FC = () => {
     if (!selectedJob) return;
     try {
       await api.delete(`${JP_API_BASE}/job-pay-codes/${selectedJob.id}/${payCodeId}`);
-      toast.success("Pay code removed from job successfully");
+      toast.success(t("Pay code removed from job successfully"));
       await refreshPayCodeMappings();
     } catch (error) {
       console.error("Error removing pay code from job:", error);
-      toast.error("Failed to remove pay code from job");
+      toast.error(t("Failed to remove pay code from job"));
     }
   };
 
@@ -266,7 +271,7 @@ const JPJobPage: React.FC = () => {
         if (!createdJob || !createdJob.id)
           throw new Error(response.message || "Failed to add job");
 
-        toast.success("Job added successfully");
+        toast.success(t("Job added successfully"));
         setShowAddJobModal(false);
         await refreshJobs();
         await refreshPayCodeMappings();
@@ -279,7 +284,7 @@ const JPJobPage: React.FC = () => {
         });
       } catch (error: any) {
         console.error("Error adding job:", error);
-        toast.error(error.message || "Failed to add job");
+        toast.error(error.message || t("Failed to add job"));
       }
     },
     [refreshJobs, refreshPayCodeMappings]
@@ -322,7 +327,7 @@ const JPJobPage: React.FC = () => {
     if (!selectedJob) return;
 
     if (jobDependencyInfo?.hasDependencies) {
-      toast.error("Cannot delete job with dependencies");
+      toast.error(t("Cannot delete job with dependencies"));
       setShowDeleteJobDialog(false);
       setJobDependencyInfo(null);
       return;
@@ -330,7 +335,11 @@ const JPJobPage: React.FC = () => {
 
     try {
       await api.delete(`${JP_API_BASE}/jobs/${selectedJob.id}`);
-      toast.success(`Job "${selectedJob.name}" deleted successfully`);
+      toast.success(
+        t('Job "{{name}}" deleted successfully', {
+          name: selectedJob.name,
+        })
+      );
       setShowDeleteJobDialog(false);
       setSelectedJob(null); // Go back to card view
       setJobDependencyInfo(null);
@@ -342,7 +351,7 @@ const JPJobPage: React.FC = () => {
       await refreshPayCodeMappings(); // Ensure mappings are cleared too
     } catch (error) {
       console.error("Error deleting job:", error);
-      toast.error("Failed to delete job");
+      toast.error(t("Failed to delete job"));
       setShowDeleteJobDialog(false);
     }
   }, [selectedJob, jobDependencyInfo, refreshJobs, refreshPayCodeMappings, navigate]);
@@ -421,6 +430,7 @@ const JPJobPage: React.FC = () => {
 
   // --- Pagination Component ---
   const Pagination = () => {
+    const { t } = useTranslation("jellypolly");
     const handleNextPage = () => {
       if (currentPage < totalPayCodePages) setCurrentPage((prev) => prev + 1);
     };
@@ -439,22 +449,20 @@ const JPJobPage: React.FC = () => {
       <div className="flex items-center justify-between py-3 border-t border-default-200 dark:border-gray-700 mt-4">
         <div>
           <p className="text-sm text-default-600 dark:text-gray-300">
-            Showing{" "}
-            <span className="font-medium">
-              {(currentPage - 1) * itemsPerPage + 1}
-            </span>{" "}
-            to{" "}
-            <span className="font-medium">
-              {Math.min(currentPage * itemsPerPage, jobPayCodesDetails.length)}
-            </span>{" "}
-            of <span className="font-medium">{jobPayCodesDetails.length}</span>{" "}
-            results
+            {t("Showing {{start}} to {{end}} of {{total}} results", {
+              start: (currentPage - 1) * itemsPerPage + 1,
+              end: Math.min(
+                currentPage * itemsPerPage,
+                jobPayCodesDetails.length
+              ),
+              total: jobPayCodesDetails.length,
+            })}
           </p>
         </div>
         <div>
           <nav
             className="inline-flex rounded-md shadow-sm -space-x-px"
-            aria-label="Pagination"
+            aria-label={t("Pagination")}
           >
             <button
               onClick={handlePrevPage}
@@ -533,7 +541,7 @@ const JPJobPage: React.FC = () => {
       {/* --- Header: Only show centered when no job selected --- */}
       {!selectedJob && (
         <h1 className="text-center text-xl font-semibold text-default-800 dark:text-gray-100">
-          Job & Pay Codes
+          {t("Job & Pay Codes")}
         </h1>
       )}
 
@@ -543,7 +551,7 @@ const JPJobPage: React.FC = () => {
           {/* --- Job Card Grid --- */}
           <div className="mb-6 text-center">
             <h2 className="text-lg font-medium text-default-500 dark:text-gray-400 mb-4 -mt-2">
-              Select a Job to Manage Pay Codes
+              {t("Select a Job to Manage Pay Codes")}
             </h2>
           </div>
           <div className="max-h-[calc(100vh-180px)] overflow-y-auto pb-4 pr-1">
@@ -552,10 +560,10 @@ const JPJobPage: React.FC = () => {
               <button
                 onClick={handleAddJobClickInList}
                 className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-sky-400 dark:border-sky-500 rounded-lg text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/30 transition-colors duration-150 h-full min-h-[120px]" // Added min-h
-                aria-label="Add New Job"
+                aria-label={t("Add New Job")}
               >
                 <IconPlus size={32} className="mb-2" />
-                <span className="text-sm font-medium">Add New Job</span>
+                <span className="text-sm font-medium">{t("Add New Job")}</span>
               </button>
               {/* Job Cards */}
               {jobs.map((job) => (
@@ -570,7 +578,9 @@ const JPJobPage: React.FC = () => {
       {loadingJobs && !selectedJob && (
         <div className="flex justify-center items-center h-40">
           <LoadingSpinner />
-          <span className="ml-3 text-default-600 dark:text-gray-300">Loading jobs...</span>
+          <span className="ml-3 text-default-600 dark:text-gray-300">
+            {t("Loading jobs...")}
+          </span>
         </div>
       )}
 
@@ -585,19 +595,19 @@ const JPJobPage: React.FC = () => {
                 <button
                   onClick={() => handleJobSelection(null)}
                   className="flex items-center gap-1 text-default-600 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 transition-colors pb-1.5"
-                  title="Back to job list"
+                  title={t("Back to job list")}
                 >
                   <IconChevronLeft size={20} />
-                  <span className="text-sm font-medium">Back</span>
+                  <span className="text-sm font-medium">{t("Back")}</span>
                 </button>
                 <span className="text-default-300 dark:text-gray-600 pb-1.5">|</span>
                 <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100 pb-1.5">
-                  Job & Pay Codes
+                  {t("Job & Pay Codes")}
                 </h1>
                 <span className="text-default-300 dark:text-gray-600 pb-1.5">|</span>
                 <div>
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                    Select Job
+                    {t("Select Job")}
                   </label>
                   <Field className="w-64">
                   <Combobox value={selectedJob} onChange={handleJobSelection}>
@@ -606,7 +616,7 @@ const JPJobPage: React.FC = () => {
                       className="w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-700 py-1.5 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100"
                       displayValue={(job: Job | null) => job?.name || ""}
                       onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Select or search..."
+                      placeholder={t("Select or search...")}
                       autoComplete="off"
                     />
                     <ComboboxButton className="absolute inset-y-0 right-0 flex items-center pr-2">
@@ -626,21 +636,21 @@ const JPJobPage: React.FC = () => {
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
                         <IconPlus size={18} />
                       </span>
-                      Add New Job
+                      {t("Add New Job")}
                     </ComboboxOption>
                     {(filteredJobs.length > 0 || loadingJobs) && (
                       <hr className="my-1 border-default-200 dark:border-gray-600" />
                     )}
                     {loadingJobs && (
                       <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-200">
-                        Loading jobs...
+                        {t("Loading jobs...")}
                       </div>
                     )}
                     {!loadingJobs &&
                       filteredJobs.length === 0 &&
                       query !== "" && (
                         <div className="relative cursor-default select-none py-2 px-4 text-gray-700 dark:text-gray-200">
-                          No jobs found.
+                          {t("No jobs found.")}
                         </div>
                       )}
                     {!loadingJobs &&
@@ -688,7 +698,7 @@ const JPJobPage: React.FC = () => {
               <div className="flex flex-wrap gap-4 flex-1">
                 <div className="rounded-lg bg-default-50 dark:bg-gray-900/50 px-4 py-2 border border-default-200 dark:border-gray-700">
                   <p className="text-xs uppercase text-default-500 dark:text-gray-400 font-medium">
-                    ID
+                    {t("ID")}
                   </p>
                   <p className="text-default-800 dark:text-gray-100 font-semibold">
                     {selectedJob.id}
@@ -696,7 +706,7 @@ const JPJobPage: React.FC = () => {
                 </div>
                 <div className="rounded-lg bg-default-50 dark:bg-gray-900/50 px-4 py-2 border border-default-200 dark:border-gray-700">
                   <p className="text-xs uppercase text-default-500 dark:text-gray-400 font-medium">
-                    Section
+                    {t("Section")}
                   </p>
                   <p
                     className="text-default-800 dark:text-gray-100 font-semibold max-w-xs truncate"
@@ -713,7 +723,7 @@ const JPJobPage: React.FC = () => {
                 </div>
                 <div className="rounded-lg bg-default-50 dark:bg-gray-900/50 px-4 py-2 border border-default-200 dark:border-gray-700">
                   <p className="text-xs uppercase text-default-500 dark:text-gray-400 font-medium">
-                    Name
+                    {t("Name")}
                   </p>
                   <p className="text-default-800 dark:text-gray-100 font-semibold">
                     {selectedJob.name}
@@ -728,7 +738,7 @@ const JPJobPage: React.FC = () => {
                   size="sm"
                   icon={IconTrash}
                 >
-                  Delete Job
+                  {t("Delete Job")}
                 </Button>
               </div>
             </div>
@@ -739,7 +749,7 @@ const JPJobPage: React.FC = () => {
             <div className="mb-4 rounded-lg border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm">
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-sm font-medium text-default-700 dark:text-gray-200">
-                  Staff Associated with this Job:
+                  {t("Staff Associated with this Job:")}
                 </h3>
                 <Button
                   onClick={() => setShowAssociateEmployeesModal(true)}
@@ -748,7 +758,7 @@ const JPJobPage: React.FC = () => {
                   size="sm"
                   icon={IconPencil}
                 >
-                  Manage Staff
+                  {t("Manage Staff")}
                 </Button>
               </div>
               {loadingStaffs ? (
@@ -769,7 +779,7 @@ const JPJobPage: React.FC = () => {
                 </div>
               ) : (
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  No staff associated with this job
+                  {t("No staff associated with this job")}
                 </p>
               )}
             </div>
@@ -780,7 +790,7 @@ const JPJobPage: React.FC = () => {
             {/* Header + Add Button + Search */}
             <div className="mb-4 flex flex-col items-center justify-between gap-4 md:flex-row">
               <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100">
-                Pay Codes for "{selectedJob.name}"
+                {t('Pay Codes for "{{name}}"', { name: selectedJob.name })}
               </h2>
               <div className="flex items-center gap-3">
                 {/* Search Input */}
@@ -791,7 +801,7 @@ const JPJobPage: React.FC = () => {
                   />
                   <input
                     type="text"
-                    placeholder="Search pay codes..."
+                    placeholder={t("Search pay codes...")}
                     className="w-64 rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
                     value={payCodeSearch}
                     onChange={(e) => {
@@ -803,7 +813,7 @@ const JPJobPage: React.FC = () => {
                     <button
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                       onClick={() => setPayCodeSearch("")}
-                      title="Clear search"
+                      title={t("Clear search")}
                     >
                       ×
                     </button>
@@ -825,7 +835,7 @@ const JPJobPage: React.FC = () => {
                   size="md"
                   disabled={!selectedJob}
                 >
-                  Batch Manage
+                  {t("Batch Manage")}
                 </Button>
 
                 {/* Add Pay Code Button */}
@@ -837,7 +847,7 @@ const JPJobPage: React.FC = () => {
                   size="md"
                   disabled={!selectedJob}
                 >
-                  Add Pay Code
+                  {t("Add Pay Code")}
                 </Button>
               </div>
             </div>
@@ -853,28 +863,28 @@ const JPJobPage: React.FC = () => {
                   <thead className="bg-default-100 dark:bg-gray-800">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Code
+                        {t("Code")}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Description
+                        {t("Description")}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Type
+                        {t("Type")}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Unit
+                        {t("Unit")}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Biasa Rate
+                        {t("Biasa Rate")}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Ahad Rate
+                        {t("Ahad Rate")}
                       </th>
                       <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Umum Rate
+                        {t("Umum Rate")}
                       </th>
                       <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                        Actions
+                        {t("Actions")}
                       </th>
                     </tr>
                   </thead>
@@ -918,7 +928,7 @@ const JPJobPage: React.FC = () => {
                               {detail.override_rate_biasa !== null && (
                                 <span
                                   className="ml-1 text-xs text-sky-600 dark:text-sky-400"
-                                  title="Override"
+                                  title={t("Override")}
                                 >
                                   (O)
                                 </span>
@@ -929,7 +939,7 @@ const JPJobPage: React.FC = () => {
                               {detail.override_rate_ahad !== null && (
                                 <span
                                   className="ml-1 text-xs text-sky-600 dark:text-sky-400"
-                                  title="Override"
+                                  title={t("Override")}
                                 >
                                   (O)
                                 </span>
@@ -940,7 +950,7 @@ const JPJobPage: React.FC = () => {
                               {detail.override_rate_umum !== null && (
                                 <span
                                   className="ml-1 text-xs text-sky-600 dark:text-sky-400"
-                                  title="Override"
+                                  title={t("Override")}
                                 >
                                   (O)
                                 </span>
@@ -952,7 +962,7 @@ const JPJobPage: React.FC = () => {
                                 {/* Edit button inside the clickable row */}
                                 <button
                                   className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
-                                  title="Edit Rates"
+                                  title={t("Edit Rates")}
                                   // onClick is handled by the <tr> now
                                 >
                                   <IconPencil size={18} />
@@ -965,7 +975,7 @@ const JPJobPage: React.FC = () => {
                                     setShowRemovePayCodeDialog(true);
                                   }}
                                   className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                                  title="Remove Pay Code"
+                                  title={t("Remove Pay Code")}
                                 >
                                   <IconTrash size={18} />
                                 </button>
@@ -980,7 +990,7 @@ const JPJobPage: React.FC = () => {
                           colSpan={8}
                           className="px-6 py-10 text-center text-sm text-default-500 dark:text-gray-400"
                         >
-                          No pay codes assigned to this job.
+                          {t("No pay codes assigned to this job.")}
                         </td>
                       </tr>
                     )}
@@ -1055,83 +1065,119 @@ const JPJobPage: React.FC = () => {
               }
             : confirmDeleteJob
         }
-        title={jobDependencyInfo?.hasDependencies ? "Cannot Delete Job" : "Delete Job"}
+        title={
+          jobDependencyInfo?.hasDependencies
+            ? t("Cannot Delete Job")
+            : t("Delete Job")
+        }
         message={
           isCheckingDependencies ? (
             <div className="flex items-center gap-2">
               <LoadingSpinner />
-              <span>Checking dependencies...</span>
+              <span>{t("Checking dependencies...")}</span>
             </div>
           ) : jobDependencyInfo?.hasDependencies ? (
             <div className="space-y-2">
               <p className="text-rose-600 dark:text-rose-400 font-medium text-sm">
-                This job has dependencies:
+                {t("This job has dependencies:")}
               </p>
               {jobDependencyInfo.payCodes.length > 0 && (
                 <div className="text-sm">
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    Pay Codes ({jobDependencyInfo.payCodes.length}):
+                    {t("Pay Codes ({{total}}):", {
+                      total: jobDependencyInfo.payCodes.length,
+                    })}
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
                     {jobDependencyInfo.payCodes.slice(0, 3).map(pc => pc.pay_code_id).join(", ")}
-                    {jobDependencyInfo.payCodes.length > 3 && ` +${jobDependencyInfo.payCodes.length - 3} more`}
+                    {jobDependencyInfo.payCodes.length > 3 &&
+                      t("+{{total}} more", {
+                        total: jobDependencyInfo.payCodes.length - 3,
+                      })}
                   </span>
                 </div>
               )}
               {jobDependencyInfo.locationMappings.length > 0 && (
                 <div className="text-sm">
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    Location Mappings ({jobDependencyInfo.locationMappings.length}):
+                    {t("Location Mappings ({{total}}):", {
+                      total: jobDependencyInfo.locationMappings.length,
+                    })}
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
                     {jobDependencyInfo.locationMappings.slice(0, 3).map(lm => lm.location_name || lm.location_code).join(", ")}
-                    {jobDependencyInfo.locationMappings.length > 3 && ` +${jobDependencyInfo.locationMappings.length - 3} more`}
+                    {jobDependencyInfo.locationMappings.length > 3 &&
+                      t("+{{total}} more", {
+                        total:
+                          jobDependencyInfo.locationMappings.length - 3,
+                      })}
                   </span>
                 </div>
               )}
               {jobDependencyInfo.staffs.length > 0 && (
                 <div className="text-sm">
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    Staff ({jobDependencyInfo.staffs.length}):
+                    {t("Staff ({{total}}):", {
+                      total: jobDependencyInfo.staffs.length,
+                    })}
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
                     {jobDependencyInfo.staffs.slice(0, 3).map(s => s.name).join(", ")}
-                    {jobDependencyInfo.staffs.length > 3 && ` +${jobDependencyInfo.staffs.length - 3} more`}
+                    {jobDependencyInfo.staffs.length > 3 &&
+                      t("+{{total}} more", {
+                        total: jobDependencyInfo.staffs.length - 3,
+                      })}
                   </span>
                 </div>
               )}
               {jobDependencyInfo.jobDetails.length > 0 && (
                 <div className="text-sm">
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    Job Details ({jobDependencyInfo.jobDetails.length}):
+                    {t("Job Details ({{total}}):", {
+                      total: jobDependencyInfo.jobDetails.length,
+                    })}
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
                     {jobDependencyInfo.jobDetails.slice(0, 3).map(jd => jd.description || jd.job_detail_id).join(", ")}
-                    {jobDependencyInfo.jobDetails.length > 3 && ` +${jobDependencyInfo.jobDetails.length - 3} more`}
+                    {jobDependencyInfo.jobDetails.length > 3 &&
+                      t("+{{total}} more", {
+                        total: jobDependencyInfo.jobDetails.length - 3,
+                      })}
                   </span>
                 </div>
               )}
               {(jobDependencyInfo.dailyWorkLogCount > 0 || jobDependencyInfo.monthlyWorkLogCount > 0) && (
                 <div className="text-sm">
                   <span className="font-medium text-default-700 dark:text-gray-200">
-                    Work Logs:
+                    {t("Work Logs:")}
                   </span>{" "}
                   <span className="text-default-600 dark:text-gray-400">
-                    {jobDependencyInfo.dailyWorkLogCount > 0 && `${jobDependencyInfo.dailyWorkLogCount} daily`}
+                    {jobDependencyInfo.dailyWorkLogCount > 0 &&
+                      t("{{count}} daily", {
+                        count: jobDependencyInfo.dailyWorkLogCount,
+                      })}
                     {jobDependencyInfo.dailyWorkLogCount > 0 && jobDependencyInfo.monthlyWorkLogCount > 0 && ", "}
-                    {jobDependencyInfo.monthlyWorkLogCount > 0 && `${jobDependencyInfo.monthlyWorkLogCount} monthly`}
+                    {jobDependencyInfo.monthlyWorkLogCount > 0 &&
+                      t("{{count}} monthly", {
+                        count: jobDependencyInfo.monthlyWorkLogCount,
+                      })}
                   </span>
                 </div>
               )}
               <p className="text-xs text-default-500 dark:text-gray-400 mt-1">
-                Remove dependencies before deleting.
+                {t("Remove dependencies before deleting.")}
               </p>
             </div>
           ) : (
-            `Are you sure you want to delete the job "${selectedJob?.name ?? ""}"? This action cannot be undone.`
+            t(
+              'Are you sure you want to delete the job "{{name}}"? This action cannot be undone.',
+              { name: selectedJob?.name ?? "" }
+            )
           )
         }
-        confirmButtonText={jobDependencyInfo?.hasDependencies ? "OK" : "Delete"}
+        confirmButtonText={
+          jobDependencyInfo?.hasDependencies ? t("OK") : t("Delete")
+        }
         variant={jobDependencyInfo?.hasDependencies ? "default" : "danger"}
         hideCancelButton={jobDependencyInfo?.hasDependencies}
       />
@@ -1139,12 +1185,14 @@ const JPJobPage: React.FC = () => {
         isOpen={showRemovePayCodeDialog}
         onClose={() => setShowRemovePayCodeDialog(false)}
         onConfirm={handleConfirmRemovePayCode}
-        title="Remove Pay Code"
-        message={`Are you sure you want to remove pay code "${
-          payCodeToRemove?.id || ""
-        }" (${
-          payCodeToRemove?.description || ""
-        }) from this job? Any specific rate overrides for this job will be lost.`}
+        title={t("Remove Pay Code")}
+        message={t(
+          'Are you sure you want to remove pay code "{{id}}" ({{description}}) from this job? Any specific rate overrides for this job will be lost.',
+          {
+            id: payCodeToRemove?.id || "",
+            description: payCodeToRemove?.description || "",
+          }
+        )}
         variant="danger"
       />
     </div>

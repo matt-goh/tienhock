@@ -1,6 +1,7 @@
 // src/components/Invoice/ConsolidatedInvoiceModal.tsx
 import React, { useState, useEffect, useMemo } from "react";
 import { api } from "../../routes/utils/api";
+import { useTranslation } from "react-i18next";
 import Button from "../Button";
 import LoadingSpinner from "../LoadingSpinner";
 import toast from "react-hot-toast";
@@ -78,6 +79,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   year,
   onMonthYearChange,
 }) => {
+  const { t } = useTranslation("jellypolly");
   // State hooks remain the same
   const [eligibleInvoices, setEligibleInvoices] = useState<EligibleInvoice[]>(
     []
@@ -161,12 +163,14 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         setEligibleInvoices(response.data || []);
         setSelectedInvoices(new Set());
       } else {
-        setError(response.message || "Failed to fetch eligible invoices");
+        setError(
+          response.message || t("Failed to fetch eligible invoices")
+        );
         setEligibleInvoices([]);
       }
     } catch (error: any) {
       console.error("Error fetching eligible invoices:", error);
-      setError(error.message || "Failed to fetch eligible invoices");
+      setError(error.message || t("Failed to fetch eligible invoices"));
       setEligibleInvoices([]);
     } finally {
       setIsLoadingEligible(false);
@@ -271,15 +275,20 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
   const handleUpdateConsolidatedStatus = async (id: string) => {
     // (Logic remains the same as previous version)
     setProcessingHistoryId(id);
-    const toastId = toast.loading(`Checking status for ${id}...`);
+    const toastId = toast.loading(
+      t("Checking status for {{id}}...", { id })
+    );
     try {
       const response = await api.post(
         `/jellypolly/api/einvoice/consolidated/${id}/update-status`
       );
       if (response.success) {
-        toast.success(response.message || `Status check complete for ${id}.`, {
-          id: toastId,
-        });
+        toast.success(
+          response.message || t("Status check complete for {{id}}.", { id }),
+          {
+            id: toastId,
+          }
+        );
         setConsolidationHistory((prev) =>
           prev.map((item) =>
             item.id === id
@@ -293,13 +302,19 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
           )
         );
       } else {
-        throw new Error(response.message || "Status check failed.");
+        throw new Error(response.message || t("Status check failed."));
       }
     } catch (error: any) {
       console.error(`Error updating status for ${id}:`, error);
-      toast.error(`Failed to update status for ${id}: ${error.message}`, {
-        id: toastId,
-      });
+      toast.error(
+        t("Failed to update status for {{id}}: {{message}}", {
+          id,
+          message: error.message,
+        }),
+        {
+          id: toastId,
+        }
+      );
     } finally {
       setProcessingHistoryId(null);
     }
@@ -318,16 +333,18 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       if (response.success) {
         setIsAutoConsolidationEnabled(response.settings.enabled);
         toast.success(
-          `Auto-consolidation ${
-            response.settings.enabled ? "enabled" : "disabled"
-          }`
+          t(
+            response.settings.enabled
+              ? "Auto-consolidation enabled"
+              : "Auto-consolidation disabled"
+          )
         );
       } else {
         throw new Error(response.message || "Update failed");
       }
     } catch (error) {
       console.error("Error toggling auto-consolidation:", error);
-      toast.error("Couldn't update auto-consolidation settings");
+      toast.error(t("Couldn't update auto-consolidation settings"));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -342,7 +359,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
       setIsAutoConsolidationEnabled(response.enabled);
     } catch (error) {
       console.error("Error fetching auto-consolidation settings:", error);
-      toast.error("Couldn't load auto-consolidation settings");
+      toast.error(t("Couldn't load auto-consolidation settings"));
     } finally {
       setIsLoadingSettings(false);
     }
@@ -385,7 +402,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
     setProcessingHistoryId(cancelTargetId); // Use processing state for loading indicator
     const currentId = cancelTargetId;
     const toastId = toast.loading(
-      `Cancelling consolidated invoice ${currentId}...`
+      t("Cancelling consolidated invoice {{id}}...", { id: currentId })
     );
 
     try {
@@ -396,7 +413,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
 
       if (response.success) {
         toast.success(
-          response.message || `Successfully cancelled ${currentId}.`,
+          response.message ||
+            t("Successfully cancelled {{id}}.", { id: currentId }),
           { id: toastId }
         );
         // Update the cancelled item's status instead of removing it
@@ -482,13 +500,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         <div className="flex items-center justify-between p-5 border-b border-default-200 dark:border-gray-700 flex-shrink-0">
           <h2 className="text-lg font-semibold text-default-800 dark:text-gray-100 flex items-center">
             <IconFileSettings size={22} className="mr-2.5 text-sky-600 dark:text-sky-400" />
-            Consolidated e-Invoice Management
+            {t("Consolidated e-Invoice Management")}
           </h2>
           <button
             onClick={onClose}
             disabled={isSubmitting || !!processingHistoryId}
             className="p-1.5 rounded-full text-default-500 dark:text-gray-400 hover:text-default-800 dark:hover:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-sky-500 disabled:opacity-50"
-            aria-label="Close modal"
+            aria-label={t("Close modal")}
           >
             <IconX size={20} />
           </button>
@@ -506,7 +524,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               }`}
               onClick={() => setActiveTab("history")}
             >
-              Consolidation History ({consolidationHistory.length})
+              {t("Consolidation History ({{count}})", {
+                count: consolidationHistory.length,
+              })}
             </button>
             <button
               className={`px-4 py-1.5 text-sm rounded-md transition-colors duration-150 ${
@@ -516,7 +536,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               }`}
               onClick={() => setActiveTab("eligible")}
             >
-              Manually Submit ({eligibleInvoices.length})
+              {t("Manually Submit ({{count}})", {
+                count: eligibleInvoices.length,
+              })}
             </button>
           </div>
         </div>
@@ -527,11 +549,12 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
             <div className="flex items-center">
               <div className="mr-3">
                 <div className="text-sm font-medium text-default-800 dark:text-gray-100">
-                  Auto Consolidation (Monthly)
+                  {t("Auto Consolidation (Monthly)")}
                 </div>
                 <p className="text-xs text-default-500 dark:text-gray-400 mt-0.5">
-                  Automatically consolidate eligible invoices during the first 7
-                  days of each month for the previous month's invoices.
+                  {t(
+                    "Automatically consolidate eligible invoices during the first 7 days of each month for the previous month's invoices."
+                  )}
                 </p>
               </div>
             </div>
@@ -568,7 +591,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                 return (
                   <div className="mb-3">
                     <h4 className="text-sm font-medium text-default-700 dark:text-gray-300 mb-2">
-                      Auto-Consolidation Status
+                      {t("Auto-Consolidation Status")}
                     </h4>
 
                     {windowInfo.inWindow ? (
@@ -576,26 +599,29 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         <div className="flex items-center mb-2">
                           <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
                           <strong className="text-green-800 dark:text-green-300">
-                            Active Consolidation Window
+                            {t("Active Consolidation Window")}
                           </strong>
                         </div>
                         <div className="mb-1">
-                          <strong>Processing:</strong>{" "}
-                          {new Date(
-                            windowInfo.targetYear,
-                            windowInfo.targetMonth
-                          ).toLocaleDateString("en-US", {
-                            month: "long",
-                            year: "numeric",
-                          })}{" "}
-                          invoices
+                          <strong>{t("Processing:")}</strong>{" "}
+                          {t("{{month}} invoices", {
+                            month: new Date(
+                              windowInfo.targetYear,
+                              windowInfo.targetMonth
+                            ).toLocaleDateString("en-US", {
+                              month: "long",
+                              year: "numeric",
+                            }),
+                          })}
                         </div>
                         <div className="mb-1">
-                          <strong>Day:</strong> {windowInfo.dayInWindow} of 7 in
-                          consolidation window
+                          <strong>{t("Day:")}</strong>{" "}
+                          {t("{{day}} of 7 in consolidation window", {
+                            day: windowInfo.dayInWindow,
+                          })}
                         </div>
                         <div>
-                          <strong>Window ends:</strong>{" "}
+                          <strong>{t("Window ends:")}</strong>{" "}
                           {windowInfo.windowEnd?.toLocaleDateString("en-GB") ||
                             "N/A"}
                         </div>
@@ -605,17 +631,18 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         <div className="flex items-center mb-2">
                           <div className="w-2 h-2 bg-blue-500 rounded-full mr-2"></div>
                           <strong className="text-blue-800 dark:text-blue-300">
-                            Outside Consolidation Window
+                            {t("Outside Consolidation Window")}
                           </strong>
                         </div>
                         <div className="mb-1">
-                          <strong>Next window starts:</strong>{" "}
+                          <strong>{t("Next window starts:")}</strong>{" "}
                           {windowInfo.nextWindowStart?.toLocaleDateString() ||
                             "N/A"}
                         </div>
                         <div>
-                          Auto-consolidation runs during the first 7 days of
-                          each month for the previous month's eligible invoices.
+                          {t(
+                            "Auto-consolidation runs during the first 7 days of each month for the previous month's eligible invoices."
+                          )}
                         </div>
                       </div>
                     )}
@@ -635,7 +662,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-semibold text-default-800 dark:text-gray-100 mr-2">
-                    Eligible for
+                    {t("Eligible for")}
                   </h3>
 
                   {/* Month Selector */}
@@ -649,7 +676,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     <div className="relative">
                       <ListboxButton className="rounded-lg border border-default-300 dark:border-gray-600 py-1 px-2 text-sm bg-white dark:bg-gray-900/50 dark:text-gray-100 w-32 text-left flex items-center justify-between">
                         <span className="block truncate">
-                          {monthOptions[selectedMonth].name}
+                          {t(monthOptions[selectedMonth].name)}
                         </span>
                         <IconChevronDown
                           className="h-4 w-4 text-default-400 dark:text-gray-400"
@@ -681,7 +708,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                       selected ? "font-medium" : "font-normal"
                                     }`}
                                   >
-                                    {month.name}
+                                    {t(month.name)}
                                   </span>
                                   {selected ? (
                                     <span
@@ -718,9 +745,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     }
                     className="flex items-center gap-1.5"
                     icon={IconRefresh}
-                    aria-label="Refresh eligible invoices"
+                    aria-label={t("Refresh eligible invoices")}
                   >
-                    Refresh
+                    {t("Refresh")}
                   </Button>
                   <Button
                     onClick={handleSubmitConsolidated}
@@ -735,11 +762,15 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     }
                     className="flex items-center gap-1.5"
                     icon={!isSubmitting ? IconSend : undefined}
-                    aria-label="Submit selected invoices for consolidation"
+                    aria-label={t(
+                      "Submit selected invoices for consolidation"
+                    )}
                   >
                     {isSubmitting
-                      ? "Submitting..."
-                      : `Submit (${selectedInvoices.size})`}
+                      ? t("Submitting...")
+                      : t("Submit ({{count}})", {
+                          count: selectedInvoices.size,
+                        })}
                   </Button>
                 </div>
               </div>
@@ -770,7 +801,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                       className="text-default-300 dark:text-gray-500 mx-auto mb-3"
                     />
                     <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                      No Eligible Invoices Found
+                      {t("No Eligible Invoices Found")}
                     </p>
                     <p className="text-xs text-default-500 dark:text-gray-400">...</p>
                   </div>
@@ -791,8 +822,8 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                       }
                       title={
                         selectedInvoices.size === eligibleInvoices.length
-                          ? "Deselect All"
-                          : "Select All"
+                          ? t("Deselect All")
+                          : t("Select All")
                       }
                     >
                       {selectedInvoices.size === eligibleInvoices.length &&
@@ -809,17 +840,17 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                       )}
                       <span className="ml-2 text-sm font-medium text-default-700 dark:text-gray-200 hidden sm:inline">
                         {selectedInvoices.size === eligibleInvoices.length
-                          ? "Deselect All"
-                          : "Select All"}
+                          ? t("Deselect All")
+                          : t("Select All")}
                       </span>
                     </div>
                     <div className="flex-grow mb-0.5">
                       {selectedInvoices.size > 0 && (
                         <span className="text-sm text-blue-800 dark:text-blue-300 font-medium">
-                          {selectedInvoices.size} selected • Total:{" "}
-                          <span className="font-semibold">
-                            {formatCurrency(getTotalAmountSelected())}
-                          </span>
+                          {t("{{count}} selected • Total: {{amount}}", {
+                            count: selectedInvoices.size,
+                            amount: formatCurrency(getTotalAmountSelected()),
+                          })}
                         </span>
                       )}
                     </div>
@@ -832,16 +863,16 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         <tr>
                           <th className="w-12 px-4 py-2.5 text-center"></th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Invoice #
+                            {t("Invoice #")}
                           </th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Customer ID
+                            {t("Customer ID")}
                           </th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Date
+                            {t("Date")}
                           </th>
                           <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Amount (MYR)
+                            {t("Amount (MYR)")}
                           </th>
                         </tr>
                       </thead>
@@ -907,7 +938,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
               {/* Tab Header Section */}
               <div className="flex justify-between items-center">
                 <h3 className="text-base font-semibold text-default-800 dark:text-gray-100">
-                  Consolidation History
+                  {t("Consolidation History")}
                 </h3>
                 <div className="flex items-center gap-2">
                   {/* Year Selector - Using Listbox */}
@@ -987,9 +1018,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         ? IconRefresh
                         : undefined
                     }
-                    aria-label="Refresh consolidation history"
+                    aria-label={t("Refresh consolidation history")}
                   >
-                    Refresh
+                    {t("Refresh")}
                   </Button>
                 </div>
               </div>
@@ -1009,11 +1040,12 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                     className="text-default-300 dark:text-gray-500 mx-auto mb-3"
                   />
                   <p className="text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-                    No Consolidation History Found
+                    {t("No Consolidation History Found")}
                   </p>
                   <p className="text-xs text-default-500 dark:text-gray-400">
-                    There are no records of past consolidated e-invoice
-                    submissions.
+                    {t(
+                      "There are no records of past consolidated e-invoice submissions."
+                    )}
                   </p>
                 </div>
               )}
@@ -1027,25 +1059,25 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                         <tr>
                           {/* Headers remain the same */}
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Consolidated ID
+                            {t("Consolidated ID")}
                           </th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Date Created
+                            {t("Date Created")}
                           </th>
                           <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Status
+                            {t("Status")}
                           </th>
                           <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Invoices
+                            {t("Invoices")}
                           </th>
                           <th className="px-4 py-2.5 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Total Amount
+                            {t("Total Amount")}
                           </th>
                           <th className="px-4 py-2.5 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            UUID
+                            {t("UUID")}
                           </th>
                           <th className="px-4 py-2.5 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider">
-                            Actions
+                            {t("Actions")}
                           </th>
                         </tr>
                       </thead>
@@ -1128,7 +1160,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 {item.long_id && (
                                   <span
                                     className="block text-xs text-default-400 dark:text-gray-500 truncate"
-                                    title="MyInvois Long ID"
+                                    title={t("MyInvois Long ID")}
                                   >
                                     {item.long_id}
                                   </span>
@@ -1138,12 +1170,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                 {item.datetime_validated && (
                                   <span
                                     className="block text-xs text-green-600 dark:text-green-400"
-                                    title="Validation Date/Time"
+                                    title={t("Validation Date/Time")}
                                   >
-                                    Validated:{" "}
-                                    {formatDisplayDate(
-                                      new Date(item.datetime_validated)
-                                    )}
+                                    {t("Validated: {{date}}", {
+                                      date: formatDisplayDate(
+                                        new Date(item.datetime_validated)
+                                      ),
+                                    })}
                                   </span>
                                 )}
                               </td>
@@ -1152,7 +1185,7 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                   className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium ${statusColor}`}
                                 >
                                   {statusIcon}
-                                  {statusText}
+                                  {t(statusText)}
                                 </span>
                               </td>
                               <td className="px-4 py-3 whitespace-nowrap text-sm text-default-600 dark:text-gray-300 text-right">
@@ -1163,7 +1196,9 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                               </td>
                               <td
                                 className="px-4 py-3 whitespace-nowrap text-sm text-default-500 dark:text-gray-400 font-mono max-w-[150px] truncate"
-                                title={item.uuid || "MyInvois Document UUID"}
+                                title={
+                                  item.uuid || t("MyInvois Document UUID")
+                                }
                               >
                                 {item.uuid || "-"}
                               </td>
@@ -1184,10 +1219,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                       !!processingHistoryId || isSubmitting
                                     }
                                     icon={IconRotateClockwise}
-                                    aria-label={`Update status for ${item.id}`}
-                                    title="Check Status"
+                                    aria-label={t(
+                                      "Update status for {{id}}",
+                                      { id: item.id }
+                                    )}
+                                    title={t("Check Status")}
                                   >
-                                    Update
+                                    {t("Update")}
                                   </Button>
                                 ) : currentStatus === "valid" ||
                                   currentStatus === "invalid" ? (
@@ -1233,10 +1271,13 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
                                         !!processingHistoryId || isSubmitting
                                       }
                                       icon={IconTrash}
-                                      aria-label={`Cancel consolidated invoice ${item.id}`}
-                                      title="Cancel"
+                                      aria-label={t(
+                                        "Cancel consolidated invoice {{id}}",
+                                        { id: item.id }
+                                      )}
+                                      title={t("Cancel")}
                                     >
-                                      Cancel
+                                      {t("Cancel")}
                                     </Button>
                                   </div>
                                 ) : (
@@ -1264,10 +1305,15 @@ const ConsolidatedInvoiceModal: React.FC<ConsolidatedInvoiceModalProps> = ({
         isOpen={showCancelConfirm}
         onClose={closeCancelDialog}
         onConfirm={confirmCancelConsolidated}
-        title={`Cancel Consolidated Invoice ${cancelTargetId}?`}
-        confirmButtonText="Confirm Cancellation"
+        title={t("Cancel Consolidated Invoice {{id}}?", {
+          id: cancelTargetId,
+        })}
+        confirmButtonText={t("Confirm Cancellation")}
         variant="danger"
-        message={`Are you sure you want to cancel the consolidated invoice ${cancelTargetId}"?`}
+        message={t(
+          "Are you sure you want to cancel the consolidated invoice {{id}}?",
+          { id: cancelTargetId }
+        )}
       />
       {/* Submission Results Modal */}
       <SubmissionResultsModal

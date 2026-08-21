@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import type {
   AdjustmentDocument,
   ExtendedInvoiceData,
@@ -91,6 +92,7 @@ const PAYMENT_TYPE_OPTIONS: ReadonlyArray<PillSelectOption<"CASH" | "INVOICE">> 
 const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
   items,
 }) => {
+  const { t } = useTranslation("jellypolly");
   const formatCurrency = (amount: number | string): string => {
     const num = Number(amount);
     return isNaN(num)
@@ -107,28 +109,28 @@ const LineItemsDisplayTable: React.FC<{ items: ProductItem[] }> = ({
         <thead className="bg-gray-50 dark:bg-gray-900/50">
           <tr>
             <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
-              Code
+              {t("Code")}
             </th>
             <th className="px-4 py-2 text-left text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[28%]">
-              Description
+              {t("Description")}
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
-              FOC
+              {t("FOC")}
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
-              RTN
+              {t("RTN")}
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[8%]">
-              Qty
+              {t("Qty")}
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
-              Price
+              {t("Price")}
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
-              Tax (RM)
+              {t("Tax (RM)")}
             </th>
             <th className="px-4 py-2 text-right text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[14%]">
-              Total (RM)
+              {t("Total (RM)")}
             </th>
           </tr>
         </thead>
@@ -225,6 +227,7 @@ const createClearanceRange = (paymentDate?: string | null): TimeRange => {
 
 // --- Main Component ---
 const InvoiceDetailsPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const navigate = useNavigate();
   const location = useLocation();
   const { id } = useParams<{ id: string }>();
@@ -359,7 +362,7 @@ const InvoiceDetailsPage: React.FC = () => {
   // --- Fetch Data ---
   const fetchDetails = useCallback(async () => {
     if (!invoiceId) {
-      setError("No Invoice ID provided.");
+      setError(t("No Invoice ID provided."));
       setIsLoading(false);
       return;
     }
@@ -380,14 +383,14 @@ const InvoiceDetailsPage: React.FC = () => {
       setPayments(payments);
       setAdjustmentDocs(adjustmentDocs);
     } catch (err: any) {
-      setError(err.message || "Failed to load invoice details.");
+      setError(err.message || t("Failed to load invoice details."));
       setInvoiceData(null); // Clear data on critical error
       setPayments([]);
       setAdjustmentDocs([]);
     } finally {
       setIsLoading(false);
     }
-  }, [invoiceId]);
+  }, [invoiceId, t]);
 
   useEffect(() => {
     fetchDetails();
@@ -518,10 +521,10 @@ const InvoiceDetailsPage: React.FC = () => {
         }
       );
 
-      toast.success("Customer updated successfully");
+      toast.success(t("Customer updated successfully"));
       if (response.einvoiceCleared) {
         toast(
-          "E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete."
+          t("E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete.")
         );
       }
 
@@ -534,7 +537,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } catch (error) {
       console.error("Error updating customer:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to update customer";
+        error instanceof Error ? error.message : t("Failed to update customer");
       toast.error(errorMessage);
     } finally {
       setIsUpdatingCustomer(false);
@@ -559,7 +562,7 @@ const InvoiceDetailsPage: React.FC = () => {
         salespersonid: selectedSalesman,
       });
 
-      toast.success("Salesman updated successfully");
+      toast.success(t("Salesman updated successfully"));
       setIsEditingSalesman(false);
       setSelectedSalesman("");
 
@@ -568,7 +571,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } catch (error) {
       console.error("Error updating salesman:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to update salesman";
+        error instanceof Error ? error.message : t("Failed to update salesman");
       toast.error(errorMessage);
     } finally {
       setIsUpdatingSalesman(false);
@@ -608,7 +611,7 @@ const InvoiceDetailsPage: React.FC = () => {
     if (!invoiceData || isUpdatingPaymentType) return;
 
     setIsUpdatingPaymentType(true);
-    const toastId = toast.loading("Updating payment type...");
+    const toastId = toast.loading(t("Updating payment type..."));
 
     try {
       await api.put(`/jellypolly/api/invoices/${invoiceData.id}/paymenttype`, {
@@ -618,12 +621,12 @@ const InvoiceDetailsPage: React.FC = () => {
 
       if (paymenttype === "CASH") {
         toast.success(
-          `Payment type updated to CASH - automatic payment created`,
+          t("Payment type updated to CASH - automatic payment created"),
           { id: toastId }
         );
       } else {
         toast.success(
-          `Payment type updated to INVOICE - automatic payment cancelled`,
+          t("Payment type updated to INVOICE - automatic payment cancelled"),
           { id: toastId }
         );
       }
@@ -638,12 +641,12 @@ const InvoiceDetailsPage: React.FC = () => {
           data: { paymenttype },
         });
         setShowEInvoiceCancelConfirm(true);
-        toast.error("E-Invoice cancellation confirmation required", {
+        toast.error(t("E-Invoice cancellation confirmation required"), {
           id: toastId,
         });
       } else {
         toast.error(
-          error.response?.data?.message || "Failed to update payment type",
+          error.response?.data?.message || t("Failed to update payment type"),
           { id: toastId }
         );
       }
@@ -719,10 +722,10 @@ const InvoiceDetailsPage: React.FC = () => {
         }
       );
 
-      toast.success("Date/time updated successfully");
+      toast.success(t("Date/time updated successfully"));
       if (response.einvoiceCleared) {
         toast(
-          "E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete."
+          t("E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete.")
         );
       }
 
@@ -734,7 +737,7 @@ const InvoiceDetailsPage: React.FC = () => {
     } catch (error) {
       console.error("Error updating date/time:", error);
       const errorMessage =
-        error instanceof Error ? error.message : "Failed to update date/time";
+        error instanceof Error ? error.message : t("Failed to update date/time");
       toast.error(errorMessage);
     } finally {
       setIsUpdatingDateTime(false);
@@ -783,10 +786,10 @@ const InvoiceDetailsPage: React.FC = () => {
         }
       );
 
-      toast.success("Order details updated successfully");
+      toast.success(t("Order details updated successfully"));
       if (response.einvoiceCleared) {
         toast(
-          "E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete."
+          t("E-invoice has been cancelled at MyInvois. Please resubmit after all changes are complete.")
         );
       }
 
@@ -800,7 +803,7 @@ const InvoiceDetailsPage: React.FC = () => {
       const errorMessage =
         error instanceof Error
           ? error.message
-          : "Failed to update order details";
+          : t("Failed to update order details");
       toast.error(errorMessage);
     } finally {
       setIsUpdatingOrderDetails(false);
@@ -817,21 +820,24 @@ const InvoiceDetailsPage: React.FC = () => {
     if (!invoiceData || isUpdatingUUID) return;
 
     setIsUpdatingUUID(true);
-    const toastId = toast.loading("Updating UUID...");
+    const toastId = toast.loading(t("Updating UUID..."));
 
     try {
       await api.put(`/jellypolly/api/invoices/${invoiceData.id}/uuid`, {
         uuid: selectedUUID.trim(),
       });
 
-      toast.success("UUID updated successfully", { id: toastId });
+      toast.success(t("UUID updated successfully"), { id: toastId });
       setIsEditingUUID(false);
       await fetchDetails(); // Refresh data
     } catch (error: any) {
       console.error("Error updating UUID:", error);
-      toast.error(error.response?.data?.message || "Failed to update UUID", {
-        id: toastId,
-      });
+      toast.error(
+        error.response?.data?.message || t("Failed to update UUID"),
+        {
+          id: toastId,
+        }
+      );
     } finally {
       setIsUpdatingUUID(false);
     }
@@ -878,7 +884,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
     setIsCancelling(true);
     setShowCancelConfirm(false);
-    const toastId = toast.loading("Cancelling invoice...");
+    const toastId = toast.loading(t("Cancelling invoice..."));
 
     try {
       await cancelInvoice(invoiceData.id);
@@ -886,10 +892,12 @@ const InvoiceDetailsPage: React.FC = () => {
       // totals, so the previously held products array is stale.
       await fetchDetails();
 
-      toast.success("Invoice cancelled successfully.", { id: toastId });
+      toast.success(t("Invoice cancelled successfully."), { id: toastId });
       setShowPaymentForm(false); // Hide payment form
     } catch (error: any) {
-      toast.error(error.message || "Failed to cancel invoice", { id: toastId });
+      toast.error(error.message || t("Failed to cancel invoice"), {
+        id: toastId,
+      });
     } finally {
       setIsCancelling(false);
     }
@@ -900,7 +908,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
     // Check for TIN and ID
     if (!invoiceData.customerTin || !invoiceData.customerIdNumber) {
-      toast.error("Customer must have TIN Number and ID Number defined");
+      toast.error(t("Customer must have TIN Number and ID Number defined"));
       return;
     }
 
@@ -909,7 +917,7 @@ const InvoiceDetailsPage: React.FC = () => {
     );
     if (!isEligibleDate) {
       toast.error(
-        "Cannot submit e-invoice: Invoice must be created within the last 3 days."
+        t("Cannot submit e-invoice: Invoice must be created within the last 3 days.")
       );
       return;
     }
@@ -941,17 +949,20 @@ const InvoiceDetailsPage: React.FC = () => {
 
       // Process response - still show toast for quick feedback
       if (response.success) {
-        toast.success("e-Invoice submitted successfully");
+        toast.success(t("e-Invoice submitted successfully"));
         // Refresh invoice data to show updated status
         await fetchDetails();
       } else {
-        const errorMessage = response.message || "Failed to submit e-invoice";
+        const errorMessage =
+          response.message || t("Failed to submit e-invoice");
         toast.error(errorMessage);
       }
     } catch (error: any) {
       console.error("Error submitting e-invoice:", error);
       toast.error(
-        `Failed to submit e-invoice: ${error.message || "Unknown error"}`
+        t("Failed to submit e-invoice: {{message}}", {
+          message: error.message || t("Unknown error"),
+        })
       );
       setShowSubmissionResults(false); // Hide modal on network error
     } finally {
@@ -964,26 +975,29 @@ const InvoiceDetailsPage: React.FC = () => {
     if (!invoiceData) return;
 
     setIsSyncingCancellation(true);
-    const toastId = toast.loading("Syncing cancellation status...");
+    const toastId = toast.loading(t("Syncing cancellation status..."));
 
     try {
       const response = await syncCancellationStatus(invoiceData.id);
 
       if (response.success) {
         toast.success(
-          response.message || "Cancellation status synced successfully",
+          response.message || t("Cancellation status synced successfully"),
           { id: toastId }
         );
         // Refresh invoice details
         fetchDetails();
       } else {
-        toast.error(response.message || "Failed to sync cancellation status", {
-          id: toastId,
-        });
+        toast.error(
+          response.message || t("Failed to sync cancellation status"),
+          {
+            id: toastId,
+          }
+        );
       }
     } catch (error) {
       console.error("Error syncing cancellation status:", error);
-      toast.error("Failed to sync cancellation status", { id: toastId });
+      toast.error(t("Failed to sync cancellation status"), { id: toastId });
     } finally {
       setIsSyncingCancellation(false);
     }
@@ -1083,15 +1097,15 @@ const InvoiceDetailsPage: React.FC = () => {
 
   const validatePaymentForm = (): boolean => {
     if (!paymentFormData.payment_date) {
-      toast.error("Payment date is required");
+      toast.error(t("Payment date is required"));
       return false;
     }
     if (paymentFormData.amount_paid <= 0) {
-      toast.error("Payment amount must be positive");
+      toast.error(t("Payment amount must be positive"));
       return false;
     }
     if (!paymentFormData.payment_method) {
-      toast.error("Payment method is required");
+      toast.error(t("Payment method is required"));
       return false;
     }
     // Removed overpayment validation from here - will be handled in handleSubmitPayment
@@ -1125,7 +1139,7 @@ const InvoiceDetailsPage: React.FC = () => {
     if (!invoiceData) return;
 
     setIsProcessingPayment(true);
-    const toastId = toast.loading("Recording payment...");
+    const toastId = toast.loading(t("Recording payment..."));
 
     const paymentPayload: Omit<Payment, "payment_id" | "created_at"> = {
       invoice_id: invoiceData.id,
@@ -1145,13 +1159,14 @@ const InvoiceDetailsPage: React.FC = () => {
       // Show different message based on whether this was an overpayment
       if (overpaymentDetails) {
         toast.success(
-          `Payment recorded successfully. Regular: ${formatCurrency(
-            overpaymentDetails.regularAmount
-          )}, Overpaid: ${formatCurrency(overpaymentDetails.overpaidAmount)}`,
+          t("Payment recorded successfully. Regular: {{regular}}, Overpaid: {{overpaid}}", {
+            regular: formatCurrency(overpaymentDetails.regularAmount),
+            overpaid: formatCurrency(overpaymentDetails.overpaidAmount),
+          }),
           { id: toastId, duration: 5000 }
         );
       } else {
-        toast.success("Payment recorded successfully.", { id: toastId });
+        toast.success(t("Payment recorded successfully."), { id: toastId });
       }
 
       setShowPaymentForm(false);
@@ -1165,7 +1180,7 @@ const InvoiceDetailsPage: React.FC = () => {
         error.response?.data?.message ||
         error.data?.message ||
         error.message ||
-        "Failed to record payment.";
+        t("Failed to record payment.");
       toast.error(errorMessage, { id: toastId });
     } finally {
       setIsProcessingPayment(false);
@@ -1187,7 +1202,7 @@ const InvoiceDetailsPage: React.FC = () => {
       !invoiceData.submission_uid &&
       !invoiceData.einvoice_status
     ) {
-      toast.error("No e-invoice data to clear");
+      toast.error(t("No e-invoice data to clear"));
       return;
     }
 
@@ -1199,7 +1214,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
     setIsClearingEInvoice(true);
     setShowClearEInvoiceConfirm(false);
-    const toastId = toast.loading("Clearing e-invoice status...");
+    const toastId = toast.loading(t("Clearing e-invoice status..."));
 
     try {
       const response = await api.post(
@@ -1207,19 +1222,24 @@ const InvoiceDetailsPage: React.FC = () => {
       );
 
       if (response.success) {
-        toast.success("E-invoice status cleared successfully", { id: toastId });
-        await fetchDetails(); // Refresh invoice data
-      } else {
-        toast.error(response.message || "Failed to clear e-invoice status", {
+        toast.success(t("E-invoice status cleared successfully"), {
           id: toastId,
         });
+        await fetchDetails(); // Refresh invoice data
+      } else {
+        toast.error(
+          response.message || t("Failed to clear e-invoice status"),
+          {
+            id: toastId,
+          }
+        );
       }
     } catch (error: any) {
       console.error("Error clearing e-invoice status:", error);
       toast.error(
         error.response?.data?.message ||
           error.message ||
-          "Failed to clear e-invoice status",
+          t("Failed to clear e-invoice status"),
         { id: toastId }
       );
     } finally {
@@ -1229,12 +1249,12 @@ const InvoiceDetailsPage: React.FC = () => {
 
   const handleConfirmPaymentClick = (payment: Payment) => {
     if (invoiceData?.invoice_status === "cancelled") {
-      toast.error("Cannot confirm payment for a cancelled invoice.");
+      toast.error(t("Cannot confirm payment for a cancelled invoice."));
       return;
     }
 
     if (payment.status !== "pending") {
-      toast.error("Only pending payments can be confirmed.");
+      toast.error(t("Only pending payments can be confirmed."));
       return;
     }
 
@@ -1248,7 +1268,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
     setIsConfirmingPayment(true);
     setShowConfirmPaymentDialog(false);
-    const toastId = toast.loading("Confirming payment...");
+    const toastId = toast.loading(t("Confirming payment..."));
 
     try {
       const clearanceDate: string = format(
@@ -1256,10 +1276,10 @@ const InvoiceDetailsPage: React.FC = () => {
         "yyyy-MM-dd"
       );
       await confirmPayment(paymentToConfirm.payment_id, clearanceDate);
-      toast.success("Payment confirmed successfully.", { id: toastId });
+      toast.success(t("Payment confirmed successfully."), { id: toastId });
       await fetchDetails(); // Refresh invoice and payment data
     } catch (error) {
-      toast.error("Failed to confirm payment.", { id: toastId });
+      toast.error(t("Failed to confirm payment."), { id: toastId });
     } finally {
       setIsConfirmingPayment(false);
       setPaymentToConfirm(null);
@@ -1272,19 +1292,19 @@ const InvoiceDetailsPage: React.FC = () => {
     // Rename from handleDeletePaymentClick
     // Prevent cancellation if invoice is cancelled
     if (invoiceData?.invoice_status === "cancelled") {
-      toast.error("Cannot cancel payment for a cancelled invoice.");
+      toast.error(t("Cannot cancel payment for a cancelled invoice."));
       return;
     }
 
     // Also prevent cancellation if payment is already cancelled
     if (payment.status === "cancelled") {
-      toast.error("This payment is already cancelled.");
+      toast.error(t("This payment is already cancelled."));
       return;
     }
 
     if (hasActiveAdjustmentDocs) {
       toast.error(
-        "Cancel the active adjustment document before cancelling payments."
+        t("Cancel the active adjustment document before cancelling payments.")
       );
       return;
     }
@@ -1298,14 +1318,14 @@ const InvoiceDetailsPage: React.FC = () => {
 
     setIsCancellingPayment(true);
     setShowCancelPaymentConfirm(false);
-    const toastId = toast.loading("Cancelling payment...");
+    const toastId = toast.loading(t("Cancelling payment..."));
 
     try {
       await cancelPayment(paymentToCancel.payment_id);
-      toast.success("Payment cancelled successfully.", { id: toastId });
+      toast.success(t("Payment cancelled successfully."), { id: toastId });
       await fetchDetails(); // Refresh invoice and payment data
     } catch (error) {
-      toast.error("Failed to cancel payment.", { id: toastId });
+      toast.error(t("Failed to cancel payment."), { id: toastId });
     } finally {
       setIsCancellingPayment(false);
       setPaymentToCancel(null);
@@ -1436,11 +1456,11 @@ const InvoiceDetailsPage: React.FC = () => {
           <BackButton fallbackPath="/jellypolly/sales/invoice" />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Invoice Details
+            {t("Invoice Details")}
           </h1>
         </div>
         <div className="p-4 text-center text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-900/20 rounded-lg">
-          Error: {error}
+          {t("Error:")} {error}
         </div>
       </div>
     );
@@ -1453,11 +1473,11 @@ const InvoiceDetailsPage: React.FC = () => {
           <BackButton fallbackPath="/jellypolly/sales/invoice" />
           <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
           <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
-            Invoice Details
+            {t("Invoice Details")}
           </h1>
         </div>
         <div className="p-4 text-center text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg">
-          Invoice data could not be loaded or invoice not found.
+          {t("Invoice data could not be loaded or invoice not found.")}
         </div>
       </div>
     );
@@ -1533,14 +1553,17 @@ const InvoiceDetailsPage: React.FC = () => {
           <h1 className="flex items-center space-x-2 text-2xl font-bold text-default-900 dark:text-gray-100 flex-shrink-0 flex-wrap">
             <span className="flex items-center">
               <IconFileInvoice size={26} className="mr-2 text-gray-500 dark:text-gray-400" />
-              Invoice #{invoiceData.paymenttype === "CASH" ? "C" : "I"}
-              {invoiceData.id}
+              {t("Invoice #{{id}}", {
+                id: `${invoiceData.paymenttype === "CASH" ? "C" : "I"}${
+                  invoiceData.id
+                }`,
+              })}
             </span>
             {/* Status Badges */}
             <span
               className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${invoiceStatusStyle}`}
             >
-              {getInvoiceDisplayStatusLabel(invoiceDisplayStatus)}
+              {t(getInvoiceDisplayStatusLabel(invoiceDisplayStatus))}
             </span>
             {eInvoiceStatusInfo && EInvoiceIcon && (
               <a
@@ -1549,10 +1572,14 @@ const InvoiceDetailsPage: React.FC = () => {
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
-                title={`e-Invoice: ${eInvoiceStatusInfo.text}`}
+                title={t("e-Invoice: {{status}}", {
+                  status: t(eInvoiceStatusInfo.text),
+                })}
               >
                 <EInvoiceIcon size={14} className="mr-1" />
-                e-Invoice: {eInvoiceStatusInfo.text}
+                {t("e-Invoice: {{status}}", {
+                  status: t(eInvoiceStatusInfo.text),
+                })}
               </a>
             )}
             {/* Consolidated Status Badge */}
@@ -1563,10 +1590,12 @@ const InvoiceDetailsPage: React.FC = () => {
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-sm font-medium ${consolidatedStatusInfo.color} hover:underline`}
-                title={`View consolidated invoice ${consolidatedStatusInfo.info.id} in MyInvois Portal`}
+                title={t("View consolidated invoice {{id}} in MyInvois Portal", {
+                  id: consolidatedStatusInfo.info.id,
+                })}
               >
                 <ConsolidatedIcon size={14} />
-                Consolidated Invoice
+                {t("Consolidated Invoice")}
               </a>
             )}
           </h1>
@@ -1583,7 +1612,9 @@ const InvoiceDetailsPage: React.FC = () => {
                   color="rose"
                   disabled={isSyncingCancellation}
                 >
-                  {isSyncingCancellation ? "Syncing..." : "Sync Cancellation"}
+                  {isSyncingCancellation
+                    ? t("Syncing...")
+                    : t("Sync Cancellation")}
                 </Button>
               )}
             {(invoiceData.einvoice_status === "pending" ||
@@ -1593,11 +1624,13 @@ const InvoiceDetailsPage: React.FC = () => {
                 color="orange"
                 onClick={handleClearEInvoiceClick}
                 disabled={isClearingEInvoice || isCancelled}
-                title="Clear E-Invoice Pending Status, only do this if the e-invoice is not valid at myinvois.hasil.gov.my and needs to be resubmitted"
+                title={t(
+                  "Clear E-Invoice Pending Status, only do this if the e-invoice is not valid at myinvois.hasil.gov.my and needs to be resubmitted"
+                )}
               >
                 <span className="flex items-center gap-1">
                   <IconRefresh size={16} />
-                  {isClearingEInvoice ? "Clearing..." : "Clear Status"}
+                  {isClearingEInvoice ? t("Clearing...") : t("Clear Status")}
                 </span>
               </Button>
             )}
@@ -1622,17 +1655,17 @@ const InvoiceDetailsPage: React.FC = () => {
                   }
                   title={
                     invoiceData.einvoice_status === "pending"
-                      ? "Update pending e-Invoice"
+                      ? t("Update pending e-Invoice")
                       : !isEligibleForEinvoiceByDate
-                      ? "Invoice must be within the last 3 days to submit"
-                      : "Submit for e-Invoicing"
+                      ? t("Invoice must be within the last 3 days to submit")
+                      : t("Submit for e-Invoicing")
                   }
                 >
                   {isSubmittingEInvoice
-                    ? "Submitting..."
+                    ? t("Submitting...")
                     : invoiceData.einvoice_status === "pending"
-                    ? "Update e-Invoice"
-                    : "Submit e-Invoice"}
+                    ? t("Update e-Invoice")
+                    : t("Submit e-Invoice")}
                 </Button>
               )}
             {!isCancelled && !isPaid && (
@@ -1644,7 +1677,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 size="md"
                 disabled={isLoading}
               >
-                {showPaymentForm ? "Cancel Payment" : "Record Payment"}
+                {showPaymentForm ? t("Cancel Payment") : t("Record Payment")}
               </Button>
             )}
             {/* Adjustment Document Buttons */}
@@ -1663,11 +1696,11 @@ const InvoiceDetailsPage: React.FC = () => {
                   disabled={isLoading || hasActiveDebitNote}
                   title={
                     hasActiveDebitNote
-                      ? "Cancel the active Debit Note before creating another"
-                      : "Issue a Debit Note (additional charge)"
+                      ? t("Cancel the active Debit Note before creating another")
+                      : t("Issue a Debit Note (additional charge)")
                   }
                 >
-                  Debit Note
+                  {t("Debit Note")}
                 </Button>
                 <Button
                   onClick={() =>
@@ -1682,11 +1715,11 @@ const InvoiceDetailsPage: React.FC = () => {
                   disabled={isLoading || hasActiveCreditNote}
                   title={
                     hasActiveCreditNote
-                      ? "Cancel the active Credit Note before creating another"
-                      : "Issue a Credit Note (sales return / reduction)"
+                      ? t("Cancel the active Credit Note before creating another")
+                      : t("Issue a Credit Note (sales return / reduction)")
                   }
                 >
-                  Credit Note
+                  {t("Credit Note")}
                 </Button>
                 {payments.some((p) => p.status === "overpaid") && (
                   <Button
@@ -1702,9 +1735,9 @@ const InvoiceDetailsPage: React.FC = () => {
                     color="sky"
                     size="md"
                     disabled={isLoading}
-                    title="Refund overpaid amount"
+                    title={t("Refund overpaid amount")}
                   >
-                    Refund Note
+                    {t("Refund Note")}
                   </Button>
                 )}
               </>
@@ -1719,7 +1752,7 @@ const InvoiceDetailsPage: React.FC = () => {
               size="md"
               disabled={isLoading || showSoloPrintOverlay || !invoiceData}
             >
-              {showSoloPrintOverlay ? "Printing..." : "Print"}
+              {showSoloPrintOverlay ? t("Printing...") : t("Print")}
             </Button>
 
             {/* Download PDF Button */}
@@ -1739,7 +1772,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 disabled={isCancelling || isLoading}
                 icon={IconBan}
               >
-                {isCancelling ? "Cancelling..." : "Cancel"}
+                {isCancelling ? t("Cancelling...") : t("Cancel")}
               </Button>
             )}
           </div>
@@ -1748,13 +1781,13 @@ const InvoiceDetailsPage: React.FC = () => {
         {showPaymentForm && !isCancelled && !isPaid && (
           <div className="bg-sky-50 dark:bg-sky-900/20 p-4 md:p-6 rounded-lg mb-6 border border-sky-200 dark:border-sky-800 shadow-sm transition-all duration-300 ease-out">
             <h2 className="text-lg font-semibold text-sky-800 dark:text-sky-300 mb-4">
-              Record Payment
+              {t("Record Payment")}
             </h2>
             <form onSubmit={handleSubmitPayment}>
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
                 <FormInput
                   name="payment_date"
-                  label="Payment Date"
+                  label={t("Payment Date")}
                   type="date"
                   value={paymentFormData.payment_date}
                   onChange={handlePaymentFormChange}
@@ -1762,7 +1795,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 />
                 <FormInput
                   name="amount_paid"
-                  label="Amount Paid (RM)"
+                  label={t("Amount Paid (RM)")}
                   type="number"
                   value={paymentFormData.amount_paid}
                   onChange={handlePaymentFormChange}
@@ -1774,13 +1807,16 @@ const InvoiceDetailsPage: React.FC = () => {
                 {/* Spans two columns so the four pills never wrap */}
                 <div className="space-y-2 lg:col-span-2">
                   <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                    Payment Method
+                    {t("Payment Method")}
                   </label>
                   <PillSelect<string>
                     value={paymentFormData.payment_method}
                     onChange={handlePaymentMethodChange}
-                    options={PAYMENT_METHOD_OPTIONS}
-                    ariaLabel="Payment method"
+                    options={PAYMENT_METHOD_OPTIONS.map((o) => ({
+                      ...o,
+                      label: t(o.label),
+                    }))}
+                    ariaLabel={t("Payment method")}
                   size="md"
                   />
                 </div>
@@ -1791,10 +1827,10 @@ const InvoiceDetailsPage: React.FC = () => {
                     name="payment_reference"
                     label={
                       paymentFormData.payment_method === "cheque"
-                        ? "Cheque Number"
+                        ? t("Cheque Number")
                         : paymentFormData.payment_method === "online"
-                        ? "Transaction ID"
-                        : "Transaction Ref"
+                        ? t("Transaction ID")
+                        : t("Transaction Ref")
                     }
                     value={paymentFormData.payment_reference || ""}
                     onChange={handlePaymentFormChange}
@@ -1805,7 +1841,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="mt-4">
                 <FormInput
                   name="notes"
-                  label="Notes (Optional)"
+                  label={t("Notes (Optional)")}
                   value={paymentFormData.notes || ""}
                   onChange={handlePaymentFormChange}
                   disabled={isProcessingPayment}
@@ -1818,7 +1854,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   onClick={() => setShowPaymentForm(false)}
                   disabled={isProcessingPayment}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -1826,7 +1862,9 @@ const InvoiceDetailsPage: React.FC = () => {
                   color="sky"
                   disabled={isProcessingPayment}
                 >
-                  {isProcessingPayment ? "Processing..." : "Confirm Payment"}
+                  {isProcessingPayment
+                    ? t("Processing...")
+                    : t("Confirm Payment")}
                 </Button>
               </div>
             </form>
@@ -1837,12 +1875,12 @@ const InvoiceDetailsPage: React.FC = () => {
           {/* Invoice Header Display */}
           <section className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <h2 className="text-lg font-semibold mb-4 text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2">
-              Invoice Details
+              {t("Invoice Details")}
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-y-5 gap-x-6 text-sm">
               <div className="flex flex-col group">
                 <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
-                  Customer
+                  {t("Customer")}
                 </span>
                 <div className="flex items-center">
                   <span
@@ -1861,7 +1899,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       e.stopPropagation();
                       handleOpenCustomerEdit();
                     }}
-                    title="Edit customer"
+                    title={t("Edit customer")}
                     disabled={isLoading}
                   >
                     <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
@@ -1870,7 +1908,7 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
               <div className="flex flex-col group">
                 <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
-                  Salesman
+                  {t("Salesman")}
                 </span>
                 <div className="flex items-center">
                   <span
@@ -1890,7 +1928,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       e.stopPropagation();
                       handleOpenSalesmanEdit();
                     }}
-                    title="Edit salesman"
+                    title={t("Edit salesman")}
                     disabled={isLoading}
                   >
                     <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
@@ -1899,7 +1937,7 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
               <div className="flex flex-col group">
                 <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
-                  Date / Time
+                  {t("Date / Time")}
                 </span>
                 <div className="flex items-center">
                   <span className="flex text-gray-900 dark:text-gray-100 font-medium gap-2">
@@ -1920,7 +1958,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       e.stopPropagation();
                       handleOpenDateTimeEdit();
                     }}
-                    title="Edit date/time"
+                    title={t("Edit date/time")}
                     disabled={isLoading}
                   >
                     <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
@@ -1931,7 +1969,7 @@ const InvoiceDetailsPage: React.FC = () => {
               {/* Payment Type with edit functionality */}
               <div className="flex flex-col group">
                 <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
-                  Payment Type
+                  {t("Payment Type")}
                 </span>
                 <div className="flex items-center">
                   <span className="text-gray-900 dark:text-gray-100 font-medium capitalize">
@@ -1943,7 +1981,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       e.stopPropagation();
                       handleOpenPaymentTypeEdit();
                     }}
-                    title="Edit payment type"
+                    title={t("Edit payment type")}
                     disabled={isLoading}
                   >
                     <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
@@ -1952,7 +1990,7 @@ const InvoiceDetailsPage: React.FC = () => {
               </div>
               <div className="flex flex-col">
                 <span className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide mb-1">
-                  Balance Due
+                  {t("Balance Due")}
                 </span>
                 <div className="flex items-center">
                   <span
@@ -1973,12 +2011,12 @@ const InvoiceDetailsPage: React.FC = () => {
                       invoiceDisplayStatus === "credit_balance" ||
                       invoiceDisplayStatus === "credited"
                         ? getInvoiceDisplayStatusLabel(invoiceDisplayStatus)
-                        : "Paid in Full"}
+                        : t("Paid in Full")}
                     </span>
                   )}
                   {isCancelled && (
                     <span className="ml-2 text-rose-600 dark:text-rose-400 text-sm font-medium px-2 py-0.5 bg-rose-50 dark:bg-rose-900/20 rounded-full">
-                      Cancelled
+                      {t("Cancelled")}
                     </span>
                   )}
                 </div>
@@ -1987,11 +2025,11 @@ const InvoiceDetailsPage: React.FC = () => {
               {invoiceData.einvoice_status === null && (
                 <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300">
                   <span className="text-gray-400 dark:text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
-                    Manual UUID
+                    {t("Manual UUID")}
                   </span>
                   <div className="flex items-center">
                     <span className="text-gray-600 dark:text-gray-400 font-mono text-sm break-all">
-                      {invoiceData.uuid || "No UUID set"}
+                      {invoiceData.uuid || t("No UUID set")}
                     </span>
                     <button
                       className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
@@ -1999,15 +2037,16 @@ const InvoiceDetailsPage: React.FC = () => {
                         e.stopPropagation();
                         handleOpenUUIDEdit();
                       }}
-                      title="Set UUID manually"
+                      title={t("Set UUID manually")}
                       disabled={isLoading}
                     >
                       <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Use this to manually set UUID if e-invoice submission didn't
-                    record it properly
+                    {t(
+                      "Use this to manually set UUID if e-invoice submission didn't record it properly"
+                    )}
                   </p>
                 </div>
               )}
@@ -2018,7 +2057,7 @@ const InvoiceDetailsPage: React.FC = () => {
           <section className="p-4 group border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <div className="flex justify-between items-center mb-3">
               <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 flex items-center">
-                Line Items
+                {t("Line Items")}
               </h2>
               <button
                 className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
@@ -2026,7 +2065,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   e.stopPropagation();
                   handleOpenOrderDetailsEdit();
                 }}
-                title="Edit line items"
+                title={t("Edit line items")}
                 disabled={isLoading}
               >
                 <IconPencil size={16} className="text-sky-600 dark:text-sky-400" />
@@ -2062,9 +2101,9 @@ const InvoiceDetailsPage: React.FC = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-sky-600 dark:text-sky-400 hover:underline"
-                    title="View in MyInvois Portal"
+                    title={t("View in MyInvois Portal")}
                   >
-                    E-Invoice Details
+                    {t("E-Invoice Details")}
                   </a>
                 ) : consolidatedStatusInfo?.info?.long_id ? (
                   <a
@@ -2072,19 +2111,19 @@ const InvoiceDetailsPage: React.FC = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="hover:text-sky-600 dark:text-sky-400 hover:underline"
-                    title="View Consolidated Invoice in MyInvois Portal"
+                    title={t("View Consolidated Invoice in MyInvois Portal")}
                   >
-                    E-Invoice Details
+                    {t("E-Invoice Details")}
                   </a>
                 ) : (
-                  "E-Invoice Details"
+                  t("E-Invoice Details")
                 )}
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                 {invoiceData.uuid && (
                   <p>
                     <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
-                      UUID:
+                      {t("UUID:")}
                     </strong>
                     <span className="font-mono text-sm break-all">
                       {invoiceData.uuid}
@@ -2094,7 +2133,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 {invoiceData.long_id && (
                   <p>
                     <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
-                      Long ID:
+                      {t("Long ID:")}
                     </strong>
                     <span className="font-mono text-sm break-all">
                       {invoiceData.long_id}
@@ -2104,7 +2143,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 {invoiceData.submission_uid && (
                   <p>
                     <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
-                      Submission:
+                      {t("Submission:")}
                     </strong>
                     <span className="font-mono text-sm break-all">
                       {invoiceData.submission_uid}
@@ -2114,7 +2153,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 {invoiceData.datetime_validated && (
                   <p>
                     <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
-                      Validated:
+                      {t("Validated:")}
                     </strong>
                     {formatDisplayDate(
                       new Date(invoiceData.datetime_validated)
@@ -2132,7 +2171,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 {!consolidatedStatusInfo && (
                   <p>
                     <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
-                      Status:
+                      {t("Status:")}
                     </strong>
                     {eInvoiceStatusInfo ? (
                       <span
@@ -2141,7 +2180,9 @@ const InvoiceDetailsPage: React.FC = () => {
                         {eInvoiceStatusInfo.text}
                       </span>
                     ) : (
-                      <span className="text-gray-500 dark:text-gray-400">Not Submitted</span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        {t("Not Submitted")}
+                      </span>
                     )}
                   </p>
                 )}
@@ -2149,7 +2190,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   <>
                     <p>
                       <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
-                        Invoice ID:
+                        {t("Invoice ID:")}
                       </strong>
                       <span className="font-medium">
                         {consolidatedStatusInfo.info.id}
@@ -2158,7 +2199,7 @@ const InvoiceDetailsPage: React.FC = () => {
                     {consolidatedStatusInfo.info.uuid && (
                       <p>
                         <strong className="text-gray-500 dark:text-gray-400 font-medium w-24 inline-block">
-                          UUID:
+                          {t("UUID:")}
                         </strong>
                         <span className="font-mono text-sm break-all">
                           {consolidatedStatusInfo.info.uuid}
@@ -2177,11 +2218,11 @@ const InvoiceDetailsPage: React.FC = () => {
               {invoiceData.einvoice_status === null && (
                 <div className="flex flex-col group opacity-0 hover:opacity-100 transition-opacity duration-300 mt-4">
                   <span className="text-gray-400 dark:text-gray-500 text-xs font-medium uppercase tracking-wide mb-1">
-                    Manual UUID
+                    {t("Manual UUID")}
                   </span>
                   <div className="flex items-center">
                     <span className="text-gray-600 dark:text-gray-400 font-mono text-sm break-all">
-                      {invoiceData.uuid || "No UUID set"}
+                      {invoiceData.uuid || t("No UUID set")}
                     </span>
                     <button
                       className="ml-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 hover:bg-sky-100 dark:hover:bg-sky-900/30 rounded"
@@ -2189,15 +2230,16 @@ const InvoiceDetailsPage: React.FC = () => {
                         e.stopPropagation();
                         handleOpenUUIDEdit();
                       }}
-                      title="Set UUID manually"
+                      title={t("Set UUID manually")}
                       disabled={isLoading}
                     >
                       <IconPencil size={14} className="text-sky-600 dark:text-sky-400" />
                     </button>
                   </div>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    Use this to manually set UUID if e-invoice submission didn't
-                    record it properly
+                    {t(
+                      "Use this to manually set UUID if e-invoice submission didn't record it properly"
+                    )}
                   </p>
                 </div>
               )}
@@ -2207,11 +2249,11 @@ const InvoiceDetailsPage: React.FC = () => {
           {/* Payment History */}
           <section className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 shadow-sm">
             <h2 className="text-lg font-semibold mb-3 text-gray-800 dark:text-gray-200">
-              Payment History
+              {t("Payment History")}
             </h2>
             {payments.length === 0 && refundNotePaymentDocs.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400 italic">
-                No payments recorded yet.
+                {t("No payments recorded yet.")}
               </p>
             ) : (
               <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
@@ -2219,25 +2261,25 @@ const InvoiceDetailsPage: React.FC = () => {
                   <thead className="bg-gray-50 dark:bg-gray-900/50">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
-                        Date
+                        {t("Date")}
                       </th>
                       <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
-                        Method
+                        {t("Method")}
                       </th>
                       <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
-                        Reference
+                        {t("Reference")}
                       </th>
                       <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[10%]">
-                        Status
+                        {t("Status")}
                       </th>
                       <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Notes
+                        {t("Notes")}
                       </th>
                       <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[12%]">
-                        Amount
+                        {t("Amount")}
                       </th>
                       <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-[15%]">
-                        Action
+                        {t("Action")}
                       </th>
                     </tr>
                   </thead>
@@ -2254,16 +2296,18 @@ const InvoiceDetailsPage: React.FC = () => {
                         }`}
                         title={
                           isCancelled
-                            ? "Cannot modify payment for cancelled invoice"
+                            ? t("Cannot modify payment for cancelled invoice")
                             : p.status === "cancelled"
                             ? p.cancellation_date
-                              ? `Cancelled on ${formatDisplayDate(
-                                  new Date(p.cancellation_date)
-                                )}`
-                              : "Payment cancelled"
+                              ? t("Cancelled on {{date}}", {
+                                  date: formatDisplayDate(
+                                    new Date(p.cancellation_date)
+                                  ),
+                                })
+                              : t("Payment cancelled")
                             : p.status === "pending"
-                            ? "Payment pending confirmation"
-                            : "Payment confirmed"
+                            ? t("Payment pending confirmation")
+                            : t("Payment confirmed")
                         }
                       >
                         <td className="px-4 py-3 whitespace-nowrap">
@@ -2271,7 +2315,7 @@ const InvoiceDetailsPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="inline-flex px-2 py-1 text-sm font-medium rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 capitalize">
-                            {p.payment_method.replace("_", " ")}
+                            {t(p.payment_method.replace("_", " "))}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
@@ -2288,10 +2332,10 @@ const InvoiceDetailsPage: React.FC = () => {
                             }`}
                           >
                             {p.status === "cancelled"
-                              ? "Cancelled"
+                              ? t("Cancelled")
                               : p.status === "pending"
-                              ? "Pending"
-                              : "Paid"}
+                              ? t("Pending")
+                              : t("Paid")}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
@@ -2304,7 +2348,7 @@ const InvoiceDetailsPage: React.FC = () => {
                           <div className="flex justify-center gap-1">
                             {p.status === "cancelled" ? (
                               <span className="italic text-gray-500 dark:text-gray-400 text-sm">
-                                Cancelled
+                                {t("Cancelled")}
                               </span>
                             ) : p.status === "pending" ? (
                               <>
@@ -2314,10 +2358,10 @@ const InvoiceDetailsPage: React.FC = () => {
                                   color="sky"
                                   onClick={() => handleConfirmPaymentClick(p)}
                                   disabled={isConfirmingPayment || isCancelled}
-                                  title="Confirm Payment"
+                                  title={t("Confirm Payment")}
                                 >
                                   <span className="flex items-center gap-1">
-                                    <IconCircleCheck size={16} /> Paid
+                                    <IconCircleCheck size={16} /> {t("Paid")}
                                   </span>
                                 </Button>
                                 <Button
@@ -2332,8 +2376,10 @@ const InvoiceDetailsPage: React.FC = () => {
                                   }
                                   title={
                                     hasActiveAdjustmentDocs
-                                      ? "Cancel the active adjustment document before cancelling payments"
-                                      : "Cancel Payment"
+                                      ? t(
+                                          "Cancel the active adjustment document before cancelling payments"
+                                        )
+                                      : t("Cancel Payment")
                                   }
                                 >
                                   <span className="flex items-center gap-1">
@@ -2354,12 +2400,14 @@ const InvoiceDetailsPage: React.FC = () => {
                                 }
                                 title={
                                   hasActiveAdjustmentDocs
-                                    ? "Cancel the active adjustment document before cancelling payments"
-                                    : "Cancel Payment"
+                                    ? t(
+                                        "Cancel the active adjustment document before cancelling payments"
+                                      )
+                                    : t("Cancel Payment")
                                 }
                               >
                                 <span className="flex items-center gap-1">
-                                  <IconTrash size={16} /> Delete
+                                  <IconTrash size={16} /> {t("Delete")}
                                 </span>
                               </Button>
                             )}
@@ -2381,7 +2429,12 @@ const InvoiceDetailsPage: React.FC = () => {
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <span className="inline-flex px-2 py-1 text-sm font-medium rounded-full bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 capitalize">
-                            {(doc.refund_method || "refund").replace("_", " ")}
+                            {t(
+                              (doc.refund_method || "refund").replace(
+                                "_",
+                                " "
+                              )
+                            )}
                           </span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap font-mono text-sm text-gray-600 dark:text-gray-400">
@@ -2395,18 +2448,24 @@ const InvoiceDetailsPage: React.FC = () => {
                                 : "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300"
                             }`}
                           >
-                            {doc.status === "cancelled" ? "Cancelled" : "Refunded"}
+                            {doc.status === "cancelled"
+                              ? t("Cancelled")
+                              : t("Refunded")}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400 truncate max-w-xs">
                           {doc.reason ||
                             (doc.paired_with_id
-                              ? `Paired with ${formatAdjustmentDocId(
-                                  doc.paired_display_id || doc.paired_with_id
-                                )}`
+                              ? t("Paired with {{id}}", {
+                                  id: formatAdjustmentDocId(
+                                    doc.paired_display_id || doc.paired_with_id
+                                  ),
+                                })
                               : doc.linked_payment_id
-                              ? `Linked to payment #${doc.linked_payment_id}`
-                              : "Refund Note")}
+                              ? t("Linked to payment #{{id}}", {
+                                  id: doc.linked_payment_id,
+                                })
+                              : t("Refund Note"))}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-rose-600 dark:text-rose-400">
                           -{formatCurrency(doc.totalamountpayable)}
@@ -2418,7 +2477,7 @@ const InvoiceDetailsPage: React.FC = () => {
                             }
                             className="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 hover:underline"
                           >
-                            Open
+                            {t("Open")}
                           </button>
                         </td>
                       </tr>
@@ -2453,18 +2512,22 @@ const InvoiceDetailsPage: React.FC = () => {
           isOpen={showSubmitEInvoiceConfirm}
           onClose={() => setShowSubmitEInvoiceConfirm(false)}
           onConfirm={handleConfirmSubmitEInvoice}
-          title="Submit Invoice for e-Invoicing"
+          title={t("Submit Invoice for e-Invoicing")}
           message={
             invoiceData.einvoice_status === "pending"
-              ? "You are about to update this invoice in the MyInvois e-invoicing system. Continue?"
-              : "You are about to submit this invoice to the MyInvois e-invoicing system. Continue?"
+              ? t(
+                  "You are about to update this invoice in the MyInvois e-invoicing system. Continue?"
+                )
+              : t(
+                  "You are about to submit this invoice to the MyInvois e-invoicing system. Continue?"
+                )
           }
           confirmButtonText={
             isSubmittingEInvoice
-              ? "Submitting..."
+              ? t("Submitting...")
               : invoiceData.einvoice_status === "pending"
-              ? "Update e-Invoice"
-              : "Submit e-Invoice"
+              ? t("Update e-Invoice")
+              : t("Submit e-Invoice")
           }
           variant="default"
         />
@@ -2476,17 +2539,25 @@ const InvoiceDetailsPage: React.FC = () => {
             setClearanceDateRange(createClearanceRange());
           }}
           onConfirm={handleConfirmPaymentConfirm}
-          title="Confirm Payment"
+          title={t("Confirm Payment")}
           message={
             <div className="space-y-3">
               <p>
-                Confirm this {paymentToConfirm?.payment_method} payment of{" "}
-                {formatCurrency(paymentToConfirm?.amount_paid)} and update the
-                invoice balance?
+                {t(
+                  "Confirm this {{method}} payment of {{amount}} and update the invoice balance?",
+                  {
+                    method: paymentToConfirm
+                      ? t(
+                          paymentToConfirm.payment_method.replace("_", " ")
+                        )
+                      : "",
+                    amount: formatCurrency(paymentToConfirm?.amount_paid),
+                  }
+                )}
               </p>
               <div>
                 <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
-                  Cheque Clearance Date
+                  {t("Cheque Clearance Date")}
                 </label>
                 <TimeNavigator
                   range={clearanceDateRange}
@@ -2507,14 +2578,15 @@ const InvoiceDetailsPage: React.FC = () => {
                   triggerClassName="w-full justify-between"
                 />
                 <p className="mt-1 text-xs text-default-500 dark:text-gray-400">
-                  Use the date the bank statement shows the cheque as cleared.
-                  Debtor statements use this date.
+                  {t(
+                    "Use the date the bank statement shows the cheque as cleared. Debtor statements use this date."
+                  )}
                 </p>
               </div>
             </div>
           }
           confirmButtonText={
-            isConfirmingPayment ? "Confirming..." : "Confirm Payment"
+            isConfirmingPayment ? t("Confirming...") : t("Confirm Payment")
           }
           variant="success"
           allowContentOverflow
@@ -2523,21 +2595,25 @@ const InvoiceDetailsPage: React.FC = () => {
           isOpen={showCancelConfirm}
           onClose={() => setShowCancelConfirm(false)}
           onConfirm={handleConfirmCancelInvoice}
-          title="Cancel Invoice"
-          message={`Are you sure you want to cancel Invoice #${invoiceData.id}? This action cannot be undone and may attempt to cancel the e-invoice if submitted.`}
-          confirmButtonText="Confirm Cancellation"
+          title={t("Cancel Invoice")}
+          message={t(
+            "Are you sure you want to cancel Invoice #{{id}}? This action cannot be undone and may attempt to cancel the e-invoice if submitted.",
+            { id: invoiceData.id }
+          )}
+          confirmButtonText={t("Confirm Cancellation")}
           variant="danger"
         />
         <ConfirmationDialog
           isOpen={showCancelPaymentConfirm}
           onClose={() => setShowCancelPaymentConfirm(false)}
           onConfirm={handleConfirmCancelPayment}
-          title="Cancel Payment"
-          message={`Are you sure you want to cancel this payment of ${formatCurrency(
-            paymentToCancel?.amount_paid
-          )}? This will increase the invoice balance due.`}
+          title={t("Cancel Payment")}
+          message={t(
+            "Are you sure you want to cancel this payment of {{amount}}? This will increase the invoice balance due.",
+            { amount: formatCurrency(paymentToCancel?.amount_paid) }
+          )}
           confirmButtonText={
-            isCancellingPayment ? "Cancelling..." : "Cancel Payment"
+            isCancellingPayment ? t("Cancelling...") : t("Cancel Payment")
           }
           variant="danger"
         />
@@ -2548,7 +2624,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
               <div className="flex justify-between items-center p-6 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Edit Line Items
+                  {t("Edit Line Items")}
                 </h3>
                 <button
                   onClick={() => {
@@ -2564,7 +2640,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="flex-1 px-6 py-4">
                 <div className="flex justify-between items-center mb-3">
                   <span className="text-sm text-gray-600 dark:text-gray-400">
-                    Modify the line items for this invoice
+                    {t("Modify the line items for this invoice")}
                   </span>
                   <div>
                     <Button
@@ -2574,7 +2650,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       className="mr-2"
                       disabled={isUpdatingOrderDetails}
                     >
-                      Add Subtotal
+                      {t("Add Subtotal")}
                     </Button>
                     <Button
                       onClick={handleAddOrderDetailRow}
@@ -2582,7 +2658,7 @@ const InvoiceDetailsPage: React.FC = () => {
                       size="sm"
                       disabled={isUpdatingOrderDetails}
                     >
-                      Add Item
+                      {t("Add Item")}
                     </Button>
                   </div>
                 </div>
@@ -2616,7 +2692,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   }}
                   disabled={isUpdatingOrderDetails}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="amber"
@@ -2625,7 +2701,9 @@ const InvoiceDetailsPage: React.FC = () => {
                     isUpdatingOrderDetails || editedProducts.length === 0
                   }
                 >
-                  {isUpdatingOrderDetails ? "Updating..." : "Update Line Items"}
+                  {isUpdatingOrderDetails
+                    ? t("Updating...")
+                    : t("Update Line Items")}
                 </Button>
               </div>
             </div>
@@ -2638,7 +2716,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Change Customer
+                  {t("Change Customer")}
                 </h3>
                 <button
                   onClick={() => {
@@ -2655,7 +2733,7 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="mb-4">
                 <CustomerCombobox
                   name="customer"
-                  label="Select New Customer"
+                  label={t("Select New Customer")}
                   value={selectedCustomer}
                   onChange={setSelectedCustomer}
                   options={filteredCustomers}
@@ -2664,7 +2742,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   onLoadMore={handleLoadMoreCustomers}
                   hasMore={hasMoreCustomers && !customerQuery.trim()} // Hide load more when searching
                   isLoading={isLoadingMoreCustomers}
-                  placeholder="Search customers by name or ID..."
+                  placeholder={t("Search customers by name or ID...")}
                   disabled={isUpdatingCustomer}
                 />
               </div>
@@ -2679,7 +2757,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   }}
                   disabled={isUpdatingCustomer}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="amber"
@@ -2687,7 +2765,9 @@ const InvoiceDetailsPage: React.FC = () => {
                   disabled={isUpdatingCustomer || !selectedCustomer}
                   icon={isUpdatingCustomer ? undefined : IconPencil}
                 >
-                  {isUpdatingCustomer ? "Updating..." : "Update Customer"}
+                  {isUpdatingCustomer
+                    ? t("Updating...")
+                    : t("Update Customer")}
                 </Button>
               </div>
             </div>
@@ -2700,7 +2780,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Change Salesman
+                  {t("Change Salesman")}
                 </h3>
                 <button
                   onClick={() => {
@@ -2717,14 +2797,14 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="mb-4">
                 <FormListbox
                   name="salesman"
-                  label="Select New Salesman"
+                  label={t("Select New Salesman")}
                   value={selectedSalesman}
                   onChange={(value) => setSelectedSalesman(value as string)}
                   options={salesmen.map((s) => ({
                     id: s.id,
                     name: s.name || s.id,
                   }))}
-                  placeholder="Select a salesman..."
+                  placeholder={t("Select a salesman...")}
                   disabled={isUpdatingSalesman || isLoadingSalesmen}
                 />
               </div>
@@ -2738,14 +2818,16 @@ const InvoiceDetailsPage: React.FC = () => {
                   }}
                   disabled={isUpdatingSalesman}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="amber"
                   onClick={handleSalesmanUpdate}
                   disabled={isUpdatingSalesman || !selectedSalesman}
                 >
-                  {isUpdatingSalesman ? "Updating..." : "Update Salesman"}
+                  {isUpdatingSalesman
+                    ? t("Updating...")
+                    : t("Update Salesman")}
                 </Button>
               </div>
             </div>
@@ -2758,7 +2840,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Change Payment Type
+                  {t("Change Payment Type")}
                 </h3>
                 <button
                   onClick={() => {
@@ -2774,16 +2856,19 @@ const InvoiceDetailsPage: React.FC = () => {
 
               <div className="mb-4 space-y-2">
                 <label className="block text-sm font-medium text-default-700 dark:text-gray-200 truncate">
-                  Select Payment Type
+                  {t("Select Payment Type")}
                 </label>
                 <PillSelect<"CASH" | "INVOICE">
                   value={selectedPaymentType}
                   onChange={(value: "CASH" | "INVOICE") =>
                     setSelectedPaymentType(value)
                   }
-                  options={PAYMENT_TYPE_OPTIONS}
+                  options={PAYMENT_TYPE_OPTIONS.map((o) => ({
+                    ...o,
+                    label: t(o.label),
+                  }))}
                   disabled={isUpdatingPaymentType}
-                  ariaLabel="Payment type"
+                  ariaLabel={t("Payment type")}
                 size="md"
                 />
               </div>
@@ -2799,16 +2884,17 @@ const InvoiceDetailsPage: React.FC = () => {
                     <div className="text-sm text-amber-800 dark:text-amber-300">
                       {selectedPaymentType === "CASH" ? (
                         <span>
-                          <strong>Note:</strong> Changing to CASH will
-                          automatically create a payment record for the full
-                          amount and mark the invoice as paid. You may cancel
-                          the payment after this if needed.
+                          <strong>{t("Note:")}</strong>{" "}
+                          {t(
+                            "Changing to CASH will automatically create a payment record for the full amount and mark the invoice as paid. You may cancel the payment after this if needed."
+                          )}
                         </span>
                       ) : (
                         <span>
-                          <strong>Note:</strong> Changing to INVOICE will cancel
-                          any automatic CASH payment and restore the full
-                          balance due.
+                          <strong>{t("Note:")}</strong>{" "}
+                          {t(
+                            "Changing to INVOICE will cancel any automatic CASH payment and restore the full balance due."
+                          )}
                         </span>
                       )}
                     </div>
@@ -2825,7 +2911,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   }}
                   disabled={isUpdatingPaymentType}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="amber"
@@ -2836,8 +2922,8 @@ const InvoiceDetailsPage: React.FC = () => {
                   }
                 >
                   {isUpdatingPaymentType
-                    ? "Updating..."
-                    : "Update Payment Type"}
+                    ? t("Updating...")
+                    : t("Update Payment Type")}
                 </Button>
               </div>
             </div>
@@ -2850,7 +2936,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Change Date & Time
+                  {t("Change Date & Time")}
                 </h3>
                 <button
                   onClick={() => {
@@ -2866,7 +2952,7 @@ const InvoiceDetailsPage: React.FC = () => {
 
               <div className="mb-4">
                 <label className="mb-1 block text-sm font-medium text-default-700 dark:text-gray-300">
-                  {"Date & Time"}
+                  {t("Date & Time")}
                 </label>
                 <DateTimePicker
                   value={selectedDateTime ? new Date(selectedDateTime) : null}
@@ -2894,14 +2980,16 @@ const InvoiceDetailsPage: React.FC = () => {
                   }}
                   disabled={isUpdatingDateTime}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="amber"
                   onClick={handleDateTimeUpdate}
                   disabled={isUpdatingDateTime || !selectedDateTime}
                 >
-                  {isUpdatingDateTime ? "Updating..." : "Update Date & Time"}
+                  {isUpdatingDateTime
+                    ? t("Updating...")
+                    : t("Update Date & Time")}
                 </Button>
               </div>
             </div>
@@ -2914,7 +3002,7 @@ const InvoiceDetailsPage: React.FC = () => {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Set Manual UUID
+                  {t("Set Manual UUID")}
                 </h3>
                 <button
                   onClick={() => {
@@ -2931,16 +3019,19 @@ const InvoiceDetailsPage: React.FC = () => {
               <div className="mb-4">
                 <FormInput
                   name="uuid"
-                  label="UUID"
+                  label={t("UUID")}
                   type="text"
                   value={selectedUUID}
                   onChange={(e) => setSelectedUUID(e.target.value)}
                   disabled={isUpdatingUUID}
-                  placeholder="Enter UUID (e.g., 4RKA7KDV6JM3HVTSQ9S60MZJ10)"
+                  placeholder={t(
+                    "Enter UUID (e.g., 4RKA7KDV6JM3HVTSQ9S60MZJ10)"
+                  )}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Enter the UUID from MyInvois if the system failed to record it
-                  automatically
+                  {t(
+                    "Enter the UUID from MyInvois if the system failed to record it automatically"
+                  )}
                 </p>
               </div>
 
@@ -2952,10 +3043,10 @@ const InvoiceDetailsPage: React.FC = () => {
                     className="text-amber-600 dark:text-amber-400 mt-0.5 mr-2 flex-shrink-0"
                   />
                   <div className="text-sm text-amber-800 dark:text-amber-300">
-                    <strong>Warning:</strong> Only use this if the e-invoice was
-                    successfully submitted to MyInvois but the UUID wasn't
-                    recorded. Setting an incorrect UUID may cause issues with
-                    e-invoice operations.
+                    <strong>{t("Warning:")}</strong>{" "}
+                    {t(
+                      "Only use this if the e-invoice was successfully submitted to MyInvois but the UUID wasn't recorded. Setting an incorrect UUID may cause issues with e-invoice operations."
+                    )}
                   </div>
                 </div>
               </div>
@@ -2969,14 +3060,14 @@ const InvoiceDetailsPage: React.FC = () => {
                   }}
                   disabled={isUpdatingUUID}
                 >
-                  Cancel
+                  {t("Cancel")}
                 </Button>
                 <Button
                   color="amber"
                   onClick={handleUUIDUpdate}
                   disabled={isUpdatingUUID || !selectedUUID.trim()}
                 >
-                  {isUpdatingUUID ? "Updating..." : "Set UUID"}
+                  {isUpdatingUUID ? t("Updating...") : t("Set UUID")}
                 </Button>
               </div>
             </div>
@@ -2991,19 +3082,22 @@ const InvoiceDetailsPage: React.FC = () => {
             setOverpaymentDetails(null);
           }}
           onConfirm={handleConfirmOverpayment}
-          title="Overpayment Detected"
+          title={t("Overpayment Detected")}
           message={
             overpaymentDetails
-              ? `The payment amount of ${formatCurrency(
-                  overpaymentDetails.totalAmount
-                )} exceeds the balance due of ${formatCurrency(
-                  overpaymentDetails.regularAmount
-                )}. This will result in an overpayment of ${formatCurrency(
-                  overpaymentDetails.overpaidAmount
-                )}. Do you want to proceed?`
-              : "Do you want to proceed with the overpayment?"
+              ? t(
+                  "The payment amount of {{total}} exceeds the balance due of {{regular}}. This will result in an overpayment of {{overpaid}}. Do you want to proceed?",
+                  {
+                    total: formatCurrency(overpaymentDetails.totalAmount),
+                    regular: formatCurrency(overpaymentDetails.regularAmount),
+                    overpaid: formatCurrency(
+                      overpaymentDetails.overpaidAmount
+                    ),
+                  }
+                )
+              : t("Do you want to proceed with the overpayment?")
           }
-          confirmButtonText="Proceed with Overpayment"
+          confirmButtonText={t("Proceed with Overpayment")}
           variant="danger"
         />
 
@@ -3012,10 +3106,12 @@ const InvoiceDetailsPage: React.FC = () => {
           isOpen={showClearEInvoiceConfirm}
           onClose={() => setShowClearEInvoiceConfirm(false)}
           onConfirm={handleConfirmClearEInvoice}
-          title="Clear E-Invoice Status"
-          message="This will clear the current e-invoice status and allow you to resubmit the e-invoice. Only do this if the e-invoice is not valid at myinvois.hasil.gov.my. Are you sure?"
+          title={t("Clear E-Invoice Status")}
+          message={t(
+            "This will clear the current e-invoice status and allow you to resubmit the e-invoice. Only do this if the e-invoice is not valid at myinvois.hasil.gov.my. Are you sure?"
+          )}
           confirmButtonText={
-            isClearingEInvoice ? "Clearing..." : "Clear Status"
+            isClearingEInvoice ? t("Clearing...") : t("Clear Status")
           }
           variant="danger"
         />
@@ -3033,9 +3129,12 @@ const InvoiceDetailsPage: React.FC = () => {
             }
           }}
           onConfirm={handleConfirmEInvoiceCancellation}
-          title="Cancel E-Invoice"
-          message={`Changing the ${eInvoiceCancelField} will require cancelling the e-invoice. This action cannot be undone. Do you want to proceed?`}
-          confirmButtonText="Proceed with Cancellation"
+          title={t("Cancel E-Invoice")}
+          message={t(
+            "Changing the {{field}} will require cancelling the e-invoice. This action cannot be undone. Do you want to proceed?",
+            { field: eInvoiceCancelField }
+          )}
+          confirmButtonText={t("Proceed with Cancellation")}
           variant="danger"
         />
 
