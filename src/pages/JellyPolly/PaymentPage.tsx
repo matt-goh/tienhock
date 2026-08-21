@@ -69,7 +69,7 @@ const reviveFilters = (cached: any): PaymentFilters | null => {
 
 const PaymentPage: React.FC = () => {
   const navigate = useNavigate();
-  const { t } = useTranslation("payments");
+  const { t } = useTranslation("jellypolly");
   const [payments, setPayments] = useState<Payment[]>([]);
   const [sortedPayments, setSortedPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +125,7 @@ const PaymentPage: React.FC = () => {
     } catch (error: any) {
       console.error("Error fetching payments:", error);
       toast.error(
-        error.response?.data?.message || "Failed to fetch payments"
+        error.response?.data?.message || t("Failed to fetch payments")
       );
       setPayments([]);
     } finally {
@@ -176,19 +176,19 @@ const PaymentPage: React.FC = () => {
   // Payment method filter options
   const paymentMethodOptions = [
     { id: "", name: "All Methods" },
-    { id: "cash", name: "Cash" },
-    { id: "cheque", name: "Cheque" },
-    { id: "bank_transfer", name: "Bank Transfer" },
-    { id: "online", name: "Online" },
+    { id: "cash", name: t("Cash") },
+    { id: "cheque", name: t("Cheque") },
+    { id: "bank_transfer", name: t("Bank Transfer") },
+    { id: "online", name: t("Online") },
   ];
 
   // Status filter options
   const statusOptions = [
     { id: "", name: "All Status" },
-    { id: "active", name: "Active" },
-    { id: "pending", name: "Pending" },
-    { id: "overpaid", name: "Overpaid" },
-    { id: "cancelled", name: "Cancelled" },
+    { id: "active", name: t("Active") },
+    { id: "pending", name: t("Pending") },
+    { id: "overpaid", name: t("Overpaid") },
+    { id: "cancelled", name: t("Cancelled") },
   ];
 
 
@@ -265,10 +265,10 @@ const PaymentPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
           <IconCash size={28} className="text-gray-700 dark:text-gray-200" />
-          JellyPolly Payment Management
+          {t("JellyPolly Payment Management")}
         </h1>
         <Button onClick={handleNewPayment} icon={IconPlus} size="md">
-          New Payment
+          {t("New Payment")}
         </Button>
       </div>
 
@@ -284,8 +284,8 @@ const PaymentPage: React.FC = () => {
               />
               <input
                 type="text"
-                placeholder="Search"
-                title="Search payments by invoice, reference, or amount"
+                placeholder={t("Search")}
+                title={t("Search payments by invoice, reference, or amount")}
                 className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 rounded-full focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
                 value={filters.searchTerm}
                 onChange={handleSearchChange}
@@ -311,7 +311,7 @@ const PaymentPage: React.FC = () => {
               }
               options={paymentMethodOptions}
               className="w-full sm:w-40"
-              placeholder="All Methods"
+              placeholder={t("All Methods")}
             />
 
             {/* Status Filter */}
@@ -325,7 +325,7 @@ const PaymentPage: React.FC = () => {
               }
               options={statusOptions}
               className="w-full sm:w-40"
-              placeholder="All Status"
+              placeholder={t("All Status")}
             />
           </div>
         </div>

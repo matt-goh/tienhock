@@ -5,6 +5,7 @@
 // at /jellypolly/catalogue/staff/:id/edit.
 import React, { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import toast from "react-hot-toast";
 import {
   IconPencil,
@@ -52,6 +53,7 @@ const mapDisplayNameToId = (
 // Only renders when the staff shares a name with other records (the case where
 // a "Head" needs to be designated for location-based salary reporting).
 const SameNameHeadControl: React.FC<{ staff: Employee }> = ({ staff }) => {
+  const { t } = useTranslation("jellypolly");
   const navigate = useNavigate();
   const { refreshStaffs } = useJPStaffsCache();
   const { options } = useStaffFormOptions();
@@ -92,10 +94,10 @@ const SameNameHeadControl: React.FC<{ staff: Employee }> = ({ staff }) => {
       });
       await fetchSiblings();
       await refreshStaffs();
-      toast.success("Head staff updated successfully");
+      toast.success(t("Head staff updated successfully"));
     } catch (e) {
       console.error("Error setting head staff:", e);
-      toast.error("Failed to update head staff");
+      toast.error(t("Failed to update head staff"));
     } finally {
       setSettingHead(false);
     }
@@ -142,15 +144,15 @@ const SameNameHeadControl: React.FC<{ staff: Employee }> = ({ staff }) => {
             ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-700 hover:bg-amber-200/70 dark:hover:bg-amber-900/60"
             : "bg-default-100 dark:bg-gray-700 text-default-700 dark:text-gray-200 border-default-200 dark:border-gray-600 hover:bg-default-200 dark:hover:bg-gray-600"
         }`}
-        title="Manage which record is the Head"
+        title={t("Manage which record is the Head")}
       >
         <IconCrown size={14} className={isThisHead ? "" : "text-amber-500"} />
         <span>
           {isThisHead
-            ? "Head"
+            ? t("Head")
             : headSibling
-            ? `Head: ${headSibling.id}`
-            : "Set Head"}
+            ? t("Head: {{id}}", { id: headSibling.id })
+            : t("Set Head")}
         </span>
         <span className="text-xs px-1.5 rounded-full bg-white/60 dark:bg-black/20">
           {siblings.length}
@@ -163,7 +165,9 @@ const SameNameHeadControl: React.FC<{ staff: Employee }> = ({ staff }) => {
             <div className="flex items-center justify-between px-2 py-1.5">
               <div className="flex items-center gap-1.5 text-sm font-semibold text-default-800 dark:text-gray-100">
                 <IconUsers size={16} className="text-default-500" />
-                Same-Name Staff ({siblings.length})
+                {t("Same-Name Staff ({{count}})", {
+                  count: siblings.length,
+                })}
               </div>
               <button
                 type="button"
@@ -174,12 +178,13 @@ const SameNameHeadControl: React.FC<{ staff: Employee }> = ({ staff }) => {
                 className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-sky-50 dark:bg-sky-900/30 text-sky-600 dark:text-sky-400 rounded-lg hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors"
               >
                 <IconUserPlus size={14} />
-                Add
+                {t("Add")}
               </button>
             </div>
             <p className="px-2 pb-2 text-xs text-default-400 dark:text-gray-500">
-              Choose who is the Head — used for location determination in salary
-              reports.
+              {t(
+                "Choose who is the Head — used for location determination in salary reports."
+              )}
             </p>
             <div className="max-h-72 overflow-auto space-y-1">
               {siblings.map((s) => (
@@ -213,17 +218,19 @@ const SameNameHeadControl: React.FC<{ staff: Employee }> = ({ staff }) => {
                         </span>
                         {s.isHead && (
                           <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded">
-                            HEAD
+                            {t("HEAD")}
                           </span>
                         )}
                         {s.id === staff.id && (
                           <span className="px-1.5 py-0.5 text-[10px] font-medium bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300 rounded">
-                            Current
+                            {t("Current")}
                           </span>
                         )}
                       </div>
                       <span className="text-xs text-default-500 dark:text-gray-400 truncate block">
-                        {s.job.length > 0 ? s.job.join(", ") : "No job assigned"}
+                        {s.job.length > 0
+                          ? s.job.join(", ")
+                          : t("No job assigned")}
                       </span>
                     </div>
                   </div>
@@ -236,7 +243,7 @@ const SameNameHeadControl: React.FC<{ staff: Employee }> = ({ staff }) => {
                         navigate(`/jellypolly/catalogue/staff/${s.id}`);
                       }}
                       className="p-1.5 text-default-400 hover:text-sky-500 dark:hover:text-sky-400 flex-shrink-0"
-                      title="View this staff"
+                      title={t("View this staff")}
                     >
                       <IconExternalLink size={16} />
                     </button>
@@ -304,6 +311,7 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({
 );
 
 const JPStaffDetailsPage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { allStaffs, loading: loadingStaffs } = useJPStaffsCache();
@@ -339,7 +347,7 @@ const JPStaffDetailsPage: React.FC = () => {
       .catch((err) => {
         if (cancelled) return;
         console.error("Error fetching staff details:", err);
-        setError("Staff member not found.");
+        setError(t("Staff member not found."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -362,7 +370,7 @@ const JPStaffDetailsPage: React.FC = () => {
       <div className="container mx-auto px-4 py-6">
         <BackButton fallbackPath="/jellypolly/catalogue/staff" />
         <div className="mt-4 p-4 border border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
-          {error || "Staff member not found."}
+          {error || t("Staff member not found.")}
         </div>
       </div>
     );
@@ -408,7 +416,7 @@ const JPStaffDetailsPage: React.FC = () => {
                 )}
                 {staff.dateResigned && (
                   <span className="px-2.5 py-0.5 text-sm font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 rounded-full">
-                    Resigned
+                    {t("Resigned")}
                   </span>
                 )}
                 <SameNameHeadControl staff={staff} />
@@ -421,30 +429,30 @@ const JPStaffDetailsPage: React.FC = () => {
             icon={IconPencil}
             onClick={() => navigate(`/jellypolly/catalogue/staff/${staff.id}/edit`)}
           >
-            Edit
+            {t("Edit")}
           </Button>
         </div>
 
         {/* Read-only fields */}
         <div className="px-6 py-5">
-          <Section title="Personal">
+          <Section title={t("Personal")}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
-              <Field label="ID" value={staff.id} />
-              <Field label="Name" value={staff.name} />
-              <Field label="Telephone Number" value={staff.telephoneNo} />
-              <Field label="Email" value={staff.email} />
-              <Field label="Gender" value={staff.gender} />
-              <Field label="Nationality" value={staff.nationality} />
-              <Field label="Birthdate" value={staff.birthdate} />
-              <Field label="Address" value={staff.address} />
+              <Field label={t("ID")} value={staff.id} />
+              <Field label={t("Name")} value={staff.name} />
+              <Field label={t("Telephone Number")} value={staff.telephoneNo} />
+              <Field label={t("Email")} value={staff.email} />
+              <Field label={t("Gender")} value={staff.gender} />
+              <Field label={t("Nationality")} value={staff.nationality} />
+              <Field label={t("Birthdate")} value={staff.birthdate} />
+              <Field label={t("Address")} value={staff.address} />
             </div>
           </Section>
 
-          <Section title="Work">
+          <Section title={t("Work")}>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
               <div className="space-y-1">
                 <p className="text-xs font-medium text-default-500 dark:text-gray-400">
-                  Jobs
+                  {t("Jobs")}
                 </p>
                 {staff.job && staff.job.length > 0 ? (
                   <div className="flex items-center gap-1.5 flex-wrap">
@@ -466,71 +474,87 @@ const JPStaffDetailsPage: React.FC = () => {
                 directLocations={directLocations}
                 jobLocations={jobLocations}
               />
-              <Field label="Date Joined" value={staff.dateJoined} />
+              <Field label={t("Date Joined")} value={staff.dateJoined} />
             </div>
             {/* Editable pay codes (the only interactive part of this page) */}
             <StaffPayCodesSection employee={staff} company="jellypolly" />
           </Section>
 
-          <Section title="Documents">
+          <Section title={t("Documents")}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-5">
-              <Field label="IC Number" value={staff.icNo} />
-              <Field label="Bank Account Number" value={staff.bankAccountNumber} />
-              <Field label="EPF Number" value={staff.epfNo} />
-              <Field label="Income Tax Number" value={staff.incomeTaxNo} />
-              <Field label="SOCSO Number" value={staff.socsoNo} />
-              <Field label="Document" value={staff.document} />
-              <Field label="Department" value={staff.department} />
-              <Field label="KWSP Number" value={staff.kwspNumber} />
+              <Field label={t("IC Number")} value={staff.icNo} />
+              <Field
+                label={t("Bank Account Number")}
+                value={staff.bankAccountNumber}
+              />
+              <Field label={t("EPF Number")} value={staff.epfNo} />
+              <Field label={t("Income Tax Number")} value={staff.incomeTaxNo} />
+              <Field label={t("SOCSO Number")} value={staff.socsoNo} />
+              <Field label={t("Document")} value={staff.document} />
+              <Field label={t("Department")} value={staff.department} />
+              <Field label={t("KWSP Number")} value={staff.kwspNumber} />
             </div>
           </Section>
 
-          <Section title="Income Tax Information">
+          <Section title={t("Income Tax Information")}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-5">
-              <Field label="Marital Status" value={staff.maritalStatus} />
+              <Field label={t("Marital Status")} value={staff.maritalStatus} />
               {staff.maritalStatus === "Married" && (
                 <Field
-                  label="Spouse Employment Status"
+                  label={t("Spouse Employment Status")}
                   value={staff.spouseEmploymentStatus}
                 />
               )}
               <Field
-                label="Number of Children"
+                label={t("Number of Children")}
                 value={staff.numberOfChildren ?? 0}
               />
             </div>
           </Section>
 
-          <Section title="Contribution Settings">
+          <Section title={t("Contribution Settings")}>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-5">
               <Field
-                label="EPF Age"
-                value={CONTRIBUTION_AGE_LABELS[staff.epfAgeOverride ?? "auto"]}
+                label={t("EPF Age")}
+                value={t(
+                  CONTRIBUTION_AGE_LABELS[staff.epfAgeOverride ?? "auto"]
+                )}
               />
               <Field
-                label="EPF Rate Type"
+                label={t("EPF Rate Type")}
                 value={
-                  EPF_NATIONALITY_LABELS[staff.epfNationalityOverride ?? "auto"]
+                  t(
+                    EPF_NATIONALITY_LABELS[
+                      staff.epfNationalityOverride ?? "auto"
+                    ]
+                  )
                 }
               />
               <Field
-                label="SOCSO Age"
-                value={CONTRIBUTION_AGE_LABELS[staff.socsoAgeOverride ?? "auto"]}
+                label={t("SOCSO Age")}
+                value={t(
+                  CONTRIBUTION_AGE_LABELS[staff.socsoAgeOverride ?? "auto"]
+                )}
               />
               <Field
-                label="SIP Age"
-                value={CONTRIBUTION_AGE_LABELS[staff.sipAgeOverride ?? "auto"]}
+                label={t("SIP Age")}
+                value={t(
+                  CONTRIBUTION_AGE_LABELS[staff.sipAgeOverride ?? "auto"]
+                )}
               />
             </div>
           </Section>
 
-          <Section title="Additional">
+          <Section title={t("Additional")}>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-5">
-              <Field label="Payment Type" value={staff.paymentType} />
-              <Field label="Payment Preference" value={staff.paymentPreference} />
-              <Field label="Race" value={staff.race} />
-              <Field label="Agama" value={staff.agama} />
-              <Field label="Date Resigned" value={staff.dateResigned} />
+              <Field label={t("Payment Type")} value={staff.paymentType} />
+              <Field
+                label={t("Payment Preference")}
+                value={staff.paymentPreference}
+              />
+              <Field label={t("Race")} value={staff.race} />
+              <Field label={t("Agama")} value={staff.agama} />
+              <Field label={t("Date Resigned")} value={staff.dateResigned} />
             </div>
           </Section>
         </div>

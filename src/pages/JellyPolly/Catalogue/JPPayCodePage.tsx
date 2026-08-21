@@ -35,6 +35,7 @@ import JobsAndEmployeesUsingPayCodeTooltip from "../../../components/Catalogue/J
 import RefreshPayCodeCacheButton from "../../../components/Catalogue/RefreshPayCodeCacheButton";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { usePersistedFilters } from "../../../hooks/usePersistedFilters";
+import { useTranslation } from "react-i18next";
 
 const FILTERS_STORAGE_KEY = "jpPayCodeList";
 const SCROLL_RESTORATION_KEY = "jp-pay-code-list";
@@ -63,6 +64,7 @@ const reviveFilters = (cached: any): PayCodeListFilters => ({
 });
 
 const JPPayCodePage: React.FC = () => {
+  const { t } = useTranslation("jellypolly");
   const location = useLocation();
   // State
   const [filteredCodes, setFilteredCodes] = useState<PayCode[]>([]);
@@ -271,17 +273,17 @@ const JPPayCodePage: React.FC = () => {
 
   const handleSavePayCode = async (payCodeData: PayCode) => {
     if (!payCodeData.id) {
-      toast.error("ID Missing");
+      toast.error(t("ID Missing"));
       throw new Error("ID Missing");
     }
     try {
       if (codeToEdit) {
         // Use codeToEdit state to know if it's an update
         await api.put(`/jellypolly/api/pay-codes/${payCodeData.id}`, payCodeData);
-        toast.success("Pay code updated successfully");
+        toast.success(t("Pay code updated successfully"));
       } else {
         await api.post("/jellypolly/api/pay-codes", payCodeData);
-        toast.success("Pay code created successfully");
+        toast.success(t("Pay code created successfully"));
       }
       setShowAddModal(false);
       setCodeToEdit(null);
@@ -294,7 +296,7 @@ const JPPayCodePage: React.FC = () => {
 
   const handleDeleteClick = (pc: PayCode) => {
     if (!pc || !pc.id) {
-      toast.error("Invalid pay code data.");
+      toast.error(t("Invalid pay code data."));
       return;
     }
     const isInUse = Object.values(detailedMappings).some((details) =>
@@ -303,7 +305,9 @@ const JPPayCodePage: React.FC = () => {
     const displayName = pc.description || pc.id;
     if (isInUse) {
       toast.error(
-        `Cannot delete: Pay code "${displayName}" is used in job assignments.`
+        t('Cannot delete: Pay code "{{name}}" is used in job assignments.', {
+          name: displayName,
+        })
       );
       return;
     }
@@ -313,21 +317,23 @@ const JPPayCodePage: React.FC = () => {
 
   const handleConfirmDelete = async () => {
     if (!codeToDelete || !codeToDelete.id) {
-      toast.error("Invalid ID for deletion.");
+      toast.error(t("Invalid ID for deletion."));
       setShowDeleteDialog(false);
       setCodeToDelete(null);
       return;
     }
     try {
       await api.delete(`/jellypolly/api/pay-codes/${codeToDelete.id}`);
-      toast.success("Pay code deleted successfully");
+      toast.success(t("Pay code deleted successfully"));
       setShowDeleteDialog(false);
       setCodeToDelete(null);
       await refreshPayCodeMappings(); // Refresh cache
     } catch (error: any) {
       console.error("Error deleting pay code:", error);
       toast.error(
-        error?.response?.data?.message || error.message || "Failed to delete."
+        error?.response?.data?.message ||
+          error.message ||
+          t("Failed to delete.")
       );
       setShowDeleteDialog(false);
       setCodeToDelete(null);
@@ -337,13 +343,15 @@ const JPPayCodePage: React.FC = () => {
   // --- Render Functions (Filters, Pagination) ---
   const renderJobFilter = () => (
     <div className="flex items-center space-x-2">
-      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Job:</span>
+      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">
+        {t("Job:")}
+      </span>
       <Listbox value={selectedJob} onChange={setSelectedJob}>
         <div className="relative">
           <ListboxButton className="relative w-48 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
             <span className="block truncate">
               {selectedJob === "All"
-                ? "All Jobs"
+                ? t("All Jobs")
                 : jobs.find((j: { id: string }) => j.id === selectedJob)
                     ?.name || selectedJob}
             </span>
@@ -367,7 +375,7 @@ const JPPayCodePage: React.FC = () => {
                       selected ? "font-medium" : "font-normal"
                     }`}
                   >
-                    All Jobs
+                    {t("All Jobs")}
                   </span>
                   {selected && (
                     <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
@@ -379,7 +387,7 @@ const JPPayCodePage: React.FC = () => {
             </ListboxOption>
             {loadingJobs ? (
               <div className="py-2 px-4 text-gray-500 dark:text-gray-400 italic text-sm">
-                Loading jobs...
+                {t("Loading jobs...")}
               </div>
             ) : (
               jobs.map(
@@ -435,7 +443,9 @@ const JPPayCodePage: React.FC = () => {
 
   const renderPayTypeFilter = () => (
     <div className="flex items-center space-x-2">
-      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">Type:</span>
+      <span className="font-semibold text-sm text-default-700 dark:text-gray-200">
+        {t("Type:")}
+      </span>
       <Listbox value={selectedType} onChange={setSelectedType}>
         <div className="relative">
           <ListboxButton className="relative w-40 cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent py-2 pl-3 pr-10 text-left shadow-sm focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm dark:text-gray-100">
@@ -462,7 +472,7 @@ const JPPayCodePage: React.FC = () => {
                         selected ? "font-medium" : "font-normal"
                       }`}
                     >
-                      {type}
+                      {t(type)}
                     </span>
                     {selected && (
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-600 dark:text-sky-400">
@@ -480,6 +490,7 @@ const JPPayCodePage: React.FC = () => {
   );
 
   const Pagination = () => {
+    const { t } = useTranslation("jellypolly");
     const handleNextPage = () => {
       if (currentPage < totalPages) setCurrentPage(currentPage + 1);
     };
@@ -500,22 +511,17 @@ const JPPayCodePage: React.FC = () => {
       <div className="flex items-center justify-between pt-3 border-t border-default-200 dark:border-gray-700 mt-4">
         <div>
           <p className="text-sm text-default-600 dark:text-gray-300">
-            Showing{" "}
-            <span className="font-medium">
-              {(currentPage - 1) * itemsPerPage + 1}
-            </span>{" "}
-            to{" "}
-            <span className="font-medium">
-              {Math.min(currentPage * itemsPerPage, filteredCodes.length)}
-            </span>{" "}
-            of <span className="font-medium">{filteredCodes.length}</span>{" "}
-            results
+            {t("Showing {{start}} to {{end}} of {{total}} results", {
+              start: (currentPage - 1) * itemsPerPage + 1,
+              end: Math.min(currentPage * itemsPerPage, filteredCodes.length),
+              total: filteredCodes.length,
+            })}
           </p>
         </div>
         <div>
           <nav
             className="inline-flex rounded-md shadow-sm -space-x-px"
-            aria-label="Pagination"
+            aria-label={t("Pagination")}
           >
             <button
               onClick={handlePrevPage}
@@ -593,7 +599,9 @@ const JPPayCodePage: React.FC = () => {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex flex-col items-center justify-between gap-4 md:flex-row">
-        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">Pay Code</h1>
+        <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
+          {t("Pay Code")}
+        </h1>
         <div className="flex w-full flex-col items-center justify-end gap-4 md:w-auto md:flex-row">
           {renderPayTypeFilter()}
           {renderJobFilter()}
@@ -605,7 +613,7 @@ const JPPayCodePage: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Search ID or description..." // Updated placeholder
+              placeholder={t("Search ID or description...")} // Updated placeholder
               className="w-full rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 placeholder:text-default-400 dark:placeholder:text-gray-400 py-2 pl-10 pr-4 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -614,7 +622,7 @@ const JPPayCodePage: React.FC = () => {
               <button
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
                 onClick={() => setSearchTerm("")}
-                title="Clear search"
+                title={t("Clear search")}
               >
                 ×
               </button>
@@ -634,7 +642,7 @@ const JPPayCodePage: React.FC = () => {
               size="md"
               className="w-full md:w-auto"
             >
-              Add Pay Code
+              {t("Add Pay Code")}
             </Button>
           </div>
         </div>
@@ -653,33 +661,33 @@ const JPPayCodePage: React.FC = () => {
               <thead className="bg-default-100 dark:bg-gray-800">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                    ID
+                    {t("ID")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 max-w-sm">
-                    Description
+                    {t("Description")}
                   </th>
                   {selectedType === "All" && (
                     <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                      Type
+                      {t("Type")}
                     </th>
                   )}
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                    Unit
+                    {t("Unit")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 min-w-[110px]">
-                    Biasa Rate
+                    {t("Biasa Rate")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 min-w-[110px]">
-                    Ahad Rate
+                    {t("Ahad Rate")}
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300 min-w-[110px]">
-                    Umum Rate
+                    {t("Umum Rate")}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                    Active
+                    {t("Active")}
                   </th>
                   <th className="w-28 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-default-600 dark:text-gray-300">
-                    Actions
+                    {t("Actions")}
                   </th>
                 </tr>
               </thead>
@@ -737,7 +745,7 @@ const JPPayCodePage: React.FC = () => {
                                 : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                             }`}
                           >
-                            {pc.is_active ? "Yes" : "No"}
+                            {pc.is_active ? t("Yes") : t("No")}
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-center text-sm">
@@ -748,7 +756,7 @@ const JPPayCodePage: React.FC = () => {
                                 handleEditClick(pc);
                               }}
                               className="text-sky-600 dark:text-sky-400 hover:text-sky-800"
-                              title="Edit"
+                              title={t("Edit")}
                             >
                               <IconPencil size={18} />
                             </button>
@@ -758,7 +766,7 @@ const JPPayCodePage: React.FC = () => {
                                 handleAssociateWithJobs(pc);
                               }}
                               className="text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300"
-                              title="Link to Jobs"
+                              title={t("Link to Jobs")}
                             >
                               <IconLink size={18} />
                             </button>
@@ -768,7 +776,7 @@ const JPPayCodePage: React.FC = () => {
                                 handleAssociateWithEmployees(pc);
                               }}
                               className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-800 dark:hover:text-emerald-300"
-                              title="Link to Employees"
+                              title={t("Link to Employees")}
                             >
                               <IconUser size={18} />
                             </button>
@@ -778,7 +786,7 @@ const JPPayCodePage: React.FC = () => {
                                 handleDeleteClick(pc);
                               }}
                               className="text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300"
-                              title="Delete"
+                              title={t("Delete")}
                             >
                               <IconTrash size={18} />
                             </button>
@@ -798,8 +806,8 @@ const JPPayCodePage: React.FC = () => {
                       searchTerm === "" &&
                       selectedType === "All" &&
                       selectedJob === "All"
-                        ? "No pay codes found. Create one."
-                        : "No pay codes match filters."}
+                        ? t("No pay codes found. Create one.")
+                        : t("No pay codes match filters.")}
                     </td>
                   </tr>
                 )}
@@ -850,11 +858,12 @@ const JPPayCodePage: React.FC = () => {
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleConfirmDelete}
-        title="Delete Pay Code"
+        title={t("Delete Pay Code")}
         // Updated message to use ID or description
-        message={`Delete pay code "${
-          codeToDelete?.description || codeToDelete?.id || "N/A"
-        }"? This cannot be undone.`}
+        message={t('Delete pay code "{{name}}"? This cannot be undone.', {
+          name:
+            codeToDelete?.description || codeToDelete?.id || "N/A",
+        })}
         variant="danger"
       />
     </div>

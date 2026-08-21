@@ -8,6 +8,7 @@ import React, {
   useRef,
 } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import Button from "../../../components/Button";
 import { Employee } from "../../../types/types";
 import BackButton from "../../../components/BackButton";
@@ -136,6 +137,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   existingWorkLog,
   onCancel,
 }) => {
+  const { t } = useTranslation("jellypolly");
   // Hardcode jobType for salesman page
   const jobType = "SALESMAN";
   const navigate = useNavigate();
@@ -447,8 +449,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     confirmationMessage,
   } = useUnsavedChanges({
     hasUnsavedChanges,
-    message:
-      "You have unsaved changes. Are you sure you want to leave this page?",
+    message: t(
+      "You have unsaved changes. Are you sure you want to leave this page?"
+    ),
   });
 
   // Note: SALESMAN has no context fields, so no context-linked activity updates needed
@@ -555,13 +558,13 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
   const leaveOptions = useMemo<LeaveOption[]>(() => {
     const options: LeaveOption[] = [
-      { value: "cuti_sakit", label: "Cuti Sakit" },
-      { value: "cuti_tahunan", label: "Cuti Tahunan" },
-      { value: "cuti_rawatan", label: "Cuti Rawatan" },
+      { value: "cuti_sakit", label: "Sick Leave" },
+      { value: "cuti_tahunan", label: "Annual Leave" },
+      { value: "cuti_rawatan", label: "Medical Leave" },
     ];
 
     if (formData.dayType === "Umum") {
-      return [{ value: "cuti_umum", label: "Cuti Umum" }, ...options];
+      return [{ value: "cuti_umum", label: "Public Holiday" }, ...options];
     }
 
     return options;
@@ -787,7 +790,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       return newBalances;
     } catch (error) {
       console.error("Error fetching batch leave balances:", error);
-      toast.error("Failed to fetch leave balances");
+      toast.error(t("Failed to fetch leave balances"));
       return {};
     }
   };
@@ -854,9 +857,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       case "cuti_sakit":
         return "Sick Leave";
       case "cuti_umum":
-        return "Public Holiday Leave";
+        return "Public Holiday";
       case "cuti_rawatan":
-        return "Hospital Leave";
+        return "Medical Leave";
     }
   };
 
@@ -1080,7 +1083,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       if (!leaveBalances[employeeId]) {
         const balanceData = await fetchLeaveBalance(employeeId);
         if (!balanceData) {
-          toast.error("Failed to load leave balance. Please try again.");
+          toast.error(t("Failed to load leave balance. Please try again."));
           return; // Don't proceed if balance fetch failed
         }
       }
@@ -1101,7 +1104,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
       if (availableLeaveTypes.length === 0) {
         toast.error(
-          "No leave types available for this employee (all balances exhausted)"
+          t(
+            "No leave types available for this employee (all balances exhausted)"
+          )
         );
         return; // Don't allow selection if no leave types are available
       }
@@ -1123,14 +1128,20 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       const leaveTypeName = getLeaveTypeDisplayName(selectedLeaveType);
 
       toast.success(
-        `${leaveTypeName} selected - ${availability.remaining} days remaining`
+        t("{{leaveType}} selected - {{days}} days remaining", {
+          leaveType: t(leaveTypeName),
+          days: availability.remaining,
+        })
       );
 
       // If we're not using the default leave type, inform the user
       if (selectedLeaveType !== defaultLeaveType) {
         const defaultTypeName = getLeaveTypeDisplayName(defaultLeaveType);
         toast(
-          `${defaultTypeName} is exhausted, using ${leaveTypeName} instead`
+          t("{{defaultType}} is exhausted, using {{leaveType}} instead", {
+            defaultType: t(defaultTypeName),
+            leaveType: t(leaveTypeName),
+          })
         );
       }
     }
@@ -1290,7 +1301,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       const fetchResult = await fetchLeaveBalancesBatch([employeeId]);
       balanceData = fetchResult[employeeId];
       if (!balanceData) {
-        toast.error("Failed to load leave balance");
+        toast.error(t("Failed to load leave balance"));
         return; // Don't proceed if balance fetch failed
       }
     }
@@ -1326,7 +1337,13 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     const available = remaining > 0;
 
     if (!available) {
-      toast.error(`${getLeaveTypeDisplayName(leaveType)} balance exhausted (${taken}/${totalAllowed} days used)`);
+      toast.error(
+        t("{{leaveType}} balance exhausted ({{taken}}/{{total}} days used)", {
+          leaveType: t(getLeaveTypeDisplayName(leaveType)),
+          taken,
+          total: totalAllowed,
+        })
+      );
       return; // Don't allow the change
     }
 
@@ -1340,7 +1357,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
     // Show remaining balance for the new leave type
     toast.success(
-      `Leave type changed - ${remaining} days remaining`
+      t("Leave type changed - {{days}} days remaining", {
+        days: remaining,
+      })
     );
   };
 
@@ -1350,12 +1369,12 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     if (isSaving) return;
 
     if (leaveType === "cuti_umum" && formData.dayType !== "Umum") {
-      toast.error("Cuti Umum is only available on public holiday logs");
+      toast.error(t("Cuti Umum is only available on public holiday logs"));
       return;
     }
 
     if (selectedLeaveEmployeesForBulk.length === 0) {
-      toast.error("Select employees for leave first");
+      toast.error(t("Select employees for leave first"));
       return;
     }
 
@@ -1394,9 +1413,10 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
     if (employeesWithInsufficientBalance.length > 0) {
       toast.error(
-        `Cannot change all: ${employeesWithInsufficientBalance.join(
-          ", "
-        )} have insufficient ${getLeaveTypeDisplayName(leaveType)} balance`
+        t("Cannot change all: {{names}} have insufficient {{leaveType}} balance", {
+          names: employeesWithInsufficientBalance.join(", "),
+          leaveType: t(getLeaveTypeDisplayName(leaveType)),
+        })
       );
       return;
     }
@@ -1414,9 +1434,10 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     });
 
     toast.success(
-      `Changed ${selectedLeaveEmployeesForBulk.length} selected leave ${
-        selectedLeaveEmployeesForBulk.length === 1 ? "employee" : "employees"
-      } to ${getLeaveTypeDisplayName(leaveType)}`
+      t("Changed {{count}} selected leave employee/employees to {{leaveType}}", {
+        count: selectedLeaveEmployeesForBulk.length,
+        leaveType: t(getLeaveTypeDisplayName(leaveType)),
+      })
     );
   };
 
@@ -1428,9 +1449,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     setIsRefreshingCache(true);
     try {
       await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
-      toast.success("Data refreshed");
+      toast.success(t("Data refreshed"));
     } catch (err) {
-      toast.error("Failed to refresh data");
+      toast.error(t("Failed to refresh data"));
     } finally {
       setIsRefreshingCache(false);
     }
@@ -1771,7 +1792,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       setSalesmanProducts(rowKeyProducts);
     } catch (error) {
       console.error("Error fetching salesman products:", error);
-      toast.error("Failed to fetch salesman products");
+      toast.error(t("Failed to fetch salesman products"));
     }
   };
 
@@ -1959,7 +1980,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       if (customAmount) {
         const parsedAmount: number = Number(customAmount);
         if (!Number.isFinite(parsedAmount) || parsedAmount < 0) {
-          toast.error("Please enter a valid non-negative leave amount.");
+          toast.error(t("Please enter a valid non-negative leave amount."));
           return;
         }
         amountPaid = Math.round(parsedAmount * 100) / 100;
@@ -1985,7 +2006,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     );
 
     if (allSelectedEmployees.length === 0 && leaveEntries.length === 0) {
-      toast.error("Please select at least one employee for work or leave.");
+      toast.error(
+        t("Please select at least one employee for work or leave.")
+      );
       return;
     }
 
@@ -2029,7 +2052,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       .flat();
 
     if (selectedEmployeeData.length === 0 && leaveEntries.length === 0) {
-      toast.error("No employees selected");
+      toast.error(t("No employees selected"));
       return;
     }
 
@@ -2053,14 +2076,14 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     try {
       if (mode === "edit" && existingWorkLog) {
         await api.put(`/jellypolly/api/daily-work-logs/${existingWorkLog.id}`, payload);
-        toast.success("Work log updated successfully");
+        toast.success(t("Work log updated successfully"));
       } else {
         const response: { workLogId?: number } = await api.post(
           "/jellypolly/api/daily-work-logs",
           payload
         );
         newLogId = response?.workLogId;
-        toast.success("Work log submitted successfully");
+        toast.success(t("Work log submitted successfully"));
       }
 
       // Reset initial state to current state after successful save
@@ -2101,7 +2124,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       toast.error(
         error?.response?.data?.message ||
           error?.message ||
-          "Failed to save work log"
+          t("Failed to save work log")
       );
     } finally {
       setIsSaving(false);
@@ -2244,9 +2267,10 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
       if (employeesWithInsufficientBalance.length > 0) {
         toast.error(
-          `Cannot select all: ${employeesWithInsufficientBalance.join(
-            ", "
-          )} have insufficient ${defaultLeaveType.replace("_", " ")} balance`
+          t("Cannot select all: {{names}} have insufficient {{leaveType}} balance", {
+            names: employeesWithInsufficientBalance.join(", "),
+            leaveType: t(getLeaveTypeDisplayName(defaultLeaveType)),
+          })
         );
         return;
       }
@@ -2281,7 +2305,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
         };
       });
 
-      toast.success(`Selected all employees for leave`);
+      toast.success(t("Selected all employees for leave"));
     }
   };
 
@@ -3643,7 +3667,11 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       [rowKey]: recalculatedActivities,
     }));
 
-    toast.success(`Activities updated for ${selectedEmployee.name}`);
+    toast.success(
+      t("Activities updated for {{name}}", {
+        name: selectedEmployee.name,
+      })
+    );
   };
 
   return (
@@ -3655,8 +3683,8 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
             <h1 className="text-lg font-semibold text-default-800 dark:text-gray-100">
               {mode === "edit"
-                ? `Edit ${jobConfig?.name} Entry`
-                : `${jobConfig?.name} Entry`}
+                ? t("Edit {{name}} Entry", { name: jobConfig?.name })
+                : t("{{name}} Entry", { name: jobConfig?.name })}
             </h1>
           </div>
           <div className="flex space-x-2">
@@ -3664,13 +3692,13 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
               onClick={handleRefreshCache}
               disabled={isRefreshingCache}
               className="px-3 py-1.5 flex items-center gap-1.5 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
-              title="Refresh staff, jobs, and pay codes"
+              title={t("Refresh staff, jobs, and pay codes")}
             >
               <IconRefresh
                 size={16}
                 className={isRefreshingCache ? "animate-spin" : ""}
               />
-              Refresh
+              {t("Refresh")}
             </button>
             <Button
               variant="outline"
@@ -3678,7 +3706,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
               onClick={mode === "edit" && onCancel ? onCancel : handleBack}
               disabled={isSaving}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               color="sky"
@@ -3686,7 +3714,11 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
               onClick={() => handleSaveForm()}
               disabled={isSaving}
             >
-              {isSaving ? "Saving..." : mode === "edit" ? "Update" : "Save"}
+              {isSaving
+                ? t("Saving...")
+                : mode === "edit"
+                ? t("Update")
+                : t("Save")}
             </Button>
           </div>
         </div>
@@ -3696,7 +3728,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
           {/* Date */}
           <div>
             <label className="block text-sm font-medium text-default-700 dark:text-gray-200 mb-1">
-              Date
+              {t("Date")}
             </label>
             <TimeNavigator
               range={selectedDateRange}
@@ -3721,8 +3753,8 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
             }`}
           >
             {formData.dayType === "Biasa" && new Date(formData.logDate).getDay() === 6
-              ? "Sabtu"
-              : formData.dayType}
+              ? t("Sabtu")
+              : t(formData.dayType)}
             {formData.dayType === "Umum" &&
               getHolidayDescription(new Date(formData.logDate)) && (
                 <span className="ml-1 text-xs font-normal">
@@ -3775,9 +3807,18 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                         {salesmanProductStats.productTotals.length > 8 && " ..."}
                       </span>
                       <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
-                      <span className="flex-shrink-0">Mee: {salesmanProductStats.totalMee} · BH: {salesmanProductStats.totalBihun}</span>
+                      <span className="flex-shrink-0">
+                        {t("Mee: {{count}} · BH: {{bihun}}", {
+                          count: salesmanProductStats.totalMee,
+                          bihun: salesmanProductStats.totalBihun,
+                        })}
+                      </span>
                       <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
-                      <span className="font-medium flex-shrink-0">Total: {salesmanProductStats.total}</span>
+                      <span className="font-medium flex-shrink-0">
+                        {t("Total: {{count}}", {
+                          count: salesmanProductStats.total,
+                        })}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -3791,7 +3832,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                             onChange={handleSelectAll}
                             size={20}
                             checkedColor="text-sky-600"
-                            ariaLabel="Select all employees"
+                            ariaLabel={t("Select all employees")}
                             buttonClassName="p-1 rounded-lg"
                             disabled={false}
                           />
@@ -3800,25 +3841,25 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                           scope="col"
                           className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          ID
+                          {t("ID")}
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Name
+                          {t("Name")}
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Location
+                          {t("Location")}
                         </th>
                         <th
                           scope="col"
                           className="px-6 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                         >
-                          Actions
+                          {t("Actions")}
                         </th>
                       </tr>
                     </thead>
@@ -3864,7 +3905,13 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                 onChange={() => {}}
                                 size={20}
                                 checkedColor="text-sky-600"
-                                ariaLabel={`Select employee ${row.name} for job ${row.jobName}`}
+                                ariaLabel={t(
+                                  "Select employee {{name}} for job {{job}}",
+                                  {
+                                    name: row.name,
+                                    job: row.jobName,
+                                  }
+                                )}
                                 buttonClassName="p-1 rounded-lg"
                                 disabled={
                                   isSaving || leaveEmployees[row.id]?.selected
@@ -3897,17 +3944,18 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                 if (selectedFollowers.length > 0) {
                                   return (
                                     <span className="text-xs text-default-500 dark:text-gray-400 block mt-1">
-                                      (Followed by{" "}
-                                      {selectedFollowers
-                                        .map((ikutEmployeeId) => {
-                                          const ikutEmployee =
-                                            availableEmployees.find(
-                                              (emp) => emp.id === ikutEmployeeId
-                                            );
-                                          return ikutEmployee?.name;
-                                        })
-                                        .join(", ")}
-                                      )
+                                      {t("(Followed by {{names}})", {
+                                        names: selectedFollowers
+                                          .map((ikutEmployeeId) => {
+                                            const ikutEmployee =
+                                              availableEmployees.find(
+                                                (emp) =>
+                                                  emp.id === ikutEmployeeId
+                                              );
+                                            return ikutEmployee?.name;
+                                          })
+                                          .join(", "),
+                                      })}
                                     </span>
                                   );
                                 }
@@ -3932,7 +3980,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                       : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-200 dark:hover:bg-gray-600"
                                   }`}
                                 >
-                                  Local
+                                  {t("Local")}
                                 </button>
                                 <button
                                   onClick={(e) => {
@@ -3950,7 +3998,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                       : "bg-default-100 dark:bg-gray-700 text-default-600 dark:text-gray-300 hover:bg-default-200 dark:hover:bg-gray-600"
                                   }`}
                                 >
-                                  Outstation
+                                  {t("Outstation")}
                                 </button>
                               </div>
                             </td>
@@ -3991,7 +4039,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                       onNavigateAttempt={safeNavigate}
                       className="text-sm font-medium text-default-700 dark:text-gray-300 hover:text-sky-600 dark:hover:text-sky-400 hover:underline"
                     >
-                      Salesman Ikut Lori
+                      {t("Salesman Ikut Lori")}
                     </SafeLink>
                   </div>
                   <div>
@@ -4002,29 +4050,33 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                             scope="col"
                             className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            ID
+                            {t("ID")}
                           </th>
                           <th
                             scope="col"
                             className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            Name
+                            {t("Name")}
                           </th>
                           <th
                             scope="col"
                             className="px-4 py-1 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            Ikut Salesman
+                            {t("Ikut Salesman")}
                           </th>
                           <th
                             scope="col"
                             className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
                             <div className="flex flex-col items-center">
-                              <span>Muat (Bags)</span>
+                              <span>{t("Muat (Bags)")}</span>
                               <div className="flex gap-4 text-[10px] mt-0.5">
-                                <span className="w-14 text-center">Mee</span>
-                                <span className="w-14 text-center">Bihun</span>
+                                <span className="w-14 text-center">
+                                  {t("Mee")}
+                                </span>
+                                <span className="w-14 text-center">
+                                  {t("Bihun")}
+                                </span>
                               </div>
                             </div>
                           </th>
@@ -4032,19 +4084,19 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                             scope="col"
                             className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            Bill
+                            {t("Bill")}
                           </th>
                           <th
                             scope="col"
                             className="px-4 py-1 text-center text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            x2
+                            {t("x2")}
                           </th>
                           <th
                             scope="col"
                             className="px-4 py-1 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                           >
-                            Actions
+                            {t("Actions")}
                           </th>
                         </tr>
                       </thead>
@@ -4146,7 +4198,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                               ? "opacity-50 cursor-not-allowed"
                                               : ""
                                           }`}
-                                          title="Clear selection"
+                                          title={t("Clear selection")}
                                         >
                                           <IconX size={14} />
                                         </button>
@@ -4154,7 +4206,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                     </>
                                   ) : (
                                     <span className="text-xs text-default-400 dark:text-gray-500 italic">
-                                      No salesmen selected
+                                      {t("No salesmen selected")}
                                     </span>
                                   )}
                                 </div>
@@ -4241,7 +4293,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                   }}
                                   size={18}
                                   checkedColor="text-amber-500"
-                                  ariaLabel={`Double units for ${row.name}`}
+                                  ariaLabel={t("Double units for {{name}}", {
+                                    name: row.name,
+                                  })}
                                   buttonClassName="p-1 rounded-lg"
                                   disabled={!isSelected || isSaving || leaveEmployees[row.id]?.selected}
                                 />
@@ -4284,16 +4338,18 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
         {JP_LEAVE_ENABLED && (
         <div className="border-t border-default-200 dark:border-gray-700 pt-2 mt-4">
           <h2 className="text-lg font-semibold text-default-700 dark:text-gray-200 mb-2">
-            Leave & Absence Recording
+            {t("Leave & Absence Recording")}
           </h2>
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-default-200 dark:border-gray-700 shadow-sm">
             {availableForLeave.length === 0 ? (
               <div className="text-center py-10 px-6">
                 <p className="text-sm text-default-500 dark:text-gray-400">
-                  No employees available for leave.
+                  {t("No employees available for leave.")}
                 </p>
                 <p className="text-xs text-default-400 mt-1">
-                  Employees selected for work cannot be marked as on leave.
+                  {t(
+                    "Employees selected for work cannot be marked as on leave."
+                  )}
                 </p>
               </div>
             ) : (
@@ -4306,7 +4362,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                         onChange={handleLeaveSelectAll}
                         size={20}
                         checkedColor="text-amber-600"
-                        ariaLabel="Select all employees for leave"
+                        ariaLabel={t("Select all employees for leave")}
                         buttonClassName="p-1 rounded-lg"
                         disabled={availableForLeave.length === 0}
                       />
@@ -4315,14 +4371,14 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                       scope="col"
                       className="w-1/3 px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
-                      Employee
+                      {t("Employee")}
                     </th>
                     <th
                       scope="col"
                       className="px-6 py-2 text-left text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
                       <div className="flex items-center gap-2 normal-case">
-                        <span className="uppercase">SET ALL</span>
+                        <span className="uppercase">{t("SET ALL")}</span>
                         {/* "mixed" matches no option, so no pill is highlighted
                             when the selected workers have different types —
                             that is the neutral state this control needs. */}
@@ -4331,12 +4387,17 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                           onChange={(value: BulkLeaveTypeValue) => {
                             void handleBulkLeaveTypeChange(value as LeaveType);
                           }}
-                          options={leaveOptions}
+                          options={leaveOptions.map((o) => ({
+                            ...o,
+                            label: t(o.label),
+                          }))}
                           disabled={
                             selectedLeaveEmployeesForBulk.length === 0 ||
                             isSaving
                           }
-                          ariaLabel="Set leave type for the selected employees"
+                          ariaLabel={t(
+                            "Set leave type for the selected employees"
+                          )}
                         />
                       </div>
                     </th>
@@ -4344,7 +4405,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                       scope="col"
                       className="w-36 px-6 py-2 text-right text-xs font-medium text-default-500 dark:text-gray-400 uppercase tracking-wider"
                     >
-                      Amount
+                      {t("Amount")}
                     </th>
                   </tr>
                 </thead>
@@ -4389,7 +4450,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                             onChange={() => {}}
                             size={20}
                             checkedColor="text-amber-600"
-                            ariaLabel={`Select ${employee.name} for leave`}
+                            ariaLabel={t("Select {{name}} for leave", {
+                              name: employee.name,
+                            })}
                             buttonClassName="p-1 rounded-lg"
                             disabled={isSaving}
                           />
@@ -4419,11 +4482,11 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                   );
                                   const leaveTypeName =
                                     currentLeaveType === "cuti_tahunan"
-                                      ? "Annual"
+                                      ? "Annual Leave"
                                       : currentLeaveType === "cuti_sakit"
-                                      ? "Sick"
+                                      ? "Sick Leave"
                                       : currentLeaveType === "cuti_rawatan"
-                                      ? "Hospital"
+                                      ? "Medical Leave"
                                       : "Public Holiday";
                                   return (
                                     <span
@@ -4433,8 +4496,14 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                                           : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300"
                                       }`}
                                     >
-                                      {leaveTypeName}: {availability.remaining}/
-                                      {availability.totalAllowed}
+                                      {t(
+                                        "{{leaveType}}: {{remaining}}/{{total}}",
+                                        {
+                                          leaveType: t(leaveTypeName),
+                                          remaining: availability.remaining,
+                                          total: availability.totalAllowed,
+                                        }
+                                      )}
                                     </span>
                                   );
                                 })()}
@@ -4452,9 +4521,14 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
                               onChange={(value: LeaveType) =>
                                 handleLeaveTypeChange(employee.id, value)
                               }
-                              options={leaveOptions}
+                              options={leaveOptions.map((o) => ({
+                                ...o,
+                                label: t(o.label),
+                              }))}
                               disabled={!isSelected || isSaving}
-                              ariaLabel={`Leave type for ${employee.name}`}
+                              ariaLabel={t("Leave type for {{name}}", {
+                                name: employee.name,
+                              })}
                             />
                           </div>
                         </td>
@@ -4532,9 +4606,9 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
         isOpen={showConfirmDialog}
         onClose={handleCancelNavigation}
         onConfirm={handleConfirmNavigation}
-        title="Unsaved Changes"
+        title={t("Unsaved Changes")}
         message={confirmationMessage}
-        confirmButtonText="Leave Page"
+        confirmButtonText={t("Leave Page")}
         variant="danger"
       />
     </div>
