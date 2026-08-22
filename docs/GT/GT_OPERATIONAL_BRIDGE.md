@@ -4,7 +4,7 @@
 [GT_ACCOUNTING_HANDOVER.md](GT_ACCOUNTING_HANDOVER.md) §3d.
 
 Tien Hock needed a whole reconciliation project to bridge its legacy ledger to its ERP
-([LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md)), because its ERP
+([LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](../Account/LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md)), because its ERP
 held 2,163 invoices against 2,121 legacy sales rows — near-parity, so every gap was a question that
 had to be answered one document at a time. **Green Target needs no such project, and this page is the
 whole deliverable.** Not because the bridge is clean, but because it is so lopsided that
