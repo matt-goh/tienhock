@@ -865,7 +865,7 @@ const JPPayrollDetailsPage: React.FC = () => {
         <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-100 dark:border-amber-800/50 flex justify-between items-center">
           <h3 className="text-md font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-2">
             <IconCoins size={18} className="text-amber-600 dark:text-amber-400" />
-            Payroll Items
+            {t("Payroll Items")}
           </h3>
           <Button
             size="sm"

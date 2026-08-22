@@ -12,6 +12,7 @@ import Checkbox from "../Checkbox";
 import { IconDeviceFloppy } from "@tabler/icons-react";
 import { FormInput, FormListbox } from "../FormComponents";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { format } from "date-fns";
 import { api } from "../../routes/utils/api";
 import { useLocationMappingsCache } from "../../utils/catalogue/useLocationMappingsCache";
@@ -55,6 +56,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
   apiBasePath = "/api/incentives",
   forceIsAdvance,
 }) => {
+  const { t } = useTranslation("payroll");
   const { locations } = useLocationMappingsCache();
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
@@ -101,18 +103,22 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
     if (!incentive) return;
 
     if (!amount || parseFloat(amount) <= 0) {
-      toast.error("Please enter a valid amount.");
+      toast.error(t("Please enter a valid amount."));
       return;
     }
 
     if (!description.trim()) {
-      toast.error("Please enter a description.");
+      toast.error(t("Please enter a description."));
       return;
     }
 
     // For commission entries, validate location
     if (isCommissionEntry && !locationCode) {
-      toast.error(`Please select a location for ${displayLabelLower} entries.`);
+      toast.error(
+        t("Please select a location for {{displayLabelLower}} entries.", {
+          displayLabelLower,
+        })
+      );
       return;
     }
 
@@ -131,13 +137,18 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
           : isAdvance,
       });
 
-      toast.success(`${displayLabel} updated successfully!`);
+      toast.success(
+        t("{{displayLabel}} updated successfully!", {
+          displayLabel: t(displayLabel),
+        })
+      );
       onSuccess();
       onClose();
     } catch (error: any) {
       console.error("Failed to update incentive:", error);
       toast.error(
-        error.response?.data?.message || `Failed to update ${displayLabelLower}.`
+        error.response?.data?.message ||
+          t("Failed to update {{displayLabelLower}}.", { displayLabelLower })
       );
     } finally {
       setIsSaving(false);
@@ -184,11 +195,13 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                     as="h3"
                     className="text-xl font-semibold text-default-800 dark:text-default-100"
                   >
-                    Edit {displayLabel}
+                    {t("Edit {{label}}", { label: t(displayLabel) })}
                   </DialogTitle>
                   <p className="text-sm text-default-600 dark:text-default-400 mt-1">
-                    Employee: {incentive.employee_name} ({incentive.employee_id}
-                    )
+                    {t("Employee: {{name}} ({{id}})", {
+                      name: incentive.employee_name,
+                      id: incentive.employee_id,
+                    })}
                   </p>
                 </div>
 
@@ -196,7 +209,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                   <div className="space-y-4">
                     <FormInput
                       name="incentiveDate"
-                      label={`${displayLabel} Date`}
+                      label={t("{{label}} Date", { label: t(displayLabel) })}
                       type="date"
                       value={incentiveDate}
                       onChange={(e) => setIncentiveDate(e.target.value)}
@@ -206,17 +219,17 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                     {isCommissionEntry && (
                       <FormListbox
                         name="location"
-                        label="Location"
+                        label={t("Location")}
                         value={locationCode || ""}
                         onChange={(value) => setLocationCode(value)}
                         options={commissionLocationOptions}
-                        placeholder="Select Location..."
+                        placeholder={t("Select Location...")}
                       />
                     )}
 
                     <FormInput
                       name="amount"
-                      label="Amount (RM)"
+                      label={t("Amount (RM)")}
                       type="number"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
@@ -227,11 +240,13 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
 
                     <FormInput
                       name="description"
-                      label="Description"
+                      label={t("Description")}
                       type="text"
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
-                      placeholder={`e.g., ${displayLabel}, Bonus`}
+                      placeholder={t("e.g., {{displayLabel}}, Bonus", {
+                        displayLabel: t(displayLabel),
+                      })}
                       required
                     />
 
@@ -239,7 +254,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       <Checkbox
                         checked={isAdvance}
                         onChange={setIsAdvance}
-                        label="Deduct as Advance"
+                        label={t("Deduct as Advance")}
                         size={18}
                       />
                     )}
@@ -251,7 +266,7 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       onClick={handleClose}
                       disabled={isSaving}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </Button>
                     <Button
                       color="sky"
@@ -259,7 +274,11 @@ const EditIncentiveModal: React.FC<EditIncentiveModalProps> = ({
                       disabled={isSaving}
                       icon={IconDeviceFloppy}
                     >
-                      {isSaving ? "Updating..." : `Update ${displayLabel}`}
+                      {isSaving
+                        ? t("Updating...")
+                        : t("Update {{displayLabel}}", {
+                            displayLabel: t(displayLabel),
+                          })}
                     </Button>
                   </div>
                 </div>

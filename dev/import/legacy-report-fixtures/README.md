@@ -43,7 +43,7 @@ harness against a different database in the same container (used for clone rehea
 `tienhock`).
 
 The harness pins the post-V3 state: TB 880/880 exact, Trade Debtor List 150/150 exact
-(including signed-ledger FIFO aging), statements 36/40 exact plus the four named
-`GP-202604-0001` drift lines (±RM7,261.51 — a genuine April invoice keyed after the scans were
-exported). Any further backdated Jan–May production entry fails the gate loudly: confirm
-genuineness, then re-pin as another named deviation; never silence it.
+(including signed-ledger FIFO aging), and statements 40/40 scan-exact with no tolerated
+differences. The former `GP-202604-0001` drift retired when the 21 Jul foreign-purchase unlink
+cancelled that journal. Any further backdated Jan–May production entry fails the gate loudly:
+confirm genuineness, then document and review the required re-pin; never silence it.

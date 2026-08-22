@@ -18,6 +18,7 @@ import msStock from "./locales/ms/stock.json";
 import msAccounting from "./locales/ms/accounting.json";
 import msGreenTarget from "./locales/ms/greentarget.json";
 import msJellyPolly from "./locales/ms/jellypolly.json";
+import msMisc from "./locales/ms/misc.json";
 import zhHansCommon from "./locales/zh-Hans/common.json";
 import zhHansNav from "./locales/zh-Hans/nav.json";
 import zhHansHome from "./locales/zh-Hans/home.json";
@@ -32,6 +33,7 @@ import zhHansStock from "./locales/zh-Hans/stock.json";
 import zhHansAccounting from "./locales/zh-Hans/accounting.json";
 import zhHansGreenTarget from "./locales/zh-Hans/greentarget.json";
 import zhHansJellyPolly from "./locales/zh-Hans/jellypolly.json";
+import zhHansMisc from "./locales/zh-Hans/misc.json";
 
 export const SUPPORTED_LANGUAGES = ["en", "ms", "zh-Hans"] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
@@ -82,6 +84,7 @@ void i18n
         accounting: msAccounting,
         greentarget: msGreenTarget,
         jellypolly: msJellyPolly,
+        misc: msMisc,
       },
       "zh-Hans": {
         common: zhHansCommon,
@@ -98,6 +101,7 @@ void i18n
         accounting: zhHansAccounting,
         greentarget: zhHansGreenTarget,
         jellypolly: zhHansJellyPolly,
+        misc: zhHansMisc,
       },
     },
     defaultNS: "common",
