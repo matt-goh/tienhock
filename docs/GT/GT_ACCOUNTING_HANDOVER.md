@@ -1,16 +1,24 @@
 # Green Target Accounting — Build-Out & Legacy Jan–Jun 2026 Import (Handover Plan)
 
+> **Historical project record.** For December 2026 context recovery and February 2027 audit
+> reconciliation, start with [AUDIT_2026_READ_FIRST.md](../Account/AUDIT_2026_READ_FIRST.md).
+> Current production correction status comes from [MIGRATIONS_LOG.md](../MIGRATIONS_LOG.md); this
+> long execution record intentionally retains historical/superseded phase snapshots.
+
 **Created 25 Jul 2026. Status: PHASES G0–G8 AND GT-P1–GT-P12 COMPLETE — LIVE IN PRODUCTION (G4 and G5 on 27 Jul
 2026, G6 and G7 on 28 Jul 2026, G8 production rollout 28 Jul night — record in §10f; the GT-P1–GT-P12
 invoice/receipt parity, CD_SD sub-ledger and debtor-dimension work rolled out to production on
 2 Aug 2026 — [GT-P5 v2 execution record](#gt-p5-v2-execution-record)) —
 see the execution records in §9. Source intake and the staging pipeline exist and pass every gate; all
 66 scan pages are transcribed and validated; the `greentarget` accounting tables, the 34-note GT
-catalogue and the 503-account chart of accounts are all loaded; **the Jan–Jun 2026 legacy ledger is
-imported as 1,705 posted journals / 4,401 lines with 501 opening anchors that balance to exactly 0.00**;
-and **the report engines now reproduce all six printed Trial Balances, the printed Income Statement and
-the printed Balance Sheet exactly, with the ledger reproducing the printed row order for all 2,968
-printed rows.** All seven open questions in §4 were answered on 25 Jul 2026, and the two G0 raised were
+catalogue and the legacy chart of accounts are all loaded; **the Jan–Jun 2026 legacy ledger is
+imported as 1,705 posted journals / 4,401 lines with 500 live opening anchors after the approved
+dormant-`PBB1` removal (G4 originally loaded 501); the anchors balance to exactly 0.00**;
+and **G5 established exact original-scan parity for the immutable imported subset across all six Trial
+Balances, the Income Statement, the Balance Sheet and all 2,968 printed ledger rows.** The live June
+books now also contain the separately verified RM2.70 `JV2606-01` overlay described below, so a current
+live report intentionally includes that approved post-import correction. All seven open questions in
+§4 were answered on 25 Jul 2026, and the two G0 raised were
 resolved by evidence during G1. G3 settled the `BTFS` disposition and the APPX-vs-statement-note
 mapping (`fs_note` holds the printed APPX verbatim — see §9, G3). G4 settled the derived CD_SD cash
 leg (user-approved), the four `(ref, date)` collisions, and `posting_sequence`. G5 settled the
@@ -26,9 +34,10 @@ invoices, payments and adjustments dated on/after 2026-07-01 now own balanced jo
 `greentarget` schema, manual journals are keyed from the shared Journal pages, and the R8 posting
 lock protects every pre-July accounting mutation. The 29 Jul payment-entry follow-up deliberately
 allows non-posting payment-history rows against pre-cutover invoices; it never changes the imported
-ledger. The bridge §5 process decision was made: enter everything in the ERP.** The one outstanding input across the whole project is still the user
-approval of `debtor-map.json` (both mappings stay unapproved; every organic receivable falls back to
-`CD_SD` until then). ⚠ **The dev database was then replaced with production data,
+ledger. The bridge §5 process decision was made: enter everything in the ERP.** The historical
+`debtor-map.json` is superseded as the live authority: PAUMIN and NURI were approved on 31 Jul,
+SUTERA remains unapproved, and current invoices use their stored debtor/revenue snapshots. ⚠ **The
+dev database was then replaced with production data,
 which removed every GT accounting row G2/G3/G4 created — see §10 for what survives and how to rebuild
 it** (the rebuild has since been done; all 230 gates are green). This
 document is the entry point for the Green Target (GT) accounting project. It is
@@ -41,8 +50,8 @@ by importing the legacy system's **January–June 2026** ledger exports as poste
 posting organically from **1 July 2026** onward. This mirrors what was already delivered for Tien
 Hock, whose reference documents are:
 
-- [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md) — ledger vs operational-invoice bridge
-- [LEGACY_REPORT_VERIFICATION_PLAN.md](LEGACY_REPORT_VERIFICATION_PLAN.md) — scans → fixtures → automated harness (read §4, §5)
+- [LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md](../Account/LEGACY_JAN_MAY_INVOICE_RECONCILIATION.md) — ledger vs operational-invoice bridge
+- [LEGACY_REPORT_VERIFICATION_PLAN.md](../Account/LEGACY_REPORT_VERIFICATION_PLAN.md) — scans → fixtures → automated harness (read §4, §5)
 
 (The TH import plan and scan-reconciliation sign-off docs — `LEGACY_JAN_MAY_IMPORT_PLAN.md` and
 `LEGACY_REPORT_RECONCILIATION.md` — were removed from `docs/Account/` on 5 Aug 2026 after the boss
@@ -67,11 +76,9 @@ share the data.
 
 ## 0. How to use this document
 
-0. **⚠ Read §10 first if you are picking this up after 27 Jul 2026.** The development database was
-   replaced with a copy of production immediately after G5, which removed every GT accounting row
-   that G2/G3/G4 created. Nothing is lost — it all rebuilds from tracked, hash-pinned sources — but
-   two G4 migrations and a generator hardcode the *development* Tien Hock baseline and will abort
-   until they are re-baselined. §10 has the blockers and the rebuild runbook.
+0. **§10 is the historical refresh/rebuild record, not a current instruction to rebuild.** The
+   replacement described there was completed and the production rollout is live. Use it only when
+   investigating that rollout or deliberately rehearsing a restore.
 1. **Read §3 before touching any source file.** It contains a date-encoding rule that will silently
    corrupt every imported date if you get it wrong, and it is *different* from the Tien Hock rule.
 2. **Ask, do not guess.** The scans are photographs of dot-matrix printouts and the Excel exports are
@@ -89,7 +96,10 @@ share the data.
 
 ---
 
-## 1. Where Green Target stands today
+## 1. Where Green Target stood at project start (historical snapshot)
+
+The table below records the pre-build state measured on 25 Jul 2026. It is not the live state; the
+status banner and execution records above describe what was subsequently delivered.
 
 | Area | State |
 |---|---|
@@ -1085,7 +1095,7 @@ No changelog entry — G5 ships no user-visible page or number (rule 16). G6 wil
 | `src/routes/greentarget/accounting/account-ledger.js` | yes | Thin router: `/accounts`, `/:code/range/:start/:end`, `/:code/:y/:m`. |
 | `src/routes/index.js` | yes | Mounts both at `/greentarget/api/financial-reports` and `/greentarget/api/bank-statement`. |
 | `dev/import/greentarget-report-fixtures/verify-legacy-reports.mjs` | yes | The harness. 5 stages, 113 gates. |
-| `docs/Account/GT_OPERATIONAL_BRIDGE.md` | yes | The §3d bridge. Every figure gated by the `bridge` stage. |
+| `docs/GT/GT_OPERATIONAL_BRIDGE.md` | yes | The §3d bridge. Every figure gated by the `bridge` stage. |
 | `dev/import/greentarget-report-fixtures/README.md` | yes | G5 harness section; the `BTFS` disposition closed. |
 | `CLAUDE.md`, `AGENTS.md` | yes | GT accounting block status sentence, byte-identical in both (rule 13). |
 
@@ -1402,7 +1412,7 @@ idempotent (the services adopt by back-link/source first).
 | `src/routes/greentarget/accounting/posting-utils.js` | New. `ensureGTAccountsExist` (never mints, R6), `nextGTPostingSequence`, `insertGTJournal`, `replaceGTJournal`, `cancelGTJournal`. |
 | `src/routes/greentarget/accounting/{sales,payment,adjustment}-journal.js` | New. The three sync/cancel services above; payment adds `updateGTPaymentJournalReference` for reference-only edits. |
 | `src/routes/greentarget/{invoices,payments,adjustment-docs}.js` | Sync/cancel wired into every lifecycle path; lock asserted BEFORE any MyInvois side effect; **the three old `/payments/debtors*` endpoints removed** (G6 open item 4). |
-| `src/routes/greentarget/accounting/journal-entries.js` | Mutation half: `GET /types`, `GET /next-reference/:type`, `POST /`, `PUT /:id` (detach semantics), `POST /:id/cancel`, `POST /:id/restore` — all behind the lock; `GET /:id` now resolves a real `source` link (invoice/payment/adjustment) instead of `null`. No DELETE (posted-on-create) and no cheque endpoints (GT cheques are per-line). |
+| `src/routes/greentarget/accounting/journal-entries.js` | Historical G7 state: mutation routes and source links were added behind the lock; no DELETE. Header cheque prefill/re-use endpoints were added later on 14 Aug 2026, while per-line references remain supported. |
 | `src/routes/index.js` | The GT journal-entries mount now sits behind `authMiddleware` + `checkRestoreState` (JP precedent) since it mutates. |
 | `src/pages/Accounting/JournalEntryPage.tsx` | `company` prop: GT fetches its own types + `?flat=true` accounts directly (TH caches still fire, unused — known waste), company-scoped last-type key (`gtJournalEntryLastType`, default `JV`), no quick-add/favourites/delete for GT. |
 | `src/pages/Accounting/{JournalEntryListPage,JournalDetailsPage}.tsx` | GT: New/edit/cancel/restore enabled (delete stays TH-only); details page fetches GT types; list empty-state offers "create a new entry". |
@@ -1447,7 +1457,7 @@ documents exist yet — first live CN/DN/RN will be the user's).
 
 ---
 
-### Post-G7 — approved June bank-charge correction — dev applied (21 Aug 2026), prod pending
+### Post-G7 — approved June bank-charge correction — ✅ DEV + PROD (21 Aug 2026)
 
 The user supplied `JV2606-01` and the supporting voucher after the Jan–Jun legacy import had been
 locked. The missing 30 June bank charge is RM2.70: cheque-process fee RM1.50 plus bank-handling
@@ -1459,7 +1469,8 @@ adjustments, generated vouchers and arbitrary manual journals, while removing on
 would leave a backdated journal impossible to edit/cancel/restore. The correction therefore uses
 the lock's intended direct-migration bypass:
 
-- `dev/migrations/2026-08-21_greentarget_june_bank_charges_jv.sql`
+- migration `2026-08-21_greentarget_june_bank_charges_jv.sql` (removed after rollout; recovery
+  command is recorded in `docs/MIGRATIONS_LOG.md`)
 - posted source-less `JV`, reference `JV2606-01`, date `2026-06-30`, June `posting_sequence=279`;
 - DR `BWBC` RM2.70 / CR `PBB_1` RM2.70, two lines with `display_order` 1/2 and particulars
   `BANK CHARGES MONTH OF JUNE 2026`;
@@ -2750,7 +2761,7 @@ only: no data, endpoint or behaviour changed, so this carries no changelog entry
 `src/pages/GreenTarget/Rentals/RentalFormPage.tsx`. The 13 handover scenarios remain for manual
 verification; no build, TypeScript, lint or database mutation was run during this implementation.
 
-#### July debtor-list audit correction (20 Aug 2026; ✅ DEV, production pending)
+#### July debtor-list audit correction (20 Aug 2026; ✅ DEV + PROD)
 
 The user-confirmed annotated `statement.pdf` (SHA-256
 `15a83afe4617366cdeeeb03befa6d81cc13f6e32bc9bc4aa8dfdc939a4cb4a0`) corrects the July closing
@@ -2770,8 +2781,9 @@ The correction follows the underlying evidence rather than altering PDF formatti
 4. The consolidated 1-Jul `CD_SD` anchor remains RM65,705.40. Only its stale explanatory note was
    updated to reflect that the full close is now assigned to named identities.
 
-Migration: `dev/migrations/2026-08-20_greentarget_july_debtor_audit_correction.sql`. It is
-serializable, guarded, idempotent and fail-closed; the second dev run was a no-op. Direct calls to the
+Migration `2026-08-20_greentarget_july_debtor_audit_correction.sql` was removed after rollout; its
+recovery command is recorded in `docs/MIGRATIONS_LOG.md`. It is serializable, guarded, idempotent and
+fail-closed; the second dev run was a no-op. Direct calls to the
 live report builders confirmed the four target rows with their unchanged July movements,
 RM83,730.40 visible/control totals, zero July reconciliation residual, and Dura's
 +RM900.00/+RM1,100.00 opening/closing. The focused verifier now
@@ -2781,5 +2793,6 @@ scan is absent; both edited `.mjs` files passed `node --check`.
 
 ---
 
-*Update this file with a per-phase execution record as phases complete. Entry point for all
-accounting work remains [ACCOUNTING_PROGRESS.md](ACCOUNTING_PROGRESS.md).*
+*Update this file with a per-phase execution record as phases complete. General accounting context:
+[ACCOUNTING_PROGRESS.md](../Account/ACCOUNTING_PROGRESS.md). 2026 audit work:
+[AUDIT_2026_READ_FIRST.md](../Account/AUDIT_2026_READ_FIRST.md).*
