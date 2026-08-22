@@ -1,6 +1,7 @@
 // src/utils/catalogue/useSalesmanCache.tsx
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { Employee } from "../../types/types";
 
@@ -43,6 +44,7 @@ if (typeof window !== 'undefined') {
 }
 
 export const useSalesmanCache = () => {
+  const { t } = useTranslation("misc");
   const [salesmen, setSalesmen] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -85,7 +87,7 @@ export const useSalesmanCache = () => {
       const err = error instanceof Error ? error : new Error("Failed to fetch salesmen");
       setError(err);
       if (!forceRefresh) { // Only show toast for initial loads, not background refreshes
-        toast.error("Error fetching salesmen");
+        toast.error(t("Error fetching salesmen"));
       }
       throw err;
     } finally {

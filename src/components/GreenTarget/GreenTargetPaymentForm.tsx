@@ -523,7 +523,7 @@ const GreenTargetPaymentForm: React.FC<GreenTargetPaymentFormProps> = ({
                   <FormInput
                     name="internal_reference"
                     label={t("Green Target Reference No.")}
-                    placeholder="e.g. RV26/06/62"
+                    placeholder={t("e.g. RV26/06/62")}
                     value={formData.internal_reference}
                     onChange={(
                       event: React.ChangeEvent<HTMLInputElement>

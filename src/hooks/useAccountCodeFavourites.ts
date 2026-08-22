@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import { api } from "../routes/utils/api";
 
@@ -17,6 +18,7 @@ interface UseAccountCodeFavouritesResult {
 }
 
 const useAccountCodeFavourites = (): UseAccountCodeFavouritesResult => {
+  const { t } = useTranslation("misc");
   const { user } = useAuth();
   const [favouriteCodes, setFavouriteCodes] = useState<Set<string>>(
     new Set<string>()
@@ -81,7 +83,7 @@ const useAccountCodeFavourites = (): UseAccountCodeFavouritesResult => {
         }
         console.error("Error fetching account code favourites:", error);
         replaceFavouriteCodes(new Set<string>());
-        toast.error("Failed to load account favourites");
+        toast.error(t("Failed to load account favourites"));
       } finally {
         if (
           fetchRequestIdRef.current === requestId &&
@@ -101,7 +103,7 @@ const useAccountCodeFavourites = (): UseAccountCodeFavouritesResult => {
         activeUserIdRef.current = null;
       }
     };
-  }, [replaceFavouriteCodes, replacePendingCodes, user?.id]);
+  }, [replaceFavouriteCodes, replacePendingCodes, t, user?.id]);
 
   const toggleFavourite = useCallback(
     async (accountCode: string): Promise<void> => {
@@ -141,9 +143,11 @@ const useAccountCodeFavourites = (): UseAccountCodeFavouritesResult => {
           else revertedCodes.delete(accountCode);
           replaceFavouriteCodes(revertedCodes);
           toast.error(
-            wasFavourite
-              ? "Failed to remove account favourite"
-              : "Failed to add account favourite"
+            t(
+              wasFavourite
+                ? "Failed to remove account favourite"
+                : "Failed to add account favourite"
+            )
           );
         }
         console.error("Error updating account code favourite:", error);
@@ -157,7 +161,7 @@ const useAccountCodeFavourites = (): UseAccountCodeFavouritesResult => {
         }
       }
     },
-    [replaceFavouriteCodes, replacePendingCodes, user?.id]
+    [replaceFavouriteCodes, replacePendingCodes, t, user?.id]
   );
 
   return {

@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-22",
+    ms: "Cetakan Lejar Akaun dan penyata bank untuk semua syarikat kini memaparkan lajur Debit, Kredit dan Baki sepenuhnya dalam halaman A4, termasuk lejar yang mempunyai senarai invois atau rujukan yang panjang.",
+    en: "Printed Account Ledgers and bank statements for all companies now keep the Debit, Credit and Balance columns fully within the A4 page, including ledgers with long invoice or reference lists.",
+  },
+  {
     date: "2026-08-21",
     ms: "Penyata bank Green Target bagi Jun 2026 kini termasuk caj bank RM2.70 yang tertinggal: Journal Voucher JV2606-01 merekodkan caj proses cek RM1.50 dan caj pengendalian bank RM1.20 pada 30 Jun. Baki PBB_1 kini RM28,465.67 dan jumlah Bank Charges RM120.10; Trial Balance dan Balance Sheet kekal seimbang, manakala rekod import Jan–Jun yang lain masih dikunci.",
     en: "Green Target's June 2026 bank statement now includes the missing RM2.70 bank charge: Journal Voucher JV2606-01 records the RM1.50 cheque-process fee and RM1.20 bank-handling charges on 30 June. PBB_1 now closes at RM28,465.67 and total Bank Charges at RM120.10; the Trial Balance and Balance Sheet remain balanced, while the rest of the imported Jan–Jun records stay locked.",

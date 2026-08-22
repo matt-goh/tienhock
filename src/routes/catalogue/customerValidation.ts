@@ -1,5 +1,6 @@
 // src/utils/customerValidation.ts
 import toast from "react-hot-toast";
+import i18n from "../../i18n";
 import { Customer } from "../../types/types";
 import { api } from "../utils/api";
 
@@ -14,7 +15,7 @@ export async function validateCustomerIdentity(
 ): Promise<ValidationResponse> {
   // Check if ID type is assigned
   if (!customer.id_type || customer.id_type === "Select") {
-    toast.error("Please select an ID type");
+    toast.error(i18n.t("Please select an ID type", { ns: "misc" }));
     return {
       isValid: false,
       message: "ID type is required",
@@ -23,7 +24,9 @@ export async function validateCustomerIdentity(
 
   // Check if both TIN number and ID number are present
   if (!customer.tin_number || !customer.id_number) {
-    toast.error("Both TIN number and ID number are required");
+    toast.error(
+      i18n.t("Both TIN number and ID number are required", { ns: "misc" })
+    );
     return {
       isValid: false,
       message: "TIN number and ID number are required",
@@ -32,7 +35,11 @@ export async function validateCustomerIdentity(
 
   // Check phone number and address - both required for validation
   if (!customer.phone_number || customer.phone_number.trim() === "") {
-    toast.error("Phone number is required for e-Invoice compliance");
+    toast.error(
+      i18n.t("Phone number is required for e-Invoice compliance", {
+        ns: "misc",
+      })
+    );
     return {
       isValid: false,
       message: "Phone number is required",
@@ -40,7 +47,9 @@ export async function validateCustomerIdentity(
   }
 
   if (!customer.address || customer.address.trim() === "") {
-    toast.error("Address is required for e-Invoice compliance");
+    toast.error(
+      i18n.t("Address is required for e-Invoice compliance", { ns: "misc" })
+    );
     return {
       isValid: false,
       message: "Address is required",
@@ -56,8 +65,13 @@ export async function validateCustomerIdentity(
 
     if (response.success) {
       const successMessage = hasPhoneWarning
-        ? "Customer e-Invoice IDs validated successfully (phone number needed)"
-        : "Customer e-Invoice IDs validated successfully";
+        ? i18n.t(
+            "Customer e-Invoice IDs validated successfully (phone number needed)",
+            { ns: "misc" }
+          )
+        : i18n.t("Customer e-Invoice IDs validated successfully", {
+            ns: "misc",
+          });
 
       toast.success(successMessage);
       return {
@@ -68,7 +82,9 @@ export async function validateCustomerIdentity(
     }
 
     // If we get here, something went wrong but didn't throw an error
-    toast.error(response.message || "Validation failed");
+    toast.error(
+      response.message || i18n.t("Validation failed", { ns: "misc" })
+    );
     return {
       isValid: false,
       message: response.message || "Validation failed",
@@ -78,7 +94,10 @@ export async function validateCustomerIdentity(
     console.error("Validation API Error:", error);
 
     // The error should now contain the custom message from the backend
-    toast.error(error.message || "Failed to validate customer identity");
+    toast.error(
+      error.message ||
+        i18n.t("Failed to validate customer identity", { ns: "misc" })
+    );
     return {
       isValid: false,
       message:

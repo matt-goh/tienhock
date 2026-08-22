@@ -1,6 +1,7 @@
 // src/utils/catalogue/useCustomerCache.tsx
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 import { Customer, CustomProduct } from "../../types/types";
 
@@ -122,6 +123,7 @@ if (typeof window !== "undefined") {
 }
 
 export const useCustomersCache = () => {
+  const { t } = useTranslation("misc");
   const [customers, setCustomers] = useState<EnhancedCustomerList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -166,7 +168,7 @@ export const useCustomersCache = () => {
       setError(err);
       if (!forceRefresh) {
         // Only show toast for initial loads, not background refreshes
-        toast.error("Error fetching customers");
+        toast.error(t("Error fetching customers"));
       }
       throw err;
     } finally {

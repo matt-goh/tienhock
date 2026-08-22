@@ -4,6 +4,10 @@ Catches keying differences between the legacy program and the ERP in the month
 they happen, so a correction is a 10-minute Journal-page edit instead of a
 forensic project months later. Read-only against the ERP database.
 
+For December 2026 year-end context recovery or February 2027 audit work, start with
+[`docs/Account/AUDIT_2026_READ_FIRST.md`](../../../docs/Account/AUDIT_2026_READ_FIRST.md). This file
+is the narrower Tien Hock monthly-comparator guide.
+
 ## Monthly procedure (±15 minutes)
 
 1. Ask the coworker for the legacy **Trial Balance as at month-end**, exported
@@ -54,7 +58,7 @@ are applied before comparing (without them you get pages of false positives):
 ## Proof profile (June 2026, after the reclass migrations)
 
 `--month 2026-06 --legacy dev/import/legacy-june-tb/june-2026-legacy-tb.json`
-yields **5 differing accounts**, all four expected:
+yields **5 differing accounts**, all expected for that archived print:
 
 ```
 MBRMF   ytd   +100.00     MBSAF   ytd   -100.00
@@ -70,8 +74,8 @@ CR_LD   ytd    +40.00
   own legacy keying errors *after* it was printed (KFC LINTAS 40.00 → `MBSM_K`;
   PAUMIN #2606-2133 → `MBRMF` 565.00 / `MBSAF` 144.00). The ERP matches the
   amended legacy, not the print. **Do not "fix" the fixture** — it is evidence.
-  Re-running June against a fresh legacy export should show only `CR_LD`.
-  See `JUNE_RECLASS_DESIGN.md` §e.
+  Evaluate a fresh export from scratch; do not pre-accept any residual merely because it appeared in
+  this old June fixture. See `JUNE_RECLASS_DESIGN.md` §e.
 
 Everything else ties to the cent.
 
@@ -87,51 +91,15 @@ Defaults to the dev Docker DB (`localhost:5434`, `postgres/foodmaker`,
 `DB_PASSWORD`. To tie out production directly, run on the server with
 `DB_HOST=localhost DB_PORT=5432 DB_NAME=tienhock_prod DB_USER=postgres`.
 
-## Handover prompt — copy-paste for a fresh session
+## Future sessions
 
+Do not maintain a separate copy-paste prompt here. Attach the current and immediately preceding
+month-end TB files, then mention only:
+
+```text
+@docs/Account/AUDIT_2026_READ_FIRST.md
 ```
-You are working in C:/tienhock (Windows, Git Bash), a multi-company ERP. Task:
-monthly tie-out of the Tien Hock Trial Balance against the legacy program.
 
-READ FIRST (short): dev/import/legacy-tieout/README.md. Reference if needed:
-docs/Account/LEGACY_TIEOUT_STRATEGY.md (why), docs/Account/KEYING_GUIDE.md
-(proven vendor→account rules for fixing), docs/Account/JUNE_RECLASS_DESIGN.md
-(the worked June 2026 example).
-
-INPUT: I will give you the legacy month-end Trial Balance (CSV preferred:
-code,debit,credit YTD columns; if it is a scanned PDF, render with
-node dev/pdf-render/render-pdf.mjs <pdf> <outdir> 2 and transcribe to JSON —
-{code, debit, credit} rows — verifying the column sums against the printed
-grand total before trusting it; never guess a digit, re-read crops at full
-fidelity).
-
-STEPS:
-1. Run: node dev/import/legacy-tieout/tie-out.mjs --month <YYYY-MM> --legacy <file>
-   (add --prev-legacy <prev file> if last month's TB is available, for
-   movement-level isolation). It reads the dev Docker DB by default; if I say
-   the books are on prod, use DB_HOST=localhost DB_PORT=5432
-   DB_NAME=tienhock_prod DB_USER=postgres on the server
-   (ssh tienhock@5.223.55.190).
-2. A clean month prints "differing accounts: 0". Known permanent exception:
-   CR_LD +40.00 (documented legacy print anomaly — ignore it). Re-running the
-   June 2026 print fixture also shows MBC/MBSM_K/MBRMF/MBSAF, the documented
-   7 Aug post-print amendments (see the June proof profile above).
-3. For each differing account: pull the ERP account-ledger lines for the month
-   (dev DB: docker exec -i tienhock_dev_db psql -U postgres -d tienhock), ask
-   me for the legacy ledger detail of just those accounts, match line by line,
-   and identify the miskeyed voucher lines. docs/Account/KEYING_GUIDE.md
-   already covers the recurring vendors. A difference means the two systems
-   disagree — it does NOT mean legacy is right. Check the original receipt
-   before editing an ERP line; in June three corrections went the wrong way
-   because the legacy print was trusted over a correct ERP entry.
-4. Fix by editing the miskeyed lines (Journal page, or a guarded idempotent
-   SQL migration in the style of dev/migrations/2026-08-06_june_legacy_reclass_e1_e7_mrm_mgt.sql
-   if there are many). HARD RULES: only manual, source-less journals past the
-   accounting period lock may be touched; never create, delete, or
-   cancel journals; every journal's total debit/credit must stay EXACTLY the
-   same (move lines between accounts; amount edits must net 0.00 per journal);
-   never invent balancing plugs — if an account cannot be tied from evidence,
-   stop and ask me.
-5. Re-run the tie-out until only documented exceptions remain. Report the
-   final diff CSV path and each fix made.
-```
+That document is the single context-recovery launcher. Its TH §5 routes the session back to this
+README for the command/input details and applies the shared read-only, evidence, approval and audit
+pack rules.

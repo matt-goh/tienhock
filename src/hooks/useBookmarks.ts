@@ -1,6 +1,7 @@
 // src/hooks/useBookmarks.ts
 import { useState, useEffect, useCallback } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../contexts/AuthContext";
 import { useCompany } from "../contexts/CompanyContext";
 import { api } from "../routes/utils/api";
@@ -20,6 +21,7 @@ export interface Bookmark {
 }
 
 export const useBookmarks = () => {
+  const { t } = useTranslation("misc");
   const { user } = useAuth();
   const { activeCompany } = useCompany();
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
@@ -173,7 +175,7 @@ export const useBookmarks = () => {
           });
           setBookmarks((prev) => prev.filter((b) => b.id !== tempId));
           console.error("Error adding bookmark:", error);
-          toast.error("Failed to add bookmark");
+          toast.error(t("Failed to add bookmark"));
         }
       } else {
         // Snapshot for revert
@@ -201,11 +203,11 @@ export const useBookmarks = () => {
           });
           setBookmarks(previousBookmarks);
           console.error("Error removing bookmark:", error);
-          toast.error("Failed to remove bookmark");
+          toast.error(t("Failed to remove bookmark"));
         }
       }
     },
-    [user?.id, bookmarks, navData, findNavItem]
+    [user?.id, bookmarks, navData, findNavItem, t]
   );
 
   // Get bookmark data with nav item info

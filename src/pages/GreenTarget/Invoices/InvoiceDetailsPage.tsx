@@ -1937,7 +1937,7 @@ const InvoiceDetailsPage: React.FC = () => {
     return (
       <div className="container mx-auto px-8 py-8">
         <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 p-4 rounded-lg">
-          <p>{error || "Invoice not found"}</p>
+          <p>{error || t("Invoice not found")}</p>
           <Button
             onClick={() => navigate("/greentarget/invoices")}
             icon={IconChevronLeft}
@@ -2419,7 +2419,7 @@ const InvoiceDetailsPage: React.FC = () => {
                   name="internal_reference"
                   value={paymentFormData.internal_reference}
                   onChange={handlePaymentFormChange}
-                  placeholder="e.g. RV26/06/62"
+                  placeholder={t("e.g. RV26/06/62")}
                   maxLength={50}
                   required
                   className={clsx(

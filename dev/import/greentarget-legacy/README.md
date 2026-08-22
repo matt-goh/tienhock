@@ -3,9 +3,11 @@
 Source intake and staging for the Green Target (GT) accounting build-out. This is the analogue of
 [`dev/import/legacy-jan-may/`](../legacy-jan-may/), which did the same job for Tien Hock.
 
-Plan and phase gates: [`docs/Account/GT_ACCOUNTING_HANDOVER.md`](../../../docs/Account/GT_ACCOUNTING_HANDOVER.md).
+Plan and phase gates: [`docs/GT/GT_ACCOUNTING_HANDOVER.md`](../../../docs/GT/GT_ACCOUNTING_HANDOVER.md).
 **Phases G0, G3 and G4 are complete.** G0 is file-only; G3 loads the chart of accounts; G4 imports the
-Jan–Jun 2026 ledger as 1,705 posted journals plus 501 opening anchors.
+Jan–Jun 2026 ledger as 1,705 posted journals plus 501 original opening anchors. The approved dormant
+`PBB1` removal on 30 Jul left **500 live anchors**; the historical G4 runbook below still describes
+the original 501-row load.
 
 Since 28 Jul 2026 the live GT chart is maintainable in the application. The 503 G3 codes are an
 immutable-identity **legacy subset**, not a permanent total-row limit: users may add accounts and

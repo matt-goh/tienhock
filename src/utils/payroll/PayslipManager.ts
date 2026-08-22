@@ -2,6 +2,7 @@
 import { EmployeePayroll } from "../../types/types";
 import { MidMonthPayroll } from "./midMonthPayrollUtils";
 import toast from "react-hot-toast";
+import i18n from "../../i18n";
 import {
   getEmployeePayrollDetails,
   getEmployeePayrollDetailsBatch,
@@ -245,7 +246,12 @@ export const downloadPayslip = async (
       error instanceof Error
         ? error
         : new Error("Unknown error during download");
-    toast.error(`Failed to download: ${errorObj.message}`);
+    toast.error(
+      i18n.t("Failed to download: {{errorMessage}}", {
+        errorMessage: errorObj.message,
+        ns: "misc",
+      })
+    );
     if (onError) onError(errorObj);
   }
 };
@@ -268,7 +274,7 @@ export const downloadBatchPayslips = async (
   } = options || {};
 
   if (payrolls.length === 0) {
-    toast.error("No payslips selected for download");
+    toast.error(i18n.t("No payslips selected for download", { ns: "misc" }));
     if (onError) onError(new Error("No payslips selected"));
     return;
   }
@@ -348,9 +354,12 @@ export const downloadBatchPayslips = async (
     setTimeout(() => URL.revokeObjectURL(link.href), 100);
 
     toast.success(
-      `${payrolls.length} payslip${
-        payrolls.length > 1 ? "s" : ""
-      } downloaded successfully`
+      i18n.t(
+        payrolls.length === 1
+          ? "{{total}} payslip downloaded successfully"
+          : "{{total}} payslips downloaded successfully",
+        { total: payrolls.length, ns: "misc" }
+      )
     );
     if (onAfterDownload) onAfterDownload();
   } catch (error) {
@@ -359,7 +368,12 @@ export const downloadBatchPayslips = async (
       error instanceof Error
         ? error
         : new Error("Unknown error during batch download");
-    toast.error(`Failed to download: ${errorObj.message}`);
+    toast.error(
+      i18n.t("Failed to download: {{errorMessage}}", {
+        errorMessage: errorObj.message,
+        ns: "misc",
+      })
+    );
     if (onError) onError(errorObj);
   }
 };
@@ -379,11 +393,22 @@ const notifyPrintMode = (
   const idList = siblingIds.length > 0 ? ` (${siblingIds.join(", ")})` : "";
 
   if (mode === "combined") {
-    toast.success("Printing combined slip only");
+    toast.success(i18n.t("Printing combined slip only", { ns: "misc" }));
   } else if (mode === "both") {
-    toast.success(`Printing combined slip + ${jobCount} per-job slips`);
+    toast.success(
+      i18n.t("Printing combined slip + {{jobCount}} per-job slips", {
+        jobCount,
+        ns: "misc",
+      })
+    );
   } else {
-    toast.success(`Printing ${jobCount} per-job slips${idList}`);
+    toast.success(
+      i18n.t("Printing {{jobCount}} per-job slips{{idList}}", {
+        jobCount,
+        idList,
+        ns: "misc",
+      })
+    );
   }
 };
 
@@ -469,7 +494,12 @@ export const printPayslip = async (
     console.error("Error printing PDF:", error);
     const errorObj =
       error instanceof Error ? error : new Error("Unknown error during print");
-    toast.error(`Failed to print: ${errorObj.message}`);
+    toast.error(
+      i18n.t("Failed to print: {{errorMessage}}", {
+        errorMessage: errorObj.message,
+        ns: "misc",
+      })
+    );
     if (onError) onError(errorObj);
     // Manual cleanup on error
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
@@ -498,7 +528,7 @@ export const printBatchPayslips = async (
   } = options || {};
 
   if (payrolls.length === 0) {
-    toast.error("No payslips selected for printing");
+    toast.error(i18n.t("No payslips selected for printing", { ns: "misc" }));
     if (onError) onError(new Error("No payslips selected"));
     return;
   }
@@ -571,18 +601,28 @@ export const printBatchPayslips = async (
       (p) => !!p.job_type && p.job_type.includes(", ")
     ).length;
     if (groupedCount > 0) {
-      const employeeWord = groupedCount === 1 ? "employee" : "employees";
       if (mode === "combined") {
         toast.success(
-          `Printing ${completePayrolls.length} payslips (combined slips only)`
+          i18n.t("Printing {{total}} payslips (combined slips only)", {
+            total: completePayrolls.length,
+            ns: "misc",
+          })
         );
       } else if (mode === "both") {
         toast.success(
-          `Printing ${completePayrolls.length} payslips (combined + per-job slips)`
+          i18n.t("Printing {{total}} payslips (combined + per-job slips)", {
+            total: completePayrolls.length,
+            ns: "misc",
+          })
         );
       } else {
         toast.success(
-          `Printing ${completePayrolls.length} payslips - per-job slips for ${groupedCount} multi-job ${employeeWord}`
+          i18n.t(
+            groupedCount === 1
+              ? "Printing {{total}} payslips - per-job slips for {{groupedCount}} multi-job employee"
+              : "Printing {{total}} payslips - per-job slips for {{groupedCount}} multi-job employees",
+            { total: completePayrolls.length, groupedCount, ns: "misc" }
+          )
         );
       }
     }
@@ -620,7 +660,12 @@ export const printBatchPayslips = async (
       error instanceof Error
         ? error
         : new Error("Unknown error during batch print");
-    toast.error(`Failed to print: ${errorObj.message}`);
+    toast.error(
+      i18n.t("Failed to print: {{errorMessage}}", {
+        errorMessage: errorObj.message,
+        ns: "misc",
+      })
+    );
     if (onError) onError(errorObj);
     // Manual cleanup on error
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);

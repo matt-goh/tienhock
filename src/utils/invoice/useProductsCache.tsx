@@ -1,6 +1,7 @@
 // src/utils/invoice/useProductsCache.tsx
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
 
 interface Product {
@@ -122,6 +123,7 @@ export const useProductsCache = (
     | string[] = "default",
   options?: { includeInactive?: boolean }
 ) => {
+  const { t } = useTranslation("misc");
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -168,7 +170,7 @@ export const useProductsCache = (
       const err =
         error instanceof Error ? error : new Error(`Failed to fetch products`);
       setError(err);
-      toast.error(`Error fetching products`);
+      toast.error(t("Error fetching products"));
       throw err;
     } finally {
       setIsLoading(false);

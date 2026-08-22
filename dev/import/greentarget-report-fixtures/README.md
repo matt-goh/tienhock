@@ -9,7 +9,7 @@ harnesses that keep them honest. Analogue of
 - `verify-legacy-reports.mjs` (**G5**) — do the shipped **report engines** reproduce those scans?
   See [below](#the-g5-harness).
 
-Plan: [`docs/Account/GT_ACCOUNTING_HANDOVER.md`](../../../docs/Account/GT_ACCOUNTING_HANDOVER.md) §5 and §9.
+Plan: [`docs/GT/GT_ACCOUNTING_HANDOVER.md`](../../../docs/GT/GT_ACCOUNTING_HANDOVER.md) §5 and §9.
 
 ```bash
 # G0's ledger report is a prerequisite — run it first if generated/ is empty
@@ -55,7 +55,7 @@ June expectations, and continues comparing ledger row order/month-end paths agai
 | `tb` | `buildTrialBalance` vs all six printed Trial Balances — every printed line, **in printed order**, the netted DEBTOR control, and grand totals | 54 |
 | `statements` | `buildIncomeStatement` + `buildBalanceSheet` vs the printed June statements, line by line, incl. the three APPX overrides and each line's account composition | 17 |
 | `ledger` | `buildAccountLedger` for **all 500 Jan–Jun anchored/imported accounts**: printed row order, month-end running balances, derived-row flagging, the five bank statements, and the corrected live BWBC/PBB_1 closes | 18 |
-| `bridge` | the §3d operational-bridge counts, so [`GT_OPERATIONAL_BRIDGE.md`](../../../docs/Account/GT_OPERATIONAL_BRIDGE.md) cannot rot | 12 |
+| `bridge` | the §3d operational-bridge counts, so [`GT_OPERATIONAL_BRIDGE.md`](../../../docs/GT/GT_OPERATIONAL_BRIDGE.md) cannot rot | 12 |
 | `regressions` | the engines + the G7 posting services are schema-isolated (static scan), the LEGACY population is unmoved (organic journals may accrue beside it), no unexplained organic journal predates the 2026-07-01 open date, the exact `JV2606-01` exception is intact, Tien Hock is untouched | 25 |
 
 Two gates are worth knowing about because they look surprising:
