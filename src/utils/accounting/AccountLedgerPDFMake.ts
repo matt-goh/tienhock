@@ -324,7 +324,10 @@ const buildDocDefinition = (
       {
         table: {
           headerRows: 1,
-          widths: [44, 72, "*", 62, 56, 56, 74],
+          // Keep every column within A4. A star width expands to the longest
+          // unbroken particulars value (for example, a slash-separated invoice
+          // list), which can push Credit and Balance beyond the page edge.
+          widths: [44, 72, 139, 62, 56, 56, 74],
           body: tableBody,
         },
         layout: {
