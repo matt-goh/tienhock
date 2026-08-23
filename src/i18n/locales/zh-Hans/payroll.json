@@ -358,6 +358,7 @@
   "{{name}} Details": "{{name}}详情",
   "{{name}} Monthly Records": "{{name}}月度记录",
   "{{name}} Records": "{{name}}记录",
+  "{{total}} {{unit}}": "{{total}} {{unit}}",
   "{{total}} Ahad": "{{total}} 周日",
   "{{total}} Biasa": "{{total}} 正常日",
   "{{total}} Day": "{{total}} 日",
