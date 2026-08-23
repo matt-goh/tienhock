@@ -658,6 +658,20 @@ export const TienHockNavData: SidebarItem[] = [
         dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
       },
       {
+        name: "Ramen Records",
+        path: "/stock/production-records/ramen",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["RAMEN"]}
+            title="Ramen Production Records"
+            {...props}
+          />
+        ),
+        group: "Production Records",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.productionRecords.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
+      },
+      {
         name: "Bundle Records",
         path: "/stock/production-records/bundle",
         component: (props: any) => (

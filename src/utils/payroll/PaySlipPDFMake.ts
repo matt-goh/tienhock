@@ -646,18 +646,30 @@ const createJobSubtotalRow = (
   ];
 };
 
-type BaseRateSummaryUnit = "Bag" | "Ctn" | "Hour";
+type BaseRateSummaryUnit = "Bag" | "Ctn" | "Hour" | "PKT" | "PCS";
 type BaseSectionCell = TableCell & {
   baseSectionBorder?: boolean;
   baseSubtotalBorder?: boolean;
 };
 
-const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Ctn", "Hour"];
+const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = [
+  "Bag",
+  "Ctn",
+  "Hour",
+  "PKT",
+  "PCS",
+];
 
 const isBaseRateSummaryUnit = (
   rateUnit: string,
 ): rateUnit is BaseRateSummaryUnit => {
-  return rateUnit === "Bag" || rateUnit === "Ctn" || rateUnit === "Hour";
+  return (
+    rateUnit === "Bag" ||
+    rateUnit === "Ctn" ||
+    rateUnit === "Hour" ||
+    rateUnit === "PKT" ||
+    rateUnit === "PCS"
+  );
 };
 
 const formatUnitQuantity = (quantity: number): string => {

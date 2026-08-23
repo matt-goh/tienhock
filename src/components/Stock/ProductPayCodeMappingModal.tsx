@@ -74,7 +74,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
 
   // Get products from cache (MEE, BH, BUNDLE for packing)
   const { products: cachedProducts, isLoading } = useProductsCache(
-    productTypes || ["MEE", "BH", "BUNDLE"]
+    productTypes || ["MEE", "BH", "BUNDLE", "RAMEN"]
   );
 
   // Map cached products and add special items (special items are TH-only).
@@ -148,7 +148,10 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
     let jobId: string;
     if (selectedProduct.type === "JP") {
       jobId = "JP_PACKING";
-    } else if (selectedProduct.type === "MEE") {
+    } else if (
+      selectedProduct.type === "MEE" ||
+      selectedProduct.type === "RAMEN"
+    ) {
       jobId = "MEE_PACKING";
     } else if (selectedProduct.type === "BUNDLE") {
       // BUNDLE_MEE uses MEE_PACKING, others use BH_PACKING
@@ -161,7 +164,19 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
 
     // Filter to only show piece-rate pay codes.
     return jobPayCodes
-      .filter((pc) => pc.rate_unit === "Bag" || pc.rate_unit === "Ctn")
+      .filter((pc) => {
+        // PKT (packet) applies only to ramen products; everyone else still
+        // gets Bag/Ctn (production) and PCS (pieces).
+        if (pc.rate_unit === "PKT" && selectedProduct.type !== "RAMEN") {
+          return false;
+        }
+        return (
+          pc.rate_unit === "Bag" ||
+          pc.rate_unit === "Ctn" ||
+          pc.rate_unit === "PKT" ||
+          pc.rate_unit === "PCS"
+        );
+      })
       .map((pc) => ({
         id: pc.id,
         description: pc.description,
@@ -472,6 +487,8 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                             ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
                                             : product.type === "BUNDLE"
                                             ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                                            : product.type === "RAMEN"
+                                            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"
                                             : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                                         }`}
                                       >
@@ -524,11 +541,13 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
                                         <div className="flex items-center gap-2">
                                           <span
                                             className={`px-1.5 py-0.5 text-xs rounded ${
-                                              product.type === "MEE"
-                                                ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
-                                                : product.type === "BUNDLE"
-                                                ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
-                                                : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
+                                          product.type === "MEE"
+                                            ? "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300"
+                                            : product.type === "BUNDLE"
+                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                                            : product.type === "RAMEN"
+                                            ? "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"
+                                            : "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300"
                                             }`}
                                           >
                                             {product.type}
