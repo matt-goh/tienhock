@@ -10,6 +10,7 @@ const STOCK_ONLY_PRODUCT_IDS = new Set([
 ]);
 const PACKING_JOB_BY_PRODUCT_TYPE = {
   MEE: "MEE_PACKING",
+  RAMEN: "MEE_PACKING",
   BH: "BH_PACKING",
 };
 const WORKER_ORDER_SCOPES = new Set(["BH_PACKING", "MEE_PACKING"]);
@@ -444,20 +445,25 @@ export default function (pool) {
     }
   });
 
-  // GET /api/production-entries/workers - Get workers by product type (MEE_PACKING/BH_PACKING)
+  // GET /api/production-entries/workers - Get workers by product type
   router.get("/workers", async (req, res) => {
     try {
       const { product_type } = req.query;
 
       if (!product_type) {
         return res.status(400).json({
-          message: "product_type parameter is required (MEE or BH)",
+          message: "product_type parameter is required (MEE, RAMEN, or BH)",
         });
       }
 
       // Map product type to job type
-      const jobFilter =
-        product_type.toUpperCase() === "MEE" ? "MEE_PACKING" : "BH_PACKING";
+      const normalizedProductType = String(product_type).toUpperCase();
+      const jobFilter = PACKING_JOB_BY_PRODUCT_TYPE[normalizedProductType];
+      if (!jobFilter) {
+        return res.status(400).json({
+          message: "product_type must be MEE, RAMEN, or BH",
+        });
+      }
 
       const query = `
         SELECT

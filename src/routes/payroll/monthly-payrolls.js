@@ -158,7 +158,10 @@ export default function (pool) {
       // Query production entries for MEE_PACKING and BH_PACKING workers
       const productionEligibleQuery = `
       SELECT DISTINCT pe.worker_id as employee_id,
-        CASE WHEN p.type = 'MEE' THEN 'MEE_PACKING' ELSE 'BH_PACKING' END as job_id
+        CASE
+          WHEN p.type IN ('MEE', 'RAMEN') THEN 'MEE_PACKING'
+          ELSE 'BH_PACKING'
+        END as job_id
       FROM production_entries pe
       JOIN products p ON pe.product_id = p.id
       WHERE pe.entry_date BETWEEN $1 AND $2
@@ -470,6 +473,7 @@ export default function (pool) {
       // 2. Fetch all required data in parallel
       let dailyLogsResult,
         monthlyLogsResult,
+        packingCutiResult,
         manualItemsResult,
         staffsResult,
         jobsResult,
@@ -487,6 +491,7 @@ export default function (pool) {
         [
           dailyLogsResult,
           monthlyLogsResult,
+          packingCutiResult,
           manualItemsResult,
           staffsResult,
           jobsResult,
@@ -550,6 +555,7 @@ export default function (pool) {
               'rate_ahad', eff.rate_ahad,
               'rate_umum', eff.rate_umum,
               'hours_applied', mwla.hours_applied,
+              'units_produced', mwla.units_produced,
               'calculated_amount', mwla.calculated_amount
             )) as activities
           FROM monthly_work_logs mwl
@@ -567,6 +573,22 @@ export default function (pool) {
             mwle.umum_hours, mwle.umum_overtime_hours
         `,
             [month, year],
+          ),
+
+          // Approved paid packing leave is an eligible job even though it has
+          // no daily/monthly activity row. Load it into the same work-data map
+          // so selective reprocessing retains the correct per-job breakdown.
+          client.query(
+            `
+          SELECT DISTINCT lr.employee_id,
+            REPLACE(lr.notes, 'PACKING_CUTI:', '') as job_id
+          FROM leave_records lr
+          WHERE lr.leave_date BETWEEN $1 AND $2
+            AND lr.status = 'approved'
+            AND lr.amount_paid > 0
+            AND lr.notes IN ('PACKING_CUTI:MEE_PACKING', 'PACKING_CUTI:BH_PACKING')
+        `,
+            [startDate, endDate],
           ),
 
           // Existing manual items
@@ -887,7 +909,9 @@ export default function (pool) {
           const qty =
             activity.rate_unit === "Hour"
               ? parseFloat(activity.hours_applied) || 0
-              : 1;
+              : activity.rate_unit === "PKT" || activity.rate_unit === "PCS"
+                ? parseFloat(activity.units_produced) || 0
+                : 1;
           // Append day-type suffix when activity's rate matches Ahad/Umum rate
           // (handles hourly pay codes split across Biasa/Ahad/Umum variants)
           let description = activity.description || "";
@@ -931,6 +955,19 @@ export default function (pool) {
             work_log_type: "monthly",
           });
         });
+      });
+
+      // Packing leave contributes through leave_records later; this zero-item
+      // marker only preserves its employee/job identity during grouping.
+      packingCutiResult.rows.forEach((row) => {
+        const key = `${row.employee_id}-${row.job_id}`;
+        if (!workLogsByEmployeeJob[key]) {
+          workLogsByEmployeeJob[key] = {
+            employeeId: row.employee_id,
+            jobType: row.job_id,
+            items: [],
+          };
+        }
       });
 
       // Process production entries for MEE_PACKING and BH_PACKING workers
@@ -1131,7 +1168,10 @@ export default function (pool) {
       // Process production entries into payroll items
       productionEntriesResult.rows.forEach((entry) => {
         const productType = entry.product_type;
-        const jobType = productType === "MEE" ? "MEE_PACKING" : "BH_PACKING";
+        const jobType =
+          productType === "MEE" || productType === "RAMEN"
+            ? "MEE_PACKING"
+            : "BH_PACKING";
         const key = `${entry.worker_id}-${jobType}`;
         const dateStr = formatDateToYMD(entry.entry_date);
         const payCodesForProduct = productPayCodeMap[entry.product_id] || [];
@@ -1357,9 +1397,71 @@ export default function (pool) {
         }
       });
 
+      // Payroll rows saved before RAMEN was classified explicitly can carry a
+      // stale or lossy packing-job selection. Rebuild the packing selections for
+      // every selected Ramen worker from the current work data so every caller
+      // repairs the old row safely and repeated reprocessing stays idempotent.
+      // Unrelated selected jobs are preserved; current work (including paid
+      // packing-leave markers) restores every valid job.
+      const ramenWorkerIds = new Set(
+        productionEntriesResult.rows
+          .filter((entry) => entry.product_type === "RAMEN")
+          .map((entry) => entry.worker_id),
+      );
+      const selectedEntriesByEmployee = new Map();
+      selected_employees.forEach((selection) => {
+        if (!selectedEntriesByEmployee.has(selection.employeeId)) {
+          selectedEntriesByEmployee.set(selection.employeeId, []);
+        }
+        selectedEntriesByEmployee.get(selection.employeeId).push(selection);
+      });
+      const currentWorkDataByEmployee = new Map();
+      Object.values(workLogsByEmployeeJob).forEach((workData) => {
+        if (!currentWorkDataByEmployee.has(workData.employeeId)) {
+          currentWorkDataByEmployee.set(workData.employeeId, []);
+        }
+        currentWorkDataByEmployee.get(workData.employeeId).push(workData);
+      });
+      const effectiveSelectedEmployees = [];
+      const seenSelectedCombinations = new Set();
+      const addEffectiveSelection = (employeeId, jobType) => {
+        const selectionKey = `${employeeId}-${jobType}`;
+        if (seenSelectedCombinations.has(selectionKey)) return;
+        seenSelectedCombinations.add(selectionKey);
+        effectiveSelectedEmployees.push({ employeeId, jobType });
+      };
+
+      const rebuiltRamenEmployeeIds = new Set();
+      selected_employees.forEach(({ employeeId, jobType }) => {
+        if (!ramenWorkerIds.has(employeeId)) {
+          addEffectiveSelection(employeeId, jobType);
+          return;
+        }
+        if (rebuiltRamenEmployeeIds.has(employeeId)) return;
+
+        // Rebuild at this ID's first occurrence so same-name sibling ordering
+        // (and therefore the established primary employee) does not change.
+        rebuiltRamenEmployeeIds.add(employeeId);
+        (selectedEntriesByEmployee.get(employeeId) || []).forEach(
+          (selection) => {
+            if (
+              selection.jobType !== "BH_PACKING" &&
+              selection.jobType !== "MEE_PACKING"
+            ) {
+              addEffectiveSelection(selection.employeeId, selection.jobType);
+            }
+          },
+        );
+        (currentWorkDataByEmployee.get(employeeId) || []).forEach(
+          (workData) => {
+            addEffectiveSelection(employeeId, workData.jobType);
+          },
+        );
+      });
+
       // 4. Group selected employees by name (same logic as frontend)
       const employeesByName = new Map();
-      selected_employees.forEach(({ employeeId, jobType }) => {
+      effectiveSelectedEmployees.forEach(({ employeeId, jobType }) => {
         const staff = staffsMap.get(employeeId);
         const name = staff?.name || employeeId;
         if (!employeesByName.has(name)) {
@@ -1968,7 +2070,7 @@ export default function (pool) {
            JOIN staffs s ON ep.employee_id = s.id
            WHERE ep.monthly_payroll_id = $2
              AND s.name NOT IN (SELECT name FROM selected_names)`,
-          [selected_employees.map((e) => e.employeeId), id],
+          [effectiveSelectedEmployees.map((e) => e.employeeId), id],
         );
 
         for (const row of orphansResult.rows) {

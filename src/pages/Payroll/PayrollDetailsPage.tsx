@@ -1137,7 +1137,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
   const isBaseRateSummaryUnit = (
     rateUnit: string,
   ): rateUnit is BaseRateSummaryUnit => {
-    return rateUnit === "Bag" || rateUnit === "Ctn" || rateUnit === "Hour";
+    return (
+      rateUnit === "Bag" ||
+      rateUnit === "Ctn" ||
+      rateUnit === "Hour" ||
+      rateUnit === "PKT" ||
+      rateUnit === "PCS"
+    );
   };
 
   const formatUnitQuantity = (quantity: number): string => {
@@ -1248,7 +1254,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
       0,
     );
 
-    if (unit === "Bag" || unit === "Ctn") {
+    if (unit !== "Hour") {
       const totalUnits: number = unitItems.reduce(
         (sum, item) => sum + getTotalUnitQuantity(item),
         0,
