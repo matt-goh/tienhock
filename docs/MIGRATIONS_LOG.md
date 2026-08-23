@@ -26,6 +26,18 @@ requires separate approval).
 
 ---
 
+## Removed 22 Aug 2026 — 1 file (PKT/PCS rate units + RAMEN product line)
+
+Applied to dev and production on 2026-08-22 (the user ran the same script on prod), then removed
+per the project convention. Recover with
+`git show c8aff31:dev/migrations/2026-08-22_ramen_product_line_and_pkt_pcs.sql`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-22_ramen_product_line_and_pkt_pcs.sql` | Added `PKT` (Packet) and `PCS` (Pieces) to the `pay_codes.rate_unit` CHECK constraint and re-typed the existing ramen finished-goods product `PM_PR` (1 PKT:ME-Q PUMPKIN RAMEN) from `MEE` to the new `RAMEN` product line, making ramen its own product group. No existing pay code rows were re-keyed (their `rate_unit` values are untouched); the new units and the `RAMEN` line are now valid system-wide (Pay Code Modal dropdown, product→pay-code mapping, product pickers, production records, stock movement, product catalogue). Schema notes and changelog updated. | dev ✓ (2026-08-22), prod ✓ (2026-08-22) |
+
+---
+
 ## Removed 21 Aug 2026 — 1 file (Green Target June bank charges)
 
 Applied to dev and production on 2026-08-21 (the user ran the same guarded file on prod), then
