@@ -20,6 +20,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-23",
+    ms: "Pengeluaran ramen dan cuti Pembungkusan Mee kini saling menyekat pada tarikh yang sama. Aktiviti berkadar PKT atau PCS juga kini mengira gaji daripada kuantiti yang dimasukkan dan memaparkan jumlah unit yang betul pada butiran gaji serta slip gaji.",
+    en: "Ramen production and Packing Mee leave now block each other on the same date. PKT- or PCS-rate activities also calculate pay from the entered quantity and show the correct unit totals in payroll details and payslips.",
+  },
+  {
+    date: "2026-08-23",
+    ms: "Pengeluaran ramen kini kekal di bawah Pembungkusan Mee semasa gaji diproses, jadi ia tidak lagi mewujudkan pecahan Bihun/mengikut kerja yang salah sehingga menyembunyikan potongan EPF, SOCSO, SIP dan PCB. Slip mengikut kerja yang telah terjejas juga kini meletakkan potongan tersebut pada slip Pembungkusan Mee; jumlah gabungan tidak berubah.",
+    en: "Ramen production now stays under Packing Mee when payroll is processed, so it no longer creates an incorrect Bihun/per-job split that hides EPF, SOCSO, SIP and PCB deductions. Existing affected per-job slips also place those deductions on the Packing Mee slip; combined totals are unchanged.",
+  },
+  {
     date: "2026-08-22",
     ms: "Medan Cukai (Tax) pada produk telah dibuang daripada halaman Katalog Produk kerana ia tidak diperlukan lagi. Nilai cukai sedia ada pada produk lama dikekalkan secara automatik dan masih digunakan untuk resit/invois lama.",
     en: "The Tax field on products has been removed from the Product Catalogue because it is no longer needed. Existing tax values on older products are preserved automatically and still used for legacy invoices/receipts.",

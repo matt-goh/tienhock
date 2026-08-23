@@ -360,6 +360,16 @@ const splitGroupedPayroll = (
     if (mapped && jobTypes.includes(mapped)) return mapped;
     return anchorJob;
   };
+  const ownerJobForLeaveRecord = (record: any): string => {
+    const packingJobType: string | undefined =
+      record.work_log_type === "packing_cuti"
+        ? record.work_log_section
+        : undefined;
+    if (packingJobType && jobTypes.includes(packingJobType)) {
+      return packingJobType;
+    }
+    return ownerJobForRecord(record.employee_id);
+  };
 
   jobTypes.forEach((jobType) => {
     const jobItems = allItems.filter((item) => {
@@ -380,7 +390,7 @@ const splitGroupedPayroll = (
     });
 
     const jobLeaveRecords = allLeaveRecords.filter(
-      (record) => ownerJobForRecord(record.employee_id) === jobType,
+      (record) => ownerJobForLeaveRecord(record) === jobType,
     );
     const jobCommissionRecords = allCommissionRecords.filter(
       (record) => ownerJobForRecord(record.employee_id) === jobType,
@@ -884,12 +894,17 @@ const getConsolidatedRateLabel = (item: ConsolidatedPayrollItem): string => {
 const getBaseItemQuantityLabel = (item: ConsolidatedPayrollItem): string => {
   if (isDirectAmountFixedItem(item)) return "-";
 
-  if (item.rate_unit === "Bag" || item.rate_unit === "Ctn") {
+  if (
+    item.rate_unit === "Bag" ||
+    item.rate_unit === "Ctn" ||
+    item.rate_unit === "PKT" ||
+    item.rate_unit === "PCS"
+  ) {
     const totalUnits =
       (Number(item.total_quantity) || 0) + (Number(item.total_foc_units) || 0);
     return item.rate_unit === "Bag"
       ? `${formatUnitQuantity(totalUnits)} Bag${totalUnits > 1 ? "s" : ""}`
-      : `${formatUnitQuantity(totalUnits)} Ctn`;
+      : `${formatUnitQuantity(totalUnits)} ${item.rate_unit}`;
   }
 
   if (item.rate_unit === "Hour") {
@@ -2356,18 +2371,40 @@ const buildIndividualJobPage = (
     0,
   );
 
-  // Head breakdown only: surface the employee's statutory deductions and a net
-  // line. The Head sibling is set via Staff form (staffs.head_staff_id, surfaced
-  // as payroll.head_employee_id); it absorbs the full deductions so Head net +
-  // the other breakdowns' grosses still equals the combined slip's net. Non-head
-  // breakdowns keep showing only their gross/advance.
-  const isHead =
-    isGrouped &&
-    !!payroll.head_employee_id &&
-    jobEmployeeId === payroll.head_employee_id;
+  // Ramen work belongs to Packing Mee. When a Ramen worker also has another
+  // job, statutory deductions stay on the Packing Mee page; this also keeps
+  // payrolls saved during the old false-BH classification printable without a
+  // data rewrite. Other grouped payrolls retain the Head-sibling rule.
+  const payrollJobTypes: Set<string> = new Set<string>(
+    payroll.job_type
+      .split(",")
+      .map((jobType: string): string => jobType.trim())
+      .filter((jobType: string): boolean => jobType.length > 0),
+  );
+  const hasGroupedRamenPackingWork: boolean =
+    payrollJobTypes.has("MEE_PACKING") &&
+    payrollJobTypes.size > 1 &&
+    (payroll.items || []).some(
+      (item: PayrollItem): boolean =>
+        item.work_log_type === "production" &&
+        item.pay_code_id === "PM_PR" &&
+        item.rate_unit === "PKT",
+    );
+  const headJobType: string | undefined = payroll.head_employee_id
+    ? employeeJobMapping[payroll.head_employee_id]
+    : undefined;
+  const statutoryDeductionJobType: string | null = hasGroupedRamenPackingWork
+    ? "MEE_PACKING"
+    : headJobType || null;
+  const carriesStatutoryDeductions: boolean =
+    isGrouped && individualJob.job_type === statutoryDeductionJobType;
 
   let baseAfterDeductions = breakdownGrossPay;
-  if (isHead && payroll.deductions && payroll.deductions.length > 0) {
+  if (
+    carriesStatutoryDeductions &&
+    payroll.deductions &&
+    payroll.deductions.length > 0
+  ) {
     const epfDeduction = payroll.deductions.find(
       (d) => d.deduction_type.toUpperCase() === "EPF",
     );

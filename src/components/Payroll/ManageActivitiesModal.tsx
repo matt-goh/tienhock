@@ -176,7 +176,9 @@ const ManageActivitiesModal: React.FC<ManageActivitiesModalProps> = ({
             if (
               isSalesman &&
               (activity.rateUnit === jobConfig?.replaceUnits ||
-                activity.rateUnit === "Ctn")
+                activity.rateUnit === "Ctn" ||
+                activity.rateUnit === "PKT" ||
+                activity.rateUnit === "PCS")
             ) {
               const matchingProduct = salesmanProducts.find(
                 (p) => String(p.product_id) === String(activity.payCodeId)

@@ -5,8 +5,8 @@ const CUTI_TAHUNAN_ADVANCE_LOCATION_CODE = "23";
 const PACKING_CUTI_NOTE_PREFIX = "PACKING_CUTI";
 const PACKING_CUTI_JOB_TYPES = new Set(["MEE_PACKING", "BH_PACKING"]);
 const PACKING_PRODUCT_TYPES = {
-  MEE_PACKING: "MEE",
-  BH_PACKING: "BH",
+  MEE_PACKING: ["MEE", "RAMEN"],
+  BH_PACKING: ["BH"],
 };
 const VALID_LEAVE_TYPES = new Set([
   "cuti_umum",
@@ -276,7 +276,7 @@ export default function (pool) {
           );
         }
 
-        const productType = PACKING_PRODUCT_TYPES[job_type];
+        const productTypes = PACKING_PRODUCT_TYPES[job_type];
         const productionConflictResult = await client.query(
           `
             SELECT DISTINCT pe.worker_id, p.description as product_description
@@ -285,9 +285,9 @@ export default function (pool) {
             WHERE pe.worker_id = ANY($1::text[])
               AND pe.entry_date = $2
               AND pe.bags_packed > 0
-              AND p.type = $3
+              AND p.type = ANY($3::text[])
           `,
-          [employeeIds, date, productType],
+          [employeeIds, date, productTypes],
         );
 
         if (productionConflictResult.rows.length > 0) {

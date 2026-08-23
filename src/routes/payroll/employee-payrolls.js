@@ -779,6 +779,15 @@ export default function (pool) {
         lr.leave_type,
         lr.days_taken,
         lr.amount_paid,
+        CASE
+          WHEN lr.notes IN ('PACKING_CUTI:MEE_PACKING', 'PACKING_CUTI:BH_PACKING') THEN 'packing_cuti'
+          ELSE NULL
+        END as work_log_type,
+        CASE
+          WHEN lr.notes = 'PACKING_CUTI:MEE_PACKING' THEN 'MEE_PACKING'
+          WHEN lr.notes = 'PACKING_CUTI:BH_PACKING' THEN 'BH_PACKING'
+          ELSE NULL
+        END as work_log_section,
         h.description as holiday_description
       FROM employee_payrolls ep
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
@@ -813,6 +822,8 @@ export default function (pool) {
             leave_type: record.leave_type,
             days_taken: parseFloat(record.days_taken),
             amount_paid: parseFloat(record.amount_paid || 0),
+            work_log_type: record.work_log_type,
+            work_log_section: record.work_log_section,
             holiday_description: record.holiday_description || null,
           });
           return acc;

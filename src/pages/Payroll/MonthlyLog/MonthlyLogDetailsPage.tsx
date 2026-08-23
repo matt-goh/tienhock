@@ -69,6 +69,9 @@ interface Activity {
   source?: string;
 }
 
+const isPacketOrPieceRateUnit = (rateUnit: string): boolean =>
+  rateUnit === "PKT" || rateUnit === "PCS";
+
 interface LeaveRecord {
   id: number;
   employee_id: string;
@@ -87,6 +90,35 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
   jobType,
 }) => {
   const { t } = useTranslation("payroll");
+  const renderActivityQuantity = (
+    activity: Activity,
+  ): React.ReactElement | null => {
+    if (
+      isPacketOrPieceRateUnit(activity.rate_unit) &&
+      activity.units_produced !== null &&
+      activity.units_produced !== undefined
+    ) {
+      return (
+        <span className="text-default-500 dark:text-gray-400 ml-2">
+          •{" "}
+          {t("{{total}} {{unit}}", {
+            total: activity.units_produced,
+            unit: activity.rate_unit,
+          })}
+        </span>
+      );
+    }
+
+    if (activity.hours_applied === null || activity.rate_unit === "Fixed") {
+      return null;
+    }
+
+    return (
+      <span className="text-default-500 dark:text-gray-400 ml-2">
+        • {t("{{total}} hrs", { total: activity.hours_applied })}
+      </span>
+    );
+  };
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const goBack = useSmartBack(
@@ -661,13 +693,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                                           • {t("Fixed")}
                                         </span>
                                       )}
-                                      {activity.hours_applied !== null && activity.rate_unit !== "Fixed" && (
-                                        <span className="text-default-500 dark:text-gray-400 ml-2">
-                                          • {t("{{total}} hrs", {
-                                            total: activity.hours_applied,
-                                          })}
-                                        </span>
-                                      )}
+                                      {renderActivityQuantity(activity)}
                                     </div>
                                     <div className="font-medium ml-4">
                                       RM{activity.calculated_amount.toFixed(2)}
@@ -721,13 +747,7 @@ const MonthlyLogDetailsPage: React.FC<MonthlyLogDetailsPageProps> = ({
                                           • {t("Fixed")}
                                         </span>
                                       )}
-                                      {activity.hours_applied !== null && activity.rate_unit !== "Fixed" && (
-                                        <span className="text-default-500 dark:text-gray-400 ml-2">
-                                          • {t("{{total}} hrs", {
-                                            total: activity.hours_applied,
-                                          })}
-                                        </span>
-                                      )}
+                                      {renderActivityQuantity(activity)}
                                     </div>
                                     <div className="font-medium ml-4">
                                       RM{activity.calculated_amount.toFixed(2)}
