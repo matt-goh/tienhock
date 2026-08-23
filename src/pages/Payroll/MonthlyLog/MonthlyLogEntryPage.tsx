@@ -562,7 +562,9 @@ const MonthlyLogEntryPage: React.FC<MonthlyLogEntryPageProps> = ({
             payCode.rate_unit === "Bag" ||
             payCode.rate_unit === "Ctn" ||
             payCode.rate_unit === "Trip" ||
-            payCode.rate_unit === "Day"
+            payCode.rate_unit === "Day" ||
+            payCode.rate_unit === "PKT" ||
+            payCode.rate_unit === "PCS"
           ) {
             isSelected = false;
           }

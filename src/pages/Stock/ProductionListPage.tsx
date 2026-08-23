@@ -48,12 +48,13 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import toast from "react-hot-toast";
 
 type ViewMode = "day" | "month" | "year";
-type CategoryKey = "MEE" | "BH" | "HANCUR" | "BUNDLE" | "JP" | "OTH";
+type CategoryKey = "MEE" | "BH" | "RAMEN" | "HANCUR" | "BUNDLE" | "JP" | "OTH";
 type ProductSelectorProductType = Exclude<StockProduct["type"], "TAX">;
 
 const PRODUCT_SELECTOR_TYPES = new Set<ProductSelectorProductType>([
   "BH",
   "MEE",
+  "RAMEN",
   "JP",
   "OTH",
   "BUNDLE",
@@ -61,6 +62,7 @@ const PRODUCT_SELECTOR_TYPES = new Set<ProductSelectorProductType>([
 const DEFAULT_PRODUCTION_PRODUCT_TYPES: ProductSelectorProductType[] = [
   "MEE",
   "BH",
+  "RAMEN",
   "BUNDLE",
   "OTH",
 ];
@@ -102,11 +104,12 @@ interface DateGroup {
   totalsByUnit: UnitTotal[];
 }
 
-const CATEGORY_ORDER: CategoryKey[] = ["MEE", "BH", "HANCUR", "BUNDLE", "JP", "OTH"];
+const CATEGORY_ORDER: CategoryKey[] = ["MEE", "BH", "RAMEN", "HANCUR", "BUNDLE", "JP", "OTH"];
 
 const CATEGORY_LABELS: Record<CategoryKey, string> = {
   MEE: "Mee",
   BH: "Bihun",
+  RAMEN: "Ramen",
   HANCUR: "Hancur",
   BUNDLE: "Bundle",
   JP: "Jelly Polly",
@@ -116,6 +119,7 @@ const CATEGORY_LABELS: Record<CategoryKey, string> = {
 const CATEGORY_CLASSES: Record<CategoryKey, string> = {
   MEE: "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-900/20 dark:text-green-300",
   BH: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300",
+  RAMEN: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-900/20 dark:text-rose-300",
   HANCUR: "border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-300",
   BUNDLE: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
   JP: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-900/20 dark:text-violet-300",
@@ -178,6 +182,7 @@ const getCategory = (entry: ProductionEntry): CategoryKey => {
   if (entry.product_type === "JP") return "JP";
   if (entry.product_type === "MEE") return "MEE";
   if (entry.product_type === "BH") return "BH";
+  if (entry.product_type === "RAMEN") return "RAMEN";
   return "OTH";
 };
 
@@ -189,6 +194,8 @@ const getWorkerOrderScope = (
 ): ProductionWorkerOrderScope | null => {
   switch (group.category) {
     case "MEE":
+      return "MEE_PACKING";
+    case "RAMEN":
       return "MEE_PACKING";
     case "BH":
     case "HANCUR":
@@ -206,6 +213,7 @@ const getUnitLabel = (entry: ProductionEntry): string => {
   const specialConfig = getSpecialItemConfig(entry.product_id);
   if (specialConfig) return specialConfig.unit;
   if (entry.product_type === "OTH") return "pcs";
+  if (entry.product_type === "RAMEN") return "pkt";
   return "bags";
 };
 
@@ -335,7 +343,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
         ? ["JP_PRODUCTION"]
         : !productTypes ||
           productTypes.some((type: ProductSelectorProductType): boolean =>
-            ["MEE", "BH", "BUNDLE"].includes(type)
+            ["MEE", "BH", "RAMEN", "BUNDLE"].includes(type)
           )
         ? ["BH_PACKING", "MEE_PACKING"]
         : [];
@@ -526,6 +534,7 @@ const ProductionListPage: React.FC<ProductionListPageProps> = ({
         const categories: Record<CategoryKey, ProductGroup[]> = {
           MEE: [],
           BH: [],
+          RAMEN: [],
           HANCUR: [],
           BUNDLE: [],
           JP: [],

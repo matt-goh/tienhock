@@ -250,6 +250,7 @@ const ProductionEntryPage: React.FC = () => {
         !isSpecialItem(product.id) &&
         (product.type === "BH" ||
           product.type === "MEE" ||
+          product.type === "RAMEN" ||
           OTH_PRODUCTION_IDS.includes(product.id))
     ) as StockProduct[];
   }, [products]);
@@ -291,6 +292,7 @@ const ProductionEntryPage: React.FC = () => {
     return {
       MEE: filtered.filter((p) => p.type === "MEE"),
       BH: bhProducts,
+      RAMEN: filtered.filter((p) => p.type === "RAMEN"),
       BUNDLE: bundleProducts,
       OTH: filtered.filter((p) => p.type === "OTH"),
     };
@@ -312,7 +314,9 @@ const ProductionEntryPage: React.FC = () => {
     if (isOthProductionProduct(selectedProduct.id)) return [];
 
     const jobFilters: string[] = [
-      selectedProduct.type === "MEE" ? "MEE_PACKING" : "BH_PACKING",
+      selectedProduct.type === "MEE" || selectedProduct.type === "RAMEN"
+        ? "MEE_PACKING"
+        : "BH_PACKING",
     ];
 
     return staffs
@@ -336,7 +340,7 @@ const ProductionEntryPage: React.FC = () => {
       }
 
       const scope: ProductionWorkerOrderScope | undefined =
-        selectedProduct?.type === "MEE"
+        selectedProduct?.type === "MEE" || selectedProduct?.type === "RAMEN"
           ? "MEE_PACKING"
           : selectedProduct?.type === "BH"
           ? "BH_PACKING"
@@ -346,7 +350,9 @@ const ProductionEntryPage: React.FC = () => {
       const wantsMachineStatus: boolean =
         specialSelection === null &&
         !!selectedProduct &&
-        (selectedProduct.type === "BH" || selectedProduct.type === "MEE");
+        (selectedProduct.type === "BH" ||
+          selectedProduct.type === "MEE" ||
+          selectedProduct.type === "RAMEN");
 
       const params: URLSearchParams = new URLSearchParams({
         date: selectedDate,
@@ -671,7 +677,7 @@ const ProductionEntryPage: React.FC = () => {
     selectedProductId !== null && isOthProductionProduct(selectedProductId);
   const stockOnlyQuantity: number = entries[STOCK_ONLY_WORKER_ID] || 0;
   const workerOrderScope: ProductionWorkerOrderScope | undefined =
-    selectedProduct?.type === "MEE"
+    selectedProduct?.type === "MEE" || selectedProduct?.type === "RAMEN"
       ? "MEE_PACKING"
       : selectedProduct?.type === "BH"
       ? "BH_PACKING"
@@ -709,7 +715,7 @@ const ProductionEntryPage: React.FC = () => {
               </span>
             </div>
             {/* Machine Rosak Toggle - only show when viewing a regular BH/MEE product */}
-            {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE") && (
+            {isViewingProduct && (selectedProduct?.type === "BH" || selectedProduct?.type === "MEE" || selectedProduct?.type === "RAMEN") && (
               <>
                 <div className="h-6 w-px bg-default-300 dark:bg-gray-600" />
                 <div className="flex items-center gap-2">
@@ -836,7 +842,7 @@ const ProductionEntryPage: React.FC = () => {
                 label={t("Search for a product (click star to favorite)")}
                 value={selectedProductId}
                 onChange={handleProductSelect}
-                productTypes={["MEE", "BH", "BUNDLE", "OTH"]}
+                productTypes={["MEE", "BH", "RAMEN", "BUNDLE", "OTH"]}
                 productFilter={productionProductFilter}
               />
             </div>
@@ -957,6 +963,41 @@ const ProductionEntryPage: React.FC = () => {
               )}
             </div>
 
+            {/* Ramen Products Section */}
+            {nonFavoriteProducts.RAMEN.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                  <span className="text-sm font-medium text-default-700 dark:text-gray-300">
+                    {t("Ramen Products")}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {nonFavoriteProducts.RAMEN.map((product) => (
+                    <button
+                      key={product.id}
+                      onClick={() => handleProductSelect(product.id)}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-default-200 dark:border-gray-600 bg-white dark:bg-gray-700/50 px-2.5 py-1.5 text-sm transition-colors hover:border-rose-400 dark:hover:border-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                    >
+                      <span className="font-semibold text-default-900 dark:text-gray-100">
+                        {product.id}
+                      </span>
+                      {product.description && (
+                        <>
+                          <span className="text-default-400 dark:text-gray-500">
+                            Â·
+                          </span>
+                          <span className="text-default-700 dark:text-gray-300">
+                            {product.description}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Bundle Products Section */}
             {nonFavoriteProducts.BUNDLE.length > 0 && (
               <div className="space-y-2">
@@ -1038,6 +1079,8 @@ const ProductionEntryPage: React.FC = () => {
                   className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium flex-shrink-0 ${
                     selectedProduct?.type === "MEE"
                       ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+                      : selectedProduct?.type === "RAMEN"
+                      ? "bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-400"
                       : selectedProduct?.type === "OTH"
                       ? "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400"
                       : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
@@ -1045,6 +1088,8 @@ const ProductionEntryPage: React.FC = () => {
                 >
                   {selectedProduct?.type === "MEE"
                     ? t("Mee")
+                    : selectedProduct?.type === "RAMEN"
+                    ? t("Ramen")
                     : selectedProduct?.type === "OTH"
                     ? t("Other")
                     : t("Bihun")}
@@ -1234,6 +1279,7 @@ const ProductionEntryPage: React.FC = () => {
               workerOrderScope={workerOrderScope}
               initialWorkerOrderIds={initialWorkerOrderIds}
               workerOrderRefreshKey={workerOrderRefreshKey}
+              unitLabel={selectedProduct?.type === "RAMEN" ? "pkt" : undefined}
             />
           )}
         </>

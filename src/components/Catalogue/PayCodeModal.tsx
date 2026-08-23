@@ -45,6 +45,8 @@ const RATE_UNITS_REQUIRING_UNITS_INPUT: RateUnit[] = [
   "Day",
   "Bag",
   "Ctn",
+  "PKT",
+  "PCS",
   "Kg",
   "Karung",
   "Bundle",
@@ -113,6 +115,8 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
     { id: "Day", name: t("Day") },
     { id: "Bag", name: t("Bag") },
     { id: "Ctn", name: t("Ctn (Carton)") },
+    { id: "PKT", name: t("PKT (Packet)") },
+    { id: "PCS", name: t("PCS (Pieces)") },
     { id: "Kg", name: t("Kilogram") },
     { id: "Karung", name: t("Karung") },
     { id: "Bundle", name: t("Bundle") },
@@ -504,6 +508,8 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                           formData.rate_unit === "Percent" ||
                           formData.rate_unit === "Bag" ||
                           formData.rate_unit === "Ctn" ||
+                          formData.rate_unit === "PKT" ||
+                          formData.rate_unit === "PCS" ||
                           formData.rate_unit === "Kg" ||
                         formData.rate_unit === "Karung" ||
                         formData.rate_unit === "Bundle" ||
@@ -520,6 +526,10 @@ const PayCodeModal: React.FC<PayCodeModalProps> = ({
                         ? t("Requires Units Input (Required for Bag)")
                         : formData.rate_unit === "Ctn"
                         ? t("Requires Units Input (Required for Carton)")
+                        : formData.rate_unit === "PKT"
+                        ? t("Requires Units Input (Required for Packet)")
+                        : formData.rate_unit === "PCS"
+                        ? t("Requires Units Input (Required for Pieces)")
                         : formData.rate_unit === "Kg"
                         ? t("Requires Units Input (Required for Kilogram)")
                         : formData.rate_unit === "Karung"

@@ -23,7 +23,7 @@ import Button from "../../components/Button";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
 import { OTH_PRODUCTION_IDS } from "../../config/othProductionProducts";
 
-type ProductTab = "BH" | "MEE" | "OTH";
+type ProductTab = "BH" | "MEE" | "RAMEN" | "OTH";
 
 const parseLocalDate = (value: string): Date => {
   const [year, month, day] = value.split("-").map(Number);
@@ -101,6 +101,10 @@ const ProductStockAdjustmentEntryPage: React.FC<
     return products.filter((p) => p.type === "MEE") as StockProduct[];
   }, [products]);
 
+  const ramenProducts = useMemo(() => {
+    return products.filter((p) => p.type === "RAMEN") as StockProduct[];
+  }, [products]);
+
   const othProducts = useMemo(() => {
     return (products.filter((p) =>
       OTH_PRODUCTION_IDS.includes(p.id)
@@ -125,6 +129,8 @@ const ProductStockAdjustmentEntryPage: React.FC<
       ? bhProducts
       : activeTab === "MEE"
       ? meeProducts
+      : activeTab === "RAMEN"
+      ? ramenProducts
       : othProducts);
 
   const adjustmentDateText = useMemo(
@@ -445,6 +451,8 @@ const ProductStockAdjustmentEntryPage: React.FC<
     let bhAdjOut = 0;
     let meeAdjIn = 0;
     let meeAdjOut = 0;
+    let ramenAdjIn = 0;
+    let ramenAdjOut = 0;
 
     Object.values(entries).forEach((entry) => {
       totalAdjIn += entry.adj_in || 0;
@@ -458,10 +466,22 @@ const ProductStockAdjustmentEntryPage: React.FC<
       } else if (product?.type === "MEE") {
         meeAdjIn += entry.adj_in || 0;
         meeAdjOut += entry.adj_out || 0;
+      } else if (product?.type === "RAMEN") {
+        ramenAdjIn += entry.adj_in || 0;
+        ramenAdjOut += entry.adj_out || 0;
       }
     });
 
-    return { totalAdjIn, totalAdjOut, bhAdjIn, bhAdjOut, meeAdjIn, meeAdjOut };
+    return {
+      totalAdjIn,
+      totalAdjOut,
+      bhAdjIn,
+      bhAdjOut,
+      meeAdjIn,
+      meeAdjOut,
+      ramenAdjIn,
+      ramenAdjOut,
+    };
   }, [entries, products]);
 
   return (
@@ -623,7 +643,7 @@ const ProductStockAdjustmentEntryPage: React.FC<
               {!restrictedProducts && (
               <div className="border-b border-default-200 dark:border-gray-700">
                 <div className="flex">
-                  {(["BH", "MEE", "OTH"] as ProductTab[]).map((tab) => (
+                  {(["BH", "MEE", "RAMEN", "OTH"] as ProductTab[]).map((tab) => (
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
@@ -639,6 +659,8 @@ const ProductStockAdjustmentEntryPage: React.FC<
                           ? "Bihun Products"
                           : tab === "MEE"
                           ? "Mee Products"
+                          : tab === "RAMEN"
+                          ? "Ramen Products"
                           : "Other Products",
                       )}
                       <span className="ml-2 rounded-full bg-default-200 dark:bg-gray-700 px-2 py-0.5 text-xs">
@@ -646,6 +668,8 @@ const ProductStockAdjustmentEntryPage: React.FC<
                           ? bhProducts.length
                           : tab === "MEE"
                           ? meeProducts.length
+                          : tab === "RAMEN"
+                          ? ramenProducts.length
                           : othProducts.length}
                       </span>
                     </button>

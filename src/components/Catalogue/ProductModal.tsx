@@ -100,10 +100,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
     }
   };
 
-  const taxOptions = [
-    { id: "None", name: t("None") },
-    { id: "SR", name: "SR" },
-    { id: "ZRL", name: "ZRL" },
+  const typeOptions = [
+    { id: "MEE", name: t("Mee") },
+    { id: "BH", name: t("Bihun") },
+    { id: "RAMEN", name: t("Ramen") },
+    { id: "BUNDLE", name: t("Bundle") },
+    { id: "JP", name: t("Jelly Polly") },
+    { id: "OTH", name: t("Others") },
   ];
 
   return (
@@ -194,24 +197,14 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   required
                 />
 
-                <FormInput
+                <FormListbox
                   name="type"
                   label={t("Type")}
                   value={formData.type}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setFormData({ ...formData, type: e.target.value })
-                  }
-                  required
-                />
-
-                <FormListbox
-                  name="tax"
-                  label={t("Tax")}
-                  value={formData.tax}
                   onChange={(value: string) =>
-                    setFormData({ ...formData, tax: value })
+                    setFormData({ ...formData, type: value })
                   }
-                  options={taxOptions}
+                  options={typeOptions}
                   required
                 />
 

@@ -21,6 +21,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-22",
+    ms: "Medan Cukai (Tax) pada produk telah dibuang daripada halaman Katalog Produk kerana ia tidak diperlukan lagi. Nilai cukai sedia ada pada produk lama dikekalkan secara automatik dan masih digunakan untuk resit/invois lama.",
+    en: "The Tax field on products has been removed from the Product Catalogue because it is no longer needed. Existing tax values on older products are preserved automatically and still used for legacy invoices/receipts.",
+  },
+  {
+    date: "2026-08-22",
+    ms: "Jenis produk (Type) kini dipilih daripada senarai pilihan (Mee, Bihun, Ramen, Bundle, Jelly Polly, Lain-lain) dan bukannya ditaip sendiri. Ini mengelakkan kesilapan ejaan dan memastikan produk baharu jatuh ke kumpulan yang betul.",
+    en: "Product type (Type) is now selected from a list (Mee, Bihun, Ramen, Bundle, Jelly Polly, Other) instead of being typed manually. This avoids typos and makes sure new products fall into the right group.",
+  },
+  {
+    date: "2026-08-22",
+    ms: "Dua unit ukuran baharu kini tersedia untuk kod gaji: PKT (bungkusan) dan PCS (keping). Produk ramen juga kini mempunyai kumpulan tersendiri dalam sistem, berasingan daripada Mee dan Bihun, supaya senang dikenal pasti dan ditambah pada masa hadapan.",
+    en: "Two new measurement units are now available for pay codes: PKT (packet) and PCS (piece). Ramen products now have their own group in the system, separate from Mee and Bihun, making them easy to identify and add in the future.",
+  },
+  {
+    date: "2026-08-22",
     ms: "Eksport Audit baharu membolehkan buku kerja LEDGERS dan DEBTORS tahunan dimuat turun untuk juruaudit. Kedua-dua fail boleh dimuat turun bersama daripada rekod perakaunan yang sama, atau secara berasingan apabila diperlukan.",
     en: "The new Audit Export downloads annual LEDGERS and DEBTORS workbooks for the auditors. Both files can be downloaded together from the same accounting records, or separately when needed.",
   },
