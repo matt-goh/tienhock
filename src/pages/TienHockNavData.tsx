@@ -27,6 +27,7 @@ import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPag
 // Accounting - Financial Reports
 import TrialBalancePage from "./Accounting/Reports/TrialBalancePage";
 import AccountLedgerPage from "./Accounting/Reports/AccountLedgerPage";
+import AuditExportPage from "./Accounting/Reports/AuditExportPage";
 import IncomeStatementPage from "./Accounting/Reports/IncomeStatementPage";
 import BalanceSheetPage from "./Accounting/Reports/BalanceSheetPage";
 import CogmPage from "./Accounting/Reports/CogmPage";
@@ -444,6 +445,12 @@ export const TienHockNavData: SidebarItem[] = [
         name: "Account Ledger",
         path: "/accounting/reports/account-ledger",
         component: AccountLedgerPage,
+        group: "Reports",
+      },
+      {
+        name: "Audit Export",
+        path: "/accounting/reports/audit-export",
+        component: AuditExportPage,
         group: "Reports",
       },
       {
