@@ -979,8 +979,15 @@ export default function (pool) {
       };
 
       // Helper to find the Base production pay code (PBH_*, PM_*, PWE_*, WE_*, WE-* prefixes)
-      // Production-based rate units: Bag, Kg, Karung, Bundle
-      const productionRateUnits = ["Bag", "Kg", "Karung", "Bundle"];
+      // Production-based rate units: Bag, Kg, Karung, Bundle, PKT, PCS
+      const productionRateUnits = [
+        "Bag",
+        "Kg",
+        "Karung",
+        "Bundle",
+        "PKT",
+        "PCS",
+      ];
       const findBasePayCode = (payCodesForProduct, assignedPayCodes) => {
         // When a product exposes several candidates (e.g. PM_2U 0.25 and
         // PM_2U(M) 0.45 for 2UDG), prefer the one the worker is actually

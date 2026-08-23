@@ -39,7 +39,7 @@ interface ProductOrderModalProps {
   products: OrderableProduct[];
 }
 
-const ORDERABLE_TYPES = ["MEE", "BH", "BUNDLE", "OTH", "JP"] as const;
+const ORDERABLE_TYPES = ["MEE", "BH", "BUNDLE", "OTH", "JP", "RAMEN"] as const;
 type OrderableType = (typeof ORDERABLE_TYPES)[number];
 
 // TH packing worker scopes shown as extra tabs. The list mirrors what the
@@ -116,6 +116,8 @@ const ProductOrderModal: React.FC<ProductOrderModalProps> = ({
         return t("Others");
       case "JP":
         return t("Jelly Polly");
+      case "RAMEN":
+        return t("Ramen");
     }
   };
 

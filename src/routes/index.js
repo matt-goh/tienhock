@@ -48,6 +48,7 @@ import journalEntriesRouter from "./accounting/journal-entries.js";
 import journalVouchersRouter from "./accounting/journal-vouchers.js";
 import financialReportsRouter from "./accounting/financial-reports.js";
 import bankStatementRouter from "./accounting/bank-statement.js";
+import auditExportsRouter from "./accounting/audit-exports.js";
 import openingBalancesRouter from "./accounting/opening-balances.js";
 import materialsRouter from "./accounting/materials.js";
 import suppliersRouter from "./accounting/suppliers.js";
@@ -246,6 +247,7 @@ export default function setupRoutes(app, pool) {
   app.use("/api/journal-vouchers", journalVouchersRouter(pool));
   app.use("/api/financial-reports", financialReportsRouter(pool));
   app.use("/api/bank-statement", bankStatementRouter(pool));
+  app.use("/api/audit-exports", auditExportsRouter(pool));
   app.use("/api/opening-balances", openingBalancesRouter(pool));
   app.use("/api/materials", materialsRouter(pool));
   app.use("/api/suppliers", suppliersRouter(pool));

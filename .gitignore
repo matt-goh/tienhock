@@ -14,7 +14,12 @@ prod/docker-compose.yml
 
 # private legacy accounting imports and generated preflight artifacts
 dev/import/legacy-jan-may/data/*.csv
+dev/import/legacy-jan-may/data/*.xlsx
 dev/import/legacy-jan-may/generated/
+/EXCEL_THDB_(Jan-May26).xlsx
+/EXCEL_THLD_(JAN-MAY26).xlsx
+/~$EXCEL_THDB_(Jan-May26).xlsx
+/~$EXCEL_THLD_(JAN-MAY26).xlsx
 
 # private legacy report scans (contain customer data) + transcription fixtures
 dev/import/legacy-report-fixtures/data/

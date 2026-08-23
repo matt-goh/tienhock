@@ -1117,7 +1117,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     0,
   );
 
-  type BaseRateSummaryUnit = "Bag" | "Ctn" | "Hour";
+  type BaseRateSummaryUnit = "Bag" | "Ctn" | "Hour" | "PKT" | "PCS";
 
   type BaseRateSummary = {
     unit: BaseRateSummaryUnit;
@@ -1126,7 +1126,13 @@ const EmployeePayrollDetailsPage: React.FC = () => {
     totalAmount: number;
   };
 
-  const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = ["Bag", "Ctn", "Hour"];
+  const BASE_RATE_SUMMARY_UNITS: BaseRateSummaryUnit[] = [
+    "Bag",
+    "Ctn",
+    "Hour",
+    "PKT",
+    "PCS",
+  ];
 
   const isBaseRateSummaryUnit = (
     rateUnit: string,

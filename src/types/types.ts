@@ -793,7 +793,7 @@ export interface SelectOption {
 }
 
 export type PayType = "Base" | "Tambahan" | "Overtime";
-export type RateUnit = "Hour" | "Bill" | "Bag" | "Ctn" | "Percent" | "Fixed" | "Day" | "Trip" | "Tray" | "Kg" | "Karung" | "Bundle";
+export type RateUnit = "Hour" | "Bill" | "Bag" | "Ctn" | "Percent" | "Fixed" | "Day" | "Trip" | "Tray" | "Kg" | "Karung" | "Bundle" | "PKT" | "PCS";
 
 // Effective-month-dated rate override layered over the base rate columns.
 // Resolved at payroll-process time by get_effective_pay_rate(); see
@@ -1342,7 +1342,7 @@ export interface AccountCodeFilters {
 export interface StockProduct {
   id: string;
   description: string;
-  type: "BH" | "MEE" | "JP" | "OTH" | "TAX" | "BUNDLE";
+  type: "BH" | "MEE" | "JP" | "OTH" | "TAX" | "BUNDLE" | "RAMEN";
   price_per_unit?: number;
   is_active?: boolean;
   // Explicit per-type display order (managed via the Catalogue Product page

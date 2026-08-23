@@ -22,7 +22,7 @@ import { StockProduct } from "../../types/types";
 import { isHiddenSpecialItem } from "../../config/specialItems";
 
 const FAVORITES_STORAGE_KEY = "stock-product-favorites";
-type ProductType = "BH" | "MEE" | "JP" | "OTH" | "BUNDLE";
+type ProductType = "BH" | "MEE" | "JP" | "OTH" | "BUNDLE" | "RAMEN";
 
 interface ProductSelectorProps {
   value: string | null;
@@ -42,6 +42,7 @@ interface GroupedProducts {
   JP: StockProduct[];
   OTH: StockProduct[];
   BUNDLE: StockProduct[];
+  RAMEN: StockProduct[];
 }
 
 const ProductSelector: React.FC<ProductSelectorProps> = ({
@@ -112,6 +113,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       JP: [],
       OTH: [],
       BUNDLE: [],
+      RAMEN: [],
     };
 
     filtered.forEach((product) => {
@@ -149,6 +151,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
       JP: [],
       OTH: [],
       BUNDLE: [],
+      RAMEN: [],
     };
 
     Object.entries(groupedProducts).forEach(([type, prods]) => {
@@ -195,6 +198,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     JP: "JellyPolly Products",
     OTH: "Other Products",
     BUNDLE: "Bundle Products",
+    RAMEN: "Ramen Products",
   };
 
   // Category colors
@@ -204,6 +208,7 @@ const ProductSelector: React.FC<ProductSelectorProps> = ({
     JP: "text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-gray-900",
     OTH: "text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-gray-900",
     BUNDLE: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-gray-900",
+    RAMEN: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-gray-900",
   };
 
   return (

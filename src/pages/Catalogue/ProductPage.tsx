@@ -312,6 +312,8 @@ const ProductPage: React.FC = () => {
                   { id: "all", name: t("All Types") },
                   { id: "MEE", name: "MEE" },
                   { id: "BH", name: "BH" },
+                  { id: "RAMEN", name: "RAMEN" },
+                  { id: "BUNDLE", name: "BUNDLE" },
                   { id: "JP", name: "JP" },
                   { id: "OTH", name: "OTH" },
                 ]}
@@ -350,9 +352,6 @@ const ProductPage: React.FC = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                     {t("type", { ns: "common" })}
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[8%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                    {t("Tax")}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                     {t("status", { ns: "common" })}
@@ -394,14 +393,15 @@ const ProductPage: React.FC = () => {
                             ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
                             : product.type === "OTH"
                             ? "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300"
+                            : product.type === "BUNDLE"
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300"
+                            : product.type === "RAMEN"
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300"
                             : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300"
                         }`}
                       >
                         {product.type}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[8%]">
-                      {product.tax}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
                       {product.is_active ? (

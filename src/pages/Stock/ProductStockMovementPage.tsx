@@ -45,11 +45,12 @@ type ProductSelectorProductType = Exclude<StockProduct["type"], "TAX">;
 const PRODUCT_SELECTOR_TYPES = new Set<ProductSelectorProductType>([
   "BH",
   "MEE",
+  "RAMEN",
   "JP",
   "OTH",
   "BUNDLE",
 ]);
-const DEFAULT_PRODUCT_TYPES: ProductSelectorProductType[] = ["BH", "MEE", "OTH"];
+const DEFAULT_PRODUCT_TYPES: ProductSelectorProductType[] = ["BH", "MEE", "RAMEN", "OTH"];
 
 const isProductSelectorProductType = (
   value: string | undefined
@@ -178,6 +179,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
               productTypes.includes(productType)
             : product.type === "BH" ||
               product.type === "MEE" ||
+              product.type === "RAMEN" ||
               isOthProductionProduct(product.id))
         );
       }
@@ -190,7 +192,12 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       // Restricted mode (e.g. Jelly Polly): one flat group per type
       return productTypes
         .map((type) => ({
-          label: type === "JP" ? "Jelly Polly Products" : `${type} Products`,
+          label:
+            type === "JP"
+              ? "Jelly Polly Products"
+              : type === "RAMEN"
+              ? "Ramen Products"
+              : `${type} Products`,
           products: (products as StockProduct[]).filter(
             (product) => product.type === type
           ),
@@ -200,11 +207,13 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
 
     const bh: StockProduct[] = [];
     const mee: StockProduct[] = [];
+    const ramen: StockProduct[] = [];
     const oth: StockProduct[] = [];
 
     (products as StockProduct[]).forEach((product) => {
       if (product.type === "BH") bh.push(product);
       else if (product.type === "MEE") mee.push(product);
+      else if (product.type === "RAMEN") ramen.push(product);
       else if (isOthProductionProduct(product.id)) oth.push(product);
     });
 
@@ -214,6 +223,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
     return [
       { label: "Bihun Products", products: bh },
       { label: "Mee Products", products: mee },
+      { label: "Ramen Products", products: ramen },
       { label: "Other Products", products: oth },
     ].filter((group) => group.products.length > 0);
   }, [products, productTypes]);
@@ -384,6 +394,14 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
       setIsPrinting(false);
     }
   };
+
+  // Ramen products move in packets (pkt); everything else stays in bags.
+  const movementUnit: string =
+    (products as StockProduct[]).find((p) => p.id === selectedProductId)
+      ?.type === "RAMEN"
+      ? "pkt"
+      : "bags";
+  const openingBalanceUnit: string = movementUnit === "pkt" ? "pkt" : "bag";
 
   return (
     <div className="space-y-4">
@@ -556,7 +574,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                   <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
                     {openingBalance.toLocaleString()}{" "}
                     <span className="text-base font-normal text-default-500 dark:text-gray-400">
-                      bags
+                      {movementUnit}
                     </span>
                   </p>
                 </div>
@@ -705,7 +723,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                   <p className="text-2xl font-bold text-default-900 dark:text-gray-100">
                     {movements[movements.length - 1]?.cf.toLocaleString()}{" "}
                     <span className="text-base font-normal text-default-500 dark:text-gray-400">
-                      bags
+                      {movementUnit}
                     </span>
                   </p>
                 </div>
@@ -769,7 +787,7 @@ const ProductStockMovementPage: React.FC<ProductStockMovementPageProps> = ({
                         <p className="text-lg font-bold tabular-nums text-default-800 dark:text-gray-100">
                           {initialBalance.toLocaleString()}{" "}
                           <span className="text-xs font-normal text-default-400 dark:text-gray-500">
-                            bag
+                            {openingBalanceUnit}
                           </span>
                         </p>
                         <p className="text-[11px] text-default-400 dark:text-gray-500">

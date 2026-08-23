@@ -27,6 +27,7 @@ import LocationAccountMappingsPage from "./Accounting/LocationAccountMappingsPag
 // Accounting - Financial Reports
 import TrialBalancePage from "./Accounting/Reports/TrialBalancePage";
 import AccountLedgerPage from "./Accounting/Reports/AccountLedgerPage";
+import AuditExportPage from "./Accounting/Reports/AuditExportPage";
 import IncomeStatementPage from "./Accounting/Reports/IncomeStatementPage";
 import BalanceSheetPage from "./Accounting/Reports/BalanceSheetPage";
 import CogmPage from "./Accounting/Reports/CogmPage";
@@ -447,6 +448,12 @@ export const TienHockNavData: SidebarItem[] = [
         group: "Reports",
       },
       {
+        name: "Audit Export",
+        path: "/accounting/reports/audit-export",
+        component: AuditExportPage,
+        group: "Reports",
+      },
+      {
         name: "Debtors",
         path: "/sales/debtors",
         component: DebtorsReportPage,
@@ -643,6 +650,20 @@ export const TienHockNavData: SidebarItem[] = [
           <ProductionListPage
             productTypes={["BH"]}
             title="Bihun Production Records"
+            {...props}
+          />
+        ),
+        group: "Production Records",
+        dropdownColumn: STOCK_DROPDOWN_COLUMNS.productionRecords.key,
+        dropdownColumnOrder: STOCK_DROPDOWN_COLUMNS.productionRecords.order,
+      },
+      {
+        name: "Ramen Records",
+        path: "/stock/production-records/ramen",
+        component: (props: any) => (
+          <ProductionListPage
+            productTypes={["RAMEN"]}
+            title="Ramen Production Records"
             {...props}
           />
         ),
