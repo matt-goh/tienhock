@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-22",
+    ms: "Eksport Audit baharu membolehkan buku kerja LEDGERS dan DEBTORS tahunan dimuat turun untuk juruaudit. Kedua-dua fail boleh dimuat turun bersama daripada rekod perakaunan yang sama, atau secara berasingan apabila diperlukan.",
+    en: "The new Audit Export downloads annual LEDGERS and DEBTORS workbooks for the auditors. Both files can be downloaded together from the same accounting records, or separately when needed.",
+  },
+  {
+    date: "2026-08-22",
     ms: "Cetakan Lejar Akaun dan penyata bank untuk semua syarikat kini memaparkan lajur Debit, Kredit dan Baki sepenuhnya dalam halaman A4, termasuk lejar yang mempunyai senarai invois atau rujukan yang panjang.",
     en: "Printed Account Ledgers and bank statements for all companies now keep the Debit, Credit and Balance columns fully within the A4 page, including ledgers with long invoice or reference lists.",
   },

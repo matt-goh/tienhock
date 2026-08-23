@@ -9,7 +9,7 @@ import { resolveDebtorChildCode } from "./debtorSync.js";
 // Match the exact candidate order used by debtorSync: ID, ID-D, ID-D2 ...
 // ID-D50. Avoid a broad prefix match because one customer ID can be the
 // prefix of another customer's legitimate debtor code.
-const DEBTOR_CHILDREN_QUERY = `
+export const DEBTOR_CHILDREN_QUERY = `
   SELECT candidate.code AS child_code,
          customer.id AS customer_id,
          customer.name AS customer_name
