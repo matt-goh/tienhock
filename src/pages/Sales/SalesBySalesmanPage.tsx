@@ -36,6 +36,8 @@ interface SalesmanData {
   name?: string;
   totalSales: number;
   totalQuantity: number;
+  ramenQuantity: number;
+  nonRamenQuantity: number;
   salesCount: number; // Total number of bills (invoices + cash bills)
   invoiceCount: number; // Number of invoices
   cashCount: number; // Number of cash bills
@@ -51,11 +53,54 @@ interface SalesTrendData {
   [key: string]: string | number; // For salesmen IDs and their sales values
 }
 
+interface TrendDateTimestamps {
+  startTimestamp: string;
+  endTimestamp: string;
+}
+
 interface SalesBySalesmanPageProps {
   activeTab: number;
   onTabChange: (tab: number) => void;
   scope?: SalesSummaryScope;
 }
+
+const SALESMAN_CHART_COLORS = [
+  "#4299e1",
+  "#48bb78",
+  "#ed8936",
+  "#9f7aea",
+  "#f56565",
+  "#0f766e",
+  "#b45309",
+  "#0369a1",
+];
+
+const getStableSalesmanColorIndex = (salesmanId: string): number => {
+  const hash = salesmanId
+    .split("")
+    .reduce((value: number, character: string) => {
+      return (value * 31 + character.charCodeAt(0)) >>> 0;
+    }, 0);
+  return hash % SALESMAN_CHART_COLORS.length;
+};
+
+const getTrendDateTimestamps = (): TrendDateTimestamps => {
+  const endDate = new Date();
+  const startDate = new Date(
+    endDate.getFullYear(),
+    endDate.getMonth() - 11,
+    1,
+    0,
+    0,
+    0,
+    0
+  );
+
+  return {
+    startTimestamp: startDate.getTime().toString(),
+    endTimestamp: endDate.getTime().toString(),
+  };
+};
 
 const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   activeTab,
@@ -63,6 +108,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   scope = "tienhock",
 }) => {
   const { t } = useTranslation("sales");
+  const isJp = scope === "jp";
   // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
     `salesBySalesmanMonth:${scope}`
@@ -99,6 +145,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
     direction: "desc",
   });
   const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
+  const [trendSalesmanIds, setTrendSalesmanIds] = useState<string[]>([]);
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
   const [selectedChartSalesmen, setSelectedChartSalesmen] = useState<string[]>(
@@ -127,20 +174,76 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   }, [selectedMonth]);
 
   useEffect(() => {
-    if (salesmenData.length > 0) {
-      const salesmenIds = salesmenData.map((employee) => employee.id);
-      setSalesmen(["All Salesmen", ...salesmenIds]);
+    const salesmenIds = Array.from(
+      new Set([
+        ...salesmenData.map((employee) => employee.id),
+        ...salesmanData.map((salesman) => salesman.id),
+        ...trendSalesmanIds,
+      ])
+    );
+    if (salesmenIds.length > 0) {
+      const nextSalesmen = ["All Salesmen", ...salesmenIds];
+      setSalesmen((currentSalesmen) =>
+        currentSalesmen.length === nextSalesmen.length &&
+        currentSalesmen.every(
+          (salesmanId, index) => salesmanId === nextSalesmen[index]
+        )
+          ? currentSalesmen
+          : nextSalesmen
+      );
     }
-  }, [salesmenData]);
+  }, [salesmenData, salesmanData, trendSalesmanIds]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setTrendSalesmanIds([]);
+
+    const fetchTrendSalesmanIds = async (): Promise<void> => {
+      const { startTimestamp, endTimestamp } = getTrendDateTimestamps();
+
+      try {
+        // An unfiltered trend response contains every salesman who actually sold
+        // in the same 12-month chart window, including inactive historical staff.
+        const chartData = await api.get(
+          `/api/invoices/sales/trends?type=salesmen&startDate=${startTimestamp}&endDate=${endTimestamp}&scope=${scope}`
+        );
+        if (!Array.isArray(chartData) || isCancelled) return;
+
+        const historicalIds = Array.from(
+          new Set<string>(
+            chartData.flatMap((monthData: SalesTrendData): string[] =>
+              Object.keys(monthData).filter((key): boolean => key !== "month")
+            )
+          )
+        ).sort((firstId: string, secondId: string): number =>
+          firstId.localeCompare(secondId)
+        );
+        setTrendSalesmanIds(historicalIds);
+      } catch (fetchError) {
+        if (!isCancelled) {
+          console.error("Error fetching trend salesman IDs:", fetchError);
+        }
+      }
+    };
+
+    void fetchTrendSalesmanIds();
+    return (): void => {
+      isCancelled = true;
+    };
+  }, [scope]);
 
   useEffect(() => {
     if (salesmen.length > 0) {
-      // Filter out "All Salesmen" and apply maximum limit
-      const allSalesmenIds = salesmen
-        .filter((id) => id !== "All Salesmen")
-        .slice(0, maxChartSalesmen);
+      const allSalesmenIds = salesmen.filter((id) => id !== "All Salesmen");
 
-      setSelectedChartSalesmen(allSalesmenIds);
+      setSelectedChartSalesmen((currentSelection) => {
+        const preservedSelection = currentSelection
+          .filter((salesmanId) => allSalesmenIds.includes(salesmanId))
+          .slice(0, maxChartSalesmen);
+        return preservedSelection.length > 0
+          ? preservedSelection
+          : allSalesmenIds.slice(0, maxChartSalesmen);
+      });
     }
   }, [salesmen, maxChartSalesmen]);
 
@@ -155,12 +258,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   const fetchYearlyTrendData = async () => {
     setIsGeneratingChart(true);
     try {
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1); // Last 12 months
-
-      const startTimestamp = startDate.getTime().toString();
-      const endTimestamp = endDate.getTime().toString();
+      const { startTimestamp, endTimestamp } = getTrendDateTimestamps();
 
       // Use the new dedicated trends endpoint
       const url = `/api/invoices/sales/trends?type=salesmen&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${selectedChartSalesmen.join(
@@ -173,8 +271,14 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
         throw new Error("Invalid response format");
       }
 
-      // Check if we received any data
-      if (chartData.length === 0) {
+      const typedChartData = chartData as SalesTrendData[];
+      const hasSelectedSales = typedChartData.some((monthData) =>
+        selectedChartSalesmen.some(
+          (salesmanId) => Number(monthData[salesmanId] || 0) !== 0
+        )
+      );
+
+      if (!hasSelectedSales) {
         toast.error(
           t("No data found for the selected salesmen in the past year")
         );
@@ -182,7 +286,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
         return;
       }
 
-      setSalesTrendData(chartData);
+      setSalesTrendData(typedChartData);
       toast.success(t("Sales trend data generated successfully"));
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
@@ -303,36 +407,31 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
     });
   };
 
-  // Generate random colors for charts
-  const generateRandomColor = () => {
-    return `#${Math.floor(Math.random() * 16777215).toString(16)}`;
-  };
+  const salesmanColors = useMemo(() => {
+    const colorMap: Record<string, string> = {};
+    const usedColorIndexes = new Set<number>();
 
-  const generateSalesmanColors = () => {
-    const colorMap: { [key: string]: string } = {};
+    // Resolve hash collisions in a stable ID order so every selected line has
+    // a distinct colour (the picker is capped below the palette size).
+    [...selectedChartSalesmen].sort().forEach((salesmanId) => {
+      const startingIndex = getStableSalesmanColorIndex(salesmanId);
+      let colorIndex = startingIndex;
 
-    // Base colors for first few salesmen
-    const baseColors = [
-      "#4299e1", // Blue
-      "#48bb78", // Green
-      "#ed8936", // Orange
-      "#9f7aea", // Purple
-      "#f56565", // Red
-    ];
-
-    // Assign colors to the selected salesmen first
-    selectedChartSalesmen.forEach((salesmanId, index) => {
-      if (index < baseColors.length) {
-        colorMap[salesmanId] = baseColors[index];
-      } else {
-        colorMap[salesmanId] = generateRandomColor();
+      for (let offset = 0; offset < SALESMAN_CHART_COLORS.length; offset++) {
+        const candidateIndex =
+          (startingIndex + offset) % SALESMAN_CHART_COLORS.length;
+        if (!usedColorIndexes.has(candidateIndex)) {
+          colorIndex = candidateIndex;
+          break;
+        }
       }
+
+      usedColorIndexes.add(colorIndex);
+      colorMap[salesmanId] = SALESMAN_CHART_COLORS[colorIndex];
     });
 
     return colorMap;
-  };
-
-  const salesmanColors = useMemo(generateSalesmanColors, [salesmanData]);
+  }, [selectedChartSalesmen]);
 
   if (error) {
     return (
@@ -515,21 +614,56 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                             ))}
                         </div>
                       </th>
-                      <th
-                        scope="col"
-                        className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
-                        onClick={() => handleSort("totalQuantity")}
-                      >
-                        <div className="flex items-center justify-end">
-                          {t("Total Quantity")}
-                          {sortConfig.key === "totalQuantity" &&
-                            (sortConfig.direction === "asc" ? (
-                              <IconSortAscending size={16} className="ml-1" />
-                            ) : (
-                              <IconSortDescending size={16} className="ml-1" />
-                            ))}
-                        </div>
-                      </th>
+                      {isJp ? (
+                        <th
+                          scope="col"
+                          className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
+                          onClick={() => handleSort("totalQuantity")}
+                        >
+                          <div className="flex items-center justify-end">
+                            {t("Total Quantity")}
+                            {sortConfig.key === "totalQuantity" &&
+                              (sortConfig.direction === "asc" ? (
+                                <IconSortAscending size={16} className="ml-1" />
+                              ) : (
+                                <IconSortDescending size={16} className="ml-1" />
+                              ))}
+                          </div>
+                        </th>
+                      ) : (
+                        <>
+                          <th
+                            scope="col"
+                            className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
+                            onClick={() => handleSort("nonRamenQuantity")}
+                          >
+                            <div className="flex items-center justify-end">
+                              {t("Non-Ramen Qty")}
+                              {sortConfig.key === "nonRamenQuantity" &&
+                                (sortConfig.direction === "asc" ? (
+                                  <IconSortAscending size={16} className="ml-1" />
+                                ) : (
+                                  <IconSortDescending size={16} className="ml-1" />
+                                ))}
+                            </div>
+                          </th>
+                          <th
+                            scope="col"
+                            className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
+                            onClick={() => handleSort("ramenQuantity")}
+                          >
+                            <div className="flex items-center justify-end">
+                              {t("Ramen (PKT)")}
+                              {sortConfig.key === "ramenQuantity" &&
+                                (sortConfig.direction === "asc" ? (
+                                  <IconSortAscending size={16} className="ml-1" />
+                                ) : (
+                                  <IconSortDescending size={16} className="ml-1" />
+                                ))}
+                            </div>
+                          </th>
+                        </>
+                      )}
                       <th
                         scope="col"
                         className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
@@ -562,9 +696,20 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
                           {(salesman.invoiceCount || 0).toLocaleString()}
                         </td>
-                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
-                          {salesman.totalQuantity.toLocaleString()}
-                        </td>
+                        {isJp ? (
+                          <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
+                            {salesman.totalQuantity.toLocaleString()}
+                          </td>
+                        ) : (
+                          <>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
+                              {salesman.nonRamenQuantity.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-rose-700 dark:text-rose-300">
+                              {salesman.ramenQuantity.toLocaleString()}
+                            </td>
+                          </>
+                        )}
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-medium">
                           {formatCurrency(salesman.totalSales)}
                         </td>
@@ -574,7 +719,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                   <tfoot className="bg-default-100 dark:bg-gray-700/50 sticky bottom-0 border-t dark:border-gray-600">
                     <tr>
                       <td
-                        colSpan={4}
+                        colSpan={isJp ? 4 : 5}
                         className="px-4 py-2 text-right text-sm font-medium"
                       >
                         {t("Total:")}
@@ -687,42 +832,44 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
 
           {/* Sales Trend Chart */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
-            <div className="flex justify-between items-center mb-4">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4">
               <h2 className="text-lg font-semibold">
                 {t("Salesmen's Sales Trends Over Time")}
               </h2>
-              <div className="flex items-center gap-3">
-                <FormCombobox
-                  name="chartSalesmen"
-                  label=""
-                  value={selectedChartSalesmen}
-                  onChange={(values) => {
-                    // Ensure values is always treated as an array and filter out nulls
-                    const valueArray = (
-                      Array.isArray(values) ? values : [values].filter(Boolean)
-                    ).filter((value): value is string => value !== null);
-                    // Limit selection to prevent chart overcrowding
-                    if (valueArray.length <= maxChartSalesmen) {
-                      setSelectedChartSalesmen(valueArray);
-                    } else if (valueArray.length > maxChartSalesmen) {
-                      toast.error(
-                        t(
-                          "Maximum {{total}} salesmen can be selected for the chart",
-                          { total: maxChartSalesmen }
-                        )
-                      );
-                      // Keep the first max number of selections
-                      setSelectedChartSalesmen(
-                        valueArray.slice(0, maxChartSalesmen)
-                      );
-                    }
-                  }}
-                  options={salesmen
-                    .filter((id) => id !== "All Salesmen")
-                    .map((id) => ({ id, name: id }))}
-                  query={salesmanQuery}
-                  setQuery={setSalesmanQuery}
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="w-full sm:w-96">
+                  <FormCombobox
+                    name="chartSalesmen"
+                    label=""
+                    value={selectedChartSalesmen}
+                    onChange={(values) => {
+                      // Ensure values is always treated as an array and filter out nulls
+                      const valueArray = (
+                        Array.isArray(values) ? values : [values].filter(Boolean)
+                      ).filter((value): value is string => value !== null);
+                      // Limit selection to prevent chart overcrowding
+                      if (valueArray.length <= maxChartSalesmen) {
+                        setSelectedChartSalesmen(valueArray);
+                      } else if (valueArray.length > maxChartSalesmen) {
+                        toast.error(
+                          t(
+                            "Maximum {{total}} salesmen can be selected for the chart",
+                            { total: maxChartSalesmen }
+                          )
+                        );
+                        // Keep the first max number of selections
+                        setSelectedChartSalesmen(
+                          valueArray.slice(0, maxChartSalesmen)
+                        );
+                      }
+                    }}
+                    options={salesmen
+                      .filter((id) => id !== "All Salesmen")
+                      .map((id) => ({ id, name: id }))}
+                    query={salesmanQuery}
+                    setQuery={setSalesmanQuery}
+                  />
+                </div>
                 <Button
                   onClick={fetchYearlyTrendData}
                   disabled={
@@ -780,9 +927,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         type="monotone"
                         dataKey={salesmanId}
                         name={salesmanId}
-                        stroke={
-                          salesmanColors[salesmanId] || generateRandomColor()
-                        }
+                        stroke={salesmanColors[salesmanId]}
                         strokeWidth={2}
                         dot={false}
                         activeDot={{ r: 4 }}

@@ -575,6 +575,11 @@ const ProductionEntryPage: React.FC = () => {
       toast.success(
         isStockOnlyProduct
           ? t("Stock record saved: {{total}} total", { total: response.total_bags })
+          : selectedProduct?.type === "RAMEN"
+          ? t("Production saved: {{total}} total packets from {{count}} workers", {
+              total: response.total_bags,
+              count: response.entry_count,
+            })
           : t("Production saved: {{total}} total bags from {{count}} workers", {
               total: response.total_bags,
               count: response.entry_count,
@@ -985,7 +990,7 @@ const ProductionEntryPage: React.FC = () => {
                       {product.description && (
                         <>
                           <span className="text-default-400 dark:text-gray-500">
-                            Â·
+                            ·
                           </span>
                           <span className="text-default-700 dark:text-gray-300">
                             {product.description}

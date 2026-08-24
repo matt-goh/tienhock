@@ -309,11 +309,63 @@ export default function (pool) {
     return byLoc;
   };
 
+  // Ramen salesman and delivery commissions belong to the MEE side of the
+  // business. Keep the two codes separate because SALESMAN's 1-PR amount is in
+  // the shared salary base, while SALESMAN_IKUT's DME-RA amount is in C/I/O.
+  const computeRamenByLocation = async (db, year, month, salaryReport) => {
+    const staffLoc = {};
+    (salaryReport?.comprehensive?.locations || []).forEach((l) => {
+      (l.employees || []).forEach((e) => {
+        if (e.staff_id != null) staffLoc[e.staff_id] = l.location;
+      });
+    });
+    const r = await db.query(
+      `SELECT ep.employee_id, pi.pay_code_id, ROUND(SUM(pi.amount), 2) AS amt
+         FROM employee_payrolls ep
+         JOIN monthly_payrolls mp ON mp.id = ep.monthly_payroll_id
+         JOIN payroll_items pi ON pi.employee_payroll_id = ep.id
+        WHERE mp.year = $1 AND mp.month = $2
+          AND pi.pay_code_id IN ('1-PR', 'DME-RA')
+          AND NOT (
+            pi.work_log_type = 'daily'
+            AND pi.source_date IS NOT NULL
+            AND EXISTS (
+              SELECT 1
+              FROM leave_records lr
+              WHERE lr.employee_id = pi.source_employee_id
+                AND lr.status = 'approved'
+                AND lr.company <> 'JP'
+                AND lr.leave_date = pi.source_date
+            )
+          )
+        GROUP BY ep.employee_id, pi.pay_code_id`,
+      [year, month]
+    );
+    const byLoc = {};
+    r.rows.forEach((row) => {
+      const loc = staffLoc[row.employee_id];
+      if (!loc) return;
+      if (!byLoc[loc]) byLoc[loc] = { split: 0, others: 0 };
+      const bucket = row.pay_code_id === "DME-RA" ? "others" : "split";
+      byLoc[loc][bucket] = round2(
+        byLoc[loc][bucket] + (parseFloat(row.amt) || 0)
+      );
+    });
+    return byLoc;
+  };
+
   // Build the JVSL journal lines (and the per-department preview rows) from the
   // salary report. mappingsByLocation is keyed `JVSL_<deptId>`; staffAccruals is the
   // JVSL_00 accrual map. jellyByLocation carves Ice-Polly jelly sales out of the
-  // salesman/ikut-lori split. Returns lines, totals, unmapped, and preview `locations`.
-  const buildJvslFromSalaryReport = (salaryReport, mappingsByLocation, staffAccruals, jellyByLocation = {}) => {
+  // salesman/ikut-lori split; ramenByLocation moves Ramen commission fully to MEE.
+  // Returns lines, totals, unmapped, and preview `locations`.
+  const buildJvslFromSalaryReport = (
+    salaryReport,
+    mappingsByLocation,
+    staffAccruals,
+    jellyByLocation = {},
+    ramenByLocation = {}
+  ) => {
     const locTotals = {};
     let commissionOnly = 0; // 16-24 amounts that fall outside the department model
     (salaryReport?.comprehensive?.locations || []).forEach((l) => {
@@ -367,21 +419,46 @@ export default function (pool) {
           ? round2(dept.locs.reduce((s, loc) => s + (jellyByLocation[loc] || 0), 0))
           : 0;
         const jellyAcct = m.commission_jelly || null;
+        const rawRamenSplitAmt = round2(
+          dept.locs.reduce(
+            (sum, loc) => sum + (ramenByLocation[loc]?.split || 0),
+            0
+          )
+        );
+        const rawRamenOthersAmt = round2(
+          dept.locs.reduce(
+            (sum, loc) => sum + (ramenByLocation[loc]?.others || 0),
+            0
+          )
+        );
+        // Locations without an Others line keep every Ramen code in the shared
+        // salary base before it is carved out to MEE.
+        const ramenSplitAmt = round2(
+          rawRamenSplitAmt + (dept.othersLine ? 0 : rawRamenOthersAmt)
+        );
+        const ramenOthersAmt = dept.othersLine ? rawRamenOthersAmt : 0;
+        const ramenAmt = round2(ramenSplitAmt + ramenOthersAmt);
         // The comm (C/I/O) column is carved out ONLY for departments with a dedicated
         // "Others" line (Ikut Lori → `others` mapping). For Salesman the legacy model
         // keeps comm inside the 50/50 split — carving it without an others line would
         // drop it from the voucher entirely (Jul 2026: JVSL short by exactly 251.37).
-        const othersAmt = dept.othersLine ? round2(t.comm) : 0;
+        // DME-RA is carved back out because all Ramen commission belongs to MEE.
+        const grossOthersAmt = dept.othersLine ? round2(t.comm) : 0;
+        const othersAmt = round2(grossOthersAmt - ramenOthersAmt);
         // Anchor to actual gross_pay (gaji_kasar), NOT the salary report's re-rounded
         // GAJI/COMM/CUTI columns — those can drift a few cents from real gross. The
-        // 50/50 base is the residual gross after carving OT (own lines), jelly and
-        // others, so each department ties out to the legacy voucher to the cent.
-        const splitBase = round2(t.gaji_kasar - t.ot - jellyAmt - othersAmt);
+        // 50/50 base is the residual gross after carving OT (own lines), jelly,
+        // Others and 1-PR Ramen commission, so the voucher still ties to the cent.
+        const splitBase = round2(
+          t.gaji_kasar - t.ot - jellyAmt - grossOthersAmt - ramenSplitAmt
+        );
         const [meeAmt, bhAmt] = splitHalf(splitBase);
-        need(meeAcct, meeAmt, `commission_mee @ ${dept.name}`);
+        need(meeAcct, round2(meeAmt + ramenAmt), `commission_mee @ ${dept.name}`);
         need(bhAcct, bhAmt, `commission_bh @ ${dept.name}`);
         if (meeAcct && meeAmt > 0)
           salaryLines.push({ account_code: meeAcct, particulars: `${dept.name}-Commission Mee`, debit: meeAmt, credit: 0 });
+        if (meeAcct && ramenAmt > 0)
+          salaryLines.push({ account_code: meeAcct, particulars: `${dept.name}-Commission Ramen`, debit: ramenAmt, credit: 0 });
         if (bhAcct && bhAmt > 0)
           salaryLines.push({ account_code: bhAcct, particulars: `${dept.name}-Commission Bihun`, debit: bhAmt, credit: 0 });
         if (dept.jelly && jellyAmt > 0) {
@@ -394,7 +471,7 @@ export default function (pool) {
           if (othersAcct)
             salaryLines.push({ account_code: othersAcct, particulars: `${dept.name}-Others`, debit: othersAmt, credit: 0 });
         }
-        deptSalaryDebit = round2(splitBase + jellyAmt + othersAmt);
+        deptSalaryDebit = round2(splitBase + ramenAmt + jellyAmt + othersAmt);
 
         // ----- OT (split 50/50) -----
         if (t.ot > 0) {
@@ -1281,11 +1358,13 @@ export default function (pool) {
       // JVSL is built 1:1 from the monthly Salary Report (single source of truth).
       const salaryReport = await computeMonthlySalaryReport(pool, yearInt, monthInt);
       const jellyByLoc = await computeJellyByLocation(pool, yearInt, monthInt, salaryReport);
+      const ramenByLoc = await computeRamenByLocation(pool, yearInt, monthInt, salaryReport);
       const jvslBuilt = buildJvslFromSalaryReport(
         salaryReport,
         mappingsByLocation,
         staffAccruals,
-        jellyByLoc
+        jellyByLoc,
+        ramenByLoc
       );
 
       res.json({
@@ -1829,7 +1908,14 @@ export default function (pool) {
           // preview shows) from the monthly Salary Report. Guard before inserting.
           const salaryReport = await computeMonthlySalaryReport(pool, yearInt, monthInt);
           const jellyByLoc = await computeJellyByLocation(pool, yearInt, monthInt, salaryReport);
-          const jvsl = buildJvslFromSalaryReport(salaryReport, mappingsByLocation, staffAccruals, jellyByLoc);
+          const ramenByLoc = await computeRamenByLocation(pool, yearInt, monthInt, salaryReport);
+          const jvsl = buildJvslFromSalaryReport(
+            salaryReport,
+            mappingsByLocation,
+            staffAccruals,
+            jellyByLoc,
+            ramenByLoc
+          );
           const hasStaff = jvsl.lines.length > 0;
 
           if (hasStaff) {

@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-24",
+    ms: "Sokongan Ramen kini lengkap dalam laporan jualan: jualan, trend, ringkasan mengikut jurujual dan PDF memaparkan Ramen secara berasingan, dan kuantiti paket tidak lagi dicampur dengan unit atau beg. Komisen Ramen untuk Jurujual dan Jurujual Ikut Lori kini menggunakan kadar PKT yang telah ditetapkan pengguna dan direkod sepenuhnya di bawah Mee dalam baucar gaji, bukan dibahagi dengan Bihun. Stock Kilang menerima produk Ramen, dan laporan Kos Anggaran Mee memasukkan nilai jualan Ramen tanpa mencampurkan paket ke dalam kiraan beg atau kos seunit. Jumlah jualan juga kini menggunakan amaun sebenar pada invois, mengecualikan invois gabungan dan mengelakkan cukai dikira dua kali dalam PDF.",
+    en: "Ramen support is now complete across sales reporting: sales, trends, salesman summaries and PDFs show Ramen separately, and packet quantities are no longer mixed with other units or bags. Ramen commissions for Salesman and Salesman Ikut Lori now use the user-set PKT rates and are recorded fully under Mee in salary vouchers instead of being split with Bihun. Stock Kilang accepts Ramen products, and the Mee Estimated Cost report includes Ramen sales value without mixing packets into bag counts or unit cost. Sales totals now also use the actual invoice-line amounts, exclude consolidated invoices and avoid counting tax twice in PDFs.",
+  },
+  {
+    date: "2026-08-24",
     ms: "Halaman log masuk dalam sistem development kini mempunyai butang Ganti Pangkalan Data daripada SQL, jadi sandaran penuh production boleh dimuatkan sebelum log masuk. Sandaran melalui cara ini menggunakan pengesahan dan amaran yang sama seperti dalam Database Backups, dan sistem development kini boleh membaca format keselamatan sandaran production terkini.",
     en: "The development login page now has a Replace Database from SQL button, so a full production backup can be loaded before signing in. It uses the same validation and warning as Database Backups, and the development system can now read the current production backup safety format.",
   },
@@ -32,7 +37,7 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-23",
     ms: "Pengeluaran ramen dan cuti Pembungkusan Mee kini saling menyekat pada tarikh yang sama. Aktiviti berkadar PKT atau PCS juga kini mengira gaji daripada kuantiti yang dimasukkan dan memaparkan jumlah unit yang betul pada butiran gaji serta slip gaji.",
-    en: "Ramen productio  n and Packing Mee leave now block each other on the same date. PKT- or PCS-rate activities also calculate pay from the entered quantity and show the correct unit totals in payroll details and payslips.",
+    en: "Ramen production and Packing Mee leave now block each other on the same date. PKT- or PCS-rate activities also calculate pay from the entered quantity and show the correct unit totals in payroll details and payslips.",
   },
   {
     date: "2026-08-23",

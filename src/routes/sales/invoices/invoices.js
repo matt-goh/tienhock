@@ -1056,6 +1056,7 @@ export default function (pool, config) {
             'price', od.price,
             'freeproduct', od.freeproduct,
             'returnproduct', od.returnproduct,
+            'tax', od.tax,
             'total', od.total,
             'type', p.type
           ) ORDER BY od.id
@@ -1089,6 +1090,7 @@ export default function (pool, config) {
             'price', od.price,
             'freeproduct', od.freeproduct,
             'returnproduct', od.returnproduct,
+            'tax', od.tax,
             'total', od.total,
             'type', p.type
           ) ORDER BY od.id
@@ -1125,6 +1127,12 @@ export default function (pool, config) {
       if (summaries.includes("bihun_salesmen")) {
         summaryData.bihun_salesmen = processSalesmenSummary(allInvoices, "BH");
       }
+      if (summaries.includes("ramen_salesmen")) {
+        summaryData.ramen_salesmen = processSalesmenSummary(
+          allInvoices,
+          "RAMEN"
+        );
+      }
       if (summaries.includes("jp_salesmen")) {
         summaryData.jp_salesmen = processSalesmenSummary(allInvoices, "JP");
       }
@@ -1149,6 +1157,7 @@ export default function (pool, config) {
       category_2: { quantity: 0, amount: 0, products: [] }, // ID starts with "2-"
       category_meq: { quantity: 0, amount: 0, products: [] }, // ID starts with "MEQ-"
       category_s: { quantity: 0, amount: 0, products: [] }, // ID starts with "S-"
+      category_ramen: { quantity: 0, amount: 0, products: [] },
       category_oth: { quantity: 0, amount: 0, products: [] }, // ID "OTH"
       category_we_mnl: { quantity: 0, amount: 0, products: [] }, // ID "WE-MNL"
       category_we_2udg: { quantity: 0, amount: 0, products: [] }, // ID "WE-2UDG"
@@ -1172,6 +1181,7 @@ export default function (pool, config) {
       category_2: new Map(),
       category_meq: new Map(),
       category_s: new Map(),
+      category_ramen: new Map(),
       category_oth: new Map(),
       category_we_mnl: new Map(),
       category_we_2udg: new Map(),
@@ -1248,20 +1258,22 @@ export default function (pool, config) {
         taxProd.amount += taxAmount;
       }
 
-      // Process products
+        // Process products
       if (!invoice.products) return;
 
       invoice.products.forEach((product) => {
         const code = product.code;
-        const quantity = parseInt(product.quantity || 0);
+        const quantity = code === "LESS" ? 0 : parseInt(product.quantity || 0);
         const price = parseFloat(product.price || 0);
-        const total =
-          code === "OTH" || code === "LESS" ? price : multiplyMoney(price, quantity);
+        const total = parseFloat(product.total || 0);
+        const lineTax = parseFloat(product.tax || 0);
+        const totalExcludingTax = addMoney(total, -lineTax);
         const returnQty = parseInt(product.returnproduct || 0);
 
         // Group products by category
         let category = null;
-        if (code.startsWith("1-")) category = "category_1";
+        if (product.type === "RAMEN") category = "category_ramen";
+        else if (code.startsWith("1-")) category = "category_1";
         else if (code.startsWith("2-")) category = "category_2";
         else if (code.startsWith("MEQ-")) category = "category_meq";
         else if (code.startsWith("S-")) category = "category_s";
@@ -1280,13 +1292,17 @@ export default function (pool, config) {
 
         if (category) {
           categories[category].quantity += quantity;
-          categories[category].amount = addMoney(categories[category].amount, total);
+          categories[category].amount = addMoney(
+            categories[category].amount,
+            totalExcludingTax
+          );
 
           // Track individual products using the category-specific Map
           if (!productsByCategory[category].has(code)) {
             productsByCategory[category].set(code, {
               code,
               description: product.description || code,
+              type: product.type || "OTH",
               quantity: 0,
               amount: 0,
               descriptions: new Set([product.description || code]), // Track unique descriptions
@@ -1294,7 +1310,7 @@ export default function (pool, config) {
           }
           const prod = productsByCategory[category].get(code);
           prod.quantity += quantity;
-          prod.amount = addMoney(prod.amount, total);
+          prod.amount = addMoney(prod.amount, totalExcludingTax);
 
           // Add description to the set if it's different
           if (product.description && product.description.trim()) {
@@ -1316,6 +1332,7 @@ export default function (pool, config) {
             productsByCategory.category_returns.set(code, {
               code,
               description: product.description || code,
+              type: product.type || "OTH",
               quantity: 0,
               amount: 0,
             });
@@ -1324,9 +1341,6 @@ export default function (pool, config) {
           returnProd.quantity += returnQty;
           returnProd.amount = addMoney(returnProd.amount, returnAmount);
         }
-
-        // Track type statistics (need to fetch product type from cache)
-        // This will be done in the frontend since we have the product cache there
       });
     });
 
@@ -1381,6 +1395,7 @@ export default function (pool, config) {
           const productTypeMap = {
             MEE: ["MEE"],
             BH: ["BH"],
+            RAMEN: ["RAMEN"],
             JP: ["JP"],
           };
 
@@ -1391,9 +1406,9 @@ export default function (pool, config) {
         }
 
         const code = product.code;
-        const quantity = parseInt(product.quantity || 0);
+        const quantity = code === "LESS" ? 0 : parseInt(product.quantity || 0);
         const price = parseFloat(product.price || 0);
-        const total = multiplyMoney(price, quantity);
+        const total = parseFloat(product.total || 0);
         const foc = parseInt(product.freeproduct || 0);
         const returns = parseInt(product.returnproduct || 0);
 
@@ -1402,6 +1417,7 @@ export default function (pool, config) {
           salesmenData[salesmanId].products.set(code, {
             code,
             description: product.description || code,
+            type: product.type || "OTH",
             quantity: 0,
             amount: 0,
             descriptions: new Set([product.description || code]), // Track unique descriptions
@@ -1431,6 +1447,7 @@ export default function (pool, config) {
             focProducts.set(code, {
               code,
               description: product.description || code,
+              type: product.type || "OTH",
               price: price,
               quantity: 0,
             });
@@ -1443,6 +1460,7 @@ export default function (pool, config) {
             returnProducts.set(code, {
               code,
               description: product.description || code,
+              type: product.type || "OTH",
               price: price,
               quantity: 0,
             });
@@ -1511,8 +1529,7 @@ export default function (pool, config) {
       invoice.products.forEach((product) => {
         const code = product.code;
         const quantity = parseInt(product.quantity || 0);
-        const price = parseFloat(product.price || 0);
-        const total = multiplyMoney(price, quantity);
+        const total = parseFloat(product.total || 0);
 
         let category = null;
         if (code.startsWith("EMPTY_BAG")) category = "empty_bag";
@@ -1806,8 +1823,8 @@ export default function (pool, config) {
         if (!productId) return;
 
         // Parse values from string to number
-        const quantity = parseInt(product.quantity) || 0;
-        const price = parseFloat(product.price) || 0;
+        const quantity =
+          productId === "LESS" ? 0 : parseInt(product.quantity) || 0;
         const total = parseFloat(product.total) || 0;
         const foc = parseInt(product.freeproduct) || 0;
         const returns = parseInt(product.returnproduct) || 0;
@@ -1869,20 +1886,26 @@ export default function (pool, config) {
       WITH invoice_totals AS (
         SELECT 
           i.id, i.salespersonid, i.paymenttype,
-          SUM(od.quantity * od.price) as total_amount,
-          SUM(od.quantity) as total_quantity
+          SUM(COALESCE(od.total, 0)) as total_amount,
+          SUM(CASE WHEN od.code = 'LESS' THEN 0 ELSE od.quantity END) as total_quantity,
+          SUM(CASE WHEN p.type = 'RAMEN' THEN od.quantity ELSE 0 END) as ramen_quantity,
+          SUM(CASE WHEN p.type = 'RAMEN' OR od.code = 'LESS' THEN 0 ELSE od.quantity END) as non_ramen_quantity
         FROM invoices i
         JOIN order_details od ON i.id = od.invoiceid
+        LEFT JOIN products p ON od.code = p.id
         WHERE 
           CAST(i.createddate AS bigint) BETWEEN $1 AND $2
           AND i.invoice_status != 'cancelled'
           AND od.issubtotal IS NOT TRUE
+          AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
         GROUP BY i.id, i.salespersonid, i.paymenttype
       )
       SELECT 
         it.salespersonid as id,
         SUM(it.total_amount) as total_sales,
         SUM(it.total_quantity) as total_quantity,
+        SUM(it.ramen_quantity) as ramen_quantity,
+        SUM(it.non_ramen_quantity) as non_ramen_quantity,
         COUNT(it.id) as sales_count,
         COUNT(CASE WHEN it.paymenttype = 'INVOICE' THEN 1 END) as invoice_count,
         COUNT(CASE WHEN it.paymenttype = 'CASH' THEN 1 END) as cash_count
@@ -1895,20 +1918,26 @@ export default function (pool, config) {
       WITH invoice_totals AS (
         SELECT 
           i.id, i.salespersonid, i.paymenttype,
-          SUM(od.quantity * od.price) as total_amount,
-          SUM(od.quantity) as total_quantity
+          SUM(COALESCE(od.total, 0)) as total_amount,
+          SUM(CASE WHEN od.code = 'LESS' THEN 0 ELSE od.quantity END) as total_quantity,
+          SUM(CASE WHEN p.type = 'RAMEN' THEN od.quantity ELSE 0 END) as ramen_quantity,
+          SUM(CASE WHEN p.type = 'RAMEN' OR od.code = 'LESS' THEN 0 ELSE od.quantity END) as non_ramen_quantity
         FROM jellypolly.invoices i
         JOIN jellypolly.order_details od ON i.id = od.invoiceid
+        LEFT JOIN products p ON od.code = p.id
         WHERE 
           CAST(i.createddate AS bigint) BETWEEN $1 AND $2
           AND i.invoice_status != 'cancelled'
           AND od.issubtotal IS NOT TRUE
+          AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
         GROUP BY i.id, i.salespersonid, i.paymenttype
       )
       SELECT 
         it.salespersonid as id,
         SUM(it.total_amount) as total_sales,
         SUM(it.total_quantity) as total_quantity,
+        SUM(it.ramen_quantity) as ramen_quantity,
+        SUM(it.non_ramen_quantity) as non_ramen_quantity,
         COUNT(it.id) as sales_count,
         COUNT(CASE WHEN it.paymenttype = 'INVOICE' THEN 1 END) as invoice_count,
         COUNT(CASE WHEN it.paymenttype = 'CASH' THEN 1 END) as cash_count
@@ -1929,6 +1958,8 @@ export default function (pool, config) {
           id: salesmanId,
           totalSales: parseFloat(row.total_sales) || 0,
           totalQuantity: parseInt(row.total_quantity) || 0,
+          ramenQuantity: parseInt(row.ramen_quantity) || 0,
+          nonRamenQuantity: parseInt(row.non_ramen_quantity) || 0,
           salesCount: parseInt(row.sales_count) || 0,
           invoiceCount: parseInt(row.invoice_count) || 0,
           cashCount: parseInt(row.cash_count) || 0,
@@ -2005,7 +2036,7 @@ export default function (pool, config) {
         if (!salesmanId || !productId) return;
 
         // Parse values from string to number
-        const quantity = parseInt(product.quantity) || 0;
+        const quantity = productId === "LESS" ? 0 : parseInt(product.quantity) || 0;
         const total = parseFloat(product.total) || 0;
         const foc = parseInt(product.freeproduct) || 0;
         const returns = parseInt(product.returnproduct) || 0;
@@ -2093,10 +2124,14 @@ export default function (pool, config) {
         mainQuery = `
         WITH monthly_data AS (
           SELECT 
-            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            DATE_TRUNC(
+              'month',
+              TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)
+                AT TIME ZONE 'Asia/Kuala_Lumpur'
+            ) as month,
             od.code as product_id,
-            p.type as product_type,
-            SUM(od.quantity * od.price) as total_sales
+            COALESCE(p.type, 'OTH') as product_type,
+            SUM(COALESCE(od.total, 0)) as total_sales
           FROM invoices i
           JOIN order_details od ON i.id = od.invoiceid
           LEFT JOIN products p ON od.code = p.id
@@ -2104,7 +2139,9 @@ export default function (pool, config) {
             CAST(i.createddate AS bigint) BETWEEN $1 AND $2
             AND i.invoice_status != 'cancelled'
             AND od.issubtotal IS NOT TRUE
-          GROUP BY month, product_id, product_type
+            AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+            ${idArray.length > 0 ? "AND (od.code = ANY($3) OR COALESCE(p.type, 'OTH') = ANY($3))" : ""}
+          GROUP BY month, product_id, COALESCE(p.type, 'OTH')
         )
         SELECT 
           TO_CHAR(month, 'YYYY-MM') as month_year,
@@ -2119,10 +2156,14 @@ export default function (pool, config) {
         jellypollyQuery = `
         WITH monthly_data AS (
           SELECT 
-            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            DATE_TRUNC(
+              'month',
+              TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)
+                AT TIME ZONE 'Asia/Kuala_Lumpur'
+            ) as month,
             od.code as product_id,
-            p.type as product_type,
-            SUM(od.quantity * od.price) as total_sales
+            COALESCE(p.type, 'OTH') as product_type,
+            SUM(COALESCE(od.total, 0)) as total_sales
           FROM jellypolly.invoices i
           JOIN jellypolly.order_details od ON i.id = od.invoiceid
           LEFT JOIN products p ON od.code = p.id
@@ -2130,7 +2171,9 @@ export default function (pool, config) {
             CAST(i.createddate AS bigint) BETWEEN $1 AND $2
             AND i.invoice_status != 'cancelled'
             AND od.issubtotal IS NOT TRUE
-          GROUP BY month, product_id, product_type
+            AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+            ${idArray.length > 0 ? "AND (od.code = ANY($3) OR COALESCE(p.type, 'OTH') = ANY($3))" : ""}
+          GROUP BY month, product_id, COALESCE(p.type, 'OTH')
         )
         SELECT 
           TO_CHAR(month, 'YYYY-MM') as month_year,
@@ -2140,20 +2183,29 @@ export default function (pool, config) {
         FROM monthly_data
         ORDER BY month, product_id
         `;
+
+        if (idArray.length > 0) {
+          queryParams.push(idArray);
+        }
       } else {
         // Salesman trends - main schema
         mainQuery = `
         WITH monthly_data AS (
           SELECT 
-            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            DATE_TRUNC(
+              'month',
+              TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)
+                AT TIME ZONE 'Asia/Kuala_Lumpur'
+            ) as month,
             i.salespersonid,
-            SUM(od.quantity * od.price) as total_sales
+            SUM(COALESCE(od.total, 0)) as total_sales
           FROM invoices i
           JOIN order_details od ON i.id = od.invoiceid
           WHERE 
             CAST(i.createddate AS bigint) BETWEEN $1 AND $2
             AND i.invoice_status != 'cancelled'
             AND od.issubtotal IS NOT TRUE
+            AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
             ${idArray.length > 0 ? "AND i.salespersonid = ANY($3)" : ""}
           GROUP BY month, i.salespersonid
         )
@@ -2169,15 +2221,20 @@ export default function (pool, config) {
         jellypollyQuery = `
         WITH monthly_data AS (
           SELECT 
-            DATE_TRUNC('month', TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)) as month,
+            DATE_TRUNC(
+              'month',
+              TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)
+                AT TIME ZONE 'Asia/Kuala_Lumpur'
+            ) as month,
             i.salespersonid,
-            SUM(od.quantity * od.price) as total_sales
+            SUM(COALESCE(od.total, 0)) as total_sales
           FROM jellypolly.invoices i
           JOIN jellypolly.order_details od ON i.id = od.invoiceid
           WHERE 
             CAST(i.createddate AS bigint) BETWEEN $1 AND $2
             AND i.invoice_status != 'cancelled'
             AND od.issubtotal IS NOT TRUE
+            AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
             ${idArray.length > 0 ? "AND i.salespersonid = ANY($3)" : ""}
           GROUP BY month, i.salespersonid
         )
@@ -2199,10 +2256,33 @@ export default function (pool, config) {
       const trendsResult = await pool.query(query, queryParams);
       const allTrendData = trendsResult.rows;
 
-      // Transform data for frontend consumption - need to aggregate data from both schemas
+      // Seed exactly 12 calendar months, ending with the requested end month.
       const monthlyData = new Map();
+      const endDateParts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Kuala_Lumpur",
+        year: "numeric",
+        month: "2-digit",
+      }).formatToParts(new Date(Number(endDate)));
+      const endYear = Number(
+        endDateParts.find((part) => part.type === "year")?.value
+      );
+      const endMonth = Number(
+        endDateParts.find((part) => part.type === "month")?.value
+      );
 
-      // For products, we also track by product type (BH, MEE)
+      for (let offset = 11; offset >= 0; offset--) {
+        const monthDate = new Date(Date.UTC(endYear, endMonth - 1 - offset, 1));
+        const monthYear = `${monthDate.getUTCFullYear()}-${String(
+          monthDate.getUTCMonth() + 1
+        ).padStart(2, "0")}`;
+        const monthEntry = { month: monthYear };
+        idArray.forEach((id) => {
+          monthEntry[id] = 0;
+        });
+        monthlyData.set(monthYear, monthEntry);
+      }
+
+      // For products, track both explicitly selected product IDs and types.
       const trackedItems = new Set();
       if (type === "products" && idArray.length > 0) {
         idArray.forEach((id) => trackedItems.add(id));
@@ -2211,11 +2291,7 @@ export default function (pool, config) {
       allTrendData.forEach((row) => {
         const monthYear = row.month_year;
 
-        if (!monthlyData.has(monthYear)) {
-          monthlyData.set(monthYear, {
-            month: monthYear,
-          });
-        }
+        if (!monthlyData.has(monthYear)) return;
 
         const monthData = monthlyData.get(monthYear);
 
@@ -2229,7 +2305,7 @@ export default function (pool, config) {
             monthData[productId] = (monthData[productId] || 0) + sales;
           }
 
-          if (trackedItems.has(productType)) {
+          if (trackedItems.has(productType) && productType !== productId) {
             // Aggregate sales for product type
             monthData[productType] = (monthData[productType] || 0) + sales;
           }
@@ -2237,7 +2313,8 @@ export default function (pool, config) {
           // Salesman data - aggregate if already exists
           const salesmanId = row.salespersonid;
           monthData[salesmanId] =
-            (monthData[salesmanId] || 0) + parseFloat(row.total_sales) || 0;
+            (monthData[salesmanId] || 0) +
+            (parseFloat(row.total_sales) || 0);
         }
       });
 
