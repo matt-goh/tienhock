@@ -20,9 +20,14 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-24",
+    ms: "Produk Ramen yang aktif kini muncul dalam senarai produk semasa membuat atau mengubah invois jualan. Produk Ramen baharu yang ditambah melalui Katalog Produk juga akan tersedia di bahagian Jualan secara automatik.",
+    en: "Active Ramen products now appear in the product list when creating or editing sales invoices. New Ramen products added through the Product Catalogue will also become available in Sales automatically.",
+  },
+  {
     date: "2026-08-23",
     ms: "Pengeluaran ramen dan cuti Pembungkusan Mee kini saling menyekat pada tarikh yang sama. Aktiviti berkadar PKT atau PCS juga kini mengira gaji daripada kuantiti yang dimasukkan dan memaparkan jumlah unit yang betul pada butiran gaji serta slip gaji.",
-    en: "Ramen production and Packing Mee leave now block each other on the same date. PKT- or PCS-rate activities also calculate pay from the entered quantity and show the correct unit totals in payroll details and payslips.",
+    en: "Ramen productio  n and Packing Mee leave now block each other on the same date. PKT- or PCS-rate activities also calculate pay from the entered quantity and show the correct unit totals in payroll details and payslips.",
   },
   {
     date: "2026-08-23",
