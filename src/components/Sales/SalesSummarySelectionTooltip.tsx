@@ -12,7 +12,6 @@ import {
 import { api } from "../../routes/utils/api";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
-import { useProductsCache } from "../../utils/invoice/useProductsCache";
 
 interface SalesSummarySelectionTooltipProps {
   activeTab: number;
@@ -45,6 +44,11 @@ const TIENHOCK_SUMMARY_OPTIONS: SummaryOption[] = [
     id: "bihun_salesmen",
     name: "Summary of Bihun sales by salesmen",
     description: "BH products only",
+  },
+  {
+    id: "ramen_salesmen",
+    name: "Summary of Ramen sales by salesmen",
+    description: "RAMEN products only",
   },
   {
     id: "sisa_sales",
@@ -86,45 +90,75 @@ const SalesSummarySelectionTooltip: React.FC<
   const [isGenerating, setIsGenerating] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { allProducts } = useProductsCache(scope === "jp" ? "jp" : "all");
   const { selectedMonth, selectedYear } = useMonthSelection(activeTab);
 
   useEffect(() => {
-    if (isVisible && buttonRef.current) {
+    if (!isVisible) return;
+
+    const updatePosition = (): void => {
+      if (!buttonRef.current) return;
+
       const rect = buttonRef.current.getBoundingClientRect();
+      const horizontalMargin = 16;
+      const tooltipWidth = Math.min(384, window.innerWidth - horizontalMargin * 2);
+      const tooltipHeight = tooltipRef.current?.offsetHeight || 0;
+      const preferredLeft = rect.right - tooltipWidth;
+      const maximumLeft = window.innerWidth - tooltipWidth - horizontalMargin;
+      const belowTop = rect.bottom + 8;
+      const aboveTop = rect.top - tooltipHeight - 8;
+
       setPosition({
-        top: rect.bottom + 8,
-        left: rect.right,
+        top:
+          tooltipHeight > 0 && belowTop + tooltipHeight > window.innerHeight - 16
+            ? Math.max(16, aboveTop)
+            : belowTop,
+        left: Math.min(
+          Math.max(preferredLeft, horizontalMargin),
+          Math.max(horizontalMargin, maximumLeft)
+        ),
       });
-    }
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [isVisible]);
 
   useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    if (!isVisible) return;
+
+    const handleDocumentPointerDown = (event: PointerEvent): void => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (
+        buttonRef.current?.contains(target) ||
+        tooltipRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setIsVisible(false);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        setIsVisible(false);
+        buttonRef.current?.focus();
       }
     };
-  }, []);
 
-  const handleMouseEnter = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => {
-      setIsVisible(true);
-    }, 0);
-  };
+    document.addEventListener("pointerdown", handleDocumentPointerDown);
+    document.addEventListener("keydown", handleKeyDown);
 
-  const handleMouseLeave = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    timeoutRef.current = setTimeout(() => {
-      setIsVisible(false);
-    }, 100);
-  };
+    return () => {
+      document.removeEventListener("pointerdown", handleDocumentPointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isVisible]);
 
   const handleSummaryToggle = (summaryId: string) => {
     setSelectedSummaries((prev) => ({
@@ -178,13 +212,11 @@ const SalesSummarySelectionTooltip: React.FC<
         scope,
       });
 
-      // Generate PDF - ADD allProducts parameter here
       await generateSalesSummaryPDF(
         response,
         selectedMonth,
         selectedYear,
         action,
-        allProducts,
         scope
       );
 
@@ -207,11 +239,12 @@ const SalesSummarySelectionTooltip: React.FC<
     <>
       <button
         ref={buttonRef}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-        onClick={() => setIsVisible(true)}
+        onClick={() => setIsVisible((current) => !current)}
         className="flex items-center px-4 py-2 text-sm font-medium text-sky-700 dark:text-sky-300 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded-full transition-colors"
         type="button"
+        aria-haspopup="dialog"
+        aria-expanded={isVisible}
+        aria-controls="sales-summary-selection"
       >
         <IconFileText size={18} className="mr-2" />
         {t("Generate PDF Summary")}
@@ -220,17 +253,16 @@ const SalesSummarySelectionTooltip: React.FC<
       {isVisible &&
         createPortal(
           <div
+            id="sales-summary-selection"
             ref={tooltipRef}
-            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-0 w-96 opacity-0 flex flex-col"
+            role="dialog"
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-default-200 dark:border-gray-700 shadow-lg rounded-lg p-0 w-[calc(100vw-2rem)] max-w-96 opacity-0 flex flex-col"
             style={{
               top: `${position.top}px`,
               left: `${position.left}px`,
               opacity: isVisible ? 1 : 0,
-              transform: `translateX(-100%)`,
               maxHeight: "80vh",
             }}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
           >
             {/* Header */}
             <div

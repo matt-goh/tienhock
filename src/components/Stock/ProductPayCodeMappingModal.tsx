@@ -72,7 +72,7 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   const [productSearch, setProductSearch] = useState("");
   const [payCodeSearch, setPayCodeSearch] = useState("");
 
-  // Get products from cache (MEE, BH, BUNDLE for packing)
+  // Get products from cache (MEE, BH, BUNDLE and RAMEN for packing)
   const { products: cachedProducts, isLoading } = useProductsCache(
     productTypes || ["MEE", "BH", "BUNDLE", "RAMEN"]
   );
@@ -128,17 +128,40 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
   const availablePayCodes = useMemo((): PayCodeOption[] => {
     if (!selectedProduct) return [];
 
-    // For special items, show ALL pay codes (they may have unique pay codes not mapped to jobs).
+    const savedMappings = productMappings[selectedProduct.id] || [];
+    const savedPayCodeIds = new Set<string>(
+      savedMappings.map((mapping): string => mapping.pay_code_id)
+    );
+    const toPayCodeOption = (payCode: PayCodeOption): PayCodeOption => ({
+      id: payCode.id,
+      description: payCode.description,
+      pay_type: payCode.pay_type,
+      rate_unit: payCode.rate_unit,
+      rate_biasa: payCode.rate_biasa,
+      rate_ahad: payCode.rate_ahad,
+      rate_umum: payCode.rate_umum,
+    });
+    const includeSavedMappings = (
+      payCodeOptions: PayCodeOption[]
+    ): PayCodeOption[] => {
+      const optionsById = new Map<string, PayCodeOption>();
+      [...payCodeOptions, ...savedMappings].forEach((payCode): void => {
+        optionsById.set(payCode.id, toPayCodeOption(payCode));
+      });
+      return Array.from(optionsById.values());
+    };
+
+    // For special items, show all unit-compatible pay codes (they may have
+    // unique pay codes not mapped to jobs). Keep saved incompatible rows visible
+    // so legacy mappings can still be removed.
     if (selectedProduct.isSpecial) {
-      return payCodes.map((pc) => ({
-        id: pc.id,
-        description: pc.description,
-        pay_type: pc.pay_type,
-        rate_unit: pc.rate_unit,
-        rate_biasa: pc.rate_biasa,
-        rate_ahad: pc.rate_ahad,
-        rate_umum: pc.rate_umum,
-      }));
+      return includeSavedMappings(payCodes.map(toPayCodeOption)).filter(
+        (payCode): boolean =>
+          savedPayCodeIds.has(payCode.id) ||
+          (selectedProduct.type === "RAMEN"
+            ? payCode.rate_unit === "PKT"
+            : payCode.rate_unit !== "PKT")
+      );
     }
 
     // For regular products, filter by job
@@ -162,31 +185,26 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
 
     const jobPayCodes = detailedMappings[jobId] || [];
 
-    // Filter to only show piece-rate pay codes.
-    return jobPayCodes
+    // Filter to only show compatible piece-rate pay codes. RAMEN production
+    // is counted in packets, while the other regular products must never use
+    // packet pay codes.
+    return includeSavedMappings(jobPayCodes.map(toPayCodeOption))
       .filter((pc) => {
-        // PKT (packet) applies only to ramen products; everyone else still
-        // gets Bag/Ctn (production) and PCS (pieces).
-        if (pc.rate_unit === "PKT" && selectedProduct.type !== "RAMEN") {
-          return false;
+        if (savedPayCodeIds.has(pc.id)) {
+          return true;
         }
+
+        if (selectedProduct.type === "RAMEN") {
+          return pc.rate_unit === "PKT";
+        }
+
         return (
           pc.rate_unit === "Bag" ||
           pc.rate_unit === "Ctn" ||
-          pc.rate_unit === "PKT" ||
           pc.rate_unit === "PCS"
         );
-      })
-      .map((pc) => ({
-        id: pc.id,
-        description: pc.description,
-        pay_type: pc.pay_type,
-        rate_unit: pc.rate_unit,
-        rate_biasa: pc.rate_biasa,
-        rate_ahad: pc.rate_ahad,
-        rate_umum: pc.rate_umum,
-      }));
-  }, [selectedProduct, detailedMappings, payCodes]);
+      });
+  }, [selectedProduct, detailedMappings, payCodes, productMappings]);
 
   // Filter and sort pay codes - saved ones at top
   const filteredPayCodes = useMemo(() => {
@@ -226,14 +244,11 @@ const ProductPayCodeMappingModal: React.FC<ProductPayCodeMappingModalProps> = ({
     const currentMappings = productMappings[selectedProduct.id] || [];
     const payCodeIds = new Set(currentMappings.map((m) => m.pay_code_id));
 
-    // Only update if the pay code IDs actually changed to prevent infinite loops
-    const currentIds = Array.from(payCodeIds).sort().join(',');
-    const existingIds = Array.from(originalPayCodeIds).sort().join(',');
-
-    if (currentIds !== existingIds) {
-      setSelectedPayCodeIds(payCodeIds);
-      setOriginalPayCodeIds(new Set(payCodeIds));
-    }
+    // Reset both sets whenever the selected product changes. Comparing only the
+    // saved ID sets can leak an unsaved selection between products whose saved
+    // mappings happen to be identical.
+    setSelectedPayCodeIds(payCodeIds);
+    setOriginalPayCodeIds(new Set(payCodeIds));
   }, [isOpen, selectedProduct, productMappings]);
 
   // Filter and group products (regular and special items)

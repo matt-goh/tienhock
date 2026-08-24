@@ -319,10 +319,27 @@ function createSourceCache(db) {
 // Line evaluation
 // ---------------------------------------------------------------------------
 
-const salesRowMatchesSource = (row, source) =>
+// RAMEN remains a separate catalogue type. Its monetary activity belongs in
+// the existing two-line Mee P&L, but packets must never be added to the Mee
+// bag quantities used by the legacy report or its unit-cost denominator.
+const salesProductTypeMatchesSource = (productType, sourceProductType) =>
+  productType === sourceProductType ||
+  (sourceProductType === "MEE" && productType === "RAMEN");
+
+const salesRowMatchesSource = (row, source, includeRamenInMee = true) =>
   source.sourceType === "product"
     ? row.productId === source.productId
-    : source.sourceType === "product_type" && row.productType === source.productType;
+    : source.sourceType === "product_type" &&
+      (includeRamenInMee
+        ? salesProductTypeMatchesSource(row.productType, source.productType)
+        : row.productType === source.productType);
+
+const usesRamenMeeAlias = (row, sources) =>
+  row.productType === "RAMEN" &&
+  sources.some(
+    (source) =>
+      source.sourceType === "product_type" && source.productType === "MEE"
+  );
 
 /**
  * Evaluates every line of one product line for one month.
@@ -379,15 +396,20 @@ function evaluateLines(defs, data, productLine) {
             productId: row.productId,
             code: row.productId,
             description: row.description,
-            bags: row.bags,
+            // The row's RM value is part of the Mee P&L, but its PKT count is
+            // deliberately blank because this report's quantity column is bags.
+            bags: usesRamenMeeAlias(row, sources) ? null : row.bags,
             amount: roundMoney(row.amount),
+            unitCostAmount: usesRamenMeeAlias(row, sources)
+              ? 0
+              : roundMoney(row.amount),
           }));
 
         expandedProducts.set(line.id, rows);
         setValue(line, {
           amount: sumMoneyBy(rows, (row) => row.amount),
           openingAmount: null,
-          bags: rows.reduce((sum, row) => sum + row.bags, 0),
+          bags: rows.reduce((sum, row) => sum + (row.bags || 0), 0),
         });
         break;
       }
@@ -395,7 +417,9 @@ function evaluateLines(defs, data, productLine) {
       case "sales_foc": {
         const bags = data.sales
           .filter((row) =>
-            sources.some((source) => salesRowMatchesSource(row, source))
+            // FOC is quantity-only on this legacy report. A Ramen packet has
+            // no valid conversion into the Mee bag column, so do not alias it.
+            sources.some((source) => salesRowMatchesSource(row, source, false))
           )
           .reduce((sum, row) => sum + row.focBags, 0);
         setValue(line, { amount: null, openingAmount: null, bags });
@@ -426,7 +450,9 @@ function evaluateLines(defs, data, productLine) {
           for (const row of data.sales) {
             if (!salesRowMatchesSource(row, source)) continue;
             amount += (row.returnAmount * source.sign * source.percentage) / 100;
-            bags += row.returnBags * source.sign;
+            if (!usesRamenMeeAlias(row, [source])) {
+              bags += row.returnBags * source.sign;
+            }
           }
         }
         setValue(line, { amount: roundMoney(amount), openingAmount: null, bags });
@@ -521,6 +547,7 @@ function buildProductRows(sectionLines, values, expandedProducts) {
           description: product.description,
           bags: product.bags,
           amount: product.amount,
+          unitCostAmount: product.unitCostAmount,
         });
       }
       continue;
@@ -534,6 +561,7 @@ function buildProductRows(sectionLines, values, expandedProducts) {
       description: line.description,
       bags: value.bags,
       amount: value.amount,
+      unitCostAmount: value.amount,
     });
   }
   return rows;
@@ -576,6 +604,10 @@ function assembleReport({
   const productLines = inSection("pl", "product");
   const products = buildProductRows(productLines, values, expandedProducts);
   const salesAmount = sumAmounts(products);
+  const unitCostSalesAmount = sumMoneyBy(
+    products,
+    (row) => row.unitCostAmount || 0
+  );
   const salesBags = products
     .filter((row) => row.kind === "product" || row.kind === "foc")
     .reduce((sum, row) => sum + (row.bags || 0), 0);
@@ -711,7 +743,10 @@ function assembleReport({
     },
     unitCost: {
       bagsSold: salesBags,
-      sales: { amount: salesAmount, unit: unitOf(salesAmount, salesBags) },
+      sales: {
+        amount: unitCostSalesAmount,
+        unit: unitOf(unitCostSalesAmount, salesBags),
+      },
       production: {
         bags: productionBags,
         lineKey: productionLine ? productionLine.lineKey : null,

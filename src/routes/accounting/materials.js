@@ -4,9 +4,10 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
   const validStockBuckets = new Set(["mee", "bihun", "shared"]);
+  // RAMEN stays a distinct catalogue type but is costed in the Mee bucket.
   const stockKilangProductTypes = new Map([
-    ["mee", "MEE"],
-    ["bihun", "BH"],
+    ["mee", ["MEE", "RAMEN"]],
+    ["bihun", ["BH"]],
   ]);
 
   function toNumber(value) {
@@ -403,14 +404,14 @@ export default function (pool) {
       const monthNumber = Number(month);
       const quantityNumber = Number(quantity);
       const unitCostNumber = Number(unit_cost);
-      const expectedProductType = stockKilangProductTypes.get(product_line);
+      const expectedProductTypes = stockKilangProductTypes.get(product_line);
 
       if (
         !Number.isInteger(yearNumber) ||
         !Number.isInteger(monthNumber) ||
         monthNumber < 1 ||
         monthNumber > 12 ||
-        !expectedProductType ||
+        !expectedProductTypes ||
         !product_id ||
         !Number.isFinite(quantityNumber) ||
         !Number.isFinite(unitCostNumber) ||
@@ -428,11 +429,13 @@ export default function (pool) {
       );
       const product = productResult.rows[0];
 
-      if (!product || product.type !== expectedProductType) {
+      if (!product || !expectedProductTypes.includes(product.type)) {
         return res.status(400).json({
           code: "STOCK_KILANG_PRODUCT_MISMATCH",
           product_ids: [product_id],
-          message: `${product_id} is not a ${expectedProductType} product (or no longer exists)`,
+          message:
+            `${product_id} is not a ${expectedProductTypes.join(" or ")} ` +
+            "product (or no longer exists)",
         });
       }
 
@@ -508,14 +511,14 @@ export default function (pool) {
       const { year, month, product_line, entries, validate_only } = req.body;
       const yearNumber = Number(year);
       const monthNumber = Number(month);
-      const expectedProductType = stockKilangProductTypes.get(product_line);
+      const expectedProductTypes = stockKilangProductTypes.get(product_line);
 
       if (
         !Number.isInteger(yearNumber) ||
         !Number.isInteger(monthNumber) ||
         monthNumber < 1 ||
         monthNumber > 12 ||
-        !expectedProductType ||
+        !expectedProductTypes ||
         !Array.isArray(entries)
       ) {
         return res.status(400).json({
@@ -561,7 +564,8 @@ export default function (pool) {
       );
 
       const mismatchedProductIds = productIds.filter(
-        (productId) => productTypes.get(productId) !== expectedProductType
+        (productId) =>
+          !expectedProductTypes.includes(productTypes.get(productId))
       );
 
       if (mismatchedProductIds.length > 0) {
@@ -570,7 +574,8 @@ export default function (pool) {
           product_ids: mismatchedProductIds,
           message:
             `Stock Kilang not saved: ${mismatchedProductIds.join(", ")} ` +
-            `${mismatchedProductIds.length === 1 ? "is" : "are"} not ${expectedProductType} ` +
+            `${mismatchedProductIds.length === 1 ? "is" : "are"} not ` +
+            `${expectedProductTypes.join(" or ")} ` +
             `product${mismatchedProductIds.length === 1 ? "" : "s"} (or no longer exist). ` +
             `The product list has been refreshed - check the table and save again.`,
         });
@@ -586,10 +591,10 @@ export default function (pool) {
           DELETE FROM material_stock_kilang_entries
           WHERE year = $1 AND month = $2 AND product_line = $3
             AND product_id IN (
-              SELECT id FROM products WHERE type = $4 AND is_active = true
+              SELECT id FROM products WHERE type = ANY($4::varchar[]) AND is_active = true
             )
         `,
-        [yearNumber, monthNumber, product_line, expectedProductType]
+        [yearNumber, monthNumber, product_line, expectedProductTypes]
       );
 
       let savedCount = 0;

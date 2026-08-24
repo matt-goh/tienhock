@@ -35,7 +35,7 @@ import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 interface ProductSalesData {
   id: string;
   description: string;
-  type: string; // The actual product type (MEE, BH, JP)
+  type: string;
   quantity: number;
   totalSales: number;
   foc: number;
@@ -55,11 +55,36 @@ interface CategorySummary {
   color: string;
 }
 
-
 interface MonthlyTypeData {
   month: string;
   [key: string]: string | number; // For product types and their sales values
 }
+
+const PRODUCT_TYPE_COLORS: Record<string, string> = {
+  BH: "#4299e1",
+  MEE: "#48bb78",
+  RAMEN: "#e11d48",
+  JP: "#ed8936",
+  OTH: "#9f7aea",
+  OTHER: "#a0aec0",
+};
+
+const getStableTypeColor = (type: string): string => {
+  if (PRODUCT_TYPE_COLORS[type]) return PRODUCT_TYPE_COLORS[type];
+
+  const hash = type.split("").reduce((value: number, character: string) => {
+    return (value * 31 + character.charCodeAt(0)) >>> 0;
+  }, 0);
+  const fallbackColors = [
+    "#0f766e",
+    "#b45309",
+    "#7e22ce",
+    "#0369a1",
+    "#be123c",
+    "#4d7c0f",
+  ];
+  return fallbackColors[hash % fallbackColors.length];
+};
 
 interface DateRange {
   start: Date;
@@ -134,30 +159,15 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
 
   // Dynamic category colors based on product types
   const categoryColors = useMemo(() => {
-    // Base colors for known types
-    const baseColors: Record<string, string> = {
-      BH: "#4299e1", // Blue
-      MEE: "#48bb78", // Green
-      JP: "#ed8936", // Orange
-      OTH: "#9f7aea", // Purple
-      OTHER: "#a0aec0", // Gray
-    };
-
-    // Add colors for any other types found in the data
     const typeSet = new Set<string>();
     salesData.forEach((product) => {
       if (product.type) typeSet.add(product.type);
     });
 
-    // Generate colors for types not in baseColors
-    const result: Record<string, string> = { ...baseColors };
+    const result: Record<string, string> = { ...PRODUCT_TYPE_COLORS };
     Array.from(typeSet).forEach((type) => {
       if (!result[type]) {
-        // Generate a random color if not already defined
-        const randomColor = `#${Math.floor(Math.random() * 16777215).toString(
-          16
-        )}`;
-        result[type] = randomColor;
+        result[type] = getStableTypeColor(type);
       }
     });
 
@@ -177,15 +187,21 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
       : [
           { id: "MEE", name: "Mee Products" },
           { id: "BH", name: "Bihun Products" },
+          { id: "RAMEN", name: "Ramen Products" },
           { id: "OTH", name: "Other Products" },
         ];
+    const optionIds = new Set(options.map((option) => option.id));
 
     // Add individual products from cache
     products.forEach((product) => {
+      // A product can share an identifier with its type (notably OTH). In that
+      // case the existing option represents the whole type and must stay unique.
+      if (optionIds.has(product.id)) return;
       options.push({
         id: product.id,
         name: product.description || product.id,
       });
+      optionIds.add(product.id);
     });
 
     return options;
@@ -213,7 +229,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   // Initialize selected products when product options are available
   useEffect(() => {
     if (productOptions.length > 0) {
-      const categoryIds = isJp ? ["JP"] : ["MEE", "BH", "OTH"];
+      const categoryIds = isJp ? ["JP"] : ["MEE", "BH", "RAMEN", "OTH"];
       const categoryOptions = productOptions
         .filter((option) => categoryIds.includes(option.id))
         .map((option) => option.id);
@@ -297,8 +313,15 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     setIsGeneratingChart(true);
     try {
       const endDate = new Date();
-      const startDate = new Date();
-      startDate.setFullYear(startDate.getFullYear() - 1); // Last 12 months
+      const startDate = new Date(
+        endDate.getFullYear(),
+        endDate.getMonth() - 11,
+        1,
+        0,
+        0,
+        0,
+        0
+      );
 
       const startTimestamp = startDate.getTime().toString();
       const endTimestamp = endDate.getTime().toString();
@@ -314,8 +337,14 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         throw new Error("Invalid response format");
       }
 
-      // Check if we received any data
-      if (chartData.length === 0) {
+      const typedChartData = chartData as MonthlyTypeData[];
+      const hasSelectedSales = typedChartData.some((monthData) =>
+        selectedChartProducts.some(
+          (productId) => Number(monthData[productId] || 0) !== 0
+        )
+      );
+
+      if (!hasSelectedSales) {
         toast.error(
           t("No data found for the selected products in the past year")
         );
@@ -323,7 +352,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         return;
       }
 
-      setYearlyTrendData(chartData);
+      setYearlyTrendData(typedChartData);
       toast.success(t("Product trend data generated successfully"));
     } catch (error) {
       console.error("Error fetching yearly trend data:", error);
@@ -517,6 +546,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     // Separate product data by type
     const bhProducts: ProductSalesData[] = [];
     const meeProducts: ProductSalesData[] = [];
+    const ramenProducts: ProductSalesData[] = [];
     const othProducts: ProductSalesData[] = [];
 
     salesData.forEach((product) => {
@@ -534,6 +564,8 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         bhProducts.push(product);
       } else if (product.type === "MEE") {
         meeProducts.push(product);
+      } else if (product.type === "RAMEN") {
+        ramenProducts.push(product);
       } else if (product.type === "JP") {
         if (isJp) othProducts.push(product);
         // In tienhock scope, JP products are excluded
@@ -545,6 +577,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     // Sort products by sales for each type
     bhProducts.sort((a, b) => b.totalSales - a.totalSales);
     meeProducts.sort((a, b) => b.totalSales - a.totalSales);
+    ramenProducts.sort((a, b) => b.totalSales - a.totalSales);
     othProducts.sort((a, b) => b.totalSales - a.totalSales);
 
     // Create pie data for each type with shaded colors
@@ -599,7 +632,17 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
 
     const bhTotal = bhProducts.reduce((sum, p) => sum + p.totalSales, 0);
     const meeTotal = meeProducts.reduce((sum, p) => sum + p.totalSales, 0);
+    const ramenTotal = ramenProducts.reduce((sum, p) => sum + p.totalSales, 0);
     const othTotal = othProducts.reduce((sum, p) => sum + p.totalSales, 0); // Now includes both OTH and JP products
+    const ramenQuantity = ramenProducts.reduce(
+      (sum, product) => sum + product.quantity,
+      0
+    );
+    const nonRamenQuantity = salesData.reduce(
+      (sum, product) =>
+        product.type === "RAMEN" ? sum : sum + product.quantity,
+      0
+    );
 
     return {
       categorySummary,
@@ -610,13 +653,20 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
         meeProducts,
         categoryColors["MEE"] || "#48bb78"
       ),
+      ramenPieData: createPieData(
+        ramenProducts,
+        categoryColors["RAMEN"] || "#e11d48"
+      ),
       othPieData: createPieData(
         othProducts,
         categoryColors[isJp ? "JP" : "OTH"] || (isJp ? "#ed8936" : "#9f7aea")
       ),
       bhTotal,
       meeTotal,
+      ramenTotal,
       othTotal,
+      ramenQuantity,
+      nonRamenQuantity,
     };
   }, [salesData, categoryColors, isJp]);
 
@@ -627,6 +677,34 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
       currency: "MYR",
     }).format(amount);
   };
+
+  const formatSeparatedQuantity = (
+    nonRamenQuantity: number,
+    ramenQuantity: number
+  ): string => {
+    if (nonRamenQuantity > 0 && ramenQuantity > 0) {
+      return t("{{units}} units + {{packets}} PKT", {
+        units: nonRamenQuantity.toLocaleString(),
+        packets: ramenQuantity.toLocaleString(),
+      });
+    }
+    if (ramenQuantity > 0) {
+      return t("{{total}} packets", {
+        total: ramenQuantity.toLocaleString(),
+      });
+    }
+    return t("{{total}} units", {
+      total: nonRamenQuantity.toLocaleString(),
+    });
+  };
+
+  const formatProductQuantity = (
+    quantity: number,
+    productType: string
+  ): string =>
+    productType === "RAMEN"
+      ? t("{{total}} packets", { total: quantity.toLocaleString() })
+      : t("{{total}} units", { total: quantity.toLocaleString() });
 
   // Handle sort change
   const handleSort = (key: keyof ProductSalesData) => {
@@ -695,7 +773,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
           </div>
         </div>
         {/* Quick Stats Row */}
-        <div className={`grid grid-cols-1 sm:grid-cols-2 ${isJp ? "lg:grid-cols-2" : "lg:grid-cols-4"} gap-3`}>
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${isJp ? "lg:grid-cols-2" : "lg:grid-cols-5"} gap-3`}>
           {/* Total Sales */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
             <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
@@ -707,13 +785,26 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               </span>
             </div>
             <div className="px-4 py-3">
-              <div className="text-xl font-bold text-sky-600 dark:text-sky-400">
-                {t("{{total}} units", {
-                  total: salesData
-                    .reduce((sum, p) => sum + p.quantity, 0)
-                    .toLocaleString(),
-                })}
-              </div>
+              {isJp ? (
+                <div className="text-xl font-bold text-sky-600 dark:text-sky-400">
+                  {t("{{total}} units", {
+                    total: summary.nonRamenQuantity.toLocaleString(),
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-0.5 text-sm font-bold">
+                  <div className="text-sky-600 dark:text-sky-400">
+                    {t("{{total}} non-Ramen units", {
+                      total: summary.nonRamenQuantity.toLocaleString(),
+                    })}
+                  </div>
+                  <div className="text-rose-600 dark:text-rose-400">
+                    {t("{{total}} Ramen packets", {
+                      total: summary.ramenQuantity.toLocaleString(),
+                    })}
+                  </div>
+                </div>
+              )}
               <div className="mt-1 text-sm font-bold">{formatCurrency(summary.totalSales)}</div>
             </div>
           </div>
@@ -786,6 +877,27 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                   <div className="mt-1 text-sm font-bold">{formatCurrency(summary.meeTotal)}</div>
                 </div>
               </div>
+              {/* RAMEN Products */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
+                <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
+                  <h3 className="text-sm font-semibold truncate">
+                    {t("Ramen Products")}
+                  </h3>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+                    RAMEN
+                  </span>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="text-xl font-bold text-rose-600 dark:text-rose-400">
+                    {t("{{total}} packets", {
+                      total: summary.ramenQuantity.toLocaleString(),
+                    })}
+                  </div>
+                  <div className="mt-1 text-sm font-bold">
+                    {formatCurrency(summary.ramenTotal)}
+                  </div>
+                </div>
+              </div>
               {/* OTH Products */}
               <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
                 <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex items-center justify-between gap-2">
@@ -835,10 +947,48 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                 const rtnProducts = salesman.products.filter(p => p.returns > 0);
                 const totalFoc = focProducts.reduce((sum, p) => sum + p.foc, 0);
                 const totalRtn = rtnProducts.reduce((sum, p) => sum + p.returns, 0);
+                const ramenFoc = focProducts.reduce(
+                  (sum, product) =>
+                    product.type === "RAMEN" ? sum + product.foc : sum,
+                  0
+                );
+                const nonRamenFoc = totalFoc - ramenFoc;
+                const ramenReturns = rtnProducts.reduce(
+                  (sum, product) =>
+                    product.type === "RAMEN" ? sum + product.returns : sum,
+                  0
+                );
+                const nonRamenReturns = totalRtn - ramenReturns;
+                const salesmanRamenQuantity = salesman.products.reduce(
+                  (sum, product) =>
+                    product.type === "RAMEN" ? sum + product.quantity : sum,
+                  0
+                );
+                const salesmanNonRamenQuantity = salesman.products.reduce(
+                  (sum, product) =>
+                    product.type === "RAMEN" ? sum : sum + product.quantity,
+                  0
+                );
 
                 // Build tooltip text for FOC/RTN breakdown
-                const focTooltip = focProducts.map(p => `${p.id} · ${p.description}: ${p.foc}`).join('\n');
-                const rtnTooltip = rtnProducts.map(p => `${p.id} · ${p.description}: ${p.returns}`).join('\n');
+                const focTooltip = focProducts
+                  .map(
+                    (product) =>
+                      `${product.id} · ${product.description}: ${formatProductQuantity(
+                        product.foc,
+                        product.type
+                      )}`
+                  )
+                  .join("\n");
+                const rtnTooltip = rtnProducts
+                  .map(
+                    (product) =>
+                      `${product.id} · ${product.description}: ${formatProductQuantity(
+                        product.returns,
+                        product.type
+                      )}`
+                  )
+                  .join("\n");
 
                 return (
                   <div
@@ -846,29 +996,50 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden"
                   >
                     {/* Salesman Header */}
-                    <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
+                    <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                       <h3 className="text-base font-semibold">{salesman.salesmanId}</h3>
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
                         {totalFoc > 0 && (
                           <HoverTooltip content={focTooltip}>
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 cursor-default">
-                              {t("FOC {{total}}", { total: totalFoc })}
+                              {t("FOC {{total}}", {
+                                total: formatSeparatedQuantity(
+                                  nonRamenFoc,
+                                  ramenFoc
+                                ),
+                              })}
                             </span>
                           </HoverTooltip>
                         )}
                         {totalRtn > 0 && (
                           <HoverTooltip content={rtnTooltip}>
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 cursor-default">
-                              {t("RTN {{total}}", { total: totalRtn })}
+                              {t("RTN {{total}}", {
+                                total: formatSeparatedQuantity(
+                                  nonRamenReturns,
+                                  ramenReturns
+                                ),
+                              })}
                             </span>
                           </HoverTooltip>
                         )}
-                        <span className="text-sky-600 dark:text-sky-400 font-bold">
-                          {t("{{total}} units", {
-                            total: salesman.totalQuantity.toLocaleString(),
-                          })}
-                        </span>
-                        <span className="text-default-400 dark:text-gray-500">·</span>
+                        {salesmanNonRamenQuantity > 0 && (
+                          <span className="text-sky-600 dark:text-sky-400 font-bold">
+                            {t("{{total}} non-Ramen units", {
+                              total: salesmanNonRamenQuantity.toLocaleString(),
+                            })}
+                          </span>
+                        )}
+                        {salesmanRamenQuantity > 0 && (
+                          <span className="text-rose-600 dark:text-rose-400 font-bold">
+                            {t("{{total}} Ramen packets", {
+                              total: salesmanRamenQuantity.toLocaleString(),
+                            })}
+                          </span>
+                        )}
+                        {(salesmanNonRamenQuantity > 0 || salesmanRamenQuantity > 0) && (
+                          <span className="text-default-400 dark:text-gray-500">·</span>
+                        )}
                         <span className="font-bold">{formatCurrency(salesman.totalSales)}</span>
                       </div>
                     </div>
@@ -912,7 +1083,12 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                                   {product.type}
                                 </span>
                               </td>
-                              <td className="px-4 py-2 text-sm text-right">{product.quantity.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm text-right">
+                                {formatProductQuantity(
+                                  product.quantity,
+                                  product.type
+                                )}
+                              </td>
                               <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(product.totalSales)}</td>
                             </tr>
                           ))}
@@ -931,23 +1107,32 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
 
           {/* All Salesmen - Product Sales Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow overflow-hidden">
-            <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex justify-between items-center">
+            <div className="px-4 py-2 bg-default-100 dark:bg-gray-700 border-b dark:border-gray-600 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
               <h3 className="text-base font-semibold">
                 {t("All Products Summary")}
               </h3>
-              <div className="flex items-center gap-2 text-sm font-bold">
+              <div className="flex flex-wrap items-center justify-end gap-2 text-sm font-bold">
                 <span className="text-default-400 dark:text-gray-500 font-normal">
                   {t("({{total}} products)", {
                     total: filteredAndSortedData.length,
                   })}
                 </span>
                 <span className="text-sky-600 dark:text-sky-400">
-                  {t("{{total}} units", {
-                    total: filteredAndSortedData
-                      .reduce((sum, p) => sum + p.quantity, 0)
-                      .toLocaleString(),
-                  })}
+                  {isJp
+                    ? t("{{total}} units", {
+                        total: summary.nonRamenQuantity.toLocaleString(),
+                      })
+                    : t("{{total}} non-Ramen units", {
+                        total: summary.nonRamenQuantity.toLocaleString(),
+                      })}
                 </span>
+                {!isJp && (
+                  <span className="text-rose-600 dark:text-rose-400">
+                    {t("{{total}} Ramen packets", {
+                      total: summary.ramenQuantity.toLocaleString(),
+                    })}
+                  </span>
+                )}
                 <span className="text-default-400 dark:text-gray-500">·</span>
                 <span>{formatCurrency(summary.totalSales)}</span>
               </div>
@@ -1090,13 +1275,13 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           </span>
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
-                          {product.foc.toLocaleString()}
+                          {formatProductQuantity(product.foc, product.type)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
-                          {product.returns.toLocaleString()}
+                          {formatProductQuantity(product.returns, product.type)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
-                          {product.quantity.toLocaleString()}
+                          {formatProductQuantity(product.quantity, product.type)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right font-medium">
                           {formatCurrency(product.totalSales)}
@@ -1113,9 +1298,10 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         {t("Total:")}
                       </td>
                       <td className="px-4 py-2 text-right text-base font-bold">
-                        {filteredAndSortedData
-                          .reduce((sum, product) => sum + product.quantity, 0)
-                          .toLocaleString()}
+                        {formatSeparatedQuantity(
+                          summary.nonRamenQuantity,
+                          isJp ? 0 : summary.ramenQuantity
+                        )}
                       </td>
                       <td className="px-4 py-2 text-right text-base font-bold">
                         {formatCurrency(
@@ -1138,8 +1324,8 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             )}
           </div>
 
-          {/* Dashboard content - Three separate doughnut charts without legends */}
-          <div className={`grid grid-cols-1 ${isJp ? "md:grid-cols-1" : "md:grid-cols-3"} gap-6`}>
+          {/* Dashboard content - category doughnut charts without legends */}
+          <div className={`grid grid-cols-1 ${isJp ? "md:grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4"} gap-6`}>
             {/* BH Products Doughnut Chart */}
             {!isJp && (
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
@@ -1290,6 +1476,78 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
             </div>
             )}
 
+            {/* RAMEN Products Doughnut Chart */}
+            {!isJp && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
+              <h2 className="text-lg font-semibold mb-4">
+                {t("Ramen Products Distribution")}
+              </h2>
+              {summary.ramenPieData && summary.ramenPieData.length > 0 ? (
+                <>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={summary.ramenPieData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent, quantity }) =>
+                            percent > 0.05
+                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
+                              : ""
+                          }
+                          outerRadius={100}
+                          innerRadius={50}
+                          fill="#8884d8"
+                          dataKey="value"
+                          paddingAngle={2}
+                        >
+                          {summary.ramenPieData.map((entry) => (
+                            <Cell key={entry.id} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value, _name, props) => [
+                            t("{{amount}} · {{quantity}} packets", {
+                              amount: formatCurrency(Number(value)),
+                              quantity:
+                                props.payload.quantity?.toLocaleString() || 0,
+                            }),
+                            props.payload.description,
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div
+                    className="text-center mt-2 py-2 rounded-lg"
+                    style={{
+                      backgroundColor: `${categoryColors["RAMEN"]}15`,
+                      color: categoryColors["RAMEN"] || "#e11d48",
+                      fontWeight: 600,
+                    }}
+                  >
+                    <div>
+                      {t("{{total}} packets", {
+                        total: summary.ramenQuantity.toLocaleString(),
+                      })}
+                    </div>
+                    <div className="text-sm opacity-80">
+                      {t("Total: {{amount}}", {
+                        amount: formatCurrency(summary.ramenTotal),
+                      })}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="h-72 flex items-center justify-center border border-dashed border-default-300 dark:border-gray-600 rounded">
+                  {t("No Ramen products data available")}
+                </div>
+              )}
+            </div>
+            )}
+
             {/* OTH / JP Products Doughnut Chart */}
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
               <h2 className="text-lg font-semibold mb-4">
@@ -1421,7 +1679,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     }}
                     options={productOptions.map((option) => ({
                       ...option,
-                      name: ["MEE", "BH", "OTH", "JP"].includes(option.id)
+                      name: ["MEE", "BH", "RAMEN", "OTH", "JP"].includes(option.id)
                         ? t(option.name)
                         : option.name,
                     }))}
@@ -1480,15 +1738,15 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     />
                     <Legend wrapperStyle={{ bottom: 20 }} />
                     {yearlyTrendData.length > 0 &&
-                      Object.keys(yearlyTrendData[0])
-                        .filter((key) => key !== "month")
-                        .map((key) => {
+                      selectedChartProducts.map((key) => {
                           // Get display name for the line
                           const displayName =
                             key === "MEE"
                               ? t("All Mee Products")
                               : key === "BH"
                                 ? t("All Bihun Products")
+                              : key === "RAMEN"
+                                ? t("All Ramen Products")
                               : key === "JP"
                                 ? t("All JellyPolly Products")
                               : key === "OTH"

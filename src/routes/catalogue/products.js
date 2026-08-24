@@ -40,8 +40,8 @@ export default function (pool) {
           : `WHERE ${typeFilter}`;
         query = `SELECT id, description, price_per_unit, type, is_active, sort_order FROM products ${whereClause}`;
       } else {
-        // Default: Return only BH, MEE, JP type products (excluding tax)
-        const typeFilter = "type IN ('BH', 'MEE', 'JP')";
+        // Default: Return the primary saleable product types (excluding tax)
+        const typeFilter = "type IN ('BH', 'MEE', 'RAMEN', 'JP')";
         whereClause = activeFilter
           ? `WHERE ${typeFilter} AND ${activeFilter}`
           : `WHERE ${typeFilter}`;
@@ -273,12 +273,19 @@ export default function (pool) {
 
   // Save the display order of products within a type (must be before /:id)
   router.put("/order", async (req, res) => {
-    const VALID_ORDER_TYPES = new Set(["BH", "MEE", "JP", "OTH", "BUNDLE"]);
+    const VALID_ORDER_TYPES = new Set([
+      "BH",
+      "MEE",
+      "RAMEN",
+      "JP",
+      "OTH",
+      "BUNDLE",
+    ]);
     const { type, product_ids } = req.body;
 
     if (typeof type !== "string" || !VALID_ORDER_TYPES.has(type)) {
       return res.status(400).json({
-        message: "type must be one of BH, MEE, JP, OTH, BUNDLE",
+        message: "type must be one of BH, MEE, RAMEN, JP, OTH, BUNDLE",
       });
     }
 
