@@ -1,3 +1,5 @@
+import { NODE_ENV } from "../configs/config.js";
+
 const ALLOWED_API_KEY = "REMOVED_SECRET";
 
 // Store last update times for session activity (more memory efficient than a regular object)
@@ -7,10 +9,27 @@ const MIN_SESSION_UPDATE_INTERVAL = 10 * 60 * 1000;
 
 export const authMiddleware = (pool) => async (req, res, next) => {
   const requestPath = req.originalUrl?.split("?")[0] || req.path;
+  const apiKey = req.headers["api-key"];
+  const remoteAddress = req.socket?.remoteAddress;
+  const isLoopbackRequest =
+    remoteAddress === "127.0.0.1" ||
+    remoteAddress === "::1" ||
+    remoteAddress === "::ffff:127.0.0.1";
+  // The development login page has no validated session yet. Keep its one
+  // destructive shortcut local-only and leave API-key requests on the normal
+  // authentication path so the backup route can reject them explicitly.
+  const isLocalDevelopmentSqlReplacement =
+    NODE_ENV === "development" &&
+    (process.platform === "win32" || process.platform === "darwin") &&
+    req.method === "POST" &&
+    requestPath === "/api/backup/upload-sql" &&
+    !apiKey &&
+    isLoopbackRequest;
 
   // STEP 1: Routes that always bypass auth check
   if (
     (req.method === "GET" && requestPath === "/api/backup/restore/status") ||
+    isLocalDevelopmentSqlReplacement ||
     req.method === "OPTIONS" ||
     req.path === "/api/sessions/initialize" ||
     req.path === "/api/auth/login" ||
@@ -32,7 +51,6 @@ export const authMiddleware = (pool) => async (req, res, next) => {
 
   // STEP 3: Get auth credentials (session ID or API key)
   const sessionId = req.headers["x-session-id"];
-  const apiKey = req.headers["api-key"];
 
   if (!sessionId && !apiKey) {
     return res

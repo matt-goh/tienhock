@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-24",
+    ms: "Halaman log masuk dalam sistem development kini mempunyai butang Ganti Pangkalan Data daripada SQL, jadi sandaran penuh production boleh dimuatkan sebelum log masuk. Sandaran melalui cara ini menggunakan pengesahan dan amaran yang sama seperti dalam Database Backups, dan sistem development kini boleh membaca format keselamatan sandaran production terkini.",
+    en: "The development login page now has a Replace Database from SQL button, so a full production backup can be loaded before signing in. It uses the same validation and warning as Database Backups, and the development system can now read the current production backup safety format.",
+  },
+  {
+    date: "2026-08-24",
     ms: "Produk Ramen yang aktif kini muncul dalam senarai produk semasa membuat atau mengubah invois jualan. Produk Ramen baharu yang ditambah melalui Katalog Produk juga akan tersedia di bahagian Jualan secara automatik.",
     en: "Active Ramen products now appear in the product list when creating or editing sales invoices. New Ramen products added through the Product Catalogue will also become available in Sales automatically.",
   },
