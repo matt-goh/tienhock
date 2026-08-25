@@ -3391,6 +3391,230 @@ export default function (pool, config) {
     }
   }); // End POST /submit-invoices
 
+  // POST /api/invoices/:id/restore - Bring a cancelled invoice back to life.
+  //
+  // Cancelling an invoice zeroes its order lines and totals and cancels the
+  // invoice-owned sales journal, so a restore cannot just flip a status flag:
+  // it must rebuild the lines (from the request body, like the create path),
+  // recompute the totals, and re-post the journal.
+  //
+  // Deliberately limited to SAFE, zero-value (FOC-like) invoices - no payment
+  // history, receipts, adjustment documents, or e-invoice submission - where
+  // un-cancelling is an exact inverse instead of an accounting change.
+  router.post("/:id/restore", async (req, res) => {
+    const { id } = req.params;
+    const { products } = req.body;
+
+    if (!products || !Array.isArray(products) || products.length === 0) {
+      return res.status(400).json({
+        message: "Products array is required to restore an invoice",
+      });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const invoiceResult = await client.query(
+        `SELECT id, customerid, paymenttype, totalamountpayable, rounding,
+                invoice_status, einvoice_status, uuid, journal_entry_id, createddate
+           FROM invoices
+          WHERE id = $1
+          FOR UPDATE`,
+        [id]
+      );
+      if (invoiceResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      const invoice = invoiceResult.rows[0];
+
+      assertTienHockAccountingDateUnlocked(
+        invoice.createddate,
+        `Sales invoice ${id}`
+      );
+
+      if (invoice.invoice_status !== "cancelled") {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Only a cancelled invoice can be restored",
+        });
+      }
+
+      // Safe-restore guards: a restore must be a clean inverse of the
+      // cancellation, with no history that a status flip would resurrect.
+      const adjustmentCheck = await client.query(
+        `SELECT id FROM adjustment_documents
+          WHERE original_invoice_id = $1 AND status = 'active' LIMIT 1`,
+        [id]
+      );
+      if (adjustmentCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Cannot restore invoice ${id}: an active adjustment document references it. Cancel that document first.`,
+        });
+      }
+
+      const receiptCheck = await client.query(
+        `SELECT r.id FROM receipt_allocations ra
+            JOIN receipts r ON r.id = ra.receipt_id
+          WHERE ra.invoice_id = $1 AND r.status IN ('pending', 'posted')
+          LIMIT 1`,
+        [id]
+      );
+      if (receiptCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Cannot restore invoice ${id}: receipts still allocate it. Cancel those receipts first.`,
+        });
+      }
+
+      // Block genuine payment history (auto-collection rows are system-owned
+      // and re-synced by the journal on restore, so they don't block).
+      const paymentCheck = await client.query(
+        `SELECT 1 FROM payments
+          WHERE invoice_id = $1 AND is_auto_collection = false LIMIT 1`,
+        [id]
+      );
+      if (paymentCheck.rows.length > 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Cannot restore invoice ${id}: it has payment history. Restoring it would resurrect a settled bill.`,
+        });
+      }
+
+      if (invoice.uuid || invoice.einvoice_status) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: `Cannot restore invoice ${id}: it was submitted as an e-invoice.`,
+        });
+      }
+
+      // Rebuild the order lines from the supplied (possibly corrected) data.
+      await client.query(`DELETE FROM order_details WHERE invoiceid = $1`, [id]);
+
+      const subtotalAmounts = [];
+      const taxAmounts = [];
+      const lineCodes = [];
+
+      for (const product of products) {
+        if (product.istotal) continue;
+        const code = product.code || (product.issubtotal ? "SUBTOTAL" : "");
+        lineCodes.push(code);
+        await client.query(
+          `INSERT INTO order_details (
+             invoiceid, code, price, quantity, freeproduct,
+             returnproduct, description, tax, total, issubtotal
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            id,
+            code,
+            parseFloat(product.price || 0),
+            parseInt(product.quantity || 0),
+            parseInt(product.freeProduct || 0),
+            parseInt(product.returnProduct || 0),
+            product.description || (product.issubtotal ? "Subtotal" : ""),
+            parseFloat(product.tax || 0),
+            String(product.total || "0.00"),
+            product.issubtotal || false,
+          ]
+        );
+        if (!product.issubtotal) {
+          subtotalAmounts.push(
+            multiplyMoney(
+              parseFloat(product.price || 0),
+              parseInt(product.quantity || 0)
+            )
+          );
+          taxAmounts.push(parseFloat(product.tax || 0));
+        }
+      }
+
+      // Only zero-value (FOC-like) bills may be restored; reject anything that
+      // would create a new receivable on the ledger.
+      const newTotal = roundMoney(
+        addMoney(
+          addMoney(sumMoney(subtotalAmounts), sumMoney(taxAmounts)),
+          parseFloat(invoice.rounding || 0)
+        )
+      );
+      if (newTotal !== 0) {
+        await client.query("ROLLBACK");
+        return res.status(400).json({
+          message: "Only zero-value (FOC) invoices can be restored",
+        });
+      }
+
+      // Reject lines that reference products which no longer exist (the
+      // PM_PR -> 1-PR re-code is exactly the class of mistake this prevents).
+      const specialCodes = new Set(["OTH", "LESS", "SUBTOTAL"]);
+      const productCodes = lineCodes.filter(
+        (code) => code !== "" && !specialCodes.has(code)
+      );
+      if (productCodes.length > 0) {
+        const existing = await client.query(
+          `SELECT id FROM products WHERE id = ANY($1)`,
+          [productCodes]
+        );
+        const existingSet = new Set(existing.rows.map((row) => row.id));
+        const missing = productCodes.filter((code) => !existingSet.has(code));
+        if (missing.length > 0) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({
+            message:
+              "Cannot restore invoice: product code(s) " +
+              missing.join(", ") +
+              " no longer exist. Choose the current product codes instead.",
+          });
+        }
+      }
+
+      // Restore the invoice to its zero-value state and re-post the sales
+      // journal (zero bills post informational 0.00 lines).
+      const restoredResult = await client.query(
+        `UPDATE invoices
+            SET total_excluding_tax = 0,
+                tax_amount = 0,
+                rounding = 0,
+                totalamountpayable = 0,
+                balance_due = 0,
+                invoice_status = 'paid'
+          WHERE id = $1
+          RETURNING *`,
+        [id]
+      );
+
+      await syncSalesJournalEntry(
+        client,
+        { ...invoice, totalamountpayable: 0 },
+        req.user?.id || null
+      );
+
+      await client.query("COMMIT");
+
+      res.status(201).json({
+        message: "Invoice restored successfully",
+        invoice: {
+          ...restoredResult.rows[0],
+          total_excluding_tax: 0,
+          tax_amount: 0,
+          rounding: 0,
+          totalamountpayable: 0,
+          balance_due: 0,
+        },
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error restoring invoice:", error);
+      res.status(500).json({
+        message: "Error restoring invoice",
+        error: error.message,
+      });
+    } finally {
+      client.release();
+    }
+  });
+
   // DELETE /api/invoices/:id - Cancel Invoice (Update Status and Cancel Payments)
   router.delete("/:id", async (req, res) => {
     const { id } = req.params;
