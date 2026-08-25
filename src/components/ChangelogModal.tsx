@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-24",
+    ms: "Apabila menambah produk baharu, ralat \"Kod gaji ID diperlukan untuk kod gaji komisen jurujual\" tidak lagi muncul walaupun medan kod gaji menunjukkan ID produk. Kod gaji komisen jurujual kini sentiasa menggunakan ID produk secara automatik, jadi produk boleh disimpan tanpa perlu menaip semula.",
+    en: "When adding a new product, the \"Pay code ID is required for Salesman commission pay code\" error no longer appears even though the pay code field showed the product ID. The salesman commission pay code now always uses the product ID automatically, so the product can be saved without retyping it.",
+  },
+  {
+    date: "2026-08-24",
     ms: "Apabila menambah produk baharu (Mee, Bihun, Ramen, Bundle atau Jelly Polly), halaman Katalog Produk kini boleh mencipta dan memetakan kod gajinya secara automatik dalam satu langkah: kod gaji pembungkusan, komisen jurujual dan komisen jurujual Ikut Lori. Anda hanya perlu memasukkan kadar; kod gaji, pemetaan produk dan perkaitan kerja jurujual disediakan serentak, jadi jualan dan gaji jurujual untuk produk baharu dapat diisi secara automatik tanpa perlu menyediakan kod gaji secara manual.",
     en: "When adding a new product (Mee, Bihun, Ramen, Bundle or Jelly Polly), the Product Catalogue page can now create and map its pay codes in one step: the packing pay code, salesman commission and Ikut Lori salesman commission. You only enter the rates; the pay codes, product mapping and salesman job links are set up together, so sales and salesman pay for the new product auto-fill without any manual pay-code setup.",
   },
