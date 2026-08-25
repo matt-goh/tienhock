@@ -23,6 +23,7 @@ import {
   getInvoiceDetailsBundle,
   cancelInvoice,
   cancelPayment,
+  restoreInvoice,
   getGroupedReceiptCancellationError,
   getPaymentBankAccountLabel,
   getPaymentCancellationErrorData,
@@ -507,6 +508,10 @@ const InvoiceDetailsPage: React.FC = () => {
   const [editedProducts, setEditedProducts] = useState<ProductItem[]>([]);
   const [isUpdatingOrderDetails, setIsUpdatingOrderDetails] =
     useState<boolean>(false);
+  // Restore cancelled invoice states
+  const [showRestoreDialog, setShowRestoreDialog] = useState<boolean>(false);
+  const [restoreProducts, setRestoreProducts] = useState<ProductItem[]>([]);
+  const [isRestoring, setIsRestoring] = useState<boolean>(false);
   const [showOverpaymentConfirm, setShowOverpaymentConfirm] = useState(false);
   const [overpaymentDetails, setOverpaymentDetails] = useState<{
     totalAmount: number;
@@ -615,6 +620,82 @@ const InvoiceDetailsPage: React.FC = () => {
       });
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  // --- Restore cancelled invoice (safe FOC / zero-value bills) ---
+  const handleRestoreClick = () => {
+    if (!invoiceData || invoiceData.invoice_status !== "cancelled") return;
+    setRestoreProducts(
+      (invoiceData.products || []).map((product) => ({
+        ...product,
+        uid: product.uid || crypto.randomUUID(),
+      }))
+    );
+    setShowRestoreDialog(true);
+  };
+
+  const handleRestoreProductsChange = (items: ProductItem[]): void => {
+    setRestoreProducts(items);
+  };
+
+  const handleAddRestoreRow = (): void => {
+    const newRow: ProductItem = {
+      uid: crypto.randomUUID(),
+      code: "",
+      description: "",
+      quantity: 1,
+      price: 0,
+      freeProduct: 0,
+      returnProduct: 0,
+      tax: 0,
+      total: "0.00",
+      issubtotal: false,
+    };
+    setRestoreProducts((prev) => [...prev, newRow]);
+  };
+
+  const handleAddRestoreSubtotal = (): void => {
+    let runningTotal = 0;
+    for (let i = restoreProducts.length - 1; i >= 0; i--) {
+      const item = restoreProducts[i];
+      if (item.issubtotal) break;
+      if (!item.istotal) {
+        runningTotal += parseFloat(item.total || "0");
+      }
+    }
+    const subtotalRow: ProductItem = {
+      uid: crypto.randomUUID(),
+      code: "SUBTOTAL",
+      description: "Subtotal",
+      quantity: 0,
+      price: 0,
+      freeProduct: 0,
+      returnProduct: 0,
+      tax: 0,
+      total: runningTotal.toFixed(2),
+      issubtotal: true,
+    };
+    setRestoreProducts((prev) => [...prev, subtotalRow]);
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!invoiceData || isRestoring) return;
+
+    setIsRestoring(true);
+    setShowRestoreDialog(false);
+    const toastId = toast.loading(t("Restoring invoice..."));
+
+    try {
+      await restoreInvoice(invoiceData.id, restoreProducts);
+      await fetchDetails(); // Refresh invoice and payment data
+      toast.success(t("Invoice restored successfully"), { id: toastId });
+    } catch (error: any) {
+      toast.error(error.message || t("Failed to restore invoice"), {
+        id: toastId,
+      });
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -2192,6 +2273,18 @@ const InvoiceDetailsPage: React.FC = () => {
                 : t("cancel", { ns: "common" })}
             </Button>
           )}
+          {isCancelled && (
+            <Button
+              onClick={handleRestoreClick}
+              variant="outline"
+              color="sky"
+              size="md"
+              disabled={isLoading}
+              icon={IconRotate2}
+            >
+              {t("Restore Invoice")}
+            </Button>
+          )}
           </div>
         </div>
 
@@ -3425,6 +3518,91 @@ const InvoiceDetailsPage: React.FC = () => {
                 {isUpdatingOrderDetails
                   ? t("Updating...")
                   : t("Update Line Items")}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Restore Cancelled Invoice Modal */}
+      {showRestoreDialog && invoiceData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 -top-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg w-full max-w-7xl max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-6 border-b dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                {t("Restore Invoice {{id}}", { id: invoiceData.id })}
+              </h3>
+              <button
+                onClick={() => setShowRestoreDialog(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                disabled={isRestoring}
+              >
+                <IconX size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 px-6 py-4">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                {t(
+                  "Restoring brings a cancelled FOC / zero-value bill back to life. Cancellation cleared the original lines, so confirm or correct them below before restoring."
+                )}
+              </p>
+              <div className="flex justify-end items-center mb-3">
+                <div>
+                  <Button
+                    onClick={handleAddRestoreSubtotal}
+                    variant="outline"
+                    size="sm"
+                    className="mr-2"
+                    disabled={isRestoring}
+                  >
+                    {t("Add Subtotal")}
+                  </Button>
+                  <Button
+                    onClick={handleAddRestoreRow}
+                    variant="outline"
+                    size="sm"
+                    disabled={isRestoring}
+                  >
+                    {t("Add Item")}
+                  </Button>
+                </div>
+              </div>
+
+              <LineItemsTable
+                items={restoreProducts}
+                onItemsChange={handleRestoreProductsChange}
+                customerProducts={[]}
+                productsCache={productsCache.map((product) => ({
+                  uid: crypto.randomUUID(),
+                  id: product.id,
+                  code: product.id,
+                  description: product.description,
+                  price: product.price_per_unit,
+                  quantity: 1,
+                  freeProduct: 0,
+                  returnProduct: 0,
+                  tax: 0,
+                  total: "0.00",
+                  issubtotal: false,
+                }))}
+                readOnly={isRestoring}
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 p-6 border-t dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <Button
+                variant="outline"
+                onClick={() => setShowRestoreDialog(false)}
+                disabled={isRestoring}
+              >
+                {t("cancel", { ns: "common" })}
+              </Button>
+              <Button
+                color="sky"
+                onClick={handleConfirmRestore}
+                disabled={isRestoring || restoreProducts.length === 0}
+              >
+                {isRestoring ? t("Restoring...") : t("Restore Invoice")}
               </Button>
             </div>
           </div>
