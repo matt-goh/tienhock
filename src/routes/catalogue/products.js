@@ -2,6 +2,9 @@
 import { Router } from "express";
 import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
+/** Client error thrown while validating the /with-paycode-setup payload. */
+class SetupValidationError extends Error {}
+
 export default function (pool) {
   const router = Router();
 
@@ -268,6 +271,412 @@ export default function (pool) {
       res
         .status(500)
         .json({ message: "Error processing products", error: error.message });
+    }
+  });
+
+  // POST /with-paycode-setup - Create a product and, in the same transaction,
+  // its optional pay codes and mappings. Used by the Add Product modal's
+  // "Automatically create pay codes and mappings" section so a new production
+  // product (RAMEN, MEE, BH, BUNDLE or JP) is fully wired up in one atomic
+  // call instead of manual Pay Code + Mappings + job-association steps.
+  //
+  // Body:
+  // {
+  //   product: { id, description, price_per_unit, type, tax, is_active },
+  //   paycodes: [
+  //     { role: 'packing' | 'salesman' | 'ikut', id, description, pay_type,
+  //       rate_unit, rate_biasa, rate_ahad, rate_umum }
+  //   ],
+  //   scope: 'tienhock' | 'jellypolly'   // default 'tienhock'
+  // }
+  //
+  // role 'packing' -> product_pay_codes (packer payroll);
+  // role 'salesman' -> SALESMAN job (JP: JP_SALESMAN + JP_SALESMAN_IKUT),
+  //   with the pay code ID forced to equal the product ID (daily-log
+  //   same-id matching convention);
+  // role 'ikut' -> SALESMAN_IKUT job + product_salesman_ikut_pay_codes
+  //   (Tien Hock only).
+  router.post("/with-paycode-setup", async (req, res) => {
+    const SETUP_ROLES = new Set(["packing", "salesman", "ikut"]);
+    const PRODUCTION_RATE_UNITS = new Set([
+      "Bag",
+      "Ctn",
+      "Bundle",
+      "PKT",
+      "PCS",
+      "Kg",
+      "Karung",
+    ]);
+    const UNITS_REQUIRING_INPUT = new Set([
+      "Percent",
+      "Trip",
+      "Day",
+      "Bag",
+      "Ctn",
+      "PKT",
+      "PCS",
+      "Kg",
+      "Karung",
+      "Bundle",
+      "Fixed",
+      "Tray",
+    ]);
+    const PACKING_UNIT_BY_TYPE = {
+      MEE: "Bag",
+      BH: "Bag",
+      RAMEN: "PKT",
+      BUNDLE: "Bundle",
+      JP: "Ctn",
+    };
+
+    const { product, paycodes = [], scope = "tienhock" } = req.body;
+
+    if (scope !== "tienhock" && scope !== "jellypolly") {
+      return res.status(400).json({
+        message: "scope must be 'tienhock' or 'jellypolly'",
+      });
+    }
+    if (!product || typeof product !== "object") {
+      return res.status(400).json({ message: "product is required" });
+    }
+    const {
+      id,
+      description,
+      price_per_unit,
+      type,
+      tax = "None",
+      is_active,
+    } = product;
+    if (
+      typeof id !== "string" ||
+      id.trim() === "" ||
+      typeof description !== "string" ||
+      description.trim() === "" ||
+      typeof type !== "string" ||
+      type.trim() === ""
+    ) {
+      return res.status(400).json({
+        message: "Product id, description and type are required",
+      });
+    }
+    const price = Number(price_per_unit);
+    if (!Number.isFinite(price) || price < 0) {
+      return res.status(400).json({
+        message: "Product price must be a number greater than or equal to 0",
+      });
+    }
+    if (!Array.isArray(paycodes)) {
+      return res.status(400).json({ message: "paycodes must be an array" });
+    }
+
+    // ----- Pre-validation (fail fast before touching the database) ---------
+    let normalizedPaycodes;
+    try {
+      const seenIds = new Set();
+      normalizedPaycodes = paycodes.map((entry) => {
+        if (!entry || typeof entry !== "object") {
+          throw new SetupValidationError(
+            "Each pay code entry must be an object"
+          );
+        }
+        const { role, id: payCodeId, pay_type, rate_unit } = entry;
+        if (!SETUP_ROLES.has(role)) {
+          throw new SetupValidationError(
+            `Unknown pay code role '${role}'; expected packing, salesman or ikut`
+          );
+        }
+        if (
+          typeof payCodeId !== "string" ||
+          payCodeId.trim() === "" ||
+          typeof pay_type !== "string" ||
+          pay_type.trim() === "" ||
+          typeof rate_unit !== "string" ||
+          rate_unit.trim() === ""
+        ) {
+          throw new SetupValidationError(
+            `Pay code id, pay_type and rate_unit are required (${role})`
+          );
+        }
+        if (seenIds.has(payCodeId)) {
+          throw new SetupValidationError(
+            `Pay code ID '${payCodeId}' is used more than once in the setup`
+          );
+        }
+        seenIds.add(payCodeId);
+
+        const parseRate = (value) => {
+          if (value === undefined || value === null || value === "") return 0;
+          const parsed = Number(value);
+          if (!Number.isFinite(parsed) || parsed < 0) {
+            throw new SetupValidationError(
+              `Pay code rates must be numbers greater than or equal to 0 (${payCodeId})`
+            );
+          }
+          return parsed;
+        };
+        // The Add Product auto-setup contract requires the user to set the
+        // normal rate for every pay code (Sunday/holiday stay optional and
+        // inherit it). Enforce it here too so a direct API call cannot create
+        // a silently unpaid pay code.
+        if (
+          entry.rate_biasa === undefined ||
+          entry.rate_biasa === null ||
+          entry.rate_biasa === ""
+        ) {
+          throw new SetupValidationError(
+            `Normal rate is required for pay code '${payCodeId}'`
+          );
+        }
+        const rateBiasa = parseRate(entry.rate_biasa);
+        const rateAhad = parseRate(entry.rate_ahad);
+        const rateUmum = parseRate(entry.rate_umum);
+
+        // Mirrors the Pay Code modal: blank Sunday/holiday rates inherit the
+        // normal rate when it is non-zero.
+        const finalRateAhad =
+          rateAhad === 0 && rateBiasa > 0 ? rateBiasa : rateAhad;
+        const finalRateUmum =
+          rateUmum === 0 && rateBiasa > 0 ? rateBiasa : rateUmum;
+
+        const packingUnit = PACKING_UNIT_BY_TYPE[type];
+
+        if (role === "packing") {
+          if (!packingUnit) {
+            throw new SetupValidationError(
+              `Packing pay codes are not supported for product type '${type}'`
+            );
+          }
+          // Same compatibility rule as /api/product-pay-codes/batch: RAMEN
+          // products map only to PKT and PKT codes map only to RAMEN.
+          if ((type === "RAMEN") !== (rate_unit === "PKT")) {
+            throw new SetupValidationError(
+              "Product and packing pay code units are incompatible; " +
+                "RAMEN must use PKT and only RAMEN may use PKT"
+            );
+          }
+          if (!PRODUCTION_RATE_UNITS.has(rate_unit)) {
+            throw new SetupValidationError(
+              `Packing pay code '${payCodeId}' must use a production rate unit`
+            );
+          }
+        } else if (role === "salesman") {
+          if (!["MEE", "BH", "RAMEN", "JP"].includes(type)) {
+            throw new SetupValidationError(
+              `Salesman commission pay codes are not supported for product type '${type}'`
+            );
+          }
+          if (payCodeId !== id) {
+            throw new SetupValidationError(
+              "Salesman commission pay code ID must equal the product ID"
+            );
+          }
+          if (!PRODUCTION_RATE_UNITS.has(rate_unit)) {
+            throw new SetupValidationError(
+              `Salesman commission pay code '${payCodeId}' must use a production rate unit`
+            );
+          }
+        } else {
+          if (scope !== "tienhock") {
+            throw new SetupValidationError(
+              "Ikut Lori pay codes are only supported for Tien Hock"
+            );
+          }
+          if (!["MEE", "BH", "RAMEN"].includes(type)) {
+            throw new SetupValidationError(
+              `Ikut Lori pay codes are not supported for product type '${type}'`
+            );
+          }
+          if (!PRODUCTION_RATE_UNITS.has(rate_unit)) {
+            throw new SetupValidationError(
+              `Ikut Lori pay code '${payCodeId}' must use a production rate unit`
+            );
+          }
+        }
+
+        return {
+          role,
+          id: payCodeId,
+          description:
+            typeof entry.description === "string" && entry.description.trim()
+              ? entry.description.trim()
+              : description,
+          pay_type,
+          rate_unit,
+          rate_biasa: rateBiasa,
+          rate_ahad: finalRateAhad,
+          rate_umum: finalRateUmum,
+          requires_units_input: UNITS_REQUIRING_INPUT.has(rate_unit),
+        };
+      });
+    } catch (error) {
+      if (error instanceof SetupValidationError) {
+        return res.status(400).json({ message: error.message });
+      }
+      throw error;
+    }
+
+    const payCodeTable =
+      scope === "jellypolly" ? "jellypolly.pay_codes" : "public.pay_codes";
+    const productPayCodeTable =
+      scope === "jellypolly"
+        ? "jellypolly.product_pay_codes"
+        : "public.product_pay_codes";
+    const jobPayCodeTable =
+      scope === "jellypolly"
+        ? "jellypolly.job_pay_codes"
+        : "public.job_pay_codes";
+    const salesmanJobs =
+      scope === "jellypolly"
+        ? ["JP_SALESMAN", "JP_SALESMAN_IKUT"]
+        : ["SALESMAN"];
+
+    try {
+      const productExists = await pool.query(
+        "SELECT 1 FROM public.products WHERE id = $1",
+        [id]
+      );
+      if (productExists.rows.length > 0) {
+        return res.status(400).json({
+          message: "A product with this ID already exists",
+        });
+      }
+
+      if (normalizedPaycodes.length > 0) {
+        const payCodeIds = normalizedPaycodes.map((entry) => entry.id);
+        const existingPayCodes = await pool.query(
+          `SELECT id FROM ${payCodeTable} WHERE id = ANY($1)`,
+          [payCodeIds]
+        );
+        if (existingPayCodes.rows.length > 0) {
+          return res.status(409).json({
+            message:
+              "A pay code with ID " +
+              existingPayCodes.rows.map((row) => `'${row.id}'`).join(", ") +
+              " already exists",
+          });
+        }
+      }
+
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        const productResult = await client.query(
+          `INSERT INTO public.products
+             (id, description, price_per_unit, type, tax, is_active)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, description, price_per_unit, type, tax, is_active`,
+          [id, description, price, type, tax, is_active === undefined ? true : !!is_active]
+        );
+
+        const createdPaycodes = [];
+        for (const entry of normalizedPaycodes) {
+          await client.query(
+            `INSERT INTO ${payCodeTable}
+               (id, description, pay_type, rate_unit,
+                rate_biasa, rate_ahad, rate_umum,
+                is_active, requires_units_input, report_column)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, NULL)`,
+            [
+              entry.id,
+              entry.description,
+              entry.pay_type,
+              entry.rate_unit,
+              entry.rate_biasa,
+              entry.rate_ahad,
+              entry.rate_umum,
+              entry.requires_units_input,
+            ]
+          );
+          createdPaycodes.push({ role: entry.role, id: entry.id });
+        }
+
+        const mappingSummary = { packing: [], salesman: [], ikut: [] };
+
+        for (const entry of normalizedPaycodes) {
+          if (entry.role === "packing") {
+            await client.query(
+              `INSERT INTO ${productPayCodeTable} (product_id, pay_code_id)
+               VALUES ($1, $2)`,
+              [id, entry.id]
+            );
+            mappingSummary.packing.push(entry.id);
+          } else if (entry.role === "salesman") {
+            for (const jobId of salesmanJobs) {
+              await client.query(
+                `INSERT INTO ${jobPayCodeTable}
+                   (job_id, pay_code_id, is_default,
+                    override_rate_biasa, override_rate_ahad, override_rate_umum)
+                 VALUES ($1, $2, false, NULL, NULL, NULL)`,
+                [jobId, entry.id]
+              );
+            }
+            mappingSummary.salesman.push(entry.id);
+          } else {
+            await client.query(
+              `INSERT INTO public.job_pay_codes
+                 (job_id, pay_code_id, is_default,
+                  override_rate_biasa, override_rate_ahad, override_rate_umum)
+               VALUES ('SALESMAN_IKUT', $1, false, NULL, NULL, NULL)`,
+              [entry.id]
+            );
+            await client.query(
+              `INSERT INTO public.product_salesman_ikut_pay_codes
+                 (product_id, pay_code_id)
+               VALUES ($1, $2)`,
+              [id, entry.id]
+            );
+            mappingSummary.ikut.push(entry.id);
+          }
+        }
+
+        if (createdPaycodes.length > 0) {
+          await client.query(
+            `UPDATE ${payCodeTable}
+                SET updated_at = CURRENT_TIMESTAMP
+              WHERE id = ANY($1)`,
+            [createdPaycodes.map((entry) => entry.id)]
+          );
+        }
+
+        await client.query("COMMIT");
+
+        // Invalidate server-side caches so the new product/pay codes appear
+        // immediately. Client-side pay-code caches are cleared by the page.
+        cache.invalidatePrefix(CACHE_KEYS.PRODUCTS);
+        cache.invalidate(CACHE_KEYS.PAY_CODES);
+        cache.invalidate(CACHE_KEYS.JOBS);
+
+        return res.status(201).json({
+          message:
+            createdPaycodes.length > 0
+              ? "Product and pay codes created successfully"
+              : "Product created successfully",
+          product: productResult.rows[0],
+          paycodes: createdPaycodes,
+          mappings: mappingSummary,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      if (error instanceof SetupValidationError) {
+        return res.status(400).json({ message: error.message });
+      }
+      if (error && error.code === "23505") {
+        // Race with a concurrent create that passed the pre-checks.
+        return res.status(409).json({
+          message: "A product or pay code with this ID already exists",
+        });
+      }
+      console.error("Error creating product with pay codes:", error);
+      res.status(500).json({
+        message: "Error creating product with pay codes",
+        error: error.message,
+      });
     }
   });
 
