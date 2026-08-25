@@ -32,6 +32,7 @@ export interface PaycodeSetupPayload {
   role: PaycodeSetupRole;
   id: string;
   description: string;
+  pay_type: string;
   rate_unit: string;
   rate_biasa: number;
   rate_ahad: number;
@@ -299,7 +300,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
         );
         return;
       }
-      const payCodeId = option.id.trim();
+      // The salesman commission pay code always mirrors the product ID (the
+      // input is disabled and bound to formData.id), so validate the live
+      // product ID rather than the stale snapshot stored at toggle time.
+      const payCodeId =
+        option.role === "salesman" ? formData.id.trim() : option.id.trim();
       if (payCodeId === "") {
         toast.error(
           t("Pay code ID is required for {{role}}", { role: roleLabel })
@@ -315,6 +320,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
         // daily-log same-id matching convention).
         id: option.role === "salesman" ? formData.id.trim() : payCodeId,
         description: option.description.trim() || formData.description.trim(),
+        // The auto-setup creates base production/salesman rates; the server
+        // requires a pay_type on every pay code.
+        pay_type: "Base",
         rate_unit: option.rate_unit,
         rate_biasa: rateBiasa,
         rate_ahad: parsedAhad === 0 && rateBiasa > 0 ? rateBiasa : parsedAhad,
@@ -411,9 +419,14 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       setFormData({ ...formData, id: nextId });
                       // Keep the suggested packing/ikut pay-code IDs in sync
                       // with the product ID until the user customizes them.
+                      // The salesman commission pay code is disabled and
+                      // mirrors the product ID, so keep its stored id in sync
+                      // too (it is snapshotted when the box is ticked, which
+                      // can happen before the product ID is typed).
                       setPaycodeSetup((prev) =>
                         prev.map((option) => {
-                          if (option.role === "salesman") return option;
+                          if (option.role === "salesman")
+                            return { ...option, id: nextTrimmedId };
                           const oldSuggestion =
                             option.role === "packing"
                               ? formData.type === "JP"
