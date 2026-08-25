@@ -26,6 +26,18 @@ export interface PaycodeSetupOption {
   rate_umum: string;
 }
 
+// The API payload built on submit: the draft keeps rate inputs as strings so
+// they can be typed/edited, but the request must carry numeric rates.
+export interface PaycodeSetupPayload {
+  role: PaycodeSetupRole;
+  id: string;
+  description: string;
+  rate_unit: string;
+  rate_biasa: number;
+  rate_ahad: number;
+  rate_umum: number;
+}
+
 const PACKING_UNIT_BY_TYPE: Record<string, string> = {
   MEE: "Bag",
   BH: "Bag",
@@ -147,7 +159,7 @@ interface ProductModalProps {
   onClose: () => void;
   onSave: (
     product: Product,
-    paycodeSetup?: PaycodeSetupOption[]
+    paycodeSetup?: PaycodeSetupPayload[]
   ) => Promise<void>;
   product?: Product | null;
   mode: "create" | "edit";
@@ -277,7 +289,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
       return;
     }
 
-    const setupPayload: PaycodeSetupOption[] = [];
+    const setupPayload: PaycodeSetupPayload[] = [];
     for (const option of paycodeSetup) {
       const roleLabel = t(SETUP_ROLE_LABELS[option.role]);
       const normalRate = option.rate_biasa.trim();

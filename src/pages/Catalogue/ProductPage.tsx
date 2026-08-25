@@ -6,7 +6,7 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import ProductModal, {
-  PaycodeSetupOption,
+  PaycodeSetupPayload,
 } from "../../components/Catalogue/ProductModal";
 import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import {
@@ -218,7 +218,7 @@ const ProductPage: React.FC = () => {
   }, [productToHardDelete]);
 
   const handleSaveProduct = useCallback(
-    async (productData: Product, paycodeSetup?: PaycodeSetupOption[]) => {
+    async (productData: Product, paycodeSetup?: PaycodeSetupPayload[]) => {
       try {
         if (modalMode === "create") {
           // Check if product ID already exists
