@@ -15,6 +15,7 @@ interface SummaryData {
   all_salesmen?: any;
   mee_salesmen?: any;
   bihun_salesmen?: any;
+  ramen_salesmen?: any;
   jp_salesmen?: any;
   sisa_sales?: any;
 }
@@ -171,7 +172,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const calculateAllSalesRows = (data: any, allProducts: any[]): number => {
+const calculateAllSalesRows = (data: any): number => {
   const { categories } = data;
   let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
 
@@ -227,6 +228,13 @@ const calculateSalesmenRows = (data: any): number => {
   return totalRows;
 };
 
+const hasSalesmenSummaryContent = (data: any): boolean =>
+  Object.values(data?.salesmen || {}).some(
+    (salesman: any) => salesman?.products?.length > 0
+  ) ||
+  (data?.foc?.products?.length || 0) > 0 ||
+  (data?.returns?.products?.length || 0) > 0;
+
 const calculateSisaSalesRows = (data: any): number => {
   let totalRows = HEADER_ROWS + TABLE_HEADER_ROWS;
 
@@ -257,7 +265,7 @@ const calculateSisaSalesRows = (data: any): number => {
   return totalRows;
 };
 
-const paginateSections = (data: SummaryData, allProducts: any[]) => {
+const paginateSections = (data: SummaryData) => {
   const sections: Array<{
     type: string;
     data: any;
@@ -267,7 +275,7 @@ const paginateSections = (data: SummaryData, allProducts: any[]) => {
 
   // Calculate rows for each section
   if (data.all_sales) {
-    const rows = calculateAllSalesRows(data.all_sales, allProducts);
+    const rows = calculateAllSalesRows(data.all_sales);
     sections.push({
       type: "all_sales",
       data: data.all_sales,
@@ -301,6 +309,20 @@ const paginateSections = (data: SummaryData, allProducts: any[]) => {
     sections.push({
       type: "bihun_salesmen",
       data: data.bihun_salesmen,
+      rows,
+      component: null,
+    });
+  }
+
+  if (
+    data.ramen_salesmen &&
+    (hasSalesmenSummaryContent(data.ramen_salesmen) ||
+      Object.keys(data).length === 1)
+  ) {
+    const rows = calculateSalesmenRows(data.ramen_salesmen);
+    sections.push({
+      type: "ramen_salesmen",
+      data: data.ramen_salesmen,
       rows,
       component: null,
     });
@@ -365,6 +387,36 @@ const formatNumber = (num: number): string => {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
+};
+
+interface QuantityProduct {
+  code?: string;
+  type?: string;
+  quantity?: number;
+}
+
+const formatQuantityByUnit = (products: QuantityProduct[]): string => {
+  const totals = products.reduce(
+    (result: { ramen: number; other: number }, product: QuantityProduct) => {
+      if (product.code === "LESS") return result;
+      const quantity = Number(product.quantity) || 0;
+      if (product.type === "RAMEN") {
+        result.ramen += quantity;
+      } else {
+        result.other += quantity;
+      }
+      return result;
+    },
+    { ramen: 0, other: 0 }
+  );
+
+  if (totals.ramen > 0 && totals.other > 0) {
+    return `${formatNumber(totals.other)} units / ${formatNumber(
+      totals.ramen
+    )} PKT`;
+  }
+  if (totals.ramen > 0) return `${formatNumber(totals.ramen)} PKT`;
+  return formatNumber(totals.other);
 };
 
 // Helper function to format currency
@@ -443,7 +495,6 @@ export const generateSalesSummaryPDF = async (
   month: number,
   year: number,
   action: "download" | "print",
-  allProducts: any[] = [],
   scope: SalesSummaryScope = "tienhock"
 ) => {
   try {
@@ -453,7 +504,7 @@ export const generateSalesSummaryPDF = async (
     })} ${dateForMonthName.getFullYear()}`;
 
     // Paginate sections
-    const pages = paginateSections(data, allProducts);
+    const pages = paginateSections(data);
 
     const doc = (
       <Document title={`Sales Summary - ${monthYearFormatted}`}>
@@ -469,7 +520,6 @@ export const generateSalesSummaryPDF = async (
                     <AllSalesSection
                       data={section.data}
                       monthFormat={monthYearFormatted}
-                      allProducts={allProducts}
                       scope={scope}
                     />
                   )}
@@ -499,6 +549,16 @@ export const generateSalesSummaryPDF = async (
                       title="Monthly Summary of Bihun Sales by Salesmen"
                       monthFormat={monthYearFormatted}
                       productType="BIHUN"
+                      scope={scope}
+                    />
+                  )}
+
+                  {section.type === "ramen_salesmen" && (
+                    <SalesmenSection
+                      data={section.data}
+                      title="Monthly Summary of Ramen Sales by Salesmen"
+                      monthFormat={monthYearFormatted}
+                      productType="RAMEN"
                       scope={scope}
                     />
                   )}
@@ -587,24 +647,19 @@ export const generateSalesSummaryPDF = async (
 const AllSalesSection: React.FC<{
   data: any;
   monthFormat: string;
-  allProducts: any[];
   scope: SalesSummaryScope;
-}> = ({ data, monthFormat, allProducts, scope }) => {
+}> = ({ data, monthFormat, scope }) => {
   const { categories, totals } = data;
   const isJp = scope === "jp";
 
-  // Calculate breakdown totals using product types from cache
+  // Calculate breakdown totals from the product types returned by the server.
   const calculateBreakdownTotals = () => {
-    // Create a map of product codes to types for quick lookup
-    const productTypeMap = allProducts.reduce((map, product) => {
-      map[product.id] = product.type;
-      return map;
-    }, {} as Record<string, string>);
-
     let meeQuantity = 0,
       meeAmount = 0;
     let bihunQuantity = 0,
       bihunAmount = 0;
+    let ramenQuantity = 0,
+      ramenAmount = 0;
     let jpQuantity = 0,
       jpAmount = 0;
     let emptyBagQuantity = 0,
@@ -618,7 +673,12 @@ const AllSalesSection: React.FC<{
 
     // Iterate through all categories and their products
     Object.entries(categories).forEach(([key, category]: [string, any]) => {
-      if (key === "total_rounding" || key === "category_returns") return;
+      if (
+        key === "total_rounding" ||
+        key === "category_returns" ||
+        key === "category_tax_rounding"
+      )
+        return;
 
       // Handle specific categories by key
       if (key === "category_empty_bag") {
@@ -648,7 +708,7 @@ const AllSalesSection: React.FC<{
       // Handle products by type
       if (category.products && Array.isArray(category.products)) {
         category.products.forEach((product: any) => {
-          const productType = productTypeMap[product.code];
+          const productType = product.type;
           const quantity = product.quantity || 0;
           const amount = product.amount || 0; // Use actual amount from invoice
 
@@ -661,11 +721,19 @@ const AllSalesSection: React.FC<{
               bihunQuantity += quantity;
               bihunAmount += amount;
               break;
+            case "RAMEN":
+              ramenQuantity += quantity;
+              ramenAmount += amount;
+              break;
             case "JP":
               jpQuantity += quantity;
               jpAmount += amount;
               break;
             case "OTH":
+              othersQuantity += quantity;
+              othersAmount += amount;
+              break;
+            default:
               othersQuantity += quantity;
               othersAmount += amount;
               break;
@@ -679,6 +747,8 @@ const AllSalesSection: React.FC<{
       meeAmount,
       bihunQuantity,
       bihunAmount,
+      ramenQuantity,
+      ramenAmount,
       meeBihunQuantity: meeQuantity + bihunQuantity,
       meeBihunAmount: meeAmount + bihunAmount,
       jpQuantity,
@@ -697,6 +767,7 @@ const AllSalesSection: React.FC<{
       totalProductsAmount:
         meeAmount +
         bihunAmount +
+        ramenAmount +
         jpAmount +
         emptyBagAmount +
         sisaAmount +
@@ -708,6 +779,19 @@ const AllSalesSection: React.FC<{
   };
 
   const breakdownTotals = calculateBreakdownTotals();
+  const soldProducts: QuantityProduct[] = Object.entries(categories).flatMap(
+    ([key, category]: [string, any]) => {
+      if (
+        key === "category_returns" ||
+        key === "category_less" ||
+        key === "category_tax_rounding" ||
+        !Array.isArray(category?.products)
+      ) {
+        return [];
+      }
+      return category.products;
+    }
+  );
 
   // Define category display names
   const categoryNames: Record<string, string> = {
@@ -777,7 +861,11 @@ const AllSalesSection: React.FC<{
                   {key === "category_returns" && " (Returned)"}
                 </Text>
                 <Text style={styles.colQty}>
-                  {product.quantity > 0 ? formatNumber(product.quantity) : ""}
+                  {product.quantity > 0
+                    ? product.type === "RAMEN"
+                      ? `${formatNumber(product.quantity)} PKT`
+                      : formatNumber(product.quantity)
+                    : ""}
                 </Text>
                 <Text style={styles.colAmount}>
                   {formatCurrency(product.amount)}
@@ -832,7 +920,11 @@ const AllSalesSection: React.FC<{
               <Text style={styles.colDescription}></Text>
               <Text style={[styles.colQty, styles.boldText]}>
                 {key === "category_returns" && "*"}
-                {formatNumber(category.quantity)}
+                {key === "category_returns"
+                  ? formatQuantityByUnit(category.products)
+                  : key === "category_ramen"
+                    ? `${formatNumber(category.quantity)} PKT`
+                    : formatNumber(category.quantity)}
               </Text>
               <Text style={[styles.colAmount, styles.boldText]}>
                 {key === "category_returns" && "*"}
@@ -849,23 +941,7 @@ const AllSalesSection: React.FC<{
           <Text style={[styles.colID, styles.boldText]}>Grand Total:</Text>
           <Text style={styles.colDescription}></Text>
           <Text style={[styles.colQty, styles.boldText]}>
-            {formatNumber(
-              Object.entries(categories).reduce(
-                (sum: number, [key, category]: [string, any]) => {
-                  // Skip total_rounding as it's not a category object
-                  if (typeof category === "number") return sum;
-                  // Skip category_returns and category_less quantities
-                  if (
-                    key === "category_returns" ||
-                    key === "category_less" ||
-                    key === "category_tax_rounding"
-                  )
-                    return sum;
-                  return sum + (category.quantity || 0);
-                },
-                0
-              )
-            )}
+            {formatQuantityByUnit(soldProducts)}
           </Text>
           <Text style={[styles.colAmount, styles.boldText]}>
             {formatCurrency(totals.grandTotal)}
@@ -896,6 +972,12 @@ const AllSalesSection: React.FC<{
                 <Text style={styles.breakdownLabel}>Bihun</Text>
                 <Text style={styles.breakdownValue}>
                   {formatNumber(breakdownTotals.bihunQuantity)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Ramen (PKT)</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatNumber(breakdownTotals.ramenQuantity)}
                 </Text>
               </View>
               <View style={styles.breakdownSeparator} />
@@ -967,6 +1049,12 @@ const AllSalesSection: React.FC<{
                 <Text style={styles.breakdownLabel}>Bihun</Text>
                 <Text style={styles.breakdownValue}>
                   {formatCurrency(breakdownTotals.bihunAmount)}
+                </Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Ramen</Text>
+                <Text style={styles.breakdownValue}>
+                  {formatCurrency(breakdownTotals.ramenAmount)}
                 </Text>
               </View>
               <View style={styles.breakdownSeparator} />
@@ -1055,8 +1143,14 @@ const SalesmenSection: React.FC<{
   monthFormat: string;
   productType?: string;
   scope: SalesSummaryScope;
-}> = ({ data, title, monthFormat, scope }) => {
+}> = ({ data, title, monthFormat, productType, scope }) => {
   const { salesmen, foc, returns } = data;
+  const hasContent = hasSalesmenSummaryContent(data);
+  const allSummaryProducts: QuantityProduct[] = [
+    ...Object.values(salesmen).flatMap((salesman: any) => salesman.products),
+    ...(foc?.products || []),
+    ...(returns?.products || []),
+  ];
 
   return (
     <View style={styles.sectionHeader}>
@@ -1071,9 +1165,15 @@ const SalesmenSection: React.FC<{
         <Text style={[styles.colDescription, styles.boldText]}>
           Description
         </Text>
-        <Text style={[styles.colQty, styles.boldText]}>Quantity</Text>
+        <Text style={[styles.colQty, styles.boldText]}>
+          {productType === "RAMEN" ? "Quantity (PKT)" : "Quantity"}
+        </Text>
         <Text style={[styles.colAmount, styles.boldText]}>Amount</Text>
       </View>
+
+      {!hasContent && (
+        <Text style={styles.salesmanHeader}>No sales data for this period.</Text>
+      )}
 
       {/* Salesmen Sections */}
       {Object.entries(salesmen).map(
@@ -1105,7 +1205,9 @@ const SalesmenSection: React.FC<{
                     {product.description}
                   </Text>
                   <Text style={styles.colQty}>
-                    {formatNumber(product.quantity)}
+                    {product.type === "RAMEN"
+                      ? `${formatNumber(product.quantity)} PKT`
+                      : formatNumber(product.quantity)}
                   </Text>
                   <Text style={styles.colAmount}>
                     {formatCurrency(product.amount)}
@@ -1142,7 +1244,7 @@ const SalesmenSection: React.FC<{
                 <Text style={styles.colID}></Text>
                 <Text style={styles.colDescription}></Text>
                 <Text style={[styles.colQty, styles.boldText]}>
-                  {formatNumber(salesmanData.total.quantity)}
+                  {formatQuantityByUnit(salesmanData.products)}
                 </Text>
                 <Text style={[styles.colAmount, styles.boldText]}>
                   {formatCurrency(salesmanData.total.amount)}
@@ -1168,7 +1270,9 @@ const SalesmenSection: React.FC<{
                 <Text style={styles.colID}>{product.code}</Text>
                 <Text style={styles.colDescription}>{product.description}</Text>
                 <Text style={styles.colQty}>
-                  {formatNumber(product.quantity)}
+                  {product.type === "RAMEN"
+                    ? `${formatNumber(product.quantity)} PKT`
+                    : formatNumber(product.quantity)}
                 </Text>
                 <Text style={styles.colAmount}>0.00</Text>
               </View>
@@ -1204,7 +1308,7 @@ const SalesmenSection: React.FC<{
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
             <Text style={[styles.colQty, styles.boldText]}>
-              {formatNumber(foc.total.quantity)}
+              {formatQuantityByUnit(foc.products)}
             </Text>
             <Text style={[styles.colAmount, styles.boldText]}>0.00</Text>
           </View>
@@ -1226,7 +1330,9 @@ const SalesmenSection: React.FC<{
                 <Text style={styles.colID}>{product.code}</Text>
                 <Text style={styles.colDescription}>{product.description}</Text>
                 <Text style={styles.colQty}>
-                  {formatNumber(product.quantity)}
+                  {product.type === "RAMEN"
+                    ? `${formatNumber(product.quantity)} PKT`
+                    : formatNumber(product.quantity)}
                 </Text>
                 <Text style={styles.colAmount}>
                   {product.price !== 0
@@ -1266,7 +1372,7 @@ const SalesmenSection: React.FC<{
             <Text style={styles.colID}></Text>
             <Text style={styles.colDescription}></Text>
             <Text style={[styles.colQty, styles.boldText]}>
-              {formatNumber(returns.total.quantity)}
+              {formatQuantityByUnit(returns.products)}
             </Text>
             <Text style={[styles.colAmount, styles.boldText]}>
               {returns.total.amount !== 0
@@ -1283,15 +1389,7 @@ const SalesmenSection: React.FC<{
           <Text style={[styles.colID, styles.boldText]}>Total:</Text>
           <Text style={styles.colDescription}></Text>
           <Text style={[styles.colQty, styles.boldText]}>
-            {formatNumber(
-              Object.values(salesmen).reduce(
-                (sum: number, salesman: any) =>
-                  sum + (salesman.total?.quantity || 0),
-                0
-              ) +
-                (foc?.total?.quantity || 0) +
-                (returns?.total?.quantity || 0)
-            )}
+            {formatQuantityByUnit(allSummaryProducts)}
           </Text>
           <Text style={[styles.colAmount, styles.boldText]}>
             {formatCurrency(

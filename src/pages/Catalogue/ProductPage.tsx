@@ -5,7 +5,9 @@ import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import ProductModal from "../../components/Catalogue/ProductModal";
+import ProductModal, {
+  PaycodeSetupOption,
+} from "../../components/Catalogue/ProductModal";
 import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
 import {
   refreshProductsCache,
@@ -44,6 +46,7 @@ const ProductPage: React.FC = () => {
   } = useProductsCache("all", { includeInactive: true });
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [isRefreshingCache, setIsRefreshingCache] = useState<boolean>(false);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -215,7 +218,7 @@ const ProductPage: React.FC = () => {
   }, [productToHardDelete]);
 
   const handleSaveProduct = useCallback(
-    async (productData: Product) => {
+    async (productData: Product, paycodeSetup?: PaycodeSetupOption[]) => {
       try {
         if (modalMode === "create") {
           // Check if product ID already exists
@@ -227,9 +230,29 @@ const ProductPage: React.FC = () => {
             return;
           }
 
-          await api.post("/api/products/batch", {
-            products: [productData],
-          });
+          if (paycodeSetup && paycodeSetup.length > 0) {
+            // One atomic call creates the product, its pay codes and the
+            // product/job mappings (or nothing at all).
+            await api.post("/api/products/with-paycode-setup", {
+              product: productData,
+              paycodes: paycodeSetup,
+              scope: productData.type === "JP" ? "jellypolly" : "tienhock",
+            });
+            // The pay-code/mapping hooks cache in localStorage for up to an
+            // hour; drop the caches so the Pay Codes, Mappings and daily-log
+            // pages pick up the new codes on their next mount.
+            try {
+              localStorage.removeItem("payCodeData");
+              localStorage.removeItem("jpPayCodeData");
+              localStorage.removeItem("salesmanIkutPayCodes");
+            } catch (cacheError) {
+              console.error("Error clearing pay-code caches:", cacheError);
+            }
+          } else {
+            await api.post("/api/products/batch", {
+              products: [productData],
+            });
+          }
           toast.success(t("Product created successfully"));
         } else {
           // For edit mode
@@ -260,6 +283,22 @@ const ProductPage: React.FC = () => {
     },
     [modalMode, selectedProduct, products]
   );
+
+  // Manually re-fetch the shared product cache (localStorage + the
+  // products-updated event) so the list reflects changes made elsewhere.
+  const handleRefreshCache = async () => {
+    if (isRefreshingCache) return;
+    setIsRefreshingCache(true);
+    try {
+      await refreshProductsCache();
+      toast.success(t("Product cache refreshed"));
+    } catch (error) {
+      console.error("Error refreshing product cache:", error);
+      toast.error(t("Failed to refresh product cache"));
+    } finally {
+      setIsRefreshingCache(false);
+    }
+  };
 
   const handleCloseModal = useCallback(() => {
     setIsModalOpen(false);
@@ -322,6 +361,16 @@ const ProductPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              onClick={handleRefreshCache}
+              icon={IconRefresh}
+              variant="outline"
+              disabled={isRefreshingCache}
+              title={t("Refresh product cache")}
+              className={isRefreshingCache ? "[&_svg]:animate-spin" : ""}
+            >
+              {t("Refresh")}
+            </Button>
             <Button
               onClick={() => setIsOrderModalOpen(true)}
               icon={IconArrowsSort}

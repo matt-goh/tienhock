@@ -4,14 +4,14 @@ import { Router } from "express";
 export default function (pool) {
   const router = Router();
 
-  // GET /all-mappings - Get all MEE/BH products and their pay code mappings
+  // GET /all-mappings - Get all production products and their pay code mappings
   router.get("/all-mappings", async (req, res) => {
     try {
-      // Get all MEE and BH products
+      // Get all production products
       const productsQuery = `
         SELECT id, description, type
         FROM products
-        WHERE type IN ('MEE', 'BH')
+        WHERE type IN ('MEE', 'BH', 'BUNDLE', 'RAMEN')
         ORDER BY type, id
       `;
       const productsResult = await pool.query(productsQuery);
@@ -142,6 +142,37 @@ export default function (pool) {
         if (!product_id || !pay_code_id) {
           return res.status(400).json({
             message: "All entries must have product_id and pay_code_id",
+            invalid_entry: entry,
+          });
+        }
+      }
+
+      // Validate unit compatibility for the complete batch before inserting
+      // anything. RAMEN production is packet-based; PKT codes are reserved for
+      // RAMEN so a direct API request cannot bypass the UI filter.
+      for (const entry of associations) {
+        const { product_id, pay_code_id } = entry;
+        const compatibilityResult = await pool.query(
+          `
+            SELECT p.type, pc.rate_unit
+            FROM products p
+            CROSS JOIN pay_codes pc
+            WHERE p.id = $1 AND pc.id = $2
+          `,
+          [product_id, pay_code_id]
+        );
+
+        if (compatibilityResult.rows.length === 0) {
+          return res.status(400).json({
+            message: "Invalid product_id or pay_code_id",
+            invalid_entry: entry,
+          });
+        }
+
+        const { type, rate_unit } = compatibilityResult.rows[0];
+        if ((type === "RAMEN") !== (rate_unit === "PKT")) {
+          return res.status(400).json({
+            message: "Product and pay code units are incompatible",
             invalid_entry: entry,
           });
         }

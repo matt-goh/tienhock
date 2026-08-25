@@ -18,7 +18,9 @@ interface CachedProducts {
   timestamp: number;
 }
 
-const CACHE_KEY = "products_cache";
+// Bump after the 1-PR RAMEN type repair so browsers do not retain its former
+// MEE classification for the full 24-hour catalogue cache window.
+const CACHE_KEY = "products_cache_v2";
 const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 const PRODUCTS_UPDATED_EVENT = "products-updated";
 
@@ -53,6 +55,7 @@ export const refreshProductsCache = async (includeInactive = true) => {
 // Clean up old cache keys
 export const cleanupOldCaches = () => {
   const oldKeys = [
+    "products_cache",
     "products_cache_all",
     "products_cache_jp",
     "products_cache_default",

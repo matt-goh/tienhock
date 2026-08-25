@@ -147,6 +147,37 @@ export default function (pool) {
         }
       }
 
+      // Validate the complete batch before inserting anything. Product mappings
+      // use PKT only for RAMEN, even though PKT remains available to other Jelly
+      // Polly payroll activities that are not tied to a production product.
+      for (const entry of associations) {
+        const { product_id, pay_code_id } = entry;
+        const compatibilityResult = await pool.query(
+          `
+            SELECT p.type, pc.rate_unit
+            FROM public.products p
+            CROSS JOIN jellypolly.pay_codes pc
+            WHERE p.id = $1 AND pc.id = $2
+          `,
+          [product_id, pay_code_id]
+        );
+
+        if (compatibilityResult.rows.length === 0) {
+          return res.status(400).json({
+            message: "Invalid product_id or pay_code_id",
+            invalid_entry: entry,
+          });
+        }
+
+        const { type, rate_unit } = compatibilityResult.rows[0];
+        if ((type === "RAMEN") !== (rate_unit === "PKT")) {
+          return res.status(400).json({
+            message: "Product and pay code units are incompatible",
+            invalid_entry: entry,
+          });
+        }
+      }
+
       const results = [];
       const errors = [];
       let successCount = 0;

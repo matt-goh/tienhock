@@ -365,7 +365,7 @@ const HomePage: React.FC = () => {
 
     return (
       <button
-        key={item.path}
+        key={`${section.company.id}-${item.name}`}
         onClick={() => handleNavigate(section.company.id, item.path)}
         className="group p-3 rounded-lg border border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 hover:bg-white dark:hover:bg-gray-800 hover:border-gray-200 dark:hover:border-gray-600 hover:shadow-sm transition-all duration-200 text-left"
       >

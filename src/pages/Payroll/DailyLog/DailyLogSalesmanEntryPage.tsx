@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import { useJobsCache } from "../../../utils/catalogue/useJobsCache";
 import { useStaffsCache } from "../../../utils/catalogue/useStaffsCache";
 import { useJobPayCodeMappings } from "../../../utils/catalogue/useJobPayCodeMappings";
+import { useSalesmanIkutPayCodes } from "../../../utils/catalogue/useSalesmanIkutPayCodes";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
 import { useEffectiveRates } from "../../../utils/payroll/useEffectiveRates";
 import { api } from "../../../routes/utils/api";
@@ -139,7 +140,10 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const goBack = useSmartBack(`/payroll/${jobType.toLowerCase()}-production`);
   const { jobs: allJobs, loading: loadingJobs, refreshJobs } = useJobsCache();
   const { staffs: allStaffs, loading: loadingStaffs, refreshStaffs } = useStaffsCache();
-  const { products: payrollProducts } = useProductsCache(["MEE", "BH", "JP"]);
+  const {
+    products: payrollProducts,
+    isLoading: isPayrollProductsLoading,
+  } = useProductsCache(["MEE", "BH", "RAMEN", "JP"]);
   const [isRefreshingCache, setIsRefreshingCache] = useState(false);
   const [employeeSelectionState, setEmployeeSelectionState] = useState<{
     selectedJobs: Record<string, string[]>; // employeeId -> list of selected jobIds
@@ -190,37 +194,31 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     () => new Set(payrollProducts.map((product) => String(product.id))),
     [payrollProducts],
   );
+  const payrollProductTypes = useMemo<Map<string, string>>(
+    () =>
+      new Map(
+        payrollProducts.map(
+          (product): [string, string] => [
+            String(product.id),
+            String(product.type),
+          ],
+        ),
+      ),
+    [payrollProducts],
+  );
 
   // Hardcoded Muat paycodes for SALESMAN_IKUT
   const MUAT_MEE_PAYCODE = "4-COMM_MUAT_MEE";
   const MUAT_BIHUN_PAYCODE = "5-COMM_MUAT_BH";
 
-  // Product ID to DME/DWE pay code mapping for SALESMAN_IKUT
-  const PRODUCT_TO_SALESMAN_IKUT_PAYCODE: Record<string, string> = {
-    // MEE products
-    "1-2UDG": "DME-2UDG",
-    "1-3UDG": "DME-3UDG",
-    "1-350G": "DME-350G",
-    "1-MNL": "DME-MNL",
-    // BH products
-    "2-APPLE": "DME-300G",
-    "2-BH": "DME-300G",
-    "2-BH2": "DME-2H",
-    "2-BCM3": "DME-600G",
-    "2-BNL": "DME-3.1KG",
-    "2-BNL(5)": "DME-5KG",
-    "2-MASAK": "DME-300G",
-    "2-PADI": "DME-300G",
-    // WE products
-    "WE-2UDG": "DWE-2UDG",
-    "WE-3UDG": "DWE-3UDG",
-    "WE-300G": "DWE-300G",
-    "WE-360": "DWE-350G",
-    "WE-360(5PK)": "DWE-350G",
-    "WE-420": "DWE-420G",
-    "WE-600G": "DWE-600G",
-    "WE-MNL": "DWE-MNL",
-  };
+  // Product ID to DME/DWE pay code mapping for SALESMAN_IKUT. Data-driven from
+  // product_salesman_ikut_pay_codes (maintained by the Add Product auto-setup
+  // flow) instead of a per-product code edit.
+  const {
+    productToIkutPayCode,
+    ikutPayCodeIds,
+    isLoading: isIkutMappingLoading,
+  } = useSalesmanIkutPayCodes();
 
   // Helper function to determine day type based on date
   const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
@@ -319,6 +317,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   // Ref to track which SALESMAN_IKUT rowKeys have had their products copied (to avoid infinite loops)
   const ikutProductsLinkedRef = useRef<Record<string, string>>({});
   const employeeActivitiesDateRef = useRef<Record<string, string>>({});
+  const salesmanProductsRequestRef = useRef<number>(0);
 
   // Sync formData when existingWorkLog changes (useState initializer only runs once)
   // This handles navigation between different edit pages
@@ -578,32 +577,40 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     );
   }, [salesmanIkutEmployees, leaveEmployees]);
 
-  // WE product type mapping (based on database product.type field)
-  const WE_PRODUCT_TYPES: Record<string, "MEE" | "BH"> = {
-    "WE-2UDG": "MEE",
-    "WE-3UDG": "MEE",
-    "WE-360": "MEE",
-    "WE-360(5PK)": "MEE",
-    "WE-420": "MEE",
-    "WE-MNL": "MEE",
-    "WE-300G": "BH",
-    "WE-600G": "BH",
+  // Use the catalogue type instead of an ID prefix. In particular, 1-PR is
+  // RAMEN even though its legacy identifier starts with the Mee "1-" prefix.
+  const getProductCategory = (
+    productId: string,
+  ): "MEE" | "BH" | "RAMEN" | null => {
+    const productType = payrollProductTypes.get(productId);
+    return productType === "MEE" ||
+      productType === "BH" ||
+      productType === "RAMEN"
+      ? productType
+      : null;
   };
 
-  // Helper function to determine product category
-  const getProductCategory = (productId: string): "MEE" | "BH" | null => {
-    if (productId.startsWith("1-")) return "MEE";
-    if (productId.startsWith("2-")) return "BH";
-    if (productId.startsWith("WE-")) return WE_PRODUCT_TYPES[productId] || null;
-    return null;
+  const formatBagPacketQuantity = (
+    bags: number,
+    packets: number,
+  ): string => {
+    if (bags > 0 && packets > 0) {
+      return t("{{bags}} bags + {{packets}} PKT", { bags, packets });
+    }
+    if (packets > 0) return t("{{total}} PKT", { total: packets });
+    return t("{{total}} bags", { total: bags });
   };
 
   // Calculate aggregate stats from salesmanProducts for selected salesmen
   const salesmanProductStats = useMemo(() => {
     let totalMee = 0;
     let totalBihun = 0;
+    let totalRamen = 0;
     const productTotals: Record<string, number> = {};
-    const salesmanTotals: Record<string, { name: string; mee: number; bihun: number; total: number }> = {};
+    const salesmanTotals: Record<
+      string,
+      { name: string; mee: number; bihun: number; ramen: number }
+    > = {};
 
     // Get selected SALESMAN employees
     const selectedSalesmen = salesmanEmployees.filter((emp) =>
@@ -614,6 +621,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       const products = salesmanProducts[emp.rowKey || ""] || [];
       let salesmanMee = 0;
       let salesmanBihun = 0;
+      let salesmanRamen = 0;
 
       products.forEach((product: { product_id: string; quantity: number }) => {
         const qty = product.quantity || 0;
@@ -626,15 +634,18 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         } else if (category === "BH") {
           totalBihun += qty;
           salesmanBihun += qty;
+        } else if (category === "RAMEN") {
+          totalRamen += qty;
+          salesmanRamen += qty;
         }
       });
 
-      if (salesmanMee + salesmanBihun > 0) {
+      if (salesmanMee + salesmanBihun + salesmanRamen > 0) {
         salesmanTotals[emp.id] = {
           name: emp.name,
           mee: salesmanMee,
           bihun: salesmanBihun,
-          total: salesmanMee + salesmanBihun,
+          ramen: salesmanRamen,
         };
       }
     });
@@ -644,8 +655,19 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       .sort((a, b) => b[1] - a[1])
       .map(([id, qty]) => ({ id, qty }));
 
-    return { totalMee, totalBihun, total: totalMee + totalBihun, productTotals: sortedProducts, salesmanTotals };
-  }, [salesmanEmployees, employeeSelectionState.selectedJobs, salesmanProducts]);
+    return {
+      totalMee,
+      totalBihun,
+      totalRamen,
+      productTotals: sortedProducts,
+      salesmanTotals,
+    };
+  }, [
+    salesmanEmployees,
+    employeeSelectionState.selectedJobs,
+    salesmanProducts,
+    payrollProductTypes,
+  ]);
 
   // Get employees followed by each salesman
   const followedBySalesman = useMemo(() => {
@@ -699,6 +721,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     if (ikutProductsLinkedRef.current) {
       ikutProductsLinkedRef.current = {};
     }
+    salesmanProductsRequestRef.current += 1;
     productsFetchedForDateRef.current = null;
 
     setFormData({
@@ -1736,22 +1759,30 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     // Skip if we've already fetched for this date (optimization to reduce API calls)
     if (productsFetchedForDateRef.current === formData.logDate) return;
 
+    const requestId = ++salesmanProductsRequestRef.current;
+    const requestedDate = formData.logDate;
+
     try {
       // Get ALL salesman IDs (not just selected ones) - fetch once per date
-      const salesmenIds = salesmanEmployees.map((emp) => emp.id);
+      const salesmenIds = Array.from(
+        new Set(salesmanEmployees.map((emp) => emp.id))
+      );
 
       if (salesmenIds.length === 0) return;
 
       // Pass date as YYYY-MM-DD string to avoid timezone issues between client and server
-      const dateString = formData.logDate;
+      const dateString = requestedDate;
 
       // Fetch products for ALL salesmen in one request
       const response = await api.get(
         `/api/invoices/salesman-products?salesmanIds=${salesmenIds.join(",")}&date=${dateString}`
       );
 
+      // Ignore an older date or employee-set request that completed later.
+      if (requestId !== salesmanProductsRequestRef.current) return;
+
       // Mark as fetched for this date
-      productsFetchedForDateRef.current = formData.logDate;
+      productsFetchedForDateRef.current = requestedDate;
 
       // Response might be directly available or in a data property
       const responseData = response.data || response;
@@ -1785,6 +1816,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
       setSalesmanProducts(rowKeyProducts);
     } catch (error) {
+      if (requestId !== salesmanProductsRequestRef.current) return;
       console.error("Error fetching salesman products:", error);
       toast.error(t("Failed to fetch salesman products"));
     }
@@ -1792,17 +1824,34 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
   // Track previous date to detect date changes
   const previousDateRef = useRef<string | null>(null);
+  const previousSalesmanIdsRef = useRef<string>("");
   // Track if products have been fetched for current date (to avoid re-fetching on selection changes)
   const productsFetchedForDateRef = useRef<string | null>(null);
+  const salesmanEmployeeIdsKey = useMemo<string>(
+    () =>
+      Array.from(new Set(salesmanEmployees.map((employee) => employee.id)))
+        .sort()
+        .join(","),
+    [salesmanEmployees]
+  );
 
   useEffect(() => {
-    // Clear refs when date changes to force re-linking and re-fetching
-    if (previousDateRef.current !== null && previousDateRef.current !== formData.logDate) {
+    const dateChanged =
+      previousDateRef.current !== null &&
+      previousDateRef.current !== formData.logDate;
+    const salesmanSetChanged =
+      previousSalesmanIdsRef.current !== salesmanEmployeeIdsKey;
+
+    // Clear refs when the date or complete salesman set changes. Incrementing
+    // the sequence also invalidates any older request still in flight.
+    if (dateChanged || salesmanSetChanged) {
+      salesmanProductsRequestRef.current += 1;
       productsLinkedRef.current = {};
       ikutProductsLinkedRef.current = {};
-      productsFetchedForDateRef.current = null; // Reset so we fetch for new date
+      productsFetchedForDateRef.current = null;
     }
     previousDateRef.current = formData.logDate;
+    previousSalesmanIdsRef.current = salesmanEmployeeIdsKey;
 
     // Fetch ALL salesman products once when date changes or employees load
     // No longer depends on selectedJobs - fetch everything upfront
@@ -1811,13 +1860,16 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     }
   }, [
     formData.logDate,
-    salesmanEmployees.length, // Only re-fetch when date changes or employees load
+    salesmanEmployeeIdsKey,
   ]);
 
   useEffect(() => {
     // After salesmanProducts are updated, auto-link them to pay codes
     // Also clear products for salesmen who no longer have products on this date
     if (productsFetchedForDateRef.current !== formData.logDate) return;
+    // Do not mark a product set as processed before the catalogue IDs exist.
+    // Otherwise a slower catalogue request permanently skips auto-linking.
+    if (isPayrollProductsLoading || payrollProductIds.size === 0) return;
 
     // Get all SALESMAN rowKeys that should have products checked
     const salesmanRowKeys = Object.entries(employeeSelectionState.selectedJobs)
@@ -1937,7 +1989,15 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     });
   // Note: We intentionally exclude employeeActivities from deps to avoid cascading updates
   // when SALESMAN_IKUT activities change. The ref tracking ensures we process when products change.
-  }, [salesmanProducts, formData.contextData, formData.logDate, locationTypes, employeeSelectionState.selectedJobs, payrollProductIds]);
+  }, [
+    salesmanProducts,
+    formData.contextData,
+    formData.logDate,
+    locationTypes,
+    employeeSelectionState.selectedJobs,
+    payrollProductIds,
+    isPayrollProductsLoading,
+  ]);
 
   const handleManageActivities = (employee: EmployeeWithHours) => {
     // Ensure rowKey is available
@@ -2523,9 +2583,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   useEffect(() => {
     if (!isInitializationComplete) return;
     if (productsFetchedForDateRef.current !== formData.logDate) return;
+    // Wait for the Ikut Lori mapping so an empty map is never marked as
+    // processed (which would skip auto-linking once the data arrives).
+    if (isIkutMappingLoading) return;
 
     // Get all DME/DWE paycodes for clearing
-    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+    const allDmePaycodes = ikutPayCodeIds;
 
     Object.entries(salesmanIkutRelations).forEach(([ikutRowKey, salesmanId]) => {
       if (!salesmanId) {
@@ -2593,7 +2656,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
       // Then apply the new salesman's products
       salesmanProductList.forEach((product) => {
         const productId = String(product.product_id);
-        const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+        const dmePaycode = productToIkutPayCode[productId];
         if (dmePaycode) {
           const qty = parseFloat(product.quantity) || 0;
           const foc = parseFloat(product.foc_quantity) || 0;
@@ -2647,7 +2710,15 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         return prev;
       });
     });
-  }, [salesmanIkutRelations, salesmanProducts, ikutDoubled, isInitializationComplete]);
+  }, [
+    salesmanIkutRelations,
+    salesmanProducts,
+    ikutDoubled,
+    isInitializationComplete,
+    productToIkutPayCode,
+    ikutPayCodeIds,
+    isIkutMappingLoading,
+  ]);
 
   // Update select all state based on individual selections and availability
   useEffect(() => {
@@ -2772,7 +2843,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
     if (
       Object.keys(employeeSelectionState.selectedJobs).length > 0 &&
-      !loadingPayCodeMappings
+      !loadingPayCodeMappings &&
+      !isIkutMappingLoading
     ) {
       fetchAndApplyActivities();
     }
@@ -2782,6 +2854,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     formData.dayType,
     formData.logDate,
     loadingPayCodeMappings,
+    isIkutMappingLoading,
     mode,
     existingWorkLog,
     getEffectiveRate,
@@ -3148,10 +3221,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
 
     // Copy products from followed salesman to SALESMAN_IKUT activities
     // Get all DME/DWE paycodes
-    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+    const allDmePaycodes = ikutPayCodeIds;
 
     Object.entries(salesmanIkutRelations).forEach(
       ([ikutRowKey, salesmanId]) => {
+        // Never mark a row as processed before the mapping is loaded.
+        if (isIkutMappingLoading) return;
         if (!salesmanId) return;
         if (!newEmployeeActivities[ikutRowKey] || newEmployeeActivities[ikutRowKey].length === 0) return;
 
@@ -3171,7 +3246,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
         // Apply products from followed salesman
         salesmanProductList.forEach((product) => {
           const productId = String(product.product_id);
-          const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+          const dmePaycode = productToIkutPayCode[productId];
           if (dmePaycode) {
             const qty = parseFloat(product.quantity) || 0;
             const foc = parseFloat(product.foc_quantity) || 0;
@@ -3781,13 +3856,19 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                   >
                     {jobs.find((j) => j.id === "SALESMAN")?.name || t("Salesman")}
                   </SafeLink>
-                  {salesmanProductStats.total > 0 && (
+                  {salesmanProductStats.totalMee +
+                    salesmanProductStats.totalBihun +
+                    salesmanProductStats.totalRamen >
+                    0 && (
                     <div className="flex items-center gap-3 text-xs text-default-500 dark:text-gray-400 truncate min-w-0 flex-1 justify-end ml-4">
                       <span className="truncate">
                         {Object.entries(salesmanProductStats.salesmanTotals).map(([id, data], idx) => (
                           <span key={id}>
                             {idx > 0 && " · "}
-                            <span className="font-medium">{id}</span>: {data.total}
+                            <span className="font-medium">{id}</span>: {formatBagPacketQuantity(
+                              data.mee + data.bihun,
+                              data.ramen
+                            )}
                           </span>
                         ))}
                       </span>
@@ -3797,22 +3878,26 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
                           <span key={p.id}>
                             {idx > 0 && " · "}
                             <span className="font-medium">{p.id}</span>: {p.qty}
+                            {payrollProductTypes.get(p.id) === "RAMEN" ? " PKT" : ""}
                           </span>
                         ))}
                         {salesmanProductStats.productTotals.length > 8 && " ..."}
                       </span>
                       <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
                       <span className="flex-shrink-0">
-                        {t("Mee: {{mee}} · BH: {{bihun}}", {
+                        {t("Mee: {{mee}} · BH: {{bihun}} · Ramen: {{ramen}} PKT", {
                           mee: salesmanProductStats.totalMee,
                           bihun: salesmanProductStats.totalBihun,
+                          ramen: salesmanProductStats.totalRamen,
                         })}
                       </span>
                       <span className="text-default-300 dark:text-gray-600 flex-shrink-0">|</span>
                       <span className="font-medium flex-shrink-0">
-                        {t("Total: {{total}}", {
-                          total: salesmanProductStats.total,
-                        })}
+                        {formatBagPacketQuantity(
+                          salesmanProductStats.totalMee +
+                            salesmanProductStats.totalBihun,
+                          salesmanProductStats.totalRamen
+                        )}
                       </span>
                     </div>
                   )}

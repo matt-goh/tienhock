@@ -30,6 +30,7 @@ import {
 
 export interface MaterialStockKilangPdfItem {
   product_id: string;
+  product_type: string;
   name: string;
   unit_cost: number;
   quantity: number;
@@ -384,7 +385,10 @@ const buildDocDefinition = (
     data.stockKilang.forEach((item: MaterialStockKilangPdfItem) => {
       bodyRows.push(
         numberRow(
-          nameCell(item.name, item.product_id),
+          nameCell(
+            item.product_type === "RAMEN" ? `${item.name} [PKT]` : item.name,
+            item.product_id
+          ),
           {
             ...EMPTY_NUMBERS,
             unit_cost: item.unit_cost,

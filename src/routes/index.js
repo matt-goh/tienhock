@@ -22,6 +22,7 @@ import staffOptionsRouter from "./catalogue/staff-options.js";
 import jobPayCodesRouter from "./catalogue/job-pay-codes.js";
 import jobLocationMappingsRouter from "./catalogue/job-location-mappings.js";
 import productPayCodesRouter from "./catalogue/product-pay-codes.js";
+import salesmanIkutPayCodesRouter from "./catalogue/salesman-ikut-pay-codes.js";
 import jobDetailsRouter from "./catalogue/job-details.js";
 import customerRouter from "./catalogue/customers.js";
 import payCodesRouter from "./catalogue/pay-codes.js";
@@ -707,6 +708,10 @@ export default function setupRoutes(app, pool) {
   app.use("/api/job-pay-codes", jobPayCodesRouter(pool));
   app.use("/api/job-location-mappings", jobLocationMappingsRouter(pool));
   app.use("/api/product-pay-codes", productPayCodesRouter(pool));
+  app.use(
+    "/api/product-salesman-ikut-pay-codes",
+    salesmanIkutPayCodesRouter(pool)
+  );
   app.use("/api/job-categories", jobCategoriesRouter(pool));
   app.use("/api/staff-options", staffOptionsRouter(pool));
   app.use("/api/employee-pay-codes", employeePayCodesRouter(pool));

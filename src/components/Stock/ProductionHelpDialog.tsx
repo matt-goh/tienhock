@@ -28,7 +28,7 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { i18n } = useTranslation("stock");
+  const { t, i18n } = useTranslation("stock");
   // The dialog keeps its own BM/EN toggle (bilingual content, like the
   // ChangelogModal); the default now follows the app language so e.g. zh-Hans
   // users land on the English tab instead of Malay. Manual choice wins.
@@ -53,12 +53,15 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
       sections: [
         {
           icon: IconPackage,
-          title: "Mee and Bihun Product Entry",
+          title: t("Mee, Bihun, and Ramen Product Entry", { lng: "en" }),
           color: "text-sky-600 dark:text-sky-400",
           bgColor: "bg-sky-50 dark:bg-sky-900/20",
           items: [
             "Select a date and product from the dropdown",
-            "Enter the number of bags packed by each worker",
+            t(
+              "Enter the number of bags (Mee/Bihun) or packets (Ramen) packed by each worker",
+              { lng: "en" }
+            ),
             "Use arrow keys to navigate between worker inputs",
             "Click Save to record the production data",
             "Star your frequently used products for quick access",
@@ -120,6 +123,10 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
           product: "Regular Products",
           payCode: "Configure in Manage Mappings",
         },
+        {
+          product: "Ramen",
+          payCode: t("Configure in Manage Mappings (PKT)", { lng: "en" }),
+        },
         { product: "Other Products", payCode: "Stock only" },
         { product: "Bihun Hancur", payCode: "BH_HANCUR" },
         { product: "Karung Hancur", payCode: "TIMBANG_HANCUR" },
@@ -135,12 +142,15 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
       sections: [
         {
           icon: IconPackage,
-          title: "Entry Produk Mee dan Bihun",
+          title: t("Mee, Bihun, and Ramen Product Entry", { lng: "ms" }),
           color: "text-sky-600 dark:text-sky-400",
           bgColor: "bg-sky-50 dark:bg-sky-900/20",
           items: [
             "Pilih tarikh dan produk dari dropdown",
-            "Masukkan bilangan bungkus yang dibungkus oleh setiap pekerja",
+            t(
+              "Enter the number of bags (Mee/Bihun) or packets (Ramen) packed by each worker",
+              { lng: "ms" }
+            ),
             "Gunakan kekunci anak panah untuk navigasi antara input pekerja",
             "Klik Simpan untuk merekod data pengeluaran",
             "Star produk yang sering digunakan untuk akses pantas",
@@ -199,6 +209,10 @@ const ProductionHelpDialog: React.FC<ProductionHelpDialogProps> = ({
         "Setiap jenis produk dipetakan ke kod gaji tertentu untuk pengiraan gaji:",
       payCodeTable: [
         { product: "Produk Biasa", payCode: "Tetapkan di Manage Mappings" },
+        {
+          product: "Ramen",
+          payCode: t("Configure in Manage Mappings (PKT)", { lng: "ms" }),
+        },
         { product: "Produk Lain", payCode: "Stok sahaja" },
         { product: "Bihun Hancur", payCode: "BH_HANCUR" },
         { product: "Karung Hancur", payCode: "TIMBANG_HANCUR" },

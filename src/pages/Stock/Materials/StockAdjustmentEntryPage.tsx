@@ -45,6 +45,7 @@ import { generateMaterialStockPDF } from "../../../utils/stock/MaterialStockPDFM
 
 interface StockKilangItem {
   product_id: string;
+  product_type: string;
   name: string;
   unit_cost: number;
   quantity: number;
@@ -208,6 +209,9 @@ const stockTabs: { id: StockEntryTab; label: string; activeClass: string }[] = [
 ];
 
 const MATERIAL_STOCK_TAB_STORAGE_KEY = "materialStock.activeTab";
+// RAMEN keeps its catalogue type but shares Mee's finished-goods costing table.
+const MEE_STOCK_KILANG_PRODUCT_TYPES: string[] = ["MEE", "RAMEN"];
+const BIHUN_STOCK_KILANG_PRODUCT_TYPES: string[] = ["BH"];
 const LEGACY_STOCK_TAB_STORAGE_KEY = "materialAndGeneralStock.activeTab";
 
 const selectedMonthStorageKey = (mode: StockEntryMode): string =>
@@ -826,13 +830,15 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     clientY: number;
   } | null>(null);
 
-  const productType = activeTab === "bihun" ? "bh" : "mee";
-  const stockKilangProductType = activeTab === "bihun" ? "BH" : "MEE";
+  const stockKilangProductTypes: string[] =
+    activeTab === "bihun"
+      ? BIHUN_STOCK_KILANG_PRODUCT_TYPES
+      : MEE_STOCK_KILANG_PRODUCT_TYPES;
   const {
     products,
     isLoading: isLoadingProducts,
     refreshProducts,
-  } = useProductsCache(productType);
+  } = useProductsCache(stockKilangProductTypes);
   const stockKilangRequestRef = useRef<number>(0);
   // Unsaved Stock Kilang edits carried across a forced product-list refresh. The
   // key pins them to the tab and month they were keyed on.
@@ -1011,7 +1017,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
     // tab's products: a row of the wrong type would be rejected by the backend
     // when the page is saved.
     const lineProducts = products.filter(
-      (product) => product.type === stockKilangProductType
+      (product) => stockKilangProductTypes.includes(product.type)
     );
     if (lineProducts.length === 0) return;
 
@@ -1040,6 +1046,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
 
         return {
           product_id: product.id,
+          product_type: product.type,
           name: product.description,
           unit_cost: unitCost,
           quantity,
@@ -1082,7 +1089,7 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
         setIsLoadingStockKilang(false);
       }
     }
-  }, [activeTab, stockKilangProductType, products, isLoadingProducts, year, month]);
+  }, [activeTab, stockKilangProductTypes, products, isLoadingProducts, year, month]);
 
   useEffect(() => {
     fetchStockKilang();
@@ -4400,6 +4407,11 @@ const StockAdjustmentEntryPage: React.FC<StockAdjustmentEntryPageProps> = ({
                           <span className="text-sm text-default-700 dark:text-gray-300">
                             {item.name}
                           </span>
+                          {item.product_type === "RAMEN" && (
+                            <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 dark:bg-rose-900/30 dark:text-rose-300">
+                              PKT
+                            </span>
+                          )}
                           {renderRowSaveButton(
                             stockKilangRowSaveKey(item.product_id),
                             isStockKilangRowDirty(item),
