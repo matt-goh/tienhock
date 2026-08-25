@@ -249,6 +249,37 @@ export const cancelInvoice = async (
   }
 };
 
+// RESTORE a cancelled invoice (safe FOC / zero-value bills only). Cancellation
+// zeroes the original lines, so the corrected line data must be supplied -
+// exactly like the create path - and the server rebuilds lines, totals and the
+// sales journal in one transaction.
+export const restoreInvoice = async (
+  id: string,
+  products: ProductItem[]
+): Promise<ExtendedInvoiceData> => {
+  try {
+    const response = await api.post(`/api/invoices/${id}/restore`, {
+      products,
+    });
+
+    if (!response || !response.invoice) {
+      throw new Error("Invalid response received after restoring invoice.");
+    }
+
+    await refreshCreditsCache(); // Refresh customer cache
+
+    return {
+      ...response.invoice,
+      products: ensureProductsHaveUid(response.invoice.products || []),
+      customerName:
+        response.invoice.customerName || response.invoice.customerid,
+    };
+  } catch (error) {
+    console.error("Error restoring invoice:", error);
+    throw error;
+  }
+};
+
 // GET Invoice By ID (Added helper)
 export const getInvoiceById = async (
   id: string

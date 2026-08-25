@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-25",
+    ms: "Invois yang telah dibatalkan tanpa sejarah bayaran, resit, dokumen pelarasan atau e-Invois kini boleh dipulihkan dari halaman invois. Ini menghidupkan semula bil FOC / nilai sifar bersama barisannya, supaya bil barang percuma yang tersilap dibatalkan boleh dibetulkan tanpa perlu menaip invois baharu.",
+    en: "Cancelled invoices with no payment, receipt, adjustment or e-Invoice history can now be restored from the invoice page. This brings FOC / zero-value bills back to life with their line items, so a wrongly cancelled free-goods bill can be corrected without re-keying a new invoice.",
+  },
+  {
     date: "2026-08-24",
     ms: "Apabila menambah produk baharu, ralat \"Kod gaji ID diperlukan untuk kod gaji komisen jurujual\" tidak lagi muncul walaupun medan kod gaji menunjukkan ID produk. Kod gaji komisen jurujual kini sentiasa menggunakan ID produk secara automatik, jadi produk boleh disimpan tanpa perlu menaip semula.",
     en: "When adding a new product, the \"Pay code ID is required for Salesman commission pay code\" error no longer appears even though the pay code field showed the product ID. The salesman commission pay code now always uses the product ID automatically, so the product can be saved without retyping it.",

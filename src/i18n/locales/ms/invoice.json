@@ -841,5 +841,12 @@
   "Cancel every active and pending payment under {{reference}}? This restores each invoice's balance and customer credit and cannot be undone.": "Batalkan semua bayaran aktif dan pending di bawah {{reference}}? Ini akan memulihkan baki setiap invois dan kredit pelanggan, dan tidak boleh dibuat asal.",
   "{{total}} payments, {{amount}} in total": "{{total}} bayaran, jumlah {{amount}}",
   "Method: {{method}}": "Kaedah: {{method}}",
-  "The existing group's date and payment method are used, so this payment appears under {{reference}} alongside the payments above. Nothing already recorded is changed.": "Tarikh dan kaedah bayaran kumpulan sedia ada digunakan, supaya bayaran ini muncul di bawah {{reference}} bersama bayaran di atas. Tiada yang telah direkodkan diubah."
+  "The existing group's date and payment method are used, so this payment appears under {{reference}} alongside the payments above. Nothing already recorded is changed.": "Tarikh dan kaedah bayaran kumpulan sedia ada digunakan, supaya bayaran ini muncul di bawah {{reference}} bersama bayaran di atas. Tiada yang telah direkodkan diubah.",
+  "Restore Invoice": "Pulihkan Invois",
+  "Restore Invoice {{id}}": "Pulihkan Invois {{id}}",
+  "Restoring invoice...": "Memulihkan invois...",
+  "Invoice restored successfully": "Invois berjaya dipulihkan",
+  "Failed to restore invoice": "Gagal memulihkan invois",
+  "Restoring...": "Memulihkan...",
+  "Restoring brings a cancelled FOC / zero-value bill back to life. Cancellation cleared the original lines, so confirm or correct them below before restoring.": "Memulihkan akan menghidupkan semula bil FOC / nilai sifar yang telah dibatalkan. Pembatalan telah mengosongkan baris asal, jadi sahkan atau betulkan baris di bawah sebelum memulihkan."
 }
