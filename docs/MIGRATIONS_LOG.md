@@ -26,7 +26,7 @@ requires separate approval).
 
 ---
 
-## Dev applied / production pending 24 Aug 2026 — 1 file (RAMEN identifier/payroll repair + Jelly Polly PKT/PCS units)
+## Dev applied / production pending 24 Aug 2026 — 2 files (RAMEN identifier/payroll repair + Jelly Polly PKT/PCS units; Ikut Lori mapping table)
 
 This guarded correction was applied to dev and re-run cleanly on 2026-08-24 without inserting a
 duplicate mapping. It has **not** been applied to production.
@@ -35,6 +35,7 @@ Keep the file in `dev/migrations/` until production has been run and verified.
 | File | What it does | Status |
 |------|-----------------|--------|
 | `2026-08-24_repair_ramen_product_and_jp_pkt_pcs.sql` | Fails closed unless finished-good `1-PR`, packing mapping `1-PR` → `PM_PR`, direct salesman packet commission `SALESMAN` → `1-PR`, and compatible RAMEN/PKT product mappings are present, then idempotently sets `1-PR` to product type `RAMEN`. It connects the existing user-set `DME-RA` rate to `SALESMAN_IKUT` as PKT without changing the rate, refusing conversion if legacy daily/monthly work-log rows exist, and expands `jellypolly.pay_codes.rate_unit` to accept `PKT` and `PCS`. It never treats `PM_PR` as a product. | dev ✓ (2026-08-24, idempotence verified), prod pending |
+| `2026-08-24_product_paycode_auto_setup.sql` | Creates `product_salesman_ikut_pay_codes` (product → Ikut Lori DME/DWE pay code, one per product) and backfills the 21 pairs the daily-log pages were hardcoding, inserting only pairs whose product, pay code and `SALESMAN_IKUT` job association all exist. The daily-log pages now read this table instead of a hardcoded map, and `POST /api/products/with-paycode-setup` writes new rows when the Add Product Ikut Lori option is used. No rate, price, pay code or job mapping is changed. | dev ✓ (2026-08-24), prod pending |
 
 ---
 

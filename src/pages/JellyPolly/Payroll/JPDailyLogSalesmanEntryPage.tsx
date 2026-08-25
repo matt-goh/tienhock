@@ -22,6 +22,7 @@ import toast from "react-hot-toast";
 import { useJPJobsCache } from "../../../utils/JellyPolly/useJPJobsCache";
 import { useJPStaffsCache } from "../../../utils/JellyPolly/useJPStaffsCache";
 import { useJPJobPayCodeMappings } from "../../../utils/JellyPolly/useJPJobPayCodeMappings";
+import { useSalesmanIkutPayCodes } from "../../../utils/catalogue/useSalesmanIkutPayCodes";
 import { useProductsCache } from "../../../utils/invoice/useProductsCache";
 import { useJPEffectiveRates } from "../../../utils/JellyPolly/useJPEffectiveRates";
 import { api } from "../../../routes/utils/api";
@@ -216,32 +217,14 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   const MUAT_MEE_PAYCODE = "4-COMM_MUAT_MEE";
   const MUAT_BIHUN_PAYCODE = "5-COMM_MUAT_BH";
 
-  // Product ID to DME/DWE pay code mapping for SALESMAN_IKUT
-  const PRODUCT_TO_SALESMAN_IKUT_PAYCODE: Record<string, string> = {
-    // MEE products
-    "1-2UDG": "DME-2UDG",
-    "1-3UDG": "DME-3UDG",
-    "1-350G": "DME-350G",
-    "1-MNL": "DME-MNL",
-    // BH products
-    "2-APPLE": "DME-300G",
-    "2-BH": "DME-300G",
-    "2-BH2": "DME-2H",
-    "2-BCM3": "DME-600G",
-    "2-BNL": "DME-3.1KG",
-    "2-BNL(5)": "DME-5KG",
-    "2-MASAK": "DME-300G",
-    "2-PADI": "DME-300G",
-    // WE products
-    "WE-2UDG": "DWE-2UDG",
-    "WE-3UDG": "DWE-3UDG",
-    "WE-300G": "DWE-300G",
-    "WE-360": "DWE-350G",
-    "WE-360(5PK)": "DWE-350G",
-    "WE-420": "DWE-420G",
-    "WE-600G": "DWE-600G",
-    "WE-MNL": "DWE-MNL",
-  };
+  // Product ID to DME/DWE pay code mapping for SALESMAN_IKUT. Data-driven from
+  // product_salesman_ikut_pay_codes (maintained by the Add Product auto-setup
+  // flow) instead of a per-product code edit.
+  const {
+    productToIkutPayCode,
+    ikutPayCodeIds,
+    isLoading: isIkutMappingLoading,
+  } = useSalesmanIkutPayCodes();
 
   // Helper function to determine day type based on date
   const determineDayType = (date: Date): "Biasa" | "Ahad" | "Umum" => {
@@ -2533,9 +2516,12 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
   useEffect(() => {
     if (!isInitializationComplete) return;
     if (productsFetchedForDateRef.current !== formData.logDate) return;
+    // Wait for the Ikut Lori mapping so an empty map is never marked as
+    // processed (which would skip auto-linking once the data arrives).
+    if (isIkutMappingLoading) return;
 
     // Get all DME/DWE paycodes for clearing
-    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+    const allDmePaycodes = ikutPayCodeIds;
 
     Object.entries(salesmanIkutRelations).forEach(([ikutRowKey, salesmanId]) => {
       if (!salesmanId) {
@@ -2603,7 +2589,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
       // Then apply the new salesman's products
       salesmanProductList.forEach((product) => {
         const productId = String(product.product_id);
-        const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+        const dmePaycode = productToIkutPayCode[productId];
         if (dmePaycode) {
           const qty = parseFloat(product.quantity) || 0;
           const foc = parseFloat(product.foc_quantity) || 0;
@@ -2657,7 +2643,15 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
         return prev;
       });
     });
-  }, [salesmanIkutRelations, salesmanProducts, ikutDoubled, isInitializationComplete]);
+  }, [
+    salesmanIkutRelations,
+    salesmanProducts,
+    ikutDoubled,
+    isInitializationComplete,
+    productToIkutPayCode,
+    ikutPayCodeIds,
+    isIkutMappingLoading,
+  ]);
 
   // Update select all state based on individual selections and availability
   useEffect(() => {
@@ -2782,7 +2776,8 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
     if (
       Object.keys(employeeSelectionState.selectedJobs).length > 0 &&
-      !loadingPayCodeMappings
+      !loadingPayCodeMappings &&
+      !isIkutMappingLoading
     ) {
       fetchAndApplyActivities();
     }
@@ -2792,6 +2787,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
     formData.dayType,
     formData.logDate,
     loadingPayCodeMappings,
+    isIkutMappingLoading,
     mode,
     existingWorkLog,
     getEffectiveRate,
@@ -3156,10 +3152,12 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
 
     // Copy products from followed salesman to SALESMAN_IKUT activities
     // Get all DME/DWE paycodes
-    const allDmePaycodes = Object.values(PRODUCT_TO_SALESMAN_IKUT_PAYCODE);
+    const allDmePaycodes = ikutPayCodeIds;
 
     Object.entries(salesmanIkutRelations).forEach(
       ([ikutRowKey, salesmanId]) => {
+        // Never mark a row as processed before the mapping is loaded.
+        if (isIkutMappingLoading) return;
         if (!salesmanId) return;
         if (!newEmployeeActivities[ikutRowKey] || newEmployeeActivities[ikutRowKey].length === 0) return;
 
@@ -3179,7 +3177,7 @@ const JPDailyLogSalesmanEntryPage: React.FC<JPDailyLogSalesmanEntryPageProps> = 
         // Apply products from followed salesman
         salesmanProductList.forEach((product) => {
           const productId = String(product.product_id);
-          const dmePaycode = PRODUCT_TO_SALESMAN_IKUT_PAYCODE[productId];
+          const dmePaycode = productToIkutPayCode[productId];
           if (dmePaycode) {
             const qty = parseFloat(product.quantity) || 0;
             const foc = parseFloat(product.foc_quantity) || 0;
