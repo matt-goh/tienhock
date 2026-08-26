@@ -656,9 +656,6 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             ariaLabel={t("Filter by journal type")}
           />
 
-          {/* Divider */}
-          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
-
           {/* Status pills */}
           <PillSelect<string>
             selectionMode="multiple"
