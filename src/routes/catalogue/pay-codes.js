@@ -252,6 +252,21 @@ export default function (pool) {
           .json({ message: `Pay code with ID '${id}' not found` });
       }
 
+      const incompatibleProductResult = await pool.query(
+        `SELECT p.id
+           FROM product_pay_codes ppc
+           JOIN products p ON p.id = ppc.product_id
+          WHERE ppc.pay_code_id = $1
+            AND ((p.type = 'RAMEN') <> ($2::text = 'PKT'))
+          LIMIT 1`,
+        [id, rate_unit]
+      );
+      if (incompatibleProductResult.rows.length > 0) {
+        return res.status(400).json({
+          message: "Product and pay code units are incompatible",
+        });
+      }
+
       // 2. Optional: Check duplicate description if needed
       // const checkDescQuery = "SELECT id FROM pay_codes WHERE description = $1 AND id != $2";
       // const checkDescResult = await pool.query(checkDescQuery, [description, id]);

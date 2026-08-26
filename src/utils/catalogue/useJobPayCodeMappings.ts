@@ -38,6 +38,15 @@ const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
 let memoryCache: CacheData | null = null;
 let pendingRequest: Promise<CacheData> | null = null;
 
+export const invalidateJobPayCodeMappingsCache = (): void => {
+  memoryCache = null;
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch (err) {
+    console.error("Error clearing pay-code cache:", err);
+  }
+};
+
 const getFreshCachedData = (): CacheData | null => {
   const now: number = Date.now();
 
@@ -135,12 +144,7 @@ export const useJobPayCodeMappings = () => {
   const [error, setError] = useState<string | null>(null);
 
   const clearCache = useCallback(() => {
-    memoryCache = null;
-    try {
-      localStorage.removeItem(CACHE_KEY);
-    } catch (err) {
-      console.error("Error clearing cache:", err);
-    }
+    invalidateJobPayCodeMappingsCache();
   }, []);
 
   const applyCacheData = useCallback((cacheData: CacheData): void => {
