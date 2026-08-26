@@ -10,6 +10,9 @@ import LoadingSpinner from "../../components/LoadingSpinner";
 import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import TimeNavigator from "../../components/TimeNavigator";
+import PillSelect, {
+  PillSelectOption,
+} from "../../components/PillSelect";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import {
   IconPlus,
@@ -33,9 +36,25 @@ const GT_LEGACY_STORAGE_KEY = "gtJournalEntryListDateRange";
 const GT_FILTERS_STORAGE_KEY = "gtJournalEntryListFilters";
 const GT_SCROLL_RESTORATION_KEY: string = "gt-journal-entry-list";
 
-const STATUS_OPTIONS: { value: string; label: string }[] = [
-  { value: "active", label: "Active" },
-  { value: "cancelled", label: "Cancelled" },
+interface StatusFilterOption {
+  value: string;
+  label: string;
+  activeClassName: string;
+}
+
+const STATUS_OPTIONS: ReadonlyArray<StatusFilterOption> = [
+  {
+    value: "active",
+    label: "Active",
+    activeClassName:
+      "border-emerald-500 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  },
+  {
+    value: "cancelled",
+    label: "Cancelled",
+    activeClassName:
+      "border-rose-500 bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+  },
 ];
 
 interface CachedListFilters {
@@ -463,17 +482,13 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
     }
   };
 
-  const toggleType = (code: string) => {
-    setSelectedTypes((prev) =>
-      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
-    );
+  const handleTypeFiltersChange = (values: string[]): void => {
+    setSelectedTypes(values);
     setPage(1);
   };
 
-  const toggleStatus = (value: string) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
-    );
+  const handleStatusFiltersChange = (values: string[]): void => {
+    setSelectedStatuses(values);
     setPage(1);
   };
 
@@ -538,6 +553,27 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
 
   // Pagination
   const totalPages = Math.ceil(total / limit);
+  const journalTypeFilterOptions: ReadonlyArray<PillSelectOption<string>> =
+    entryTypes
+      .filter((type: JournalEntryTypeInfo): boolean =>
+        type.code !== LEGACY_IMPORT_ENTRY_TYPE
+      )
+      .map(
+        (type: JournalEntryTypeInfo): PillSelectOption<string> => ({
+          value: type.code,
+          label: type.code,
+          secondaryLabel: type.name,
+          title: type.name,
+        })
+      );
+  const statusFilterOptions: ReadonlyArray<PillSelectOption<string>> =
+    STATUS_OPTIONS.map(
+      (status: StatusFilterOption): PillSelectOption<string> => ({
+        value: status.value,
+        label: t(status.label),
+        activeClassName: status.activeClassName,
+      })
+    );
 
   return (
     <div className="space-y-4">
@@ -611,62 +647,27 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
         {/* Filters - own row below the title/date controls; all pills flow in one wrapping line */}
         <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
           {/* Type pills - toggle each journal type on/off (none selected = show all) */}
-          {entryTypes
-            .filter((type) => type.code !== LEGACY_IMPORT_ENTRY_TYPE)
-            .map((type) => {
-                const active = selectedTypes.includes(type.code);
-                return (
-                  <button
-                    key={type.code}
-                    type="button"
-                    onClick={() => toggleType(type.code)}
-                    aria-pressed={active}
-                    className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full border transition-colors select-none whitespace-nowrap ${
-                      active
-                        ? "border-sky-500 bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300"
-                        : "border-default-300 dark:border-gray-600 text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    <span className="font-semibold">{type.code}</span>
-                    <span
-                      className={
-                        active
-                          ? "text-sky-600/80 dark:text-sky-300/80"
-                          : "text-default-500 dark:text-gray-400"
-                      }
-                    >
-                      {type.name}
-                    </span>
-                  </button>
-                );
-              })}
+          <PillSelect<string>
+            selectionMode="multiple"
+            value={selectedTypes}
+            onChange={handleTypeFiltersChange}
+            options={journalTypeFilterOptions}
+            showSelectOnly
+            ariaLabel={t("Filter by journal type")}
+          />
 
           {/* Divider */}
           <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
 
           {/* Status pills */}
-          {STATUS_OPTIONS.map((status) => {
-            const active = selectedStatuses.includes(status.value);
-            const activeClass =
-              status.value === "cancelled"
-                ? "border-rose-500 bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300"
-                : "border-emerald-500 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300";
-            return (
-              <button
-                key={status.value}
-                type="button"
-                onClick={() => toggleStatus(status.value)}
-                aria-pressed={active}
-                className={`px-2.5 py-1 text-xs font-medium rounded-full border transition-colors select-none ${
-                  active
-                    ? activeClass
-                    : "border-default-300 dark:border-gray-600 text-default-600 dark:text-gray-300 hover:bg-default-100 dark:hover:bg-gray-700"
-                }`}
-              >
-                {t(status.label)}
-              </button>
-            );
-          })}
+          <PillSelect<string>
+            selectionMode="multiple"
+            value={selectedStatuses}
+            onChange={handleStatusFiltersChange}
+            options={statusFilterOptions}
+            showSelectOnly
+            ariaLabel={t("Filter by status")}
+          />
 
         </div>
 

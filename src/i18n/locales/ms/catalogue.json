@@ -318,6 +318,7 @@
   "No pay codes found. Create one.": "Tiada pay codes ditemui. Cipta satu.",
   "No pay codes match filters.": "Tiada pay codes sepadan dengan filters.",
   "No products found for type \"{{type}}\". Try changing the filter or add a new product.": "Tiada produk ditemui untuk type \"{{type}}\". Cuba tukar filter atau tambah produk baru.",
+  "No products found for the selected types: {{types}}. Try changing the filter or add a new product.": "Tiada produk untuk jenis yang dipilih: {{types}}. Cuba tukar penapis atau tambah produk baharu.",
   "No products found. Click \"Add Product\" to create your first product.": "Tiada produk ditemui. Klik \"Add Product\" untuk mencipta produk pertama anda.",
   "No staff associated with this job": "Tiada kakitangan dikaitkan dengan job ini",
   "No staff members found": "Tiada ahli kakitangan ditemui",
@@ -900,5 +901,6 @@
   "Unlink all pay codes from this product before permanently deleting it.": "Nyahpaut semua kod gaji daripada produk ini sebelum memadamkannya secara kekal.",
   "e.g. DME-RA2": "cth. DME-RA2",
   "e.g. PM_1-PR2": "cth. PM_1-PR2",
+  "Filter products by type": "Tapis produk mengikut jenis",
   "Cancelled": "Cancelled"
 }
