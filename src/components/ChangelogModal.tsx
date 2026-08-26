@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-25",
+    ms: "Cetakan bil daripada PC kini memaparkan kuantiti FOC dan barang dipulangkan (RTN) bagi setiap produk, sama seperti cetakan jurujual.",
+    en: "Bills printed from the PC now show the FOC and returned-goods (RTN) quantity for each product, matching the salesman printout.",
+  },
+  {
+    date: "2026-08-25",
     ms: "Penapis jenis produk serta penapis jenis dan status journal kini menggunakan pilihan berbentuk pill. Anda boleh memilih beberapa pilihan sekali gus, atau tekan ikon sasaran pada sesuatu pill untuk menunjukkan pilihan itu sahaja.",
     en: "Product type and Journal Entry type/status filters now use pill selections. You can select several options at once, or press the target icon on a pill to show only that option.",
   },

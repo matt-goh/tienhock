@@ -168,7 +168,15 @@ const styles = StyleSheet.create({
     width: "8%",
   },
   itemNameCol: {
-    width: "44%",
+    width: "34%",
+  },
+  focCol: {
+    width: "5%",
+    textAlign: "center",
+  },
+  rtnCol: {
+    width: "5%",
+    textAlign: "center",
   },
   qtyCol: {
     width: "5%",
@@ -397,6 +405,8 @@ const EInvoicePDF: React.FC<Props> = ({
           <Text style={[styles.itemNameCol, styles.headerText]}>
             Product Name
           </Text>
+          <Text style={[styles.focCol, styles.headerText]}>FOC</Text>
+          <Text style={[styles.rtnCol, styles.headerText]}>RTN</Text>
           <Text style={[styles.qtyCol, styles.headerText]}>Qty</Text>
           <Text style={[styles.priceCol, styles.headerText]}>U. Price</Text>
           <Text style={[styles.subtotalCol, styles.headerText]}>Subtotal</Text>
@@ -411,6 +421,12 @@ const EInvoicePDF: React.FC<Props> = ({
               <Text style={[styles.classCol, styles.cellText]}>{isConsolidated ? "004" : "022"}</Text>
               <Text style={[styles.itemNameCol, styles.cellText]}>
                 {item.description}
+              </Text>
+              <Text style={[styles.focCol, styles.cellText]}>
+                {item.freeProduct}
+              </Text>
+              <Text style={[styles.rtnCol, styles.cellText]}>
+                {item.returnProduct}
               </Text>
               <Text style={[styles.qtyCol, styles.cellText]}>{item.qty}</Text>
               <Text style={[styles.priceCol, styles.cellText]}>
@@ -441,6 +457,8 @@ const EInvoicePDF: React.FC<Props> = ({
             >
               No item details available
             </Text>
+            <Text style={[styles.focCol, styles.cellText]}></Text>
+            <Text style={[styles.rtnCol, styles.cellText]}></Text>
             <Text style={[styles.qtyCol, styles.cellText]}></Text>
             <Text style={[styles.priceCol, styles.cellText]}></Text>
             <Text style={[styles.subtotalCol, styles.cellText]}></Text>
