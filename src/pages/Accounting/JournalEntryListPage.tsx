@@ -653,8 +653,12 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             onChange={handleTypeFiltersChange}
             options={journalTypeFilterOptions}
             showSelectOnly
+            className="!contents"
             ariaLabel={t("Filter by journal type")}
           />
+
+          {/* Divider */}
+          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
 
           {/* Status pills */}
           <PillSelect<string>
@@ -663,6 +667,7 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
             onChange={handleStatusFiltersChange}
             options={statusFilterOptions}
             showSelectOnly
+            className="!contents"
             ariaLabel={t("Filter by status")}
           />
 
