@@ -443,6 +443,7 @@ const ProductPage: React.FC = () => {
               onClick={handleRefreshCache}
               icon={IconRefresh}
               variant="outline"
+              size="sm"
               disabled={isRefreshingCache}
               title={t("Refresh product cache")}
               className={isRefreshingCache ? "[&_svg]:animate-spin" : ""}
@@ -453,10 +454,16 @@ const ProductPage: React.FC = () => {
               onClick={() => setIsOrderModalOpen(true)}
               icon={IconArrowsSort}
               variant="outline"
+              size="sm"
             >
               {t("Reorder")}
             </Button>
-            <Button onClick={handleCreateProduct} icon={IconPlus} color="sky">
+            <Button
+              onClick={handleCreateProduct}
+              icon={IconPlus}
+              color="sky"
+              size="sm"
+            >
               {t("Add Product")}
             </Button>
           </div>
