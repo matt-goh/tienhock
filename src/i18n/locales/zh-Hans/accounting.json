@@ -379,6 +379,8 @@
   "Favourite": "收藏",
   "February": "二月",
   "Filter by ledger type": "按分类账类型筛选",
+  "Filter by journal type": "按日记账类型筛选",
+  "Filter by status": "按状态筛选",
   "Fix the highlighted amounts before saving": "保存前请修正高亮显示的金额",
   "Flat": "平铺",
   "For period {{start}} to {{end}}": "期间 {{start}} 至 {{end}}",

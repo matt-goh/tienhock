@@ -24,7 +24,9 @@ import {
   IconArrowsSort,
   IconLink,
 } from "@tabler/icons-react";
-import { FormListbox } from "../../components/FormComponents";
+import PillSelect, {
+  PillSelectOption,
+} from "../../components/PillSelect";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import CustomersUsingProductTooltip from "../../components/Catalogue/CustomersUsingProductTooltip";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
@@ -41,6 +43,50 @@ interface Product {
   tax: string;
   is_active: boolean;
 }
+
+const PRODUCT_TYPE_FILTER_VALUES = [
+  "MEE",
+  "BH",
+  "RAMEN",
+  "BUNDLE",
+  "JP",
+  "OTH",
+] as const;
+
+type ProductTypeFilter = (typeof PRODUCT_TYPE_FILTER_VALUES)[number];
+
+const PRODUCT_TYPE_FILTER_OPTIONS: ReadonlyArray<
+  PillSelectOption<ProductTypeFilter>
+> = PRODUCT_TYPE_FILTER_VALUES.map(
+  (value: ProductTypeFilter): PillSelectOption<ProductTypeFilter> => ({
+    value,
+    label: value,
+  })
+);
+
+const isProductTypeFilter = (value: unknown): value is ProductTypeFilter =>
+  typeof value === "string" &&
+  PRODUCT_TYPE_FILTER_VALUES.includes(value as ProductTypeFilter);
+
+const reviveProductTypeFilters = (
+  cached: unknown
+): ProductTypeFilter[] | null => {
+  // Migrate the previous single-select value without resetting the user's
+  // saved filter. "all" is represented by an empty selection in multi mode.
+  if (typeof cached === "string") {
+    if (cached === "all") return [];
+    return isProductTypeFilter(cached) ? [cached] : null;
+  }
+
+  if (!Array.isArray(cached)) return null;
+
+  return cached
+    .filter(isProductTypeFilter)
+    .filter(
+      (value: ProductTypeFilter, index: number, values: ProductTypeFilter[]) =>
+        values.indexOf(value) === index
+    );
+};
 
 const ProductPage: React.FC = () => {
   const { t } = useTranslation("catalogue");
@@ -67,10 +113,12 @@ const ProductPage: React.FC = () => {
   const [productToHardDelete, setProductToHardDelete] = useState<Product | null>(null);
   // The product-type filter persists so returning to the page keeps the same
   // slice of the catalogue.
-  const [typeFilter, setTypeFilter] = usePersistedFilters<string>(
+  const [typeFilters, setTypeFilters] = usePersistedFilters<
+    ProductTypeFilter[]
+  >(
     "productListTypeFilter",
-    () => "all",
-    (cached) => (typeof cached === "string" ? cached : null)
+    (): ProductTypeFilter[] => [],
+    reviveProductTypeFilters
   );
   const {
     customers,
@@ -79,11 +127,13 @@ const ProductPage: React.FC = () => {
   } = useCustomersCache();
 
   const filteredProducts = React.useMemo(() => {
-    if (typeFilter === "all") {
+    if (typeFilters.length === 0) {
       return products;
     }
-    return products.filter((product: Product) => product.type === typeFilter);
-  }, [products, typeFilter]);
+    return products.filter((product: Product): boolean =>
+      typeFilters.includes(product.type as ProductTypeFilter)
+    );
+  }, [products, typeFilters]);
 
   const productToCustomersMap = useMemo(() => {
     // Create reverse mapping: productId -> customer info[]
@@ -369,24 +419,21 @@ const ProductPage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex flex-col items-center justify-center w-full">
         <div className="mb-4 flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 lg:flex-1">
             <h1 className="text-lg text-default-700 dark:text-gray-200 font-medium">
               {t("Product Catalogue")}
             </h1>
-            <div className="w-full sm:w-48">
-              <FormListbox
-                name="typeFilter"
-                value={typeFilter}
-                onChange={(value: string) => setTypeFilter(value)}
-                options={[
-                  { id: "all", name: t("All Types") },
-                  { id: "MEE", name: "MEE" },
-                  { id: "BH", name: "BH" },
-                  { id: "RAMEN", name: "RAMEN" },
-                  { id: "BUNDLE", name: "BUNDLE" },
-                  { id: "JP", name: "JP" },
-                  { id: "OTH", name: "OTH" },
-                ]}
+            <div className="min-w-0">
+              <PillSelect<ProductTypeFilter>
+                selectionMode="multiple"
+                value={typeFilters}
+                onChange={(values: ProductTypeFilter[]): void =>
+                  setTypeFilters(values)
+                }
+                options={PRODUCT_TYPE_FILTER_OPTIONS}
+                emptyOption={{ label: t("All Types") }}
+                showSelectOnly
+                ariaLabel={t("Filter products by type")}
               />
             </div>
           </div>
@@ -557,13 +604,13 @@ const ProductPage: React.FC = () => {
 
             {filteredProducts.length === 0 && !cacheLoading && (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                {typeFilter === "all"
+                {typeFilters.length === 0
                   ? t(
                       "No products found. Click \"Add Product\" to create your first product."
                     )
                   : t(
-                      "No products found for type \"{{type}}\". Try changing the filter or add a new product.",
-                      { type: typeFilter }
+                      "No products found for the selected types: {{types}}. Try changing the filter or add a new product.",
+                      { types: typeFilters.join(", ") }
                     )}
               </div>
             )}

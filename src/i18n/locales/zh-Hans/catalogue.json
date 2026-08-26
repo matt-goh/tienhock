@@ -318,6 +318,7 @@
   "No pay codes found. Create one.": "未找到工资代码。创建一个。",
   "No pay codes match filters.": "没有工资代码符合筛选条件。",
   "No products found for type \"{{type}}\". Try changing the filter or add a new product.": "未找到类型为“{{type}}”的产品。尝试更改筛选条件或添加新产品。",
+  "No products found for the selected types: {{types}}. Try changing the filter or add a new product.": "未找到所选类型的产品：{{types}}。请更改筛选条件或添加新产品。",
   "No products found. Click \"Add Product\" to create your first product.": "未找到产品。点击“添加产品”创建您的第一个产品。",
   "No staff associated with this job": "没有与此工作关联的员工",
   "No staff members found": "未找到员工成员",
@@ -900,5 +901,6 @@
   "Unlink all pay codes from this product before permanently deleting it.": "永久删除此产品前，请先取消关联其所有工资代码。",
   "e.g. DME-RA2": "例如 DME-RA2",
   "e.g. PM_1-PR2": "例如 PM_1-PR2",
+  "Filter products by type": "按类型筛选产品",
   "Cancelled": "已取消"
 }

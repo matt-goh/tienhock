@@ -245,5 +245,6 @@
   "Expenses": "费用",
   "Unclassified": "未分类",
   "Only show accounts in the selected month's Trial Balance": "仅显示所选月份试算平衡表中的账户",
+  "Show only {{option}}": "仅显示 {{option}}",
   "No account codes found.": "未找到账户代码。"
 }

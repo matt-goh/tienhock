@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-25",
+    ms: "Penapis jenis produk serta penapis jenis dan status journal kini menggunakan pilihan berbentuk pill. Anda boleh memilih beberapa pilihan sekali gus, atau tekan ikon sasaran pada sesuatu pill untuk menunjukkan pilihan itu sahaja.",
+    en: "Product type and Journal Entry type/status filters now use pill selections. You can select several options at once, or press the target icon on a pill to show only that option.",
+  },
+  {
+    date: "2026-08-25",
     ms: "Katalog Produk kini mempunyai pengurus Kod Gaji bagi setiap produk. Semua pautan Pembungkusan/Pengeluaran, Komisen Jurujual dan Ikut Lori daripada katalog Tien Hock dan Jelly Polly dipaparkan di satu tempat, termasuk pautan yang dibuat di halaman lain. Anda boleh memautkan kod sedia ada, mencipta kod baharu, mengubah atau menyahaktifkan kod, membaiki pautan kerja yang tidak lengkap dan menyahpaut tanpa memadam sejarah gaji. Senarai penuh kod gaji hanya dimuatkan apabila pilihan tambah dibuka. ID produk sedia ada kini dikunci, dan semua pautan kod gajinya perlu dinyahpaut sebelum produk dipadam secara kekal supaya pautan serta sejarah kekal selamat.",
     en: "The Product Catalogue now has a Pay Code manager for every product. Packing/production, Salesman Commission and Ikut Lori links from both the Tien Hock and Jelly Polly catalogues appear in one place, including links created on other pages. You can link an existing code, create a new one, edit or deactivate it, repair incomplete job links, and unlink it without deleting payroll history. The full pay-code list loads only when you open the add options. Existing product IDs are now locked, and all pay-code links must be unlinked before permanently deleting a product so its links and history remain safe.",
   },
