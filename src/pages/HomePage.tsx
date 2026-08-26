@@ -138,6 +138,8 @@ const HomePage: React.FC = () => {
   const getDescriptionForGreenTarget = (name: string): string => {
     const descriptions: Record<string, string> = {
       Dashboard: "Overview and analytics",
+      Accounting: "Financial records and transactions",
+      Sales: "Invoices and sales management",
       Rentals: "Manage dumpster rentals",
       Invoices: "Billing and invoicing",
       Documents: "Credit, debit and refund notes",
@@ -167,6 +169,7 @@ const HomePage: React.FC = () => {
       Sales: "Sales and invoice management",
       Payroll: "Manage Jelly Polly payroll and staff work",
       Stock: "Production records and product stock",
+      Catalogue: "Manage staff, customers, products, etc",
     };
     const description: string | undefined = descriptions[name];
     return description ? t(description) : "";

@@ -42,6 +42,8 @@ export interface EInvoicePDFData {
   };
   orderDetails: Array<{
     description: string;
+    freeProduct: number;
+    returnProduct: number;
     qty: number;
     price: string | number;
     total: string | number;
@@ -502,6 +504,8 @@ export const preparePDFData = async (
       },
       orderDetails: orderDetails.map((item: any) => ({
         description: item.description || "",
+        freeProduct: Number(item.freeProduct ?? item.freeproduct ?? 0),
+        returnProduct: Number(item.returnProduct ?? item.returnproduct ?? 0),
         qty: Number(item.qty || item.quantity || 0),
         price: item.price || 0,
         total: item.total || 0,

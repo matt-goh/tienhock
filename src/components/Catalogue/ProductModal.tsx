@@ -164,6 +164,7 @@ interface ProductModalProps {
   ) => Promise<void>;
   product?: Product | null;
   mode: "create" | "edit";
+  onManagePayCodes?: (product: Product) => void;
 }
 
 const ProductModal: React.FC<ProductModalProps> = ({
@@ -172,6 +173,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   onSave,
   product,
   mode,
+  onManagePayCodes,
 }) => {
   const { t } = useTranslation("catalogue");
   const [formData, setFormData] = useState<Product>({
@@ -212,6 +214,15 @@ const ProductModal: React.FC<ProductModalProps> = ({
   // types that carry pay codes: MEE, BH, RAMEN, BUNDLE and JP.
   const canAutoSetup =
     mode === "create" && PRODUCTION_TYPES.includes(formData.type);
+  const hasUnsavedProductChanges: boolean =
+    mode === "edit" &&
+    !!product &&
+    (formData.id !== product.id ||
+      formData.description !== product.description ||
+      formData.price_per_unit !== product.price_per_unit ||
+      formData.type !== product.type ||
+      formData.tax !== product.tax ||
+      formData.is_active !== product.is_active);
 
   const setupUnitFor = (role: PaycodeSetupRole): string => {
     if (role === "packing") return PACKING_UNIT_BY_TYPE[formData.type] || "";
@@ -351,7 +362,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
   return (
     <Transition appear show={isOpen} as={React.Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
+      <Dialog
+        as="div"
+        className="relative z-50"
+        onClose={() => !isSubmitting && onClose()}
+      >
         <TransitionChild
           as={React.Fragment}
           enter="ease-out duration-300"
@@ -391,7 +406,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="text-default-400 dark:text-gray-400 hover:text-default-600 dark:hover:text-gray-200"
+                  disabled={isSubmitting}
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-default-400 transition-colors hover:bg-default-100 hover:text-default-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200"
                   aria-label={t("Close")}
                 >
                   <IconX size={20} />
@@ -412,6 +428,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     name="id"
                     label={t("Product ID")}
                     value={formData.id}
+                    disabled={mode === "edit"}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const nextId = e.target.value;
                       const previousId = formData.id.trim();
@@ -451,9 +468,20 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     name="description"
                     label={t("Description")}
                     value={formData.description}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const previousDescription: string = formData.description;
+                      const nextDescription: string = e.target.value;
+                      setFormData({ ...formData, description: nextDescription });
+                      // Keep untouched quick-create descriptions synced while
+                      // preserving any role description the user customized.
+                      setPaycodeSetup((previousSetup) =>
+                        previousSetup.map((option) =>
+                          option.description === previousDescription
+                            ? { ...option, description: nextDescription }
+                            : option
+                        )
+                      );
+                    }}
                     required
                   />
 
@@ -484,13 +512,15 @@ const ProductModal: React.FC<ProductModalProps> = ({
                         // All applicable pay-code roles default to checked;
                         // units and suggested IDs depend on the type, so the
                         // drafts are rebuilt whenever the type changes.
-                        setPaycodeSetup(
-                          createDefaultSetup(
-                            value,
-                            formData.id,
-                            formData.description
-                          )
-                        );
+                        if (mode === "create") {
+                          setPaycodeSetup(
+                            createDefaultSetup(
+                              value,
+                              formData.id,
+                              formData.description
+                            )
+                          );
+                        }
                       }}
                       options={typeOptions.map((option) => ({
                         value: option.id,
@@ -514,6 +544,45 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     />
                   </div>
                 </section>
+
+                {mode === "edit" && product && onManagePayCodes && (
+                  <section className="space-y-3 rounded-xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-800 dark:bg-sky-950/20">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
+                          {t("Linked Pay Codes")}
+                        </h4>
+                        <p className="mt-1 text-xs text-default-600 dark:text-gray-300">
+                          {t(
+                            "View, create, link, edit, deactivate, and unlink every pay code connected to this product, including mappings created elsewhere."
+                          )}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        color="sky"
+                        onClick={() => onManagePayCodes(product)}
+                        disabled={isSubmitting || hasUnsavedProductChanges}
+                        className="shrink-0"
+                      >
+                        {t("Manage Linked Pay Codes")}
+                      </Button>
+                    </div>
+                    {hasUnsavedProductChanges && (
+                      <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                        {t(
+                          "Save the product changes before managing its linked pay codes."
+                        )}
+                      </p>
+                    )}
+                    <p className="text-xs text-default-500 dark:text-gray-400">
+                      {t(
+                        "Product IDs cannot be changed after creation because product links and payroll history use this ID."
+                      )}
+                    </p>
+                  </section>
+                )}
 
                 {canAutoSetup && (
                   <section className="space-y-3">
@@ -607,8 +676,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
                                     required
                                     placeholder={
                                       role === "ikut"
-                                        ? "e.g. DME-RA2"
-                                        : "e.g. PM_1-PR2"
+                                        ? t("e.g. DME-RA2")
+                                        : t("e.g. PM_1-PR2")
                                     }
                                   />
                                 )}
@@ -626,7 +695,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                                   }
                                 />
 
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                                   <FormInput
                                     name={`setup-biasa-${role}`}
                                     label={t("Normal Rate")}
@@ -683,7 +752,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   </section>
                 )}
 
-                <div className="flex justify-end gap-3 pt-4 border-t border-default-200 dark:border-gray-700">
+                <div className="sticky bottom-0 z-10 -mx-6 flex justify-end gap-3 border-t border-default-200 bg-white px-6 pb-1 pt-4 dark:border-gray-700 dark:bg-gray-800">
                   <Button
                     type="button"
                     onClick={onClose}

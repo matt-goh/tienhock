@@ -27,6 +27,15 @@ const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour
 let memoryCache: CacheData | null = null;
 let pendingRequest: Promise<Record<string, string>> | null = null;
 
+export const invalidateSalesmanIkutPayCodesCache = (): void => {
+  memoryCache = null;
+  try {
+    localStorage.removeItem(CACHE_KEY);
+  } catch (err) {
+    console.error("Error clearing Ikut Lori mapping cache:", err);
+  }
+};
+
 const getFreshCache = (): CacheData | null => {
   const now = Date.now();
   if (memoryCache && now - memoryCache.timestamp < CACHE_DURATION) {
@@ -160,12 +169,7 @@ export const useSalesmanIkutPayCodes = () => {
     isLoading,
     error,
     refreshData: (): Promise<void> => {
-      memoryCache = null;
-      try {
-        localStorage.removeItem(CACHE_KEY);
-      } catch (err) {
-        console.error("Error clearing Ikut Lori mapping cache:", err);
-      }
+      invalidateSalesmanIkutPayCodesCache();
       return fetchData(true);
     },
   };

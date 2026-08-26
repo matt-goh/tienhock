@@ -9,6 +9,7 @@ import ProductModal, {
   PaycodeSetupPayload,
 } from "../../components/Catalogue/ProductModal";
 import ProductOrderModal from "../../components/Catalogue/ProductOrderModal";
+import ProductPayCodeManager from "../../components/Catalogue/ProductPayCodeManager";
 import {
   refreshProductsCache,
   useProductsCache,
@@ -21,12 +22,18 @@ import {
   IconX,
   IconRefresh,
   IconArrowsSort,
+  IconLink,
 } from "@tabler/icons-react";
-import { FormListbox } from "../../components/FormComponents";
+import PillSelect, {
+  PillSelectOption,
+} from "../../components/PillSelect";
 import { useCustomersCache } from "../../utils/catalogue/useCustomerCache";
 import CustomersUsingProductTooltip from "../../components/Catalogue/CustomersUsingProductTooltip";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import { usePersistedFilters } from "../../hooks/usePersistedFilters";
+import { invalidateJobPayCodeMappingsCache } from "../../utils/catalogue/useJobPayCodeMappings";
+import { invalidateJPJobPayCodeMappingsCache } from "../../utils/JellyPolly/useJPJobPayCodeMappings";
+import { invalidateSalesmanIkutPayCodesCache } from "../../utils/catalogue/useSalesmanIkutPayCodes";
 
 interface Product {
   id: string;
@@ -36,6 +43,50 @@ interface Product {
   tax: string;
   is_active: boolean;
 }
+
+const PRODUCT_TYPE_FILTER_VALUES = [
+  "MEE",
+  "BH",
+  "RAMEN",
+  "BUNDLE",
+  "JP",
+  "OTH",
+] as const;
+
+type ProductTypeFilter = (typeof PRODUCT_TYPE_FILTER_VALUES)[number];
+
+const PRODUCT_TYPE_FILTER_OPTIONS: ReadonlyArray<
+  PillSelectOption<ProductTypeFilter>
+> = PRODUCT_TYPE_FILTER_VALUES.map(
+  (value: ProductTypeFilter): PillSelectOption<ProductTypeFilter> => ({
+    value,
+    label: value,
+  })
+);
+
+const isProductTypeFilter = (value: unknown): value is ProductTypeFilter =>
+  typeof value === "string" &&
+  PRODUCT_TYPE_FILTER_VALUES.includes(value as ProductTypeFilter);
+
+const reviveProductTypeFilters = (
+  cached: unknown
+): ProductTypeFilter[] | null => {
+  // Migrate the previous single-select value without resetting the user's
+  // saved filter. "all" is represented by an empty selection in multi mode.
+  if (typeof cached === "string") {
+    if (cached === "all") return [];
+    return isProductTypeFilter(cached) ? [cached] : null;
+  }
+
+  if (!Array.isArray(cached)) return null;
+
+  return cached
+    .filter(isProductTypeFilter)
+    .filter(
+      (value: ProductTypeFilter, index: number, values: ProductTypeFilter[]) =>
+        values.indexOf(value) === index
+    );
+};
 
 const ProductPage: React.FC = () => {
   const { t } = useTranslation("catalogue");
@@ -51,6 +102,9 @@ const ProductPage: React.FC = () => {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState<boolean>(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [payCodeProduct, setPayCodeProduct] = useState<Product | null>(null);
+  const [isPayCodeManagerOpen, setIsPayCodeManagerOpen] =
+    useState<boolean>(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [reactivateConfirmOpen, setReactivateConfirmOpen] = useState<boolean>(false);
@@ -59,10 +113,12 @@ const ProductPage: React.FC = () => {
   const [productToHardDelete, setProductToHardDelete] = useState<Product | null>(null);
   // The product-type filter persists so returning to the page keeps the same
   // slice of the catalogue.
-  const [typeFilter, setTypeFilter] = usePersistedFilters<string>(
+  const [typeFilters, setTypeFilters] = usePersistedFilters<
+    ProductTypeFilter[]
+  >(
     "productListTypeFilter",
-    () => "all",
-    (cached) => (typeof cached === "string" ? cached : null)
+    (): ProductTypeFilter[] => [],
+    reviveProductTypeFilters
   );
   const {
     customers,
@@ -71,11 +127,13 @@ const ProductPage: React.FC = () => {
   } = useCustomersCache();
 
   const filteredProducts = React.useMemo(() => {
-    if (typeFilter === "all") {
+    if (typeFilters.length === 0) {
       return products;
     }
-    return products.filter((product: Product) => product.type === typeFilter);
-  }, [products, typeFilter]);
+    return products.filter((product: Product): boolean =>
+      typeFilters.includes(product.type as ProductTypeFilter)
+    );
+  }, [products, typeFilters]);
 
   const productToCustomersMap = useMemo(() => {
     // Create reverse mapping: productId -> customer info[]
@@ -136,6 +194,18 @@ const ProductPage: React.FC = () => {
     setModalMode("edit");
     setSelectedProduct(product);
     setIsModalOpen(true);
+  }, []);
+
+  const handleManagePayCodes = useCallback((product: Product): void => {
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+    setPayCodeProduct(product);
+    setIsPayCodeManagerOpen(true);
+  }, []);
+
+  const handleClosePayCodeManager = useCallback((): void => {
+    setIsPayCodeManagerOpen(false);
+    setPayCodeProduct(null);
   }, []);
 
   const handleDeleteProduct = useCallback((product: Product) => {
@@ -203,8 +273,23 @@ const ProductPage: React.FC = () => {
     } catch (error: any) {
       console.error("Error deleting product:", error);
       // Check for foreign key constraint error
-      const errorMessage = error?.data?.error || error?.message || "";
-      if (errorMessage.includes("foreign key constraint") || errorMessage.includes("customer_products")) {
+      const errorMessage =
+        error?.data?.message || error?.data?.error || error?.message || "";
+      if (
+        errorMessage.includes(
+          "Unlink all pay codes from the product before permanently deleting it"
+        )
+      ) {
+        toast.error(
+          t(
+            "Unlink all pay codes from this product before permanently deleting it."
+          ),
+          { duration: 5000 }
+        );
+      } else if (
+        errorMessage.includes("foreign key constraint") ||
+        errorMessage.includes("customer_products")
+      ) {
         toast.error(
           t(
             "Cannot delete this product - it is assigned to one or more customers. Remove customer assignments first or deactivate instead."
@@ -241,13 +326,9 @@ const ProductPage: React.FC = () => {
             // The pay-code/mapping hooks cache in localStorage for up to an
             // hour; drop the caches so the Pay Codes, Mappings and daily-log
             // pages pick up the new codes on their next mount.
-            try {
-              localStorage.removeItem("payCodeData");
-              localStorage.removeItem("jpPayCodeData");
-              localStorage.removeItem("salesmanIkutPayCodes");
-            } catch (cacheError) {
-              console.error("Error clearing pay-code caches:", cacheError);
-            }
+            invalidateJobPayCodeMappingsCache();
+            invalidateJPJobPayCodeMappingsCache();
+            invalidateSalesmanIkutPayCodesCache();
           } else {
             await api.post("/api/products/batch", {
               products: [productData],
@@ -337,30 +418,27 @@ const ProductPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="flex flex-col items-center justify-center w-full">
-        <div className="w-full mb-4 flex justify-between items-center">
-          <div className="flex items-center space-x-4">
+        <div className="mb-4 flex w-full flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 lg:flex-1">
             <h1 className="text-lg text-default-700 dark:text-gray-200 font-medium">
               {t("Product Catalogue")}
             </h1>
-            <div className="w-48">
-              <FormListbox
-                name="typeFilter"
-                value={typeFilter}
-                onChange={(value: string) => setTypeFilter(value)}
-                options={[
-                  { id: "all", name: t("All Types") },
-                  { id: "MEE", name: "MEE" },
-                  { id: "BH", name: "BH" },
-                  { id: "RAMEN", name: "RAMEN" },
-                  { id: "BUNDLE", name: "BUNDLE" },
-                  { id: "JP", name: "JP" },
-                  { id: "OTH", name: "OTH" },
-                ]}
+            <div className="min-w-0">
+              <PillSelect<ProductTypeFilter>
+                selectionMode="multiple"
+                value={typeFilters}
+                onChange={(values: ProductTypeFilter[]): void =>
+                  setTypeFilters(values)
+                }
+                options={PRODUCT_TYPE_FILTER_OPTIONS}
+                emptyOption={{ label: t("All Types") }}
+                showSelectOnly
+                ariaLabel={t("Filter products by type")}
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={handleRefreshCache}
               icon={IconRefresh}
@@ -384,28 +462,27 @@ const ProductPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="w-full border border-default-200 dark:border-gray-700 rounded-lg overflow-hidden">
+        <div className="w-full rounded-lg border border-default-200 dark:border-gray-700">
           {/* Single table with sticky header so column widths match the body */}
-          <div className="max-h-[76vh] overflow-y-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <thead>
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[12%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="sticky top-0 z-10 w-[11%] border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {t("ID")}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[32%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="sticky top-0 z-10 w-[20%] border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {t("description", { ns: "common" })}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="sticky top-0 z-10 w-[9%] border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {t("Price/Unit")}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="sticky top-0 z-10 w-[8%] border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {t("type", { ns: "common" })}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[10%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="sticky top-0 z-10 w-[10%] border-b border-gray-200 bg-gray-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {t("status", { ns: "common" })}
                   </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-[18%] sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <th className="sticky top-0 z-10 w-[42%] border-b border-gray-200 bg-gray-50 px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
                     {t("actions", { ns: "common" })}
                   </th>
                 </tr>
@@ -413,7 +490,7 @@ const ProductPage: React.FC = () => {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredProducts.map((product: Product) => (
                   <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 w-[12%]">
+                    <td className="w-[11%] px-4 py-4 text-sm font-medium text-gray-900 dark:text-gray-100">
                       <div className="flex items-center">
                         {product.id}
                         <CustomersUsingProductTooltip
@@ -423,15 +500,15 @@ const ProductPage: React.FC = () => {
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[32%]">
+                    <td className="w-[20%] px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
                       <div className="truncate" title={product.description}>
                         {product.description}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
+                    <td className="w-[9%] px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
                       {product.price_per_unit.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
+                    <td className="w-[8%] px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
                       <span
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           product.type === "MEE"
@@ -452,7 +529,7 @@ const ProductPage: React.FC = () => {
                         {product.type}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100 w-[10%]">
+                    <td className="w-[10%] px-4 py-4 text-sm text-gray-900 dark:text-gray-100">
                       {product.is_active ? (
                         <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded-full dark:bg-green-900/30 dark:text-green-300">
                           <IconCheck className="w-3 h-3 mr-0.5" />
@@ -465,8 +542,8 @@ const ProductPage: React.FC = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center w-[18%]">
-                      <div className="flex justify-center space-x-2">
+                    <td className="w-[42%] px-4 py-4 text-center text-sm font-medium">
+                      <div className="flex flex-wrap justify-center gap-2">
                         <Button
                           onClick={() => handleEditProduct(product)}
                           icon={IconEdit}
@@ -475,6 +552,18 @@ const ProductPage: React.FC = () => {
                           color="sky"
                         >
                           {t("Edit")}
+                        </Button>
+                        <Button
+                          onClick={() => handleManagePayCodes(product)}
+                          icon={IconLink}
+                          size="sm"
+                          variant="outline"
+                          color="purple"
+                          title={t("Manage pay codes for {{product}}", {
+                            product: product.id,
+                          })}
+                        >
+                          {t("Pay Codes")}
                         </Button>
                         {product.is_active ? (
                           <Button
@@ -515,17 +604,16 @@ const ProductPage: React.FC = () => {
 
             {filteredProducts.length === 0 && !cacheLoading && (
               <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                {typeFilter === "all"
+                {typeFilters.length === 0
                   ? t(
                       "No products found. Click \"Add Product\" to create your first product."
                     )
                   : t(
-                      "No products found for type \"{{type}}\". Try changing the filter or add a new product.",
-                      { type: typeFilter }
+                      "No products found for the selected types: {{types}}. Try changing the filter or add a new product.",
+                      { types: typeFilters.join(", ") }
                     )}
               </div>
             )}
-          </div>
         </div>
         <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 ml-auto text-right">
           {t("Showing {{shown}} of {{total}} products", {
@@ -541,7 +629,16 @@ const ProductPage: React.FC = () => {
         onSave={handleSaveProduct}
         product={selectedProduct}
         mode={modalMode}
+        onManagePayCodes={handleManagePayCodes}
       />
+
+      {payCodeProduct && (
+        <ProductPayCodeManager
+          isOpen={isPayCodeManagerOpen}
+          onClose={handleClosePayCodeManager}
+          product={payCodeProduct}
+        />
+      )}
 
       <ProductOrderModal
         isOpen={isOrderModalOpen}

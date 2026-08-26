@@ -1,5 +1,5 @@
 // src/pages/Sales/SalesBySalesmanPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { IconSortAscending, IconSortDescending } from "@tabler/icons-react";
@@ -144,13 +144,16 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
     key: "totalSales",
     direction: "desc",
   });
-  const [salesmen, setSalesmen] = useState<string[]>(["All Salesmen"]);
   const [trendSalesmanIds, setTrendSalesmanIds] = useState<string[]>([]);
+  const [salesmanOptionsReadyScope, setSalesmanOptionsReadyScope] = useState<
+    string | null
+  >(null);
   const { salesmen: salesmenData, isLoading: salesmenLoading } =
     useSalesmanCache();
   const [selectedChartSalesmen, setSelectedChartSalesmen] = useState<string[]>(
     []
   );
+  const initializedChartScopeRef = useRef<string | null>(null);
   const [salesmanQuery, setSalesmanQuery] = useState("");
   const [maxChartSalesmen] = useState(5); // Limit to prevent chart legend overcrowding
 
@@ -173,30 +176,24 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
     }
   }, [selectedMonth]);
 
-  useEffect(() => {
-    const salesmenIds = Array.from(
+  const salesmen = useMemo<string[]>(() => {
+    const salesmenIds: string[] = Array.from(
       new Set([
         ...salesmenData.map((employee) => employee.id),
         ...salesmanData.map((salesman) => salesman.id),
         ...trendSalesmanIds,
       ])
     );
-    if (salesmenIds.length > 0) {
-      const nextSalesmen = ["All Salesmen", ...salesmenIds];
-      setSalesmen((currentSalesmen) =>
-        currentSalesmen.length === nextSalesmen.length &&
-        currentSalesmen.every(
-          (salesmanId, index) => salesmanId === nextSalesmen[index]
-        )
-          ? currentSalesmen
-          : nextSalesmen
-      );
-    }
+    return ["All Salesmen", ...salesmenIds];
   }, [salesmenData, salesmanData, trendSalesmanIds]);
 
   useEffect(() => {
     let isCancelled = false;
+    setSalesmanData([]);
     setTrendSalesmanIds([]);
+    setSalesmanOptionsReadyScope(null);
+    initializedChartScopeRef.current = null;
+    setSelectedChartSalesmen([]);
 
     const fetchTrendSalesmanIds = async (): Promise<void> => {
       const { startTimestamp, endTimestamp } = getTrendDateTimestamps();
@@ -219,6 +216,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           firstId.localeCompare(secondId)
         );
         setTrendSalesmanIds(historicalIds);
+        setSalesmanOptionsReadyScope(scope);
       } catch (fetchError) {
         if (!isCancelled) {
           console.error("Error fetching trend salesman IDs:", fetchError);
@@ -233,19 +231,26 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   }, [scope]);
 
   useEffect(() => {
-    if (salesmen.length > 0) {
-      const allSalesmenIds = salesmen.filter((id) => id !== "All Salesmen");
+    if (salesmanOptionsReadyScope !== scope) return;
 
-      setSelectedChartSalesmen((currentSelection) => {
-        const preservedSelection = currentSelection
-          .filter((salesmanId) => allSalesmenIds.includes(salesmanId))
-          .slice(0, maxChartSalesmen);
-        return preservedSelection.length > 0
-          ? preservedSelection
-          : allSalesmenIds.slice(0, maxChartSalesmen);
-      });
+    const allSalesmenIds = salesmen.filter((id) => id !== "All Salesmen");
+    if (allSalesmenIds.length === 0) return;
+
+    if (initializedChartScopeRef.current !== scope) {
+      initializedChartScopeRef.current = scope;
+      setSelectedChartSalesmen(allSalesmenIds.slice(0, maxChartSalesmen));
+      return;
     }
-  }, [salesmen, maxChartSalesmen]);
+
+    setSelectedChartSalesmen((currentSelection) => {
+      // Once this scope has its initial defaults, an empty array is a valid
+      // user choice. Only discard IDs that genuinely disappeared; do not
+      // repopulate the picker when an asynchronous source expands the options.
+      return currentSelection
+        .filter((salesmanId) => allSalesmenIds.includes(salesmanId))
+        .slice(0, maxChartSalesmen);
+    });
+  }, [salesmanOptionsReadyScope, salesmen, maxChartSalesmen, scope]);
 
   // Unified Time Navigator change handler. Handles day, month, and custom-range
   // selections from the single TimeNavigator control.
@@ -298,6 +303,8 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
 
   // Fetch sales data for the selected date range
   useEffect(() => {
+    let isCancelled = false;
+
     const fetchSalesData = async () => {
       setIsLoading(true);
       setError(null);
@@ -312,21 +319,27 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
           `/api/invoices/sales/salesmen?startDate=${startTimestamp}&endDate=${endTimestamp}&scope=${scope}`
         );
 
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !isCancelled) {
           setSalesmanData(data);
+          setSalesmanOptionsReadyScope(scope);
         } else {
+          if (isCancelled) return;
           throw new Error("Invalid response format");
         }
       } catch (error) {
+        if (isCancelled) return;
         console.error("Error fetching sales data:", error);
         setError(t("Failed to load sales data. Please try again."));
         toast.error(t("Failed to load sales data"));
       } finally {
-        setIsLoading(false);
+        if (!isCancelled) setIsLoading(false);
       }
     };
 
-    fetchSalesData();
+    void fetchSalesData();
+    return (): void => {
+      isCancelled = true;
+    };
   }, [dateRange, scope, t]);
 
   useEffect(() => {
@@ -868,12 +881,14 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                       .map((id) => ({ id, name: id }))}
                     query={salesmanQuery}
                     setQuery={setSalesmanQuery}
+                    disabled={salesmanOptionsReadyScope !== scope}
                   />
                 </div>
                 <Button
                   onClick={fetchYearlyTrendData}
                   disabled={
                     isGeneratingChart ||
+                    salesmanOptionsReadyScope !== scope ||
                     salesTrendData.length > 0 ||
                     selectedChartSalesmen.length === 0
                   }
