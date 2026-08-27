@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-26",
+    ms: "Apabila jurujual menjual Mihun Cap 2UDG 300g (2-BH2), aktiviti Ikut Lori DME-2H kini dipilih secara automatik dengan kuantiti jualan. Produk 3UDG (2-BH) kekal menggunakan DME-300G.",
+    en: "When a salesman sells 2UDG 300g Mihun (2-BH2), the DME-2H Ikut Lori activity is now selected automatically with the sold quantity. The 3UDG product (2-BH) continues to use DME-300G.",
+  },
+  {
+    date: "2026-08-26",
     ms: "Satu invois Tien Hock kini boleh mempunyai lebih daripada satu Credit Note aktif. Setiap Credit Note mengurangkan baki invois yang sama, dan jumlah semua Credit Note aktif dihadkan supaya tidak melebihi nilai invois terlaras.",
     en: "A Tien Hock invoice can now have more than one active Credit Note. Each Credit Note reduces the same invoice balance, and their combined active amount is capped at the adjusted invoice value.",
   },
