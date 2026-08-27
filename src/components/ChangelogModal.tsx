@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-27",
+    ms: "Mihun Cap 2UDG 300g (2-BH2) kini turut dipautkan kepada enam kod pengeluaran Merah: PBH_2UM, PBH_2UM_BAG, FULL_B2UM, FULL_B2UM_140, FULL_2UM_40 dan FULL_2UM_60. Kod Hijau yang sedia ada kekal, dan kadar gaji serta rekod lama tidak berubah.",
+    en: "2UDG 300g Mihun (2-BH2) is now also linked to the six red production codes: PBH_2UM, PBH_2UM_BAG, FULL_B2UM, FULL_B2UM_140, FULL_2UM_40 and FULL_2UM_60. The existing green codes remain, and pay rates and previous records are unchanged.",
+  },
+  {
     date: "2026-08-26",
     ms: "Apabila jurujual menjual Mihun Cap 2UDG 300g (2-BH2), aktiviti Ikut Lori DME-2H kini dipilih secara automatik dengan kuantiti jualan. Produk 3UDG (2-BH) kekal menggunakan DME-300G.",
     en: "When a salesman sells 2UDG 300g Mihun (2-BH2), the DME-2H Ikut Lori activity is now selected automatically with the sold quantity. The 3UDG product (2-BH) continues to use DME-300G.",
