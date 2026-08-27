@@ -187,10 +187,37 @@ const getActiveDebitNoteTotal = (
       )
   );
 
-const getMaxCreditNoteAmount = (sourceInvoice: ExtendedInvoiceData): number =>
+const getActiveCreditNoteTotal = (
+  adjustmentDocs: AdjustmentDocument[] | undefined
+): number =>
   roundMoney(
-    Number(sourceInvoice.totalamountpayable || 0) +
-      getActiveDebitNoteTotal(sourceInvoice.adjustmentDocs)
+    (adjustmentDocs || [])
+      .filter(
+        (doc: AdjustmentDocument) =>
+          doc.status === "active" &&
+          !doc.is_consolidated &&
+          doc.type === "credit_note"
+      )
+      .reduce(
+        (sum: number, doc: AdjustmentDocument) =>
+          sum + Number(doc.totalamountpayable || 0),
+        0
+      )
+  );
+
+const getMaxCreditNoteAmount = (
+  sourceInvoice: ExtendedInvoiceData,
+  allowMultipleCreditNotes: boolean
+): number =>
+  Math.max(
+    0,
+    roundMoney(
+      Number(sourceInvoice.totalamountpayable || 0) +
+        getActiveDebitNoteTotal(sourceInvoice.adjustmentDocs) -
+        (allowMultipleCreditNotes
+          ? getActiveCreditNoteTotal(sourceInvoice.adjustmentDocs)
+          : 0)
+    )
   );
 
 const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
@@ -386,9 +413,14 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const invoiceBalanceDue: number = invoice
     ? roundMoney(Number(invoice.balance_due || 0))
     : 0;
+  const allowMultipleCreditNotes: boolean = company === "tienhock";
   const maxCreditNoteAmount: number = invoice
-    ? getMaxCreditNoteAmount(invoice)
+    ? getMaxCreditNoteAmount(invoice, allowMultipleCreditNotes)
     : 0;
+  const activeCreditNoteTotal: number =
+    allowMultipleCreditNotes && invoice
+      ? getActiveCreditNoteTotal(invoice.adjustmentDocs)
+      : 0;
 
   // A paired Refund Note only makes sense when the customer has actually paid
   // and the Credit Note exceeds the current outstanding balance.
@@ -667,9 +699,8 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   // Paired RN is bounded by two things:
   //   (a) the excess of the CN over the outstanding balance — only that part
   //       is "refundable" rather than a balance reduction; and
-  //   (b) the value the customer has actually given us (adjusted invoice
-  //       total minus current balance). We can never refund more cash than
-  //       was received, even if the CN line items add up to more.
+  //   (b) the invoice value that remains available after prior active Credit
+  //       Notes. We can never refund more than the new CN is allowed to cover.
   const pairedRefundAmount: number = isCN
     ? roundMoney(
         Math.max(
@@ -792,10 +823,15 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
       );
       if (totals.totalamountpayable > maxCreditNoteAmount) {
         errors.push(
-          t(
-            "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}",
-            { amount: maxCreditNoteAmount.toFixed(2) }
-          )
+          activeCreditNoteTotal > MONEY_TOLERANCE
+            ? t(
+                "Credit Note amount cannot exceed remaining allowable amount RM {{amount}} after existing active Credit Notes",
+                { amount: maxCreditNoteAmount.toFixed(2) }
+              )
+            : t(
+                "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}",
+                { amount: maxCreditNoteAmount.toFixed(2) }
+              )
         );
       }
       if (
