@@ -742,6 +742,7 @@
   "Cancel the active Debit Note before creating another": "Batalkan Debit Note aktif sebelum mencipta yang lain",
   "Issue a Debit Note (additional charge)": "Terbitkan Debit Note (caj tambahan)",
   "Cancel the active Credit Note before creating another": "Batalkan Credit Note aktif sebelum mencipta yang lain",
+  "Credit Notes already cover the full adjusted invoice amount": "Credit Note aktif sudah meliputi keseluruhan amaun invois terlaras",
   "Issue a Credit Note (sales return / reduction)": "Terbitkan Credit Note (pulangan jualan / pengurangan)",
   "Refund overpaid amount": "Refund amaun yang terlebih bayar",
   "Printing...": "Printing...",

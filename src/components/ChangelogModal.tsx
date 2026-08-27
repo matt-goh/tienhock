@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-26",
+    ms: "Satu invois Tien Hock kini boleh mempunyai lebih daripada satu Credit Note aktif. Setiap Credit Note mengurangkan baki invois yang sama, dan jumlah semua Credit Note aktif dihadkan supaya tidak melebihi nilai invois terlaras.",
+    en: "A Tien Hock invoice can now have more than one active Credit Note. Each Credit Note reduces the same invoice balance, and their combined active amount is capped at the adjusted invoice value.",
+  },
+  {
     date: "2026-08-25",
     ms: "Cetakan bil daripada PC kini memaparkan kuantiti FOC dan barang dipulangkan (RTN) bagi setiap produk, sama seperti cetakan jurujual.",
     en: "Bills printed from the PC now show the FOC and returned-goods (RTN) quantity for each product, matching the salesman printout.",
