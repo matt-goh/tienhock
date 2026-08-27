@@ -29,8 +29,8 @@ interface CacheData {
   timestamp: number;
 }
 
-const CACHE_KEY: string = "payCodeData:v2";
-const LEGACY_CACHE_KEY: string = "payCodeData";
+const CACHE_KEY: string = "payCodeData:v3";
+const STALE_CACHE_KEYS: string[] = ["payCodeData:v2", "payCodeData"];
 const CACHE_DURATION: number = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
 
 // Module-level memory cache + shared in-flight request so multiple mounted
@@ -43,7 +43,9 @@ export const invalidateJobPayCodeMappingsCache = (): void => {
   memoryCache = null;
   try {
     localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(LEGACY_CACHE_KEY);
+    STALE_CACHE_KEYS.forEach((cacheKey: string): void => {
+      localStorage.removeItem(cacheKey);
+    });
   } catch (err) {
     console.error("Error clearing pay-code cache:", err);
   }
