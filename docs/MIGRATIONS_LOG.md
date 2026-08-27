@@ -26,6 +26,18 @@ requires separate approval).
 
 ---
 
+## Removed 27 Aug 2026 — 1 file (2UDG 300g red/M production pay-code links)
+
+Applied to dev and production on 2026-08-27 (dev first with an idempotent re-run, then the user
+ran the same guarded file on production), then removed per the project convention. Recover with
+`git show 7f6590d6:dev/migrations/2026-08-27_link_2_bh2_2um_production_pay_codes.sql`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-27_link_2_bh2_2um_production_pay_codes.sql` | Added the six confirmed red/M production links `PBH_2UM`, `PBH_2UM_BAG`, `FULL_B2UM`, `FULL_B2UM_140`, `FULL_2UM_40` and `FULL_2UM_60` to product `2-BH2`, alongside its six existing green/H links. It verifies and preserves Salesman `2-BH2` and Ikut Lori `DME-2H`. No rate, employee assignment, production entry, daily log or processed payroll was changed. The existing production-entry model records only `2-BH2`, not an H/M variant; a worker assigned both families therefore resolves to the first matching code, while the confirmed H/M counterpart rates are currently equal. Guarded, idempotent and fail-closed. | dev ✓ (2026-08-27, idempotence verified), prod ✓ (2026-08-27) |
+
+---
+
 ## Removed 27 Aug 2026 — 1 file (2UDG 300g Ikut Lori mapping repair)
 
 Applied to dev on 2026-08-26 and to production on 2026-08-27 (the user ran the same guarded file
