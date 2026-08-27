@@ -286,6 +286,19 @@ async function getActiveDebitNoteTotalForInvoice(client, invoiceId) {
   return parseFloat(parseFloat(result.rows[0]?.total || 0).toFixed(2));
 }
 
+async function getActiveCreditNoteTotalForInvoice(client, invoiceId) {
+  const result = await client.query(
+    `SELECT COALESCE(SUM(totalamountpayable), 0) AS total
+       FROM ${T.docs}
+      WHERE original_invoice_id = $1
+        AND type = 'credit_note'
+        AND status = 'active'
+        AND COALESCE(is_consolidated, false) = false`,
+    [invoiceId]
+  );
+  return parseFloat(parseFloat(result.rows[0]?.total || 0).toFixed(2));
+}
+
 async function validateAdjustmentAmountForCreate(client, type, amount, invoice, pairedRefund) {
   if (type !== "credit_note") return;
 
@@ -299,10 +312,22 @@ async function validateAdjustmentAmountForCreate(client, type, amount, invoice, 
   const adjustedInvoiceTotal = parseFloat(
     (originalInvoiceTotal + debitNoteTotal).toFixed(2)
   );
+  const activeCreditNoteTotal =
+    COMPANY_PREFIX === "TH"
+      ? await getActiveCreditNoteTotalForInvoice(client, invoice.id)
+      : 0;
+  const remainingCreditNoteAmount = parseFloat(
+    Math.max(0, adjustedInvoiceTotal - activeCreditNoteTotal).toFixed(2)
+  );
   const currentBalance = parseFloat(parseFloat(invoice.balance_due || 0).toFixed(2));
   const hasReceivedPayment = await hasReceivedPaymentForInvoice(client, invoice);
 
-  if (amount > adjustedInvoiceTotal + MONEY_TOLERANCE) {
+  if (amount > remainingCreditNoteAmount + MONEY_TOLERANCE) {
+    if (activeCreditNoteTotal > MONEY_TOLERANCE) {
+      throw new Error(
+        `Credit Note amount RM ${amount.toFixed(2)} cannot exceed remaining allowable amount RM ${remainingCreditNoteAmount.toFixed(2)} because RM ${activeCreditNoteTotal.toFixed(2)} is already covered by active Credit Notes.`
+      );
+    }
     throw new Error(
       `Credit Note amount RM ${amount.toFixed(2)} cannot exceed adjusted invoice total RM ${adjustedInvoiceTotal.toFixed(2)}.`
     );
@@ -987,8 +1012,11 @@ async function resolveReferencedDocument(client, doc) {
         }
       }
 
+      // Tien Hock invoices may carry multiple active Credit Notes. Debit Notes
+      // and Jelly Polly Credit Notes retain their existing one-active-note rule.
       const existingAdjustment =
-        type === "credit_note" || type === "debit_note"
+        type === "debit_note" ||
+        (type === "credit_note" && COMPANY_PREFIX !== "TH")
           ? await fetchActiveAdjustmentOfTypeForInvoice(
               client,
               original_invoice_id,
@@ -1383,6 +1411,51 @@ async function resolveReferencedDocument(client, doc) {
       const totalAmt = parseFloat(doc.totalamountpayable);
       const isInvoiceCreditType = invoice.paymenttype === "INVOICE";
 
+      if (COMPANY_PREFIX === "TH" && doc.type === "debit_note") {
+        const activeCreditNoteTotal =
+          await getActiveCreditNoteTotalForInvoice(
+            client,
+            doc.original_invoice_id
+          );
+        const activeDebitNoteTotal = await getActiveDebitNoteTotalForInvoice(
+          client,
+          doc.original_invoice_id
+        );
+        const otherActiveDebitNoteTotal = parseFloat(
+          Math.max(0, activeDebitNoteTotal - totalAmt).toFixed(2)
+        );
+        const adjustedInvoiceTotalAfterCancellation = parseFloat(
+          (
+            parseFloat(invoice.totalamountpayable || 0) +
+            otherActiveDebitNoteTotal
+          ).toFixed(2)
+        );
+
+        if (
+          activeCreditNoteTotal >
+          adjustedInvoiceTotalAfterCancellation + MONEY_TOLERANCE
+        ) {
+          const cancellationError = new Error(
+            `Cannot cancel Debit Note ${formatAdjustmentDocId(
+              doc.display_id || doc.id
+            )}: active Credit Notes total RM ${activeCreditNoteTotal.toFixed(
+              2
+            )}, which would exceed the remaining adjusted invoice total RM ${adjustedInvoiceTotalAfterCancellation.toFixed(
+              2
+            )}. Cancel enough Credit Notes first.`
+          );
+          cancellationError.status = 409;
+          cancellationError.code =
+            "ACTIVE_CREDIT_NOTES_EXCEED_INVOICE_AFTER_DEBIT_NOTE_CANCELLATION";
+          cancellationError.details = {
+            active_credit_note_total: activeCreditNoteTotal,
+            adjusted_invoice_total_after_cancellation:
+              adjustedInvoiceTotalAfterCancellation,
+          };
+          throw cancellationError;
+        }
+      }
+
       switch (doc.type) {
         case "credit_note": {
           // Reverse: balance back up, credit_used back up.
@@ -1452,6 +1525,7 @@ async function resolveReferencedDocument(client, doc) {
       res.status(error.status || 400).json({
         code: error.code,
         message: error.message,
+        details: error.details,
       });
     } finally {
       client.release();

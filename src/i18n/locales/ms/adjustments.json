@@ -188,6 +188,8 @@
   "Document No. is required": "No. Dokumen diperlukan",
   "Document No. availability is still being checked": "Ketersediaan No. Dokumen masih disemak",
   "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}": "Amaun Credit Note tidak boleh melebihi jumlah invois terlaras RM {{amount}}",
+  "Credit Note amount cannot exceed remaining allowable amount RM {{amount}} after existing active Credit Notes": "Amaun Credit Note tidak boleh melebihi baki amaun dibenarkan RM {{amount}} selepas Credit Note aktif sedia ada",
+  "Cannot cancel this Debit Note because active Credit Notes total RM {{creditAmount}} would exceed the adjusted invoice total RM {{invoiceAmount}}. Cancel enough Credit Notes first.": "Debit Note ini tidak boleh dibatalkan kerana jumlah Credit Note aktif RM {{creditAmount}} akan melebihi jumlah invois terlaras RM {{invoiceAmount}}. Batalkan Credit Note yang mencukupi dahulu.",
   "Credit Note amount cannot exceed unpaid balance RM {{amount}} when the invoice has no received payment": "Amaun Credit Note tidak boleh melebihi baki belum bayar RM {{amount}} apabila invois tiada bayaran diterima",
   "Refund method required": "Refund method diperlukan",
   "Bank account required for non-cash refund": "Akaun bank diperlukan untuk refund bukan tunai",

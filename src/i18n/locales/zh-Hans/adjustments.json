@@ -187,6 +187,8 @@
   "Document No. is required": "需要单据编号",
   "Document No. availability is still being checked": "单据编号可用性仍在检查中",
   "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}": "Credit Note 金额不能超过调整后的发票总额 RM {{amount}}",
+  "Credit Note amount cannot exceed remaining allowable amount RM {{amount}} after existing active Credit Notes": "存在有效 Credit Note 后，新 Credit Note 金额不能超过剩余允许金额 RM {{amount}}",
+  "Cannot cancel this Debit Note because active Credit Notes total RM {{creditAmount}} would exceed the adjusted invoice total RM {{invoiceAmount}}. Cancel enough Credit Notes first.": "无法取消此 Debit Note，因为有效 Credit Note 总额 RM {{creditAmount}} 将超过调整后的发票总额 RM {{invoiceAmount}}。请先取消足够的 Credit Note。",
   "Credit Note amount cannot exceed unpaid balance RM {{amount}} when the invoice has no received payment": "当发票没有收到付款时，Credit Note 金额不能超过未付余额 RM {{amount}}",
   "Refund method required": "需要退款方式",
   "Bank account required for non-cash refund": "非现金退款需要银行账户",

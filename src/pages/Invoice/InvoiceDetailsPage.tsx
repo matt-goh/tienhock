@@ -1974,9 +1974,29 @@ const InvoiceDetailsPage: React.FC = () => {
   const hasActiveDebitNote: boolean = activeInvoiceAdjustmentDocs.some(
     (doc: AdjustmentDocument) => doc.type === "debit_note"
   );
-  const hasActiveCreditNote: boolean = activeInvoiceAdjustmentDocs.some(
-    (doc: AdjustmentDocument) => doc.type === "credit_note"
+  const activeDebitNoteTotal: number = activeInvoiceAdjustmentDocs
+    .filter((doc: AdjustmentDocument) => doc.type === "debit_note")
+    .reduce(
+      (sum: number, doc: AdjustmentDocument) =>
+        sum + Number(doc.totalamountpayable || 0),
+      0
+    );
+  const activeCreditNoteTotal: number = activeInvoiceAdjustmentDocs
+    .filter((doc: AdjustmentDocument) => doc.type === "credit_note")
+    .reduce(
+      (sum: number, doc: AdjustmentDocument) =>
+        sum + Number(doc.totalamountpayable || 0),
+      0
+    );
+  const remainingCreditNoteAmount: number = Number(
+    Math.max(
+      0,
+      Number(invoiceData.totalamountpayable || 0) +
+        activeDebitNoteTotal -
+        activeCreditNoteTotal
+    ).toFixed(2)
   );
+  const canCreateCreditNote: boolean = remainingCreditNoteAmount > 0.005;
   const refundNotePaymentDocs: AdjustmentDocument[] = adjustmentDocs.filter(
     (doc: AdjustmentDocument) =>
       doc.type === "refund_note" && !doc.is_consolidated
@@ -2194,11 +2214,13 @@ const InvoiceDetailsPage: React.FC = () => {
                 variant="outline"
                 color="rose"
                 size="md"
-                disabled={isLoading || hasActiveCreditNote}
+                disabled={isLoading || !canCreateCreditNote}
                 title={
-                  hasActiveCreditNote
-                    ? t("Cancel the active Credit Note before creating another")
-                    : t("Issue a Credit Note (sales return / reduction)")
+                  canCreateCreditNote
+                    ? t("Issue a Credit Note (sales return / reduction)")
+                    : t(
+                        "Credit Notes already cover the full adjusted invoice amount"
+                      )
                 }
               >
                 {t("Credit Note")}

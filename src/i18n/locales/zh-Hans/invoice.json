@@ -749,6 +749,7 @@
   "Cancel the active Debit Note before creating another": "创建另一张单据前，请先取消有效的 Debit Note",
   "Issue a Debit Note (additional charge)": "开具 Debit Note（额外收费）",
   "Cancel the active Credit Note before creating another": "创建另一张单据前，请先取消有效的 Credit Note",
+  "Credit Notes already cover the full adjusted invoice amount": "有效 Credit Note 已涵盖全部调整后发票金额",
   "Issue a Credit Note (sales return / reduction)": "开具 Credit Note（销售退货 / 减少）",
   "Refund overpaid amount": "退还多付金额",
   "Printing...": "正在打印...",
