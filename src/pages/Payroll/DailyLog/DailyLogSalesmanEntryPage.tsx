@@ -218,6 +218,7 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
     productToIkutPayCode,
     ikutPayCodeIds,
     isLoading: isIkutMappingLoading,
+    refreshData: refreshIkutPayCodes,
   } = useSalesmanIkutPayCodes();
 
   // Helper function to determine day type based on date
@@ -1465,7 +1466,12 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
   const handleRefreshCache = async () => {
     setIsRefreshingCache(true);
     try {
-      await Promise.all([refreshJobs(), refreshStaffs(), refreshPayCodeMappings()]);
+      await Promise.all([
+        refreshJobs(),
+        refreshStaffs(),
+        refreshPayCodeMappings(),
+        refreshIkutPayCodes(),
+      ]);
       toast.success(t("Data refreshed"));
     } catch (err) {
       toast.error(t("Failed to refresh data"));
@@ -2636,6 +2642,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
           id: p.product_id,
           qty: p.quantity,
           foc: p.foc_quantity,
+          ikutPayCodeId:
+            productToIkutPayCode[String(p.product_id)] || null,
         })),
         isDoubled,
         salesmanId,
@@ -3284,6 +3292,8 @@ const DailyLogSalesmanEntryPage: React.FC<DailyLogSalesmanEntryPageProps> = ({
             id: p.product_id,
             qty: p.quantity,
             foc: p.foc_quantity,
+            ikutPayCodeId:
+              productToIkutPayCode[String(p.product_id)] || null,
           })),
           isDoubled,
           salesmanId,
