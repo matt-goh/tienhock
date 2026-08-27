@@ -29,8 +29,9 @@ interface CacheData {
   timestamp: number;
 }
 
-const CACHE_KEY = "payCodeData";
-const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
+const CACHE_KEY: string = "payCodeData:v2";
+const LEGACY_CACHE_KEY: string = "payCodeData";
+const CACHE_DURATION: number = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
 
 // Module-level memory cache + shared in-flight request so multiple mounted
 // consumers (and React StrictMode's double effect in dev) share one fetch
@@ -42,6 +43,7 @@ export const invalidateJobPayCodeMappingsCache = (): void => {
   memoryCache = null;
   try {
     localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (err) {
     console.error("Error clearing pay-code cache:", err);
   }

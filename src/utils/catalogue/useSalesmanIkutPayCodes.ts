@@ -19,8 +19,9 @@ interface CacheData {
   timestamp: number;
 }
 
-const CACHE_KEY = "salesmanIkutPayCodes";
-const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour
+const CACHE_KEY: string = "salesmanIkutPayCodes:v2";
+const LEGACY_CACHE_KEY: string = "salesmanIkutPayCodes";
+const CACHE_DURATION: number = 1 * 60 * 60 * 1000; // 1 hour
 
 // Module-level memory cache + shared in-flight request so multiple mounted
 // consumers (and React StrictMode's double effect in dev) share one fetch.
@@ -31,6 +32,7 @@ export const invalidateSalesmanIkutPayCodesCache = (): void => {
   memoryCache = null;
   try {
     localStorage.removeItem(CACHE_KEY);
+    localStorage.removeItem(LEGACY_CACHE_KEY);
   } catch (err) {
     console.error("Error clearing Ikut Lori mapping cache:", err);
   }
@@ -80,8 +82,8 @@ const fetchFromApi = async (): Promise<Record<string, string>> => {
   return map;
 };
 
-const getDataRequest = (): Promise<Record<string, string>> => {
-  if (pendingRequest) {
+const getDataRequest = (force: boolean): Promise<Record<string, string>> => {
+  if (!force && pendingRequest) {
     return pendingRequest;
   }
   const request = fetchFromApi();
@@ -114,17 +116,23 @@ export const useSalesmanIkutPayCodes = () => {
   }, []);
 
   const fetchData = useCallback(async (force = false): Promise<void> => {
+    let hasCachedMap: boolean = false;
     if (!force) {
       const cached = getFreshCache();
       if (cached) {
         applyMap(cached.productToIkutPayCode);
         setIsLoading(false);
-        return;
+        hasCachedMap = true;
       }
     }
-    setIsLoading(true);
+    if (!hasCachedMap) {
+      setIsLoading(true);
+    }
     try {
-      const map = await getDataRequest();
+      // Revalidate even a fresh cached map. Product links can be changed from
+      // another browser, and this small catalogue must be current before the
+      // daily log decides which Ikut Lori activity to auto-select.
+      const map = await getDataRequest(force);
       applyMap(map);
     } catch (fetchError) {
       console.error("Error fetching Ikut Lori pay-code mappings:", fetchError);
