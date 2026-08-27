@@ -26,6 +26,18 @@ requires separate approval).
 
 ---
 
+## Removed 27 Aug 2026 — 1 file (2UDG 300g Ikut Lori mapping repair)
+
+Applied to dev on 2026-08-26 and to production on 2026-08-27 (the user ran the same guarded file
+on production), then removed per the project convention. Recover with
+`git show b96d0225:dev/migrations/2026-08-26_restore_2_bh2_dme_2h_ikut_mapping.sql`.
+
+| File | What it did | Status |
+|------|-------------|--------|
+| `2026-08-26_restore_2_bh2_dme_2h_ikut_mapping.sql` | Restored the missing `2-BH2` → `DME-2H` automatic Ikut Lori mapping and connected the existing `DME-2H` pay code to the `SALESMAN_IKUT` job. The 24 Aug conditional backfill had skipped this pair because that job link was missing. It verifies that the separate `2-BH` → `DME-300G` rule remains unchanged. No rate, production mapping, previously saved daily log or processed payroll was changed. Guarded, idempotent and fail-closed; the dev re-run was verified before production use. | dev ✓ (2026-08-26, idempotence verified), prod ✓ (2026-08-27) |
+
+---
+
 ## Removed 24 Aug 2026 — 2 files (RAMEN identifier/payroll repair + Jelly Polly PKT/PCS units; Ikut Lori mapping table)
 
 Applied to dev and production on 2026-08-24 (dev first, then the user ran both guarded files on
