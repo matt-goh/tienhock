@@ -1180,7 +1180,9 @@ const GeneralPurchaseInvoiceFormPage: React.FC = () => {
               {t("E-Invoice Details")}
             </a>
           )}
-          {isEditMode && existingInvoice?.uuid && (
+          {isEditMode &&
+            existingInvoice?.uuid &&
+            existingInvoice.einvoice_status !== "valid" && (
             <Button
               type="button"
               icon={IconRefresh}
