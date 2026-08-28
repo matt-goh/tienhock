@@ -186,12 +186,10 @@ const styles = StyleSheet.create({
   },
   reasonBlock: {
     marginTop: 8,
+    border: "1 solid #9CA3AF",
+    borderRadius: 6,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "#F9FAFB",
-    borderRadius: 4,
-    borderLeftWidth: 2,
-    borderLeftColor: "#9CA3AF",
+    paddingVertical: 8,
   },
   reasonLabel: {
     fontFamily: "Helvetica-Bold",
