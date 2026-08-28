@@ -378,27 +378,20 @@ function buildSummaryInvoiceLine(invoiceData) {
 function generateAdditionalReferences(invoice) {
   const customsReference = cleanValue(invoice.customs_form_reference, "");
   const orderReference = cleanValue(invoice.order_no, "");
-  const shippingNumber = cleanValue(invoice.shipping_number, "");
+  const customsReferenceXml = customsReference
+    ? `
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>${escapeXml(customsReference)}</cbc:ID>
+    <cbc:DocumentType>CustomsImportForm</cbc:DocumentType>
+  </cac:AdditionalDocumentReference>`
+    : "";
 
   return `
   <cac:BillingReference>
     <cac:AdditionalDocumentReference>
       <cbc:ID>${escapeXml(orderReference || invoice.self_billed_no)}</cbc:ID>
     </cac:AdditionalDocumentReference>
-  </cac:BillingReference>
-  <cac:AdditionalDocumentReference>
-    <cbc:ID>${escapeXml(customsReference)}</cbc:ID>
-    <cbc:DocumentType>${customsReference ? "CustomsImportForm" : ""}</cbc:DocumentType>
-  </cac:AdditionalDocumentReference>
-  <cac:AdditionalDocumentReference>
-    <cbc:ID>${escapeXml(orderReference)}</cbc:ID>
-    <cbc:DocumentType>${orderReference ? "OrderReference" : ""}</cbc:DocumentType>
-    <cbc:DocumentDescription>${escapeXml(cleanValue(invoice.platform, ""))}</cbc:DocumentDescription>
-  </cac:AdditionalDocumentReference>
-  <cac:AdditionalDocumentReference>
-    <cbc:ID>${escapeXml(shippingNumber)}</cbc:ID>
-    <cbc:DocumentType>${shippingNumber ? "ShippingReference" : ""}</cbc:DocumentType>
-  </cac:AdditionalDocumentReference>`;
+  </cac:BillingReference>${customsReferenceXml}`;
 }
 
 export async function SelfBilledInvoiceTemplate(invoiceData) {
