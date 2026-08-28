@@ -57,9 +57,6 @@ const styles = StyleSheet.create({
     fontSize: 8,
     color: colors.text,
   },
-  headerBlock: {
-    marginBottom: 10,
-  },
   headerLine: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -82,7 +79,7 @@ const styles = StyleSheet.create({
   },
   columnHeader: {
     flexDirection: "row",
-    marginTop: 16,
+    marginTop: 12,
   },
   ledgerBanner: {
     width: MONEY_COLUMN_WIDTH * 2,
@@ -113,11 +110,11 @@ const styles = StyleSheet.create({
     width: MONEY_COLUMN_WIDTH,
     textAlign: "center",
     fontFamily: "Helvetica-Bold",
-    lineHeight: 1.15,
+    lineHeight: 0.5,
   },
   sectionHeadingRow: {
     flexDirection: "row",
-    marginTop: 12,
+    marginTop: 8,
     marginBottom: 2,
   },
   // No flex: the underline should hug the words, not span the column.
@@ -221,7 +218,7 @@ const OpeningBalancesPDFDocument: React.FC<{
     >
       <Page size="A4" style={styles.page}>
         {/* Auditor header block */}
-        <View style={styles.headerBlock}>
+        <View>
           <View style={styles.headerLine}>
             <Text style={styles.headerLabel}>Client :</Text>
             <Text style={styles.headerValue}>
@@ -251,7 +248,7 @@ const OpeningBalancesPDFDocument: React.FC<{
           <Text style={styles.ledgerBanner}>As per ledger</Text>
         </View>
         <View
-          style={[styles.columnHeader, { marginTop: 3, marginBottom: 4 }]}
+          style={[styles.columnHeader, { marginTop: 3}]}
           fixed
         >
           <Text style={styles.cellCode} />
