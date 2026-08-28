@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-28",
+    ms: "Pembelian am luar negara dengan keterangan penghantaran seperti kurier atau penghantaran udara kini boleh dihantar ke MyInvois tanpa ditolak kerana ralat panjang Incoterms.",
+    en: "Foreign general purchases with shipping descriptions such as courier or air shipping can now be submitted to MyInvois without being rejected for an Incoterms length error.",
+  },
+  {
+    date: "2026-08-28",
     ms: "Invois Green Target dan Jelly Polly kini boleh mempunyai lebih daripada satu Credit Note aktif, sama seperti Tien Hock. Setiap Credit Note mengurangkan baki invois yang sama, dan jumlah semua Credit Note aktif tidak boleh melebihi nilai invois selepas Debit Note diambil kira. Status pembatalan e-Invois juga hanya akan berubah selepas MyInvois menerima atau mengesahkan pembatalan tersebut.",
     en: "Green Target and Jelly Polly invoices can now have more than one active Credit Note, matching Tien Hock. Each Credit Note reduces the same invoice balance, and all active Credit Notes together cannot exceed the invoice value after Debit Notes are included. An e-Invoice cancellation status now changes only after MyInvois accepts or confirms the cancellation.",
   },
