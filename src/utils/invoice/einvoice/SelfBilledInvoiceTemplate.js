@@ -398,9 +398,6 @@ function generateAdditionalReferences(invoice) {
   <cac:AdditionalDocumentReference>
     <cbc:ID>${escapeXml(shippingNumber)}</cbc:ID>
     <cbc:DocumentType>${shippingNumber ? "ShippingReference" : ""}</cbc:DocumentType>
-  </cac:AdditionalDocumentReference>
-  <cac:AdditionalDocumentReference>
-    <cbc:ID>${escapeXml(cleanValue(invoice.shipping_method, ""))}</cbc:ID>
   </cac:AdditionalDocumentReference>`;
 }
 
