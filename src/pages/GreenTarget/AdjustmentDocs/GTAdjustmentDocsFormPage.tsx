@@ -211,6 +211,7 @@ interface GTAdjDoc {
   original_invoice_number: string;
   total_amount: number;
   status: string;
+  is_consolidated?: boolean;
   paired_with_id: string | null;
   lines?: Array<{
     description: string | null;
@@ -306,12 +307,43 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
 
   const activeDebitNoteTotal: number = roundMoney(
     activeAdjustmentDocs
-      .filter((d) => d.type === "debit_note" && d.status === "active")
-      .reduce((sum, d) => sum + Number(d.total_amount || 0), 0)
+      .filter(
+        (doc: GTAdjDoc): boolean =>
+          doc.type === "debit_note" &&
+          doc.status === "active" &&
+          !doc.is_consolidated
+      )
+      .reduce(
+        (sum: number, doc: GTAdjDoc): number =>
+          sum + Number(doc.total_amount || 0),
+        0
+      )
+  );
+
+  const activeCreditNoteTotal: number = roundMoney(
+    activeAdjustmentDocs
+      .filter(
+        (doc: GTAdjDoc): boolean =>
+          doc.type === "credit_note" &&
+          doc.status === "active" &&
+          !doc.is_consolidated
+      )
+      .reduce(
+        (sum: number, doc: GTAdjDoc): number =>
+          sum + Number(doc.total_amount || 0),
+        0
+      )
   );
 
   const maxCreditNoteAmount: number = invoice
-    ? roundMoney(Number(invoice.total_amount || 0) + activeDebitNoteTotal)
+    ? Math.max(
+        0,
+        roundMoney(
+          Number(invoice.total_amount || 0) +
+            activeDebitNoteTotal -
+            activeCreditNoteTotal
+        )
+      )
     : 0;
 
   // GT considers any non-cancelled payment as "received". No 'overpaid' status.
@@ -779,10 +811,15 @@ const GTAdjustmentDocsFormPage: React.FC = () => {
     if (isCN && invoice) {
       if (totals.total_amount > maxCreditNoteAmount + MONEY_TOLERANCE) {
         errors.push(
-          t(
-            "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}",
-            { amount: maxCreditNoteAmount.toFixed(2) }
-          )
+          activeCreditNoteTotal > MONEY_TOLERANCE
+            ? t(
+                "Credit Note amount cannot exceed remaining allowable amount RM {{amount}} after existing active Credit Notes",
+                { amount: maxCreditNoteAmount.toFixed(2) }
+              )
+            : t(
+                "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}",
+                { amount: maxCreditNoteAmount.toFixed(2) }
+              )
         );
       }
       if (

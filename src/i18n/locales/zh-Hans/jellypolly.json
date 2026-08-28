@@ -100,6 +100,7 @@
   "Invoice data could not be loaded or invoice not found.": "无法加载发票数据或未找到发票。",
   "Invoice must be within the last 3 days to submit": "发票必须在前 3 天内才能提交",
   "Issue a Credit Note (sales return / reduction)": "开具 Credit Note（销售退货 / 减少）",
+  "Credit Notes already cover the full adjusted invoice amount": "有效 Credit Note 已涵盖全部调整后发票金额",
   "Issue a Debit Note (additional charge)": "开具 Debit Note（额外收费）",
   "Line Items": "行项目",
   "Linked to payment #{{id}}": "关联到付款 #{{id}}",

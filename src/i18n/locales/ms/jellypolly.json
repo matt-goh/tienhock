@@ -100,6 +100,7 @@
   "Invoice data could not be loaded or invoice not found.": "Data invois tidak dapat dimuatkan atau invois tidak ditemui.",
   "Invoice must be within the last 3 days to submit": "Invois mesti dalam tempoh 3 hari terakhir untuk dihantar",
   "Issue a Credit Note (sales return / reduction)": "Terbitkan Credit Note (pulangan jualan / pengurangan)",
+  "Credit Notes already cover the full adjusted invoice amount": "Credit Note aktif sudah meliputi keseluruhan amaun invois terlaras",
   "Issue a Debit Note (additional charge)": "Terbitkan Debit Note (caj tambahan)",
   "Line Items": "Line Items",
   "Linked to payment #{{id}}": "Dikaitkan dengan payment #{{id}}",

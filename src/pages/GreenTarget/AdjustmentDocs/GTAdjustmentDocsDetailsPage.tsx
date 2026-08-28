@@ -79,6 +79,11 @@ interface GTAdjDoc {
   revenue_splits?: GreenTargetRevenueSplit[];
 }
 
+interface DebitNoteCancellationBlockedData {
+  active_credit_note_total: number;
+  adjusted_invoice_total_after_cancellation: number;
+}
+
 const formatCurrency = (amount: number): string =>
   new Intl.NumberFormat("en-MY", {
     style: "currency",
@@ -157,7 +162,29 @@ const GTAdjustmentDocsDetailsPage: React.FC = () => {
       setCancelReason("");
       fetchDoc();
     } catch (error: any) {
-      toast.error(error?.message || t("Failed to cancel"), { id: toastId });
+      if (
+        error?.data?.code ===
+        "ACTIVE_CREDIT_NOTES_EXCEED_INVOICE_AFTER_DEBIT_NOTE_CANCELLATION"
+      ) {
+        const details: DebitNoteCancellationBlockedData | undefined =
+          error.data.details;
+        toast.error(
+          t(
+            "Cannot cancel this Debit Note because active Credit Notes total RM {{creditAmount}} would exceed the adjusted invoice total RM {{invoiceAmount}}. Cancel enough Credit Notes first.",
+            {
+              creditAmount: Number(
+                details?.active_credit_note_total || 0
+              ).toFixed(2),
+              invoiceAmount: Number(
+                details?.adjusted_invoice_total_after_cancellation || 0
+              ).toFixed(2),
+            }
+          ),
+          { id: toastId }
+        );
+      } else {
+        toast.error(error?.message || t("Failed to cancel"), { id: toastId });
+      }
     } finally {
       setIsCancelling(false);
     }

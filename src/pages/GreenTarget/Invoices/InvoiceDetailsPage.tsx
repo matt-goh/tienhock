@@ -1976,9 +1976,29 @@ const InvoiceDetailsPage: React.FC = () => {
   const hasActiveDebitNote: boolean = activeInvoiceAdjustmentDocs.some(
     (doc: GTAdjDocSummary) => doc.type === "debit_note"
   );
-  const hasActiveCreditNote: boolean = activeInvoiceAdjustmentDocs.some(
-    (doc: GTAdjDocSummary) => doc.type === "credit_note"
+  const activeDebitNoteTotal: number = activeInvoiceAdjustmentDocs
+    .filter((doc: GTAdjDocSummary): boolean => doc.type === "debit_note")
+    .reduce(
+      (sum: number, doc: GTAdjDocSummary): number =>
+        sum + Number(doc.total_amount || 0),
+      0
+    );
+  const activeCreditNoteTotal: number = activeInvoiceAdjustmentDocs
+    .filter((doc: GTAdjDocSummary): boolean => doc.type === "credit_note")
+    .reduce(
+      (sum: number, doc: GTAdjDocSummary): number =>
+        sum + Number(doc.total_amount || 0),
+      0
+    );
+  const remainingCreditNoteAmount: number = Number(
+    Math.max(
+      0,
+      Number(invoice.total_amount || 0) +
+        activeDebitNoteTotal -
+        activeCreditNoteTotal
+    ).toFixed(2)
   );
+  const canCreateCreditNote: boolean = remainingCreditNoteAmount > 0.005;
   const refundNotePaymentDocs: GTAdjDocSummary[] = (
     invoice.adjustmentDocs || []
   ).filter(
@@ -2317,13 +2337,13 @@ const InvoiceDetailsPage: React.FC = () => {
                   variant="outline"
                   color="rose"
                   className="flex-1 sm:flex-none"
-                  disabled={hasActiveCreditNote}
+                  disabled={!canCreateCreditNote}
                   title={
-                    hasActiveCreditNote
-                      ? t(
-                          "Cancel the active Credit Note before creating another"
+                    canCreateCreditNote
+                      ? t("Issue a Credit Note against this invoice")
+                      : t(
+                          "Credit Notes already cover the full adjusted invoice amount"
                         )
-                      : t("Issue a Credit Note against this invoice")
                   }
                 >
                   CN

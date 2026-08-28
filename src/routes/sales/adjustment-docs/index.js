@@ -312,10 +312,10 @@ async function validateAdjustmentAmountForCreate(client, type, amount, invoice, 
   const adjustedInvoiceTotal = parseFloat(
     (originalInvoiceTotal + debitNoteTotal).toFixed(2)
   );
-  const activeCreditNoteTotal =
-    COMPANY_PREFIX === "TH"
-      ? await getActiveCreditNoteTotalForInvoice(client, invoice.id)
-      : 0;
+  const activeCreditNoteTotal = await getActiveCreditNoteTotalForInvoice(
+    client,
+    invoice.id
+  );
   const remainingCreditNoteAmount = parseFloat(
     Math.max(0, adjustedInvoiceTotal - activeCreditNoteTotal).toFixed(2)
   );
@@ -1012,11 +1012,10 @@ async function resolveReferencedDocument(client, doc) {
         }
       }
 
-      // Tien Hock invoices may carry multiple active Credit Notes. Debit Notes
-      // and Jelly Polly Credit Notes retain their existing one-active-note rule.
+      // Every company may carry multiple active Credit Notes on one invoice.
+      // Debit Notes retain their existing one-active-note rule.
       const existingAdjustment =
-        type === "debit_note" ||
-        (type === "credit_note" && COMPANY_PREFIX !== "TH")
+        type === "debit_note"
           ? await fetchActiveAdjustmentOfTypeForInvoice(
               client,
               original_invoice_id,
@@ -1411,7 +1410,7 @@ async function resolveReferencedDocument(client, doc) {
       const totalAmt = parseFloat(doc.totalamountpayable);
       const isInvoiceCreditType = invoice.paymenttype === "INVOICE";
 
-      if (COMPANY_PREFIX === "TH" && doc.type === "debit_note") {
+      if (doc.type === "debit_note") {
         const activeCreditNoteTotal =
           await getActiveCreditNoteTotalForInvoice(
             client,
@@ -1705,7 +1704,8 @@ async function resolveReferencedDocument(client, doc) {
   });
 
   // --- POST /api/adjustment-docs/:id/update-status ---
-  // Poll MyInvois for a doc currently in 'pending' state.
+  // Reconcile the local state with MyInvois. This remains available for a
+  // locally-valid document so a portal-side cancellation can be recovered.
   router.post("/:id/update-status", async (req, res) => {
     if (!apiClient) {
       return res
@@ -1716,7 +1716,8 @@ async function resolveReferencedDocument(client, doc) {
     const client = await pool.connect();
     try {
       const docResult = await client.query(
-        `SELECT id, uuid, einvoice_status, long_id, datetime_validated
+        `SELECT id, uuid, einvoice_status, long_id, datetime_validated,
+                is_consolidated, consolidated_adjustments
            FROM ${T.docs} WHERE id = $1`,
         [id]
       );
@@ -1729,16 +1730,6 @@ async function resolveReferencedDocument(client, doc) {
           .status(400)
           .json({ message: "No MyInvois UUID — nothing to check." });
       }
-      if (doc.einvoice_status === "valid") {
-        return res.json({
-          success: true,
-          message: "Already valid",
-          status: doc.einvoice_status,
-          longId: doc.long_id,
-          dateTimeValidated: doc.datetime_validated,
-        });
-      }
-
       const remote = await apiClient.makeApiCall(
         "GET",
         `/api/v1.0/documents/${doc.uuid}/details`
@@ -1749,18 +1740,18 @@ async function resolveReferencedDocument(client, doc) {
       let newDateTimeValidated = doc.datetime_validated;
       const remoteStatus = remote.status?.toLowerCase();
 
-      if (remote.longId) {
+      if (remoteStatus === "cancelled") {
+        newStatus = "cancelled";
+      } else if (remoteStatus === "invalid" || remoteStatus === "rejected") {
+        newStatus = "invalid";
+        newLongId = null;
+        newDateTimeValidated = null;
+      } else if (remote.longId) {
         newStatus = "valid";
         newLongId = remote.longId;
         newDateTimeValidated = remote.dateTimeValidation
           ? new Date(remote.dateTimeValidation).toISOString()
           : newDateTimeValidated;
-      } else if (remoteStatus === "invalid" || remoteStatus === "rejected") {
-        newStatus = "invalid";
-        newLongId = null;
-        newDateTimeValidated = null;
-      } else if (remoteStatus === "cancelled") {
-        newStatus = "cancelled";
       }
 
       if (newStatus !== doc.einvoice_status) {
@@ -1777,6 +1768,23 @@ async function resolveReferencedDocument(client, doc) {
             id,
           ]
         );
+      }
+
+      if (doc.is_consolidated) {
+        const childIds = Array.isArray(doc.consolidated_adjustments)
+          ? doc.consolidated_adjustments
+          : doc.consolidated_adjustments
+          ? JSON.parse(doc.consolidated_adjustments)
+          : [];
+        if (childIds.length > 0) {
+          await client.query(
+            `UPDATE ${T.docs}
+                SET einvoice_status = $1
+              WHERE id = ANY($2::text[])
+                AND uuid = $3`,
+            [newStatus, childIds, doc.uuid]
+          );
+        }
       }
 
       res.json({
@@ -1843,10 +1851,27 @@ async function resolveReferencedDocument(client, doc) {
       } catch (apiError) {
         console.warn(
           `MyInvois cancel returned error for ${id}:`,
-          apiError.response?.data || apiError.message
+          apiError.response || apiError.message
         );
-        // Proceed with local cleanup — Malaysia API has known quirks where it
-        // returns errors despite successful state change.
+        // A timed-out request can still have reached MyInvois. Reconcile once,
+        // but never mark the local record cancelled unless the remote document
+        // now confirms that state.
+        let remoteStatus = null;
+        try {
+          const remote = await apiClient.makeApiCall(
+            "GET",
+            `/api/v1.0/documents/${doc.uuid}/details`
+          );
+          remoteStatus = remote.status?.toLowerCase() || null;
+        } catch (verificationError) {
+          console.warn(
+            `Unable to verify MyInvois cancellation for ${id}:`,
+            verificationError.response || verificationError.message
+          );
+        }
+        if (remoteStatus !== "cancelled") {
+          throw apiError;
+        }
       }
 
       await client.query(
@@ -1888,7 +1913,21 @@ async function resolveReferencedDocument(client, doc) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error cancelling e-invoice for ${id}:`, error);
-      res.status(500).json({ message: error.message });
+      const remoteError = error?.response?.error;
+      const responseStatus =
+        Number.isInteger(error?.status) &&
+        error.status >= 400 &&
+        error.status < 500
+          ? error.status
+          : 502;
+      res.status(responseStatus).json({
+        code: remoteError?.code || "MYINVOIS_CANCELLATION_FAILED",
+        message:
+          remoteError?.message ||
+          error?.response?.message ||
+          error.message ||
+          "MyInvois cancellation failed",
+      });
     } finally {
       client.release();
     }
