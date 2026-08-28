@@ -17,6 +17,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { format, parse } from "date-fns";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import Button from "../../../components/Button";
@@ -166,11 +167,10 @@ const getInvoiceStatusClasses = (status: SelfBilledInvoiceStatus): string => {
 
 const formatDate = (value: string): string => {
   if (!value) return "-";
-  return new Date(value).toLocaleDateString("en-MY", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  const parsedDate: Date = parse(value, "yyyy-MM-dd", new Date());
+  return Number.isNaN(parsedDate.getTime())
+    ? value
+    : format(parsedDate, "dd MMM yyyy");
 };
 
 const formatAmount = (amount: number | string, currency: string): string => {

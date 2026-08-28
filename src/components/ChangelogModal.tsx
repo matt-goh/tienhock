@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-28",
+    ms: "Tarikh pembelian dalam senarai Pembelian Am kini sepadan dengan tarikh dalam borang, termasuk apabila sistem digunakan dalam zon waktu yang berbeza.",
+    en: "Purchase dates in the General Purchases list now match the dates shown in the form, including when the system is used in different time zones.",
+  },
+  {
+    date: "2026-08-28",
     ms: "Pembelian am luar negara dengan keterangan penghantaran seperti kurier atau penghantaran udara kini boleh dihantar ke MyInvois tanpa ditolak kerana ralat panjang Incoterms.",
     en: "Foreign general purchases with shipping descriptions such as courier or air shipping can now be submitted to MyInvois without being rejected for an Incoterms length error.",
   },
