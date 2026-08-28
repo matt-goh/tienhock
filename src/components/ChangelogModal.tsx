@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-28",
+    ms: "Invois Green Target dan Jelly Polly kini boleh mempunyai lebih daripada satu Credit Note aktif, sama seperti Tien Hock. Setiap Credit Note mengurangkan baki invois yang sama, dan jumlah semua Credit Note aktif tidak boleh melebihi nilai invois selepas Debit Note diambil kira. Status pembatalan e-Invois juga hanya akan berubah selepas MyInvois menerima atau mengesahkan pembatalan tersebut.",
+    en: "Green Target and Jelly Polly invoices can now have more than one active Credit Note, matching Tien Hock. Each Credit Note reduces the same invoice balance, and all active Credit Notes together cannot exceed the invoice value after Debit Notes are included. An e-Invoice cancellation status now changes only after MyInvois accepts or confirms the cancellation.",
+  },
+  {
     date: "2026-08-27",
     ms: "Mihun Cap 2UDG 300g (2-BH2) kini turut dipautkan kepada enam kod pengeluaran Merah: PBH_2UM, PBH_2UM_BAG, FULL_B2UM, FULL_B2UM_140, FULL_2UM_40 dan FULL_2UM_60. Kod Hijau yang sedia ada kekal, dan kadar gaji serta rekod lama tidak berubah.",
     en: "2UDG 300g Mihun (2-BH2) is now also linked to the six red production codes: PBH_2UM, PBH_2UM_BAG, FULL_B2UM, FULL_B2UM_140, FULL_2UM_40 and FULL_2UM_60. The existing green codes remain, and pay rates and previous records are unchanged.",
