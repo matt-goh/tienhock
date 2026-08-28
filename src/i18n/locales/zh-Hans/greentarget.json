@@ -157,8 +157,10 @@
   "Credit Balance": "贷方余额",
   "Credit Note": "贷记单",
   "Credit Note amount cannot exceed adjusted invoice total RM {{amount}}": "Credit Note 金额不能超过调整后的发票总额 RM {{amount}}",
+  "Credit Note amount cannot exceed remaining allowable amount RM {{amount}} after existing active Credit Notes": "存在有效 Credit Note 后，新 Credit Note 金额不能超过剩余允许金额 RM {{amount}}",
   "Credit Note amount cannot exceed unpaid balance RM {{amount}} when the invoice has no received payment": "当发票没有收到付款时，Credit Note 金额不能超过未付余额 RM {{amount}}",
   "Credit Note link required for replacement Refund Note": "替代 Refund Note 需要 Credit Note 链接",
+  "Credit Notes already cover the full adjusted invoice amount": "有效 Credit Note 已涵盖全部调整后发票金额",
   "Credited": "已贷记",
   "Customer": "客户",
   "Customer #{{id}}": "客户 #{{id}}",
@@ -1766,5 +1768,6 @@
   "({{changes}} changes)": "（{{changes}} 项更改）",
   "Payment confirmed successfully": "付款确认成功",
   "Payment cancelled successfully": "付款取消成功",
-  "Pickup date cannot be earlier than placement date.": "回收日期不能早于放置日期。"
+  "Pickup date cannot be earlier than placement date.": "回收日期不能早于放置日期。",
+  "Cannot cancel this Debit Note because active Credit Notes total RM {{creditAmount}} would exceed the adjusted invoice total RM {{invoiceAmount}}. Cancel enough Credit Notes first.": "无法取消此 Debit Note，因为有效 Credit Note 总额 RM {{creditAmount}} 将超过调整后的发票总额 RM {{invoiceAmount}}。请先取消足够的 Credit Note。"
 }

@@ -205,18 +205,13 @@ const getActiveCreditNoteTotal = (
       )
   );
 
-const getMaxCreditNoteAmount = (
-  sourceInvoice: ExtendedInvoiceData,
-  allowMultipleCreditNotes: boolean
-): number =>
+const getMaxCreditNoteAmount = (sourceInvoice: ExtendedInvoiceData): number =>
   Math.max(
     0,
     roundMoney(
       Number(sourceInvoice.totalamountpayable || 0) +
         getActiveDebitNoteTotal(sourceInvoice.adjustmentDocs) -
-        (allowMultipleCreditNotes
-          ? getActiveCreditNoteTotal(sourceInvoice.adjustmentDocs)
-          : 0)
+        getActiveCreditNoteTotal(sourceInvoice.adjustmentDocs)
     )
   );
 
@@ -413,14 +408,11 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const invoiceBalanceDue: number = invoice
     ? roundMoney(Number(invoice.balance_due || 0))
     : 0;
-  const allowMultipleCreditNotes: boolean = company === "tienhock";
   const maxCreditNoteAmount: number = invoice
-    ? getMaxCreditNoteAmount(invoice, allowMultipleCreditNotes)
+    ? getMaxCreditNoteAmount(invoice)
     : 0;
   const activeCreditNoteTotal: number =
-    allowMultipleCreditNotes && invoice
-      ? getActiveCreditNoteTotal(invoice.adjustmentDocs)
-      : 0;
+    invoice ? getActiveCreditNoteTotal(invoice.adjustmentDocs) : 0;
 
   // A paired Refund Note only makes sense when the customer has actually paid
   // and the Credit Note exceeds the current outstanding balance.

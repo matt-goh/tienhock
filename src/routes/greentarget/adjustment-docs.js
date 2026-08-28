@@ -158,6 +158,19 @@ export default function (pool, myInvoisGTConfig) {
     return parseFloat(parseFloat(result.rows[0]?.total || 0).toFixed(2));
   }
 
+  async function getActiveCreditNoteTotalForInvoice(client, invoiceId) {
+    const result = await client.query(
+      `SELECT COALESCE(SUM(total_amount), 0) AS total
+         FROM greentarget.adjustment_documents
+        WHERE original_invoice_id = $1
+          AND type = 'credit_note'
+          AND status = 'active'
+          AND COALESCE(is_consolidated, false) = false`,
+      [invoiceId]
+    );
+    return parseFloat(parseFloat(result.rows[0]?.total || 0).toFixed(2));
+  }
+
   async function validateAdjustmentAmountForCreate(
     client,
     type,
@@ -177,6 +190,13 @@ export default function (pool, myInvoisGTConfig) {
     const adjustedInvoiceTotal = parseFloat(
       (originalInvoiceTotal + debitNoteTotal).toFixed(2)
     );
+    const activeCreditNoteTotal = await getActiveCreditNoteTotalForInvoice(
+      client,
+      invoice.invoice_id
+    );
+    const remainingCreditNoteAmount = parseFloat(
+      Math.max(0, adjustedInvoiceTotal - activeCreditNoteTotal).toFixed(2)
+    );
     const currentBalance = parseFloat(
       parseFloat(invoice.balance_due || 0).toFixed(2)
     );
@@ -185,7 +205,12 @@ export default function (pool, myInvoisGTConfig) {
       invoice.invoice_id
     );
 
-    if (amount > adjustedInvoiceTotal + MONEY_TOLERANCE) {
+    if (amount > remainingCreditNoteAmount + MONEY_TOLERANCE) {
+      if (activeCreditNoteTotal > MONEY_TOLERANCE) {
+        throw new Error(
+          `Credit Note amount RM ${amount.toFixed(2)} cannot exceed remaining allowable amount RM ${remainingCreditNoteAmount.toFixed(2)} because RM ${activeCreditNoteTotal.toFixed(2)} is already covered by active Credit Notes.`
+        );
+      }
       throw new Error(
         `Credit Note amount RM ${amount.toFixed(2)} cannot exceed adjusted invoice total RM ${adjustedInvoiceTotal.toFixed(2)}.`
       );
@@ -1059,7 +1084,7 @@ export default function (pool, myInvoisGTConfig) {
       }
 
       const existingAdjustment =
-        type === "credit_note" || type === "debit_note"
+        type === "debit_note"
           ? await fetchActiveAdjustmentOfTypeForInvoice(
               client,
               invoice.invoice_id,
@@ -1397,6 +1422,64 @@ export default function (pool, myInvoisGTConfig) {
         doc.date_issued,
         `Adjustment ${id} cancellation`
       );
+
+      if (doc.type === "debit_note") {
+        const invoiceResult = await client.query(
+          `SELECT total_amount
+             FROM greentarget.invoices
+            WHERE invoice_id = $1
+            FOR UPDATE`,
+          [doc.original_invoice_id]
+        );
+        if (invoiceResult.rows.length === 0) {
+          throw new Error("Original invoice not found");
+        }
+
+        const activeCreditNoteTotal =
+          await getActiveCreditNoteTotalForInvoice(
+            client,
+            doc.original_invoice_id
+          );
+        const activeDebitNoteTotal = await getActiveDebitNoteTotalForInvoice(
+          client,
+          doc.original_invoice_id
+        );
+        const otherActiveDebitNoteTotal = parseFloat(
+          Math.max(
+            0,
+            activeDebitNoteTotal - parseFloat(doc.total_amount)
+          ).toFixed(2)
+        );
+        const adjustedInvoiceTotalAfterCancellation = parseFloat(
+          (
+            parseFloat(invoiceResult.rows[0].total_amount || 0) +
+            otherActiveDebitNoteTotal
+          ).toFixed(2)
+        );
+
+        if (
+          activeCreditNoteTotal >
+          adjustedInvoiceTotalAfterCancellation + MONEY_TOLERANCE
+        ) {
+          const cancellationError = new Error(
+            `Cannot cancel Debit Note ${doc.id}: active Credit Notes total RM ${activeCreditNoteTotal.toFixed(
+              2
+            )}, which would exceed the remaining adjusted invoice total RM ${adjustedInvoiceTotalAfterCancellation.toFixed(
+              2
+            )}. Cancel enough Credit Notes first.`
+          );
+          cancellationError.status = 409;
+          cancellationError.code =
+            "ACTIVE_CREDIT_NOTES_EXCEED_INVOICE_AFTER_DEBIT_NOTE_CANCELLATION";
+          cancellationError.details = {
+            active_credit_note_total: activeCreditNoteTotal,
+            adjusted_invoice_total_after_cancellation:
+              adjustedInvoiceTotalAfterCancellation,
+          };
+          throw cancellationError;
+        }
+      }
+
       if (doc.journal_entry_id) {
         await cancelGTAdjustmentJournalEntry(client, doc.journal_entry_id);
       }
@@ -1435,7 +1518,11 @@ export default function (pool, myInvoisGTConfig) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error cancelling GT adjustment doc ${id}:`, error);
-      res.status(error.status || error.statusCode || 400).json({ message: error.message });
+      res.status(error.status || error.statusCode || 400).json({
+        code: error.code,
+        message: error.message,
+        details: error.details,
+      });
     } finally {
       client.release();
     }
@@ -1651,7 +1738,8 @@ export default function (pool, myInvoisGTConfig) {
     const client = await pool.connect();
     try {
       const docResult = await client.query(
-        `SELECT id, uuid, einvoice_status, long_id, datetime_validated
+        `SELECT id, uuid, einvoice_status, long_id, datetime_validated,
+                is_consolidated, consolidated_adjustments
            FROM greentarget.adjustment_documents WHERE id = $1`,
         [id]
       );
@@ -1664,16 +1752,6 @@ export default function (pool, myInvoisGTConfig) {
           .status(400)
           .json({ message: "No MyInvois UUID — nothing to check." });
       }
-      if (doc.einvoice_status === "valid") {
-        return res.json({
-          success: true,
-          message: "Already valid",
-          status: doc.einvoice_status,
-          longId: doc.long_id,
-          dateTimeValidated: doc.datetime_validated,
-        });
-      }
-
       const remote = await apiClient.makeApiCall(
         "GET",
         `/api/v1.0/documents/${doc.uuid}/details`
@@ -1684,18 +1762,18 @@ export default function (pool, myInvoisGTConfig) {
       let newDateTimeValidated = doc.datetime_validated;
       const remoteStatus = remote.status?.toLowerCase();
 
-      if (remote.longId) {
+      if (remoteStatus === "cancelled") {
+        newStatus = "cancelled";
+      } else if (remoteStatus === "invalid" || remoteStatus === "rejected") {
+        newStatus = "invalid";
+        newLongId = null;
+        newDateTimeValidated = null;
+      } else if (remote.longId) {
         newStatus = "valid";
         newLongId = remote.longId;
         newDateTimeValidated = remote.dateTimeValidation
           ? new Date(remote.dateTimeValidation).toISOString()
           : newDateTimeValidated;
-      } else if (remoteStatus === "invalid" || remoteStatus === "rejected") {
-        newStatus = "invalid";
-        newLongId = null;
-        newDateTimeValidated = null;
-      } else if (remoteStatus === "cancelled") {
-        newStatus = "cancelled";
       }
 
       if (newStatus !== doc.einvoice_status) {
@@ -1712,6 +1790,23 @@ export default function (pool, myInvoisGTConfig) {
             id,
           ]
         );
+      }
+
+      if (doc.is_consolidated) {
+        const childIds = Array.isArray(doc.consolidated_adjustments)
+          ? doc.consolidated_adjustments
+          : doc.consolidated_adjustments
+          ? JSON.parse(doc.consolidated_adjustments)
+          : [];
+        if (childIds.length > 0) {
+          await client.query(
+            `UPDATE greentarget.adjustment_documents
+                SET einvoice_status = $1
+              WHERE id = ANY($2::text[])
+                AND uuid = $3`,
+            [newStatus, childIds, doc.uuid]
+          );
+        }
       }
 
       res.json({
@@ -1775,8 +1870,24 @@ export default function (pool, myInvoisGTConfig) {
       } catch (apiError) {
         console.warn(
           `MyInvois cancel returned error for GT ${id}:`,
-          apiError.response?.data || apiError.message
+          apiError.response || apiError.message
         );
+        let remoteStatus = null;
+        try {
+          const remote = await apiClient.makeApiCall(
+            "GET",
+            `/api/v1.0/documents/${doc.uuid}/details`
+          );
+          remoteStatus = remote.status?.toLowerCase() || null;
+        } catch (verificationError) {
+          console.warn(
+            `Unable to verify MyInvois cancellation for GT ${id}:`,
+            verificationError.response || verificationError.message
+          );
+        }
+        if (remoteStatus !== "cancelled") {
+          throw apiError;
+        }
       }
 
       await client.query(
@@ -1815,7 +1926,21 @@ export default function (pool, myInvoisGTConfig) {
     } catch (error) {
       await client.query("ROLLBACK");
       console.error(`Error cancelling e-invoice for GT ${id}:`, error);
-      res.status(500).json({ message: error.message });
+      const remoteError = error?.response?.error;
+      const responseStatus =
+        Number.isInteger(error?.status) &&
+        error.status >= 400 &&
+        error.status < 500
+          ? error.status
+          : 502;
+      res.status(responseStatus).json({
+        code: remoteError?.code || "MYINVOIS_CANCELLATION_FAILED",
+        message:
+          remoteError?.message ||
+          error?.response?.message ||
+          error.message ||
+          "MyInvois cancellation failed",
+      });
     } finally {
       client.release();
     }
