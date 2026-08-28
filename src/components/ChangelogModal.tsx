@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-28",
+    ms: "Pembelian yang e-Invoisnya sudah sah kini tidak lagi menunjukkan butang Muat Semula E-Invois. Maklumat e-Invois yang sah masih boleh dibuka melalui butang E-Invoice Details.",
+    en: "General purchases with a valid e-Invoice no longer show the Refresh E-Invoice button. You can still open the valid e-Invoice through the E-Invoice Details button.",
+  },
+  {
+    date: "2026-08-28",
     ms: "Tarikh pembelian dalam senarai Pembelian Am kini sepadan dengan tarikh dalam borang, termasuk apabila sistem digunakan dalam zon waktu yang berbeza.",
     en: "Purchase dates in the General Purchases list now match the dates shown in the form, including when the system is used in different time zones.",
   },
