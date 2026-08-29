@@ -11,22 +11,25 @@ import {
   IconId,
   IconUsers,
   IconRefresh,
+  IconX,
 } from "@tabler/icons-react";
 import { Employee, FilterOptions } from "../../types/types";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
-import StaffFilterMenu from "../../components/Catalogue/StaffFilterMenu";
 import Button from "../../components/Button";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import { usePersistedFilters } from "../../hooks/usePersistedFilters";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 
 const FILTERS_STORAGE_KEY = "staffList";
 const SCROLL_RESTORATION_KEY = "staff-list";
+
+type StaffStatusFilter = "active" | "all";
 
 // Search, the filter-menu selections and the page all persist so returning
 // from a staff form lands on the same slice of the list.
@@ -238,6 +241,31 @@ const StaffPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const statusPillOptions: ReadonlyArray<
+    PillSelectOption<StaffStatusFilter>
+  > = useMemo(
+    () => [
+      { value: "active", label: t("Active") },
+      { value: "all", label: t("All") },
+    ],
+    [t]
+  );
+
+  const jobPillOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          employees.flatMap((employee: Employee): string[] => employee.job)
+        )
+      ).map(
+        (job: string): PillSelectOption<string> => ({ value: job, label: job })
+      ),
+    [employees]
+  );
+
+  const selectedJobFilters: ReadonlyArray<string> =
+    filters.applyJobFilter === false ? [] : filters.jobFilter ?? [];
 
   // Focus the search box once the page has finished loading (the input isn't
   // mounted yet while the loading spinner is shown).
@@ -453,26 +481,90 @@ const StaffPage = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="flex items-center text-2xl text-default-700 dark:text-gray-200 font-bold gap-2.5">
-          <IconBriefcase size={28} stroke={2.5} className="text-default-700 dark:text-gray-200" />
-          {t("Staff Directory ({{total}})", {
-            total: filteredEmployees.length,
-          })}
-        </h1>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
+      <div className="sticky top-0 z-30 -mx-4 -mt-2.5 px-4 pt-2.5 pb-3 border-b border-default-200 dark:border-gray-700 bg-white/95 dark:bg-gray-950/95 backdrop-blur flex flex-wrap items-center gap-x-2 gap-y-3">
+        <div className="order-1 flex items-center flex-shrink-0">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
+            {t("Staff Directory ({{total}})", {
+              total: filteredEmployees.length,
+            })}
+          </h1>
+        </div>
+
+        <div className="order-3 w-full md:order-2 md:w-auto md:ml-auto min-w-0">
+          <div className="relative flex-1 min-w-0 md:w-64 md:flex-none">
+            <IconSearch
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-default-400"
+              stroke={1.5}
+            />
+            <input
+              ref={searchInputRef}
+              type="text"
+              placeholder={t("Search name, ID or phone...")}
+              className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
+                onClick={() => setSearchTerm("")}
+                title={t("Clear search")}
+              >
+                <IconX size={16} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
+          <span className="mr-0.5 text-xs font-medium text-default-500 dark:text-gray-400">
+            {t("Status")}
+          </span>
+          <PillSelect<StaffStatusFilter>
+            value={filters.showResigned ? "all" : "active"}
+            onChange={(value: StaffStatusFilter): void =>
+              handleFilterChange({ ...filters, showResigned: value === "all" })
+            }
+            options={statusPillOptions}
+            className="!contents"
+            ariaLabel={t("Status")}
+          />
+
+          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
+
+          <span className="mr-0.5 text-xs font-medium text-default-500 dark:text-gray-400">
+            {t("Jobs")}
+          </span>
+          <PillSelect<string>
+            selectionMode="multiple"
+            value={selectedJobFilters}
+            onChange={(jobs: string[]): void =>
+              handleFilterChange({
+                ...filters,
+                applyJobFilter: true,
+                jobFilter: jobs.length > 0 ? jobs : null,
+              })
+            }
+            options={jobPillOptions}
+            emptyOption={{ label: t("All Jobs") }}
+            showSelectOnly
+            className="!contents"
+            ariaLabel={t("Filter by job(s)")}
+          />
+        </div>
+
+        <div className="order-2 ml-auto md:order-3 md:ml-0 flex items-center gap-2 flex-shrink-0">
+          <Button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="px-3 py-2 flex items-center gap-2 rounded-full border border-default-300 dark:border-gray-600 hover:bg-default-100 dark:hover:bg-gray-700 text-default-600 dark:text-gray-300 text-sm font-medium transition-colors disabled:opacity-50"
+            icon={IconRefresh}
+            variant="outline"
             title={t("Refresh staff list")}
+            className={isRefreshing ? "[&_svg]:animate-spin" : ""}
           >
-            <IconRefresh
-              size={18}
-              className={isRefreshing ? "animate-spin" : ""}
-            />
             {t("Refresh")}
-          </button>
+          </Button>
           <Button
             onClick={() => navigate("/catalogue/staff/records")}
             icon={IconUsers}
@@ -480,43 +572,13 @@ const StaffPage = () => {
           >
             {t("Records")}
           </Button>
-          <div className="relative flex items-center sm:max-w-xs">
-            <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400"
-              size={18}
-            />
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder={t("Search name, ID or phone...")}
-              className="w-full pl-10 pr-10 py-2.5 border border-default-300 dark:border-gray-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500 rounded-full text-sm dark:bg-transparent dark:text-gray-100"
-              value={searchTerm}
-              onChange={handleSearchChange}
-            />
-            {searchTerm && (
-              <button
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-200"
-                onClick={() => setSearchTerm("")}
-                title={t("Clear search")}
-              >
-                ×
-              </button>
-            )}
-          </div>
-          <div className="flex gap-3">
-            <StaffFilterMenu
-              onFilterChange={handleFilterChange}
-              currentFilters={filters}
-              jobOptions={employees.map((emp) => emp.job).flat()}
-            />
-            <Button
-              onClick={() => navigate("/catalogue/staff/new")}
-              icon={IconPlus}
-              color="sky"
+          <Button
+            onClick={() => navigate("/catalogue/staff/new")}
+            icon={IconPlus}
+            color="sky"
           >
             {t("Add Staff")}
-            </Button>
-          </div>
+          </Button>
         </div>
       </div>
 
