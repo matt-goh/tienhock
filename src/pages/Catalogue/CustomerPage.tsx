@@ -6,11 +6,10 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPlus,
-  IconCheck,
-  IconChevronDown,
-  IconBuildingStore,
   IconRefresh,
   IconBuildingSkyscraper,
+  IconChartBar,
+  IconX,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -19,12 +18,6 @@ import Button from "../../components/Button";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
 import { api } from "../../routes/utils/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
-import {
-  Listbox,
-  ListboxButton,
-  ListboxOption,
-  ListboxOptions,
-} from "@headlessui/react";
 import {
   EnhancedCustomerList,
   refreshCustomersCache,
@@ -35,6 +28,7 @@ import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import { usePersistedFilters } from "../../hooks/usePersistedFilters";
+import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 
 const ITEMS_PER_PAGE = 20;
 const FILTERS_STORAGE_KEY = "customerList";
@@ -120,6 +114,34 @@ const CustomerPage: React.FC = () => {
     () => [ALL_BRANCHES, IN_BRANCH_GROUP, NO_BRANCH_GROUP, ...branchGroupNames],
     [branchGroupNames]
   );
+
+  const salesmanPillOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    () =>
+      salesmen.map(
+        (salesman: string): PillSelectOption<string> => ({
+          value: salesman,
+          label: salesman === "All Salesmen" ? t(salesman) : salesman,
+        })
+      ),
+    [salesmen, t]
+  );
+
+  const branchGroupPillOptions: ReadonlyArray<PillSelectOption<string>> =
+    useMemo(
+      () =>
+        branchFilterOptions.map(
+          (branchGroup: string): PillSelectOption<string> => ({
+            value: branchGroup,
+            label:
+              branchGroup === ALL_BRANCHES ||
+              branchGroup === IN_BRANCH_GROUP ||
+              branchGroup === NO_BRANCH_GROUP
+                ? t(branchGroup)
+                : branchGroup,
+          })
+        ),
+      [branchFilterOptions, t]
+    );
 
   const openBranchModal = (customerId?: string): void => {
     setBranchModalCustomerId(customerId);
@@ -234,71 +256,6 @@ const CustomerPage: React.FC = () => {
     setCurrentPage(page);
   };
 
-  const renderFilterListbox = (
-    value: string,
-    onChange: (next: string) => void,
-    options: string[],
-    widthClass: string = "w-48"
-  ) => (
-    <div className="flex items-center">
-      <Listbox value={value} onChange={onChange}>
-        <div className="relative">
-          <ListboxButton
-            className={`${widthClass} rounded-full border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 py-2 pl-3 pr-10 text-left focus:outline-none focus:border-default-500 dark:focus:border-gray-500`}
-          >
-            <span className="block truncate pl-2">{displayFilterValue(value)}</span>
-            <span className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-              <IconChevronDown
-                className="h-5 w-5 text-default-400 dark:text-gray-400"
-                aria-hidden="true"
-              />
-            </span>
-          </ListboxButton>
-          <ListboxOptions className="absolute z-10 w-max min-w-full max-w-[22rem] right-0 p-1 mt-1 border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-800 max-h-60 rounded-lg overflow-auto focus:outline-none shadow-lg">
-            {options.map((option) => (
-              <ListboxOption
-                key={option}
-                className={({ active }) =>
-                  `relative cursor-pointer select-none rounded py-2 pl-3 pr-9 ${
-                    active
-                      ? "bg-default-100 dark:bg-gray-900/50 text-default-900 dark:text-gray-100"
-                      : "text-default-900 dark:text-gray-100"
-                  }`
-                }
-                value={option}
-              >
-                {({ selected }) => (
-                  <>
-                    <span
-                      className={`block truncate ${
-                        selected ? "font-medium" : "font-normal"
-                      }`}
-                    >
-                      {displayFilterValue(option)}
-                    </span>
-                    {selected && (
-                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-default-600 dark:text-gray-300">
-                        <IconCheck className="h-5 w-5" aria-hidden="true" />
-                      </span>
-                    )}
-                  </>
-                )}
-              </ListboxOption>
-            ))}
-          </ListboxOptions>
-        </div>
-      </Listbox>
-    </div>
-  );
-
-  const displayFilterValue = (value: string): string =>
-    value === "All Salesmen" ||
-    value === ALL_BRANCHES ||
-    value === IN_BRANCH_GROUP ||
-    value === NO_BRANCH_GROUP
-      ? t(value)
-      : value;
-
   const renderPaginationButtons = () => {
     const buttons = [];
     const maxVisiblePages = 5;
@@ -406,54 +363,69 @@ const CustomerPage: React.FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <h1 className="flex items-center text-2xl text-default-700 dark:text-gray-200 font-bold gap-2.5">
-            <IconBuildingStore
-              size={28}
-              stroke={2.5}
-              className="text-default-700 dark:text-gray-200"
-            />
-            {t("Customers ({{total}})", {
-              total: filteredCustomers.length,
-            })}
+      <div className="sticky top-0 z-30 -mx-4 -mt-2.5 px-4 pt-2.5 pb-3 border-b border-default-200 dark:border-gray-700 bg-white/95 dark:bg-gray-950/95 backdrop-blur flex flex-wrap items-center gap-x-2 gap-y-3">
+        <div className="order-1 flex items-center flex-shrink-0">
+          <h1 className="text-xl font-semibold text-default-800 dark:text-gray-100">
+            {t("Customers ({{total}})", { total: filteredCustomers.length })}
           </h1>
         </div>
-        <div className="flex space-x-3">
-          <div className="relative">
+
+        <div className="order-3 w-full md:order-2 md:w-auto md:ml-auto min-w-0">
+          <div className="relative flex-1 min-w-0 md:w-64 md:flex-none">
             <IconSearch
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-default-400 dark:text-gray-400"
-              size={22}
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-default-400"
+              stroke={1.5}
             />
             <input
               ref={searchInputRef}
               type="text"
               placeholder={t("search", { ns: "common" })}
-              className="w-full pl-11 py-2 border border-default-300 dark:border-gray-600 bg-white dark:bg-transparent text-default-900 dark:text-gray-100 focus:border-default-500 dark:focus:border-gray-500 rounded-full"
+              className="w-full h-[40px] rounded-lg border border-default-300 dark:border-gray-600 pl-9 pr-8 text-sm focus:border-sky-500 focus:outline-none focus:ring-1 focus:ring-sky-500 bg-white dark:bg-gray-900/50 text-default-800 dark:text-gray-100"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(event: React.ChangeEvent<HTMLInputElement>): void =>
+                setSearchTerm(event.target.value)
+              }
             />
             {searchTerm && (
               <button
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-default-400 dark:text-gray-400 hover:text-default-700 dark:hover:text-gray-300"
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-default-400 hover:text-default-600 dark:hover:text-gray-300"
                 onClick={() => setSearchTerm("")}
                 title={t("Clear search")}
               >
-                ×
+                <IconX size={16} />
               </button>
             )}
           </div>
-          {renderFilterListbox(
-            selectedSalesman,
-            setSelectedSalesman,
-            salesmen
-          )}
-          {renderFilterListbox(
-            selectedBranchGroup,
-            setSelectedBranchGroup,
-            branchFilterOptions,
-            "w-44"
-          )}
+        </div>
+
+        <div className="order-4 w-full flex flex-wrap items-center gap-1.5 min-w-0">
+          <span className="mr-0.5 text-xs font-medium text-default-500 dark:text-gray-400">
+            {t("Salesman")}
+          </span>
+          <PillSelect<string>
+            value={selectedSalesman}
+            onChange={setSelectedSalesman}
+            options={salesmanPillOptions}
+            className="!contents"
+            ariaLabel={t("Salesman")}
+          />
+
+          <span className="h-5 w-px bg-default-300 dark:bg-gray-600 mx-1" />
+
+          <span className="mr-0.5 text-xs font-medium text-default-500 dark:text-gray-400">
+            {t("Branches")}
+          </span>
+          <PillSelect<string>
+            value={selectedBranchGroup}
+            onChange={setSelectedBranchGroup}
+            options={branchGroupPillOptions}
+            className="!contents"
+            ariaLabel={t("Branches")}
+          />
+        </div>
+
+        <div className="order-2 ml-auto md:order-3 md:ml-0 flex items-center gap-2 flex-shrink-0">
           <Button
             onClick={async () => {
               try {
@@ -480,6 +452,13 @@ const CustomerPage: React.FC = () => {
               : t("Branches")}
           </Button>
           <Button
+            onClick={() => navigate("/sales/summary/customer")}
+            variant="outline"
+            icon={IconChartBar}
+          >
+            {t("Sales by Customer")}
+          </Button>
+          <Button
             onClick={() => navigate("/catalogue/customer/new")}
             icon={IconPlus}
             color="sky"
@@ -496,7 +475,13 @@ const CustomerPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div
+          className="grid gap-6"
+          style={{
+            gridTemplateColumns:
+              "repeat(auto-fill, minmax(min(300px, 100%), 1fr))",
+          }}
+        >
           {paginatedCustomers.map((customer: EnhancedCustomerList) => (
             <CustomerCard
               key={customer.id}

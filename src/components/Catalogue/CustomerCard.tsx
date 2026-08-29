@@ -79,7 +79,7 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border ${
+      className={`relative flex h-full flex-col overflow-hidden rounded-lg border ${
         isCardHovered ? "border-sky-200 dark:border-sky-700 shadow-md" : "border-default-200 dark:border-gray-700"
       } transition-all duration-200 cursor-pointer bg-white dark:bg-gray-800`}
       onClick={handleClick}
@@ -135,15 +135,18 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
       </div>
 
       {/* Card Body */}
-      <div className="p-4 space-y-3">
+      <div className="grid flex-1 grid-cols-1 gap-x-4 gap-y-3 p-4 min-[360px]:grid-cols-2">
         {/* Salesman field - Always show */}
-        <div className="flex items-start">
+        <div className="flex min-w-0 items-center">
           <IconUser
             size={16}
-            className="text-default-400 dark:text-gray-500 mt-0.5 flex-shrink-0 mr-2"
+            className="mr-2 flex-shrink-0 text-default-400 dark:text-gray-500"
           />
-          <div className="text-sm text-default-700 dark:text-gray-200 flex-1">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-sky-100 dark:bg-sky-900/50 text-sky-800 dark:text-sky-300">
+          <div className="min-w-0 text-sm text-default-700 dark:text-gray-200">
+            <span
+              className="inline-flex max-w-full items-center truncate rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-800 dark:bg-sky-900/50 dark:text-sky-300"
+              title={customer.salesman || t("Unassigned")}
+            >
               {customer.salesman || t("Unassigned")}
             </span>
           </div>
@@ -151,22 +154,34 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
 
         {/* Phone Number - Only if exists */}
         {customer.phone_number && (
-          <div className="flex items-center">
+          <div className="flex min-w-0 items-center">
             <IconPhone
               size={16}
-              className="text-default-400 dark:text-gray-500 flex-shrink-0 mr-2"
+              className="mr-2 flex-shrink-0 text-default-400 dark:text-gray-500"
             />
-            <div className="text-sm text-default-700 dark:text-gray-200 flex-1 truncate">
+            <div
+              className="min-w-0 truncate text-sm text-default-700 dark:text-gray-200"
+              title={customer.phone_number}
+            >
               {customer.phone_number}
             </div>
           </div>
         )}
+        {!customer.phone_number && (
+          <div className="hidden min-[360px]:block" aria-hidden="true" />
+        )}
 
         {/* ID Number - Only if exists */}
         {customer.id_number && (
-          <div className="flex items-center">
-            <IconId size={16} className="text-default-400 dark:text-gray-500 flex-shrink-0 mr-2" />
-            <div className="text-sm text-default-700 dark:text-gray-200 flex-1 truncate">
+          <div className="flex min-w-0 items-center">
+            <IconId
+              size={16}
+              className="mr-2 flex-shrink-0 text-default-400 dark:text-gray-500"
+            />
+            <div
+              className="min-w-0 truncate text-sm text-default-700 dark:text-gray-200"
+              title={customer.id_number}
+            >
               {customer.id_number}
             </div>
           </div>
@@ -174,92 +189,85 @@ const CustomerCard: React.FC<CustomerCardProps> = ({
 
         {/* E-Invoice Status - Only show if ready*/}
         {hasEInvoiceInfo ? (
-          <div className="flex items-center">
+          <div className="flex min-w-0 items-center" title={t("e-Invoice:")}>
             <IconFileInvoice
               size={16}
-              className="text-default-400 dark:text-gray-500 flex-shrink-0 mr-2"
+              className="mr-2 flex-shrink-0 text-default-400 dark:text-gray-500"
             />
-            <div className="flex items-center">
-              <span className="text-sm text-default-700 dark:text-gray-200 mr-1">
-                {t("e-Invoice:")}
-              </span>
-              <span className="inline-flex items-center text-xs font-medium text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 rounded-full px-2 py-0.5">
-                <IconCheck size={12} className="mr-1" /> {t("Ready")}
-              </span>
-            </div>
+            <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700 dark:bg-green-900/50 dark:text-green-300">
+              <IconCheck size={12} className="mr-1" /> {t("Ready")}
+            </span>
           </div>
         ) : null}
-
-        {/* Branch Status - Only show if part of a branch group */}
-        {branchInfo?.isInBranchGroup && (
-          <div className="flex items-center">
-            {branchInfo.isMainBranch ? (
-              <IconBuildingSkyscraper
-                size={16}
-                className="text-indigo-500 flex-shrink-0 mr-2"
-              />
-            ) : (
-              <IconBuildingStore
-                size={16}
-                className="text-indigo-400 flex-shrink-0 mr-2"
-              />
-            )}
-            <div className="flex items-center space-x-1 min-w-0">
-              <span className="text-sm text-default-700 dark:text-gray-200 mr-1">
-                {t("Branch:")}
-              </span>
-              {onManageBranchesClick ? (
-                <button
-                  type="button"
-                  onClick={handleManageBranchesClick}
-                  title={
-                    siblingBranchCount > 0
-                      ? t(
-                          siblingBranchCount === 1
-                            ? "Manage {{group}} ({{total}} other branch)"
-                            : "Manage {{group}} ({{total}} other branches)",
-                          {
-                            group: branchInfo.groupName,
-                            total: siblingBranchCount,
-                          }
-                        )
-                      : t("Manage {{group}}", { group: branchInfo.groupName })
-                  }
-                  className={`inline-flex items-center max-w-full truncate text-xs font-medium rounded-full px-2 py-0.5 transition-colors hover:ring-1 hover:ring-indigo-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
-                    branchInfo.isMainBranch
-                      ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
-                      : "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                  }`}
-                >
-                  {branchInfo.groupName}
-                </button>
-              ) : (
-                <span
-                  className={`inline-flex items-center max-w-full truncate text-xs font-medium rounded-full px-2 py-0.5 ${
-                    branchInfo.isMainBranch
-                      ? "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300"
-                      : "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                  }`}
-                >
-                  {branchInfo.groupName}
-                </span>
-              )}
-              {branchInfo.isMainBranch && (
-                <span
-                  className={`inline-flex items-center flex-shrink-0 text-xs font-medium rounded-full px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300`}
-                >
-                  {t("Main")}
-                </span>
-              )}
-              {siblingBranchCount > 0 && (
-                <span className="text-xs text-default-500 dark:text-gray-400 flex-shrink-0 whitespace-nowrap">
-                  +{siblingBranchCount}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Branch Status - Only show if part of a branch group */}
+      {branchInfo?.isInBranchGroup && (
+        <div className="flex min-w-0 items-center border-t border-default-100 px-4 py-3 dark:border-gray-700">
+          {branchInfo.isMainBranch ? (
+            <IconBuildingSkyscraper
+              size={16}
+              className="mr-2 flex-shrink-0 text-indigo-500"
+            />
+          ) : (
+            <IconBuildingStore
+              size={16}
+              className="mr-2 flex-shrink-0 text-indigo-400"
+            />
+          )}
+          <div className="flex min-w-0 items-center space-x-1">
+            <span className="mr-1 flex-shrink-0 text-sm text-default-700 dark:text-gray-200">
+              {t("Branch:")}
+            </span>
+            {onManageBranchesClick ? (
+              <button
+                type="button"
+                onClick={handleManageBranchesClick}
+                title={
+                  siblingBranchCount > 0
+                    ? t(
+                        siblingBranchCount === 1
+                          ? "Manage {{group}} ({{total}} other branch)"
+                          : "Manage {{group}} ({{total}} other branches)",
+                        {
+                          group: branchInfo.groupName,
+                          total: siblingBranchCount,
+                        }
+                      )
+                    : t("Manage {{group}}", { group: branchInfo.groupName })
+                }
+                className={`inline-flex min-w-0 max-w-full items-center truncate rounded-full px-2 py-0.5 text-xs font-medium transition-colors hover:ring-1 hover:ring-indigo-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+                  branchInfo.isMainBranch
+                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
+                    : "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+                }`}
+              >
+                {branchInfo.groupName}
+              </button>
+            ) : (
+              <span
+                className={`inline-flex min-w-0 max-w-full items-center truncate rounded-full px-2 py-0.5 text-xs font-medium ${
+                  branchInfo.isMainBranch
+                    ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300"
+                    : "bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400"
+                }`}
+              >
+                {branchInfo.groupName}
+              </span>
+            )}
+            {branchInfo.isMainBranch && (
+              <span className="inline-flex flex-shrink-0 items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300">
+                {t("Main")}
+              </span>
+            )}
+            {siblingBranchCount > 0 && (
+              <span className="flex-shrink-0 whitespace-nowrap text-xs text-default-500 dark:text-gray-400">
+                +{siblingBranchCount}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

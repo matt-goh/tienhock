@@ -1872,6 +1872,169 @@ export default function (pool, config) {
     }
   });
 
+  // GET /api/invoices/sales/customers - Get customer sales data
+  router.get("/sales/customers", async (req, res) => {
+    try {
+      const { startDate, endDate, scope = "tienhock" } = req.query;
+
+      if (!startDate || !endDate) {
+        return res.status(400).json({ message: "Date range is required" });
+      }
+
+      const mainQuery = `
+      SELECT
+        i.id, i.customerid, i.salespersonid, i.paymenttype, i.createddate,
+        c.name as customer_name, c.salesman as assigned_salesman,
+        c.phone_number, c.city, c.state,
+        od.code, od.description, od.quantity, od.freeproduct,
+        od.returnproduct, od.total, p.type
+      FROM invoices i
+      JOIN order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      LEFT JOIN customers c ON i.customerid = c.id
+      WHERE
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    `;
+
+      const jellypollyQuery = `
+      SELECT
+        i.id, i.customerid, i.salespersonid, i.paymenttype, i.createddate,
+        c.name as customer_name, c.salesman as assigned_salesman,
+        c.phone_number, c.city, c.state,
+        od.code, od.description, od.quantity, od.freeproduct,
+        od.returnproduct, od.total, p.type
+      FROM jellypolly.invoices i
+      JOIN jellypolly.order_details od ON i.id = od.invoiceid
+      LEFT JOIN products p ON od.code = p.id
+      LEFT JOIN customers c ON i.customerid = c.id
+      WHERE
+        CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+        AND i.invoice_status != 'cancelled'
+        AND od.issubtotal IS NOT TRUE
+        AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+    `;
+
+      const query = scope === "jp" ? jellypollyQuery : mainQuery;
+      const result = await pool.query(query, [startDate, endDate]);
+      const customerMap = new Map();
+
+      result.rows.forEach((row) => {
+        const customerId = row.customerid || "Unassigned";
+        const productId = row.code;
+
+        if (!customerMap.has(customerId)) {
+          customerMap.set(customerId, {
+            id: customerId,
+            name: row.customer_name || customerId,
+            assignedSalesman: row.assigned_salesman || null,
+            phoneNumber: row.phone_number || null,
+            city: row.city || null,
+            state: row.state || null,
+            totalSales: 0,
+            totalQuantity: 0,
+            totalFoc: 0,
+            totalReturns: 0,
+            lastSaleDate: null,
+            invoiceIds: new Set(),
+            invoiceBillIds: new Set(),
+            cashBillIds: new Set(),
+            salesmen: new Set(),
+            products: new Map(),
+          });
+        }
+
+        const customer = customerMap.get(customerId);
+        const quantity = productId === "LESS" ? 0 : parseFloat(row.quantity) || 0;
+        const total = parseFloat(row.total) || 0;
+        const foc = parseFloat(row.freeproduct) || 0;
+        const returns = parseFloat(row.returnproduct) || 0;
+        const createdTimestamp = Number(row.createddate) || 0;
+
+        customer.totalSales = addMoney(customer.totalSales, total);
+        customer.totalQuantity += quantity;
+        customer.totalFoc += foc;
+        customer.totalReturns += returns;
+        customer.invoiceIds.add(row.id);
+
+        if (row.paymenttype === "INVOICE") {
+          customer.invoiceBillIds.add(row.id);
+        } else if (row.paymenttype === "CASH") {
+          customer.cashBillIds.add(row.id);
+        }
+
+        if (row.salespersonid) {
+          customer.salesmen.add(row.salespersonid);
+        }
+
+        if (
+          createdTimestamp > 0 &&
+          (!customer.lastSaleDate ||
+            createdTimestamp > Number(customer.lastSaleDate))
+        ) {
+          customer.lastSaleDate = row.createddate;
+        }
+
+        if (!productId) return;
+
+        if (!customer.products.has(productId)) {
+          customer.products.set(productId, {
+            id: productId,
+            description: row.description || productId,
+            type: row.type || "OTH",
+            quantity: 0,
+            totalSales: 0,
+            foc: 0,
+            returns: 0,
+          });
+        }
+
+        const product = customer.products.get(productId);
+        product.quantity += quantity;
+        product.totalSales = addMoney(product.totalSales, total);
+        product.foc += foc;
+        product.returns += returns;
+      });
+
+      const customerData = Array.from(customerMap.values())
+        .map((customer) => ({
+          id: customer.id,
+          name: customer.name,
+          assignedSalesman: customer.assignedSalesman,
+          phoneNumber: customer.phoneNumber,
+          city: customer.city,
+          state: customer.state,
+          totalSales: customer.totalSales,
+          totalQuantity: customer.totalQuantity,
+          totalFoc: customer.totalFoc,
+          totalReturns: customer.totalReturns,
+          salesCount: customer.invoiceIds.size,
+          invoiceCount: customer.invoiceBillIds.size,
+          cashCount: customer.cashBillIds.size,
+          lastSaleDate: customer.lastSaleDate,
+          salesmen: Array.from(customer.salesmen).sort(),
+          products: Array.from(customer.products.values()).sort(
+            (firstProduct, secondProduct) =>
+              secondProduct.totalSales - firstProduct.totalSales
+          ),
+        }))
+        .sort(
+          (firstCustomer, secondCustomer) =>
+            secondCustomer.totalSales - firstCustomer.totalSales
+        );
+
+      res.json(customerData);
+    } catch (error) {
+      console.error("Error fetching customer sales data:", error);
+      res.status(500).json({
+        message: "Error fetching customer sales data",
+        error: error.message,
+      });
+    }
+  });
+
   // GET /api/invoices/sales/salesmen - Get salesmen sales data
   router.get("/sales/salesmen", async (req, res) => {
     try {
@@ -2097,7 +2260,7 @@ export default function (pool, config) {
     }
   });
 
-  // GET /api/invoices/sales/trends - Get monthly sales trends for products or salesmen
+  // GET /api/invoices/sales/trends - Get monthly sales trends
   router.get("/sales/trends", async (req, res) => {
     try {
       const { startDate, endDate, type, ids, scope = "tienhock" } = req.query;
@@ -2106,9 +2269,13 @@ export default function (pool, config) {
         return res.status(400).json({ message: "Date range is required" });
       }
 
-      if (!type || (type !== "products" && type !== "salesmen")) {
+      if (
+        !type ||
+        !["products", "salesmen", "customers"].includes(type)
+      ) {
         return res.status(400).json({
-          message: "Valid type parameter (products or salesmen) is required",
+          message:
+            "Valid type parameter (products, salesmen or customers) is required",
         });
       }
 
@@ -2187,7 +2354,7 @@ export default function (pool, config) {
         if (idArray.length > 0) {
           queryParams.push(idArray);
         }
-      } else {
+      } else if (type === "salesmen") {
         // Salesman trends - main schema
         mainQuery = `
         WITH monthly_data AS (
@@ -2244,6 +2411,68 @@ export default function (pool, config) {
           total_sales
         FROM monthly_data
         ORDER BY month, salespersonid
+        `;
+
+        if (idArray.length > 0) {
+          queryParams.push(idArray);
+        }
+      } else {
+        // Customer trends - main schema
+        mainQuery = `
+        WITH monthly_data AS (
+          SELECT
+            DATE_TRUNC(
+              'month',
+              TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)
+                AT TIME ZONE 'Asia/Kuala_Lumpur'
+            ) as month,
+            COALESCE(NULLIF(TRIM(i.customerid), ''), 'Unassigned') as customerid,
+            SUM(COALESCE(od.total, 0)) as total_sales
+          FROM invoices i
+          JOIN order_details od ON i.id = od.invoiceid
+          WHERE
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+            AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+            ${idArray.length > 0 ? "AND COALESCE(NULLIF(TRIM(i.customerid), ''), 'Unassigned') = ANY($3)" : ""}
+          GROUP BY month, COALESCE(NULLIF(TRIM(i.customerid), ''), 'Unassigned')
+        )
+        SELECT
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          customerid,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, customerid
+        `;
+
+        // Customer trends - JellyPolly schema
+        jellypollyQuery = `
+        WITH monthly_data AS (
+          SELECT
+            DATE_TRUNC(
+              'month',
+              TO_TIMESTAMP(CAST(i.createddate AS bigint) / 1000)
+                AT TIME ZONE 'Asia/Kuala_Lumpur'
+            ) as month,
+            COALESCE(NULLIF(TRIM(i.customerid), ''), 'Unassigned') as customerid,
+            SUM(COALESCE(od.total, 0)) as total_sales
+          FROM jellypolly.invoices i
+          JOIN jellypolly.order_details od ON i.id = od.invoiceid
+          WHERE
+            CAST(i.createddate AS bigint) BETWEEN $1 AND $2
+            AND i.invoice_status != 'cancelled'
+            AND od.issubtotal IS NOT TRUE
+            AND (i.is_consolidated = false OR i.is_consolidated IS NULL)
+            ${idArray.length > 0 ? "AND COALESCE(NULLIF(TRIM(i.customerid), ''), 'Unassigned') = ANY($3)" : ""}
+          GROUP BY month, COALESCE(NULLIF(TRIM(i.customerid), ''), 'Unassigned')
+        )
+        SELECT
+          TO_CHAR(month, 'YYYY-MM') as month_year,
+          customerid,
+          total_sales
+        FROM monthly_data
+        ORDER BY month, customerid
         `;
 
         if (idArray.length > 0) {
@@ -2309,11 +2538,17 @@ export default function (pool, config) {
             // Aggregate sales for product type
             monthData[productType] = (monthData[productType] || 0) + sales;
           }
-        } else {
+        } else if (type === "salesmen") {
           // Salesman data - aggregate if already exists
           const salesmanId = row.salespersonid;
           monthData[salesmanId] =
             (monthData[salesmanId] || 0) +
+            (parseFloat(row.total_sales) || 0);
+        } else {
+          // Customer data - aggregate if already exists
+          const customerId = row.customerid;
+          monthData[customerId] =
+            (monthData[customerId] || 0) +
             (parseFloat(row.total_sales) || 0);
         }
       });

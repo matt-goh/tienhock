@@ -20,11 +20,13 @@ import {
   Line,
   CartesianGrid,
 } from "recharts";
+import type { PieLabelRenderProps } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import Button from "../../components/Button";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 import HoverTooltip from "../../components/HoverTooltip";
 import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
+import { useTheme } from "../../contexts/ThemeContext";
 import {
   reviveDate,
   usePersistedFilters,
@@ -69,6 +71,20 @@ const PRODUCT_TYPE_COLORS: Record<string, string> = {
   OTHER: "#a0aec0",
 };
 
+const PRODUCT_TYPE_DISPLAY_ORDER: Record<string, number> = {
+  MEE: 0,
+  BH: 1,
+  RAMEN: 2,
+  OTH: 3,
+  JP: 4,
+};
+
+// Top five products by sales value in the latest 12-month reporting period.
+const DEFAULT_PRODUCT_MIX_PRODUCTS: Record<SalesSummaryScope, readonly string[]> = {
+  tienhock: ["2-BCM3", "2-BH", "1-MNL", "2-BNL(5)", "1-2UDG"],
+  jp: ["S-25ML", "MEQ-60ML", "MEQ-25ML", "S-60ML", "AQ-60ML"],
+};
+
 const getStableTypeColor = (type: string): string => {
   if (PRODUCT_TYPE_COLORS[type]) return PRODUCT_TYPE_COLORS[type];
 
@@ -103,6 +119,44 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   scope = "tienhock",
 }) => {
   const { t } = useTranslation("sales");
+  const { isDarkMode } = useTheme();
+  const chartTextColor: string = isDarkMode ? "#e5e7eb" : "#4b5563";
+  const chartGridColor: string = isDarkMode ? "#64748b" : "#d1d5db";
+  const chartTooltipStyle: React.CSSProperties = {
+    backgroundColor: isDarkMode ? "#111827" : "#ffffff",
+    border: `1px solid ${isDarkMode ? "#4b5563" : "#d1d5db"}`,
+    borderRadius: "0.5rem",
+    color: isDarkMode ? "#f9fafb" : "#111827",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.18)",
+  };
+  const chartTooltipLabelStyle: React.CSSProperties = {
+    color: isDarkMode ? "#f9fafb" : "#111827",
+    fontWeight: 600,
+  };
+  const chartTooltipItemStyle: React.CSSProperties = {
+    color: isDarkMode ? "#e5e7eb" : "#374151",
+  };
+  const renderPieLabel = (
+    labelProps: PieLabelRenderProps
+  ): React.ReactElement | null => {
+    const { name, percent, quantity, x, y, textAnchor } = labelProps;
+    if ((percent ?? 0) <= 0.05) return null;
+
+    return (
+      <text
+        x={x}
+        y={y}
+        textAnchor={textAnchor as "start" | "middle" | "end"}
+        fill={chartTextColor}
+        stroke="none"
+        dominantBaseline="middle"
+      >
+        {`${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${Number(
+          quantity || 0
+        ).toLocaleString()})`}
+      </text>
+    );
+  };
   const isJp = scope === "jp";
   // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
@@ -229,27 +283,16 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   // Initialize selected products when product options are available
   useEffect(() => {
     if (productOptions.length > 0) {
-      const categoryIds = isJp ? ["JP"] : ["MEE", "BH", "RAMEN", "OTH"];
-      const categoryOptions = productOptions
-        .filter((option) => categoryIds.includes(option.id))
-        .map((option) => option.id);
-
-      // Take up to the limit
-      const initialSelection = categoryOptions.slice(0, maxChartProducts);
-
-      // If we still have room, add some individual products
-      if (initialSelection.length < maxChartProducts) {
-        const individualProducts = productOptions
-          .filter((option) => !categoryIds.includes(option.id))
-          .slice(0, maxChartProducts - initialSelection.length)
-          .map((option) => option.id);
-
-        initialSelection.push(...individualProducts);
-      }
+      const availableProductIds = new Set(
+        productOptions.map((option) => option.id)
+      );
+      const initialSelection = DEFAULT_PRODUCT_MIX_PRODUCTS[scope]
+        .filter((productId) => availableProductIds.has(productId))
+        .slice(0, maxChartProducts);
 
       setSelectedChartProducts(initialSelection);
     }
-  }, [productOptions, maxChartProducts, isJp]);
+  }, [productOptions, maxChartProducts, scope]);
 
   // Get product type from product ID using cache
   const getProductType = (productId: string): string => {
@@ -638,9 +681,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
       (sum, product) => sum + product.quantity,
       0
     );
-    const nonRamenQuantity = salesData.reduce(
-      (sum, product) =>
-        product.type === "RAMEN" ? sum : sum + product.quantity,
+    const totalQuantity: number = salesData.reduce(
+      (sum: number, product: ProductSalesData): number =>
+        sum + product.quantity,
       0
     );
 
@@ -666,7 +709,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
       ramenTotal,
       othTotal,
       ramenQuantity,
-      nonRamenQuantity,
+      totalQuantity,
     };
   }, [salesData, categoryColors, isJp]);
 
@@ -678,33 +721,8 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
     }).format(amount);
   };
 
-  const formatSeparatedQuantity = (
-    nonRamenQuantity: number,
-    ramenQuantity: number
-  ): string => {
-    if (nonRamenQuantity > 0 && ramenQuantity > 0) {
-      return t("{{units}} units + {{packets}} PKT", {
-        units: nonRamenQuantity.toLocaleString(),
-        packets: ramenQuantity.toLocaleString(),
-      });
-    }
-    if (ramenQuantity > 0) {
-      return t("{{total}} packets", {
-        total: ramenQuantity.toLocaleString(),
-      });
-    }
-    return t("{{total}} units", {
-      total: nonRamenQuantity.toLocaleString(),
-    });
-  };
-
-  const formatProductQuantity = (
-    quantity: number,
-    productType: string
-  ): string =>
-    productType === "RAMEN"
-      ? t("{{total}} packets", { total: quantity.toLocaleString() })
-      : t("{{total}} units", { total: quantity.toLocaleString() });
+  const formatQuantity = (quantity: number): string =>
+    t("{{total}} units", { total: quantity.toLocaleString() });
 
   // Handle sort change
   const handleSort = (key: keyof ProductSalesData) => {
@@ -756,6 +774,18 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               >
                 {t("Salesman")}
               </button>
+              {scope === "tienhock" && (
+                <button
+                  onClick={() => onTabChange(2)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 2
+                      ? "bg-white dark:bg-gray-600 text-default-900 dark:text-gray-100 shadow-sm"
+                      : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
+                  }`}
+                >
+                  {t("Customer")}
+                </button>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -785,26 +815,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               </span>
             </div>
             <div className="px-4 py-3">
-              {isJp ? (
-                <div className="text-xl font-bold text-sky-600 dark:text-sky-400">
-                  {t("{{total}} units", {
-                    total: summary.nonRamenQuantity.toLocaleString(),
-                  })}
-                </div>
-              ) : (
-                <div className="space-y-0.5 text-sm font-bold">
-                  <div className="text-sky-600 dark:text-sky-400">
-                    {t("{{total}} non-Ramen units", {
-                      total: summary.nonRamenQuantity.toLocaleString(),
-                    })}
-                  </div>
-                  <div className="text-rose-600 dark:text-rose-400">
-                    {t("{{total}} Ramen packets", {
-                      total: summary.ramenQuantity.toLocaleString(),
-                    })}
-                  </div>
-                </div>
-              )}
+              <div className="text-xl font-bold text-sky-600 dark:text-sky-400">
+                {formatQuantity(summary.totalQuantity)}
+              </div>
               <div className="mt-1 text-sm font-bold">{formatCurrency(summary.totalSales)}</div>
             </div>
           </div>
@@ -889,9 +902,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                 </div>
                 <div className="px-4 py-3">
                   <div className="text-xl font-bold text-rose-600 dark:text-rose-400">
-                    {t("{{total}} packets", {
-                      total: summary.ramenQuantity.toLocaleString(),
-                    })}
+                    {formatQuantity(summary.ramenQuantity)}
                   </div>
                   <div className="mt-1 text-sm font-bold">
                     {formatCurrency(summary.ramenTotal)}
@@ -947,45 +958,54 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                 const rtnProducts = salesman.products.filter(p => p.returns > 0);
                 const totalFoc = focProducts.reduce((sum, p) => sum + p.foc, 0);
                 const totalRtn = rtnProducts.reduce((sum, p) => sum + p.returns, 0);
-                const ramenFoc = focProducts.reduce(
-                  (sum, product) =>
-                    product.type === "RAMEN" ? sum + product.foc : sum,
-                  0
-                );
-                const nonRamenFoc = totalFoc - ramenFoc;
-                const ramenReturns = rtnProducts.reduce(
-                  (sum, product) =>
-                    product.type === "RAMEN" ? sum + product.returns : sum,
-                  0
-                );
-                const nonRamenReturns = totalRtn - ramenReturns;
-                const salesmanRamenQuantity = salesman.products.reduce(
-                  (sum, product) =>
-                    product.type === "RAMEN" ? sum + product.quantity : sum,
-                  0
-                );
-                const salesmanNonRamenQuantity = salesman.products.reduce(
-                  (sum, product) =>
-                    product.type === "RAMEN" ? sum : sum + product.quantity,
-                  0
-                );
+                const quantityByType: Record<string, number> =
+                  salesman.products.reduce(
+                    (
+                      totals: Record<string, number>,
+                      product: ProductSalesData
+                    ): Record<string, number> => {
+                      const productType: string = product.type || "OTH";
+                      totals[productType] =
+                        (totals[productType] || 0) + product.quantity;
+                      return totals;
+                    },
+                    {}
+                  );
+                const quantityBreakdown: [string, number][] = Object.entries(
+                  quantityByType
+                )
+                  .filter((entry: [string, number]): boolean => entry[1] !== 0)
+                  .sort(
+                    (
+                      firstEntry: [string, number],
+                      secondEntry: [string, number]
+                    ): number => {
+                      const orderDifference: number =
+                        (PRODUCT_TYPE_DISPLAY_ORDER[firstEntry[0]] ??
+                          Number.MAX_SAFE_INTEGER) -
+                        (PRODUCT_TYPE_DISPLAY_ORDER[secondEntry[0]] ??
+                          Number.MAX_SAFE_INTEGER);
+                      return (
+                        orderDifference ||
+                        firstEntry[0].localeCompare(secondEntry[0])
+                      );
+                    }
+                  );
 
                 // Build tooltip text for FOC/RTN breakdown
                 const focTooltip = focProducts
                   .map(
                     (product) =>
-                      `${product.id} · ${product.description}: ${formatProductQuantity(
-                        product.foc,
-                        product.type
+                      `${product.id} · ${product.description}: ${formatQuantity(
+                        product.foc
                       )}`
                   )
                   .join("\n");
                 const rtnTooltip = rtnProducts
                   .map(
                     (product) =>
-                      `${product.id} · ${product.description}: ${formatProductQuantity(
-                        product.returns,
-                        product.type
+                      `${product.id} · ${product.description}: ${formatQuantity(
+                        product.returns
                       )}`
                   )
                   .join("\n");
@@ -1003,10 +1023,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           <HoverTooltip content={focTooltip}>
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 cursor-default">
                               {t("FOC {{total}}", {
-                                total: formatSeparatedQuantity(
-                                  nonRamenFoc,
-                                  ramenFoc
-                                ),
+                                total: formatQuantity(totalFoc),
                               })}
                             </span>
                           </HoverTooltip>
@@ -1015,29 +1032,32 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           <HoverTooltip content={rtnTooltip}>
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 cursor-default">
                               {t("RTN {{total}}", {
-                                total: formatSeparatedQuantity(
-                                  nonRamenReturns,
-                                  ramenReturns
-                                ),
+                                total: formatQuantity(totalRtn),
                               })}
                             </span>
                           </HoverTooltip>
                         )}
-                        {salesmanNonRamenQuantity > 0 && (
+                        {salesman.totalQuantity > 0 && (
                           <span className="text-sky-600 dark:text-sky-400 font-bold">
-                            {t("{{total}} non-Ramen units", {
-                              total: salesmanNonRamenQuantity.toLocaleString(),
-                            })}
+                            {t("Total:")} {formatQuantity(salesman.totalQuantity)}
                           </span>
                         )}
-                        {salesmanRamenQuantity > 0 && (
-                          <span className="text-rose-600 dark:text-rose-400 font-bold">
-                            {t("{{total}} Ramen packets", {
-                              total: salesmanRamenQuantity.toLocaleString(),
-                            })}
-                          </span>
+                        {quantityBreakdown.map(
+                          ([productType, quantity]: [string, number]) => (
+                            <span
+                              key={productType}
+                              className="font-bold"
+                              style={{
+                                color:
+                                  categoryColors[productType] ||
+                                  PRODUCT_TYPE_COLORS.OTHER,
+                              }}
+                            >
+                              {productType}: {formatQuantity(quantity)}
+                            </span>
+                          )
                         )}
-                        {(salesmanNonRamenQuantity > 0 || salesmanRamenQuantity > 0) && (
+                        {salesman.totalQuantity > 0 && (
                           <span className="text-default-400 dark:text-gray-500">·</span>
                         )}
                         <span className="font-bold">{formatCurrency(salesman.totalSales)}</span>
@@ -1084,10 +1104,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                                 </span>
                               </td>
                               <td className="px-4 py-2 text-sm text-right">
-                                {formatProductQuantity(
-                                  product.quantity,
-                                  product.type
-                                )}
+                                {formatQuantity(product.quantity)}
                               </td>
                               <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(product.totalSales)}</td>
                             </tr>
@@ -1118,21 +1135,8 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                   })}
                 </span>
                 <span className="text-sky-600 dark:text-sky-400">
-                  {isJp
-                    ? t("{{total}} units", {
-                        total: summary.nonRamenQuantity.toLocaleString(),
-                      })
-                    : t("{{total}} non-Ramen units", {
-                        total: summary.nonRamenQuantity.toLocaleString(),
-                      })}
+                  {formatQuantity(summary.totalQuantity)}
                 </span>
-                {!isJp && (
-                  <span className="text-rose-600 dark:text-rose-400">
-                    {t("{{total}} Ramen packets", {
-                      total: summary.ramenQuantity.toLocaleString(),
-                    })}
-                  </span>
-                )}
                 <span className="text-default-400 dark:text-gray-500">·</span>
                 <span>{formatCurrency(summary.totalSales)}</span>
               </div>
@@ -1275,13 +1279,13 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           </span>
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
-                          {formatProductQuantity(product.foc, product.type)}
+                          {formatQuantity(product.foc)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
-                          {formatProductQuantity(product.returns, product.type)}
+                          {formatQuantity(product.returns)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right text-default-700 dark:text-gray-200">
-                          {formatProductQuantity(product.quantity, product.type)}
+                          {formatQuantity(product.quantity)}
                         </td>
                         <td className="px-4 py-2 whitespace-nowrap text-base text-right font-medium">
                           {formatCurrency(product.totalSales)}
@@ -1298,10 +1302,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                         {t("Total:")}
                       </td>
                       <td className="px-4 py-2 text-right text-base font-bold">
-                        {formatSeparatedQuantity(
-                          summary.nonRamenQuantity,
-                          isJp ? 0 : summary.ramenQuantity
-                        )}
+                        {formatQuantity(summary.totalQuantity)}
                       </td>
                       <td className="px-4 py-2 text-right text-base font-bold">
                         {formatCurrency(
@@ -1325,7 +1326,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
           </div>
 
           {/* Dashboard content - category doughnut charts without legends */}
-          <div className={`grid grid-cols-1 ${isJp ? "md:grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4"} gap-6`}>
+          <div
+            className={`grid gap-6 ${
+              isJp ? "grid-cols-1" : "grid-cols-2 2xl:grid-cols-4"
+            }`}
+          >
             {/* BH Products Doughnut Chart */}
             {!isJp && (
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
@@ -1342,11 +1347,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1358,6 +1359,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
                             t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
@@ -1417,11 +1421,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1433,6 +1433,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
                             t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
@@ -1492,11 +1495,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1508,8 +1507,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
-                            t("{{amount}} · {{quantity}} packets", {
+                            t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
                               quantity:
                                 props.payload.quantity?.toLocaleString() || 0,
@@ -1529,9 +1531,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     }}
                   >
                     <div>
-                      {t("{{total}} packets", {
-                        total: summary.ramenQuantity.toLocaleString(),
-                      })}
+                      {formatQuantity(summary.ramenQuantity)}
                     </div>
                     <div className="text-sm opacity-80">
                       {t("Total: {{amount}}", {
@@ -1567,11 +1567,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1583,6 +1579,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
                             t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
@@ -1715,14 +1714,24 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     data={yearlyTrendData}
                     margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid
+                      stroke={chartGridColor}
+                      strokeDasharray="3 3"
+                      strokeOpacity={isDarkMode ? 0.55 : 0.75}
+                    />
                     <XAxis
                       dataKey="month"
                       textAnchor="middle"
                       height={80}
                       tickMargin={15}
+                      tick={{ fill: chartTextColor, fontSize: 12 }}
+                      axisLine={{ stroke: chartGridColor }}
+                      tickLine={{ stroke: chartGridColor }}
                     />
                     <YAxis
+                      tick={{ fill: chartTextColor, fontSize: 12 }}
+                      axisLine={{ stroke: chartGridColor }}
+                      tickLine={{ stroke: chartGridColor }}
                       tickFormatter={(value: string | number | bigint) =>
                         new Intl.NumberFormat("en", {
                           notation: "compact",
@@ -1731,12 +1740,22 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                       }
                     />
                     <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      itemStyle={chartTooltipItemStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      cursor={{
+                        fill: isDarkMode
+                          ? "rgba(148, 163, 184, 0.12)"
+                          : "rgba(15, 23, 42, 0.06)",
+                      }}
                       formatter={(value: any) => formatCurrency(Number(value))}
                       itemSorter={(item) =>
                         item.value ? -Number(item.value) : 0
                       }
                     />
-                    <Legend wrapperStyle={{ bottom: 20 }} />
+                    <Legend
+                      wrapperStyle={{ bottom: 20, color: chartTextColor }}
+                    />
                     {yearlyTrendData.length > 0 &&
                       selectedChartProducts.map((key) => {
                           // Get display name for the line

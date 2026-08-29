@@ -20,6 +20,36 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-29",
+    ms: "Analisis Campuran Produk kini memilih lima produk yang paling banyak menjana jualan secara automatik apabila dibuka, dengan pilihan berasingan untuk Tien Hock dan Jelly Polly. Produk pilihan masih boleh diubah.",
+    en: "Product Mix Analysis now automatically selects the five highest-selling products when opened, with separate defaults for Tien Hock and Jelly Polly. You can still change the selected products.",
+  },
+  {
+    date: "2026-08-29",
+    ms: "Halaman Jualan mengikut Pelanggan yang baharu kini menyediakan jumlah jualan, bil dan kuantiti mengikut pelanggan untuk sebarang tempoh, bersama carian, pengisihan, pecahan produk dan carta trend 12 bulan. Menu Jualan kini memaparkan Jualan mengikut Produk, Jurujual dan Pelanggan secara berasingan, dan halaman Pelanggan mempunyai pintasan terus ke laporan pelanggan.",
+    en: "The new Sales by Customer page shows sales, bill and quantity totals by customer for any period, with search, sorting, product breakdowns and a 12-month trend chart. The Sales menu now lists Sales by Products, Salesman and Customer separately, and the Customers page includes a direct shortcut to the customer report.",
+  },
+  {
+    date: "2026-08-29",
+    ms: "Apabila anda membuka pelanggan atau kakitangan daripada senarai invois dan kembali, halaman invois serta kedudukan tatal kini dikekalkan, termasuk pada halaman kedua dan seterusnya.",
+    en: "When you open a customer or staff member from the invoice list and return, the invoice page and scroll position are now preserved, including on page 2 and later.",
+  },
+  {
+    date: "2026-08-29",
+    ms: "Setiap kad invois dalam senarai invois Tien Hock dan Jelly Polly kini mempunyai butang Cetak, supaya anda boleh mencetak satu invois terus tanpa memilihnya untuk tindakan pukal terlebih dahulu.",
+    en: "Each invoice card in the Tien Hock and Jelly Polly invoice lists now has a Print button, so you can print one invoice directly without selecting it for a bulk action first.",
+  },
+  {
+    date: "2026-08-29",
+    ms: "Penapis Jurujual dan Cawangan pada halaman Pelanggan, penapis status dan jobs pada halaman Kakitangan, serta penapis Jurujual pada senarai invois Tien Hock dan Jelly Polly kini dipaparkan sebagai pilihan pill. Pada halaman Pelanggan dan Kakitangan, penapis menggunakan bar khas, manakala pilihan Jurujual pada senarai invois kekal di sebelah carian dan butang penapis. Tajuk halaman, carian dan tindakan pada halaman Pelanggan dan Kakitangan juga kini menggunakan susun atur yang lebih padat dan kekal kelihatan semasa menatal.",
+    en: "Salesman and branch filters on the Customers page, status and job filters on the Staff page, and Salesman filters on the Tien Hock and Jelly Polly invoice lists are now shown as pill choices. The Customers and Staff pages use dedicated filter bars, while the invoice-list Salesman choices remain beside Search and the Filter button. Page titles, search and actions on the Customers and Staff pages also use a more compact layout that stays visible while scrolling.",
+  },
+  {
+    date: "2026-08-29",
+    ms: "Laporan Jualan mengikut Produk, laporan Jualan mengikut Jurujual dan PDF ringkasan jualan kini mengira kuantiti Ramen bersama semua produk lain sebagai unit. Jumlah tidak lagi dipecahkan kepada bukan Ramen dan paket Ramen, dan label PKT berulang telah dibuang. Setiap kad jurujual dalam laporan mengikut Produk turut menunjukkan pecahan unit mengikut setiap jenis produk yang dijual, termasuk Ramen, supaya pecahan sentiasa sepadan dengan jumlah keseluruhan.",
+    en: "Sales by Products, Sales by Salesman and sales-summary PDFs now count Ramen quantities together with all other products as units. Totals are no longer split into non-Ramen units and Ramen packets, and repeated PKT labels have been removed. Each salesman card in Sales by Products also shows units for every product type sold, including Ramen, so the breakdown always reconciles to the overall total.",
+  },
+  {
     date: "2026-08-28",
     ms: "Pembelian yang e-Invoisnya sudah sah kini tidak lagi menunjukkan butang Muat Semula E-Invois. Maklumat e-Invois yang sah masih boleh dibuka melalui butang E-Invoice Details.",
     en: "General purchases with a valid e-Invoice no longer show the Refresh E-Invoice button. You can still open the valid e-Invoice through the E-Invoice Details button.",

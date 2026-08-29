@@ -8,6 +8,7 @@ import React, {
 } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
+  Employee,
   ExtendedInvoiceData,
   InvoiceFilters,
   ProductItem,
@@ -15,6 +16,9 @@ import {
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TimeNavigator from "../../components/TimeNavigator";
+import PillSelect, {
+  PillSelectOption,
+} from "../../components/PillSelect";
 import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu";
 import InvoiceGrid from "../../components/Invoice/InvoiceGrid";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
@@ -55,7 +59,6 @@ import {
 import Pagination from "../../components/Invoice/Pagination";
 import ConsolidatedInvoiceModal from "../../components/Invoice/ConsolidatedInvoiceModal";
 import InvoiceDailyPrintMenu from "../../components/Invoice/InvoiceDailyPrintMenu";
-import StyledListbox from "../../components/StyledListbox";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import { isZeroValueBill } from "../../utils/invoice/invoiceDisplayStatus";
 
@@ -361,9 +364,6 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
   const [searchParams] = useSearchParams();
   const [initialParamsApplied, setInitialParamsApplied] = useState(false);
-  const [selectedSalesmanId, setSelectedSalesmanId] = useState<string | number>(
-    ""
-  );
 
   // Filters State - Initialized with dates from storage, others default
   const initialFilters = useMemo((): InvoiceFilters => {
@@ -381,6 +381,14 @@ const InvoiceListPage: React.FC = () => {
     };
   }, [savedSessionState]);
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
+  const selectedSalesmanIds: ReadonlyArray<string> =
+    filters.salespersonId ?? [];
+  const selectedSalesmanId: string =
+    selectedSalesmanIds.length === 1
+      ? selectedSalesmanIds[0]
+      : selectedSalesmanIds.length > 1
+      ? "__multiple_salesmen__"
+      : "";
 
   const DEFAULT_FILTERS: InvoiceFilters = {
     dateRange: getInitialDates(), // This will be overridden in actual usage
@@ -422,16 +430,19 @@ const InvoiceListPage: React.FC = () => {
   // Fetch customer names based on IDs present in the currently loaded invoices
   const { customerNames } = useCustomerNames(customerIds);
 
-  // Salesman options for single selection dropdown
-  const salesmanOptions = useMemo(() => {
-    const options = [{ id: "", name: "All Salesmen" }];
-    return options.concat(
-      salesmen.map((s) => ({
-        id: s.id,
-        name: s.name || s.id,
-      }))
-    );
-  }, [salesmen]);
+  // Salesman options for the compact single-selection pill row
+  const salesmanOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    (): ReadonlyArray<PillSelectOption<string>> => [
+      { value: "", label: t("All Salesmen") },
+      ...salesmen.map(
+        (salesman: Employee): PillSelectOption<string> => ({
+          value: salesman.id,
+          label: salesman.name || salesman.id,
+        })
+      ),
+    ],
+    [salesmen, t]
+  );
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -537,26 +548,19 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [currentPage, filters, searchTerm, initialParamsApplied]);
 
-  // Clear session state when navigating away from the app entirely
+  // Clear session state on a full page reload/exit. Keep it across in-app
+  // navigation so Back can restore this page and its scroll position.
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = (): void => {
       clearSessionState();
     };
 
-    // Listen for route changes
-    if (location.pathname.includes("/sales/invoice")) {
-      window.addEventListener("beforeunload", handleBeforeUnload);
-    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Clear session state when component unmounts and not navigating to another invoice page
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes("/sales/invoice")) {
-        clearSessionState();
-      }
     };
-  }, [location, navigate]);
+  }, []);
 
   // Effect: Process customerId URL parameter ONCE after mount
   useEffect(() => {
@@ -707,31 +711,16 @@ const InvoiceListPage: React.FC = () => {
 
   // Single Salesman Selection Handler
   const handleSalesmanChange = useCallback(
-    (salesmanId: string | number) => {
-      setSelectedSalesmanId(salesmanId);
-
+    (salesmanId: string): void => {
       // Update filters to sync with the single selection
       const updatedFilters: InvoiceFilters = {
         ...filters,
-        salespersonId: salesmanId === "" ? null : [salesmanId as string],
+        salespersonId: salesmanId === "" ? null : [salesmanId],
       };
       handleApplyFilters(updatedFilters);
     },
     [filters, handleApplyFilters]
   );
-
-  // Effect to sync selectedSalesmanId with filters when filters change externally
-  useEffect(() => {
-    const currentSalespersonIds = filters.salespersonId;
-    if (!currentSalespersonIds || currentSalespersonIds.length === 0) {
-      setSelectedSalesmanId("");
-    } else if (currentSalespersonIds.length === 1) {
-      setSelectedSalesmanId(currentSalespersonIds[0]);
-    } else {
-      // Multiple salesmen selected - show empty for single dropdown
-      setSelectedSalesmanId("");
-    }
-  }, [filters.salespersonId]);
 
   // Search Handlers - Update state locally, trigger fetch on blur/enter
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1524,6 +1513,31 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const handlePrintInvoice = async (invoiceId: string): Promise<void> => {
+    const toastId: string = toast.loading(
+      t("Preparing {{total}} invoice for printing...", { total: 1 })
+    );
+
+    try {
+      const invoiceData: ExtendedInvoiceData[] = await getInvoicesByIds([
+        invoiceId,
+      ]);
+      const invoiceToPrint: ExtendedInvoiceData | undefined = invoiceData[0];
+
+      if (!invoiceToPrint) {
+        toast.error(t("Failed to prepare print view"), { id: toastId });
+        return;
+      }
+
+      setSelectedInvoicesForPDF([invoiceToPrint]);
+      setShowSoloPrintOverlay(true);
+      toast.success(t("Opening print dialog..."), { id: toastId });
+    } catch (error: unknown) {
+      console.error("Error preparing invoice for print:", error);
+      toast.dismiss(toastId);
+    }
+  };
+
   // Bulk Print PDF Handler
   const handleBulkPrint = async () => {
     if (selectedInvoiceIds.size === 0) {
@@ -1626,10 +1640,10 @@ const InvoiceListPage: React.FC = () => {
           </div>
 
           {/* Right: Search and Filters */}
-          <div className="flex items-center gap-2 h-10">
+          <div className="flex flex-wrap items-center justify-end gap-2 min-h-10">
             {/* Search Input */}
             <div
-              className="relative flex-1 xl:flex-none xl:w-48 h-10"
+              className="relative flex-1 min-w-40 xl:flex-none xl:w-48 h-10"
               title={t(
                 "Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
               )}
@@ -1659,19 +1673,15 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Salesman Filter */}
-            <div className="w-36 h-10">
-              <StyledListbox
-                value={selectedSalesmanId}
-                onChange={handleSalesmanChange}
-                options={salesmanOptions.map((option) => ({
-                  ...option,
-                  name: option.id === "" ? t("All Salesmen") : option.name,
-                }))}
-                placeholder={t("All Salesmen")}
-                rounded="lg"
-                className="h-10"
-              />
-            </div>
+            <PillSelect<string>
+              value={selectedSalesmanId}
+              onChange={handleSalesmanChange}
+              options={salesmanOptions}
+              className="max-w-full justify-end [&>button]:h-10"
+              ariaLabel={t("Salesman")}
+              size="md"
+              rounded="lg"
+            />
 
             {/* Filter Menu Button */}
             <div className="relative flex-shrink-0 h-10">
@@ -1845,6 +1855,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
           </div>
         </div>
+
         {/* --- Batch Action Bar --- */}
         <div
           className={`p-3 ${
@@ -2080,6 +2091,7 @@ const InvoiceListPage: React.FC = () => {
               selectedInvoiceIds={selectedInvoiceIds}
               onSelectInvoice={handleSelectInvoice}
               onViewDetails={handleViewDetails}
+              onPrintInvoice={handlePrintInvoice}
               isLoading={false} // Grid itself isn't loading, page is
               error={null}
               customerNames={customerNames} // Pass customer names for display
