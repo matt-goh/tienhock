@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-29",
+    ms: "Penapis Jurujual dan Cawangan pada halaman Pelanggan, serta penapis status dan jobs pada halaman Kakitangan, kini dipaparkan sebagai pilihan pill dalam bar penapis khas. Tajuk halaman, carian dan tindakan juga kini menggunakan susun atur yang lebih padat dan kekal kelihatan semasa menatal.",
+    en: "Salesman and branch filters on the Customers page, and status and job filters on the Staff page, are now shown as pill choices in dedicated filter bars. Page titles, search and actions also use a more compact layout that stays visible while scrolling.",
+  },
+  {
+    date: "2026-08-29",
     ms: "Laporan Jualan mengikut Produk, laporan Jualan mengikut Jurujual dan PDF ringkasan jualan kini mengira kuantiti Ramen bersama semua produk lain sebagai unit. Jumlah tidak lagi dipecahkan kepada bukan Ramen dan paket Ramen, dan label PKT berulang telah dibuang. Setiap kad jurujual dalam laporan mengikut Produk turut menunjukkan pecahan unit mengikut setiap jenis produk yang dijual, termasuk Ramen, supaya pecahan sentiasa sepadan dengan jumlah keseluruhan.",
     en: "Sales by Products, Sales by Salesman and sales-summary PDFs now count Ramen quantities together with all other products as units. Totals are no longer split into non-Ramen units and Ramen packets, and repeated PKT labels have been removed. Each salesman card in Sales by Products also shows units for every product type sold, including Ramen, so the breakdown always reconciles to the overall total.",
   },
