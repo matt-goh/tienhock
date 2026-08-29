@@ -39,6 +39,7 @@
   "Branches ({{total}})": "分支机构 ({{total}})",
   "Branches": "分支机构",
   "Add Customer": "添加客户",
+  "Sales by Customer": "按客户统计销售",
   "Customers ({{total}})": "客户 ({{total}})",
   "No customers found.": "未找到客户。",
   "Previous": "上一页",

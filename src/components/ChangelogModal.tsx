@@ -21,6 +21,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-29",
+    ms: "Analisis Campuran Produk kini memilih lima produk yang paling banyak menjana jualan secara automatik apabila dibuka, dengan pilihan berasingan untuk Tien Hock dan Jelly Polly. Produk pilihan masih boleh diubah.",
+    en: "Product Mix Analysis now automatically selects the five highest-selling products when opened, with separate defaults for Tien Hock and Jelly Polly. You can still change the selected products.",
+  },
+  {
+    date: "2026-08-29",
+    ms: "Halaman Jualan mengikut Pelanggan yang baharu kini menyediakan jumlah jualan, bil dan kuantiti mengikut pelanggan untuk sebarang tempoh, bersama carian, pengisihan, pecahan produk dan carta trend 12 bulan. Menu Jualan kini memaparkan Jualan mengikut Produk, Jurujual dan Pelanggan secara berasingan, dan halaman Pelanggan mempunyai pintasan terus ke laporan pelanggan.",
+    en: "The new Sales by Customer page shows sales, bill and quantity totals by customer for any period, with search, sorting, product breakdowns and a 12-month trend chart. The Sales menu now lists Sales by Products, Salesman and Customer separately, and the Customers page includes a direct shortcut to the customer report.",
+  },
+  {
+    date: "2026-08-29",
     ms: "Apabila anda membuka pelanggan atau kakitangan daripada senarai invois dan kembali, halaman invois serta kedudukan tatal kini dikekalkan, termasuk pada halaman kedua dan seterusnya.",
     en: "When you open a customer or staff member from the invoice list and return, the invoice page and scroll position are now preserved, including on page 2 and later.",
   },

@@ -29,6 +29,7 @@ import {
   usePersistedMonth,
 } from "../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
+import { useTheme } from "../../contexts/ThemeContext";
 
 // Define interfaces
 interface SalesmanData {
@@ -106,6 +107,23 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   scope = "tienhock",
 }) => {
   const { t } = useTranslation("sales");
+  const { isDarkMode } = useTheme();
+  const chartTextColor: string = isDarkMode ? "#e5e7eb" : "#4b5563";
+  const chartGridColor: string = isDarkMode ? "#64748b" : "#d1d5db";
+  const chartTooltipStyle: React.CSSProperties = {
+    backgroundColor: isDarkMode ? "#111827" : "#ffffff",
+    border: `1px solid ${isDarkMode ? "#4b5563" : "#d1d5db"}`,
+    borderRadius: "0.5rem",
+    color: isDarkMode ? "#f9fafb" : "#111827",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.18)",
+  };
+  const chartTooltipItemStyle: React.CSSProperties = {
+    color: isDarkMode ? "#e5e7eb" : "#374151",
+  };
+  const chartTooltipLabelStyle: React.CSSProperties = {
+    color: isDarkMode ? "#f9fafb" : "#111827",
+    fontWeight: 600,
+  };
   // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
     `salesBySalesmanMonth:${scope}`
@@ -481,6 +499,18 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
               >
                 {t("Salesman")}
               </button>
+              {scope === "tienhock" && (
+                <button
+                  onClick={() => onTabChange(2)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 2
+                      ? "bg-white dark:bg-gray-600 text-default-900 dark:text-gray-100 shadow-sm"
+                      : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
+                  }`}
+                >
+                  {t("Customer")}
+                </button>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -721,17 +751,37 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                       layout="vertical"
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      <XAxis type="number" />
+                      <CartesianGrid
+                        stroke={chartGridColor}
+                        strokeDasharray="3 3"
+                        strokeOpacity={isDarkMode ? 0.55 : 0.75}
+                      />
+                      <XAxis
+                        type="number"
+                        tick={{ fill: chartTextColor, fontSize: 12 }}
+                        axisLine={{ stroke: chartGridColor }}
+                        tickLine={{ stroke: chartGridColor }}
+                      />
                       <YAxis
                         type="category"
                         dataKey="id"
                         width={80}
-                        tick={{ fontSize: 12 }}
+                        tick={{ fill: chartTextColor, fontSize: 12 }}
+                        axisLine={{ stroke: chartGridColor }}
+                        tickLine={{ stroke: chartGridColor }}
                       />
                       <Tooltip
+                        contentStyle={chartTooltipStyle}
+                        itemStyle={chartTooltipItemStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        cursor={{
+                          fill: isDarkMode
+                            ? "rgba(148, 163, 184, 0.12)"
+                            : "rgba(15, 23, 42, 0.06)",
+                        }}
                         formatter={(value) => formatCurrency(Number(value))}
                       />
-                      <Legend />
+                      <Legend wrapperStyle={{ color: chartTextColor }} />
                       <Bar
                         dataKey="totalSales"
                         name={t("Sales")}
@@ -764,9 +814,21 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                       }))}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="id" />
+                      <CartesianGrid
+                        stroke={chartGridColor}
+                        strokeDasharray="3 3"
+                        strokeOpacity={isDarkMode ? 0.55 : 0.75}
+                      />
+                      <XAxis
+                        dataKey="id"
+                        tick={{ fill: chartTextColor, fontSize: 12 }}
+                        axisLine={{ stroke: chartGridColor }}
+                        tickLine={{ stroke: chartGridColor }}
+                      />
                       <YAxis
+                        tick={{ fill: chartTextColor, fontSize: 12 }}
+                        axisLine={{ stroke: chartGridColor }}
+                        tickLine={{ stroke: chartGridColor }}
                         tickFormatter={(value) =>
                           new Intl.NumberFormat("en", {
                             notation: "compact",
@@ -775,9 +837,17 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         }
                       />
                       <Tooltip
+                        contentStyle={chartTooltipStyle}
+                        itemStyle={chartTooltipItemStyle}
+                        labelStyle={chartTooltipLabelStyle}
+                        cursor={{
+                          fill: isDarkMode
+                            ? "rgba(148, 163, 184, 0.12)"
+                            : "rgba(15, 23, 42, 0.06)",
+                        }}
                         formatter={(value) => formatCurrency(Number(value))}
                       />
-                      <Legend />
+                      <Legend wrapperStyle={{ color: chartTextColor }} />
                       <Bar
                         dataKey="averageSale"
                         name={t("Average Sale")}
@@ -864,14 +934,24 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                     data={salesTrendData}
                     margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid
+                      stroke={chartGridColor}
+                      strokeDasharray="3 3"
+                      strokeOpacity={isDarkMode ? 0.55 : 0.75}
+                    />
                     <XAxis
                       dataKey="month"
                       textAnchor="middle"
                       height={80}
                       tickMargin={15}
+                      tick={{ fill: chartTextColor, fontSize: 12 }}
+                      axisLine={{ stroke: chartGridColor }}
+                      tickLine={{ stroke: chartGridColor }}
                     />
                     <YAxis
+                      tick={{ fill: chartTextColor, fontSize: 12 }}
+                      axisLine={{ stroke: chartGridColor }}
+                      tickLine={{ stroke: chartGridColor }}
                       tickFormatter={(value) =>
                         new Intl.NumberFormat("en", {
                           notation: "compact",
@@ -880,12 +960,22 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                       }
                     />
                     <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      itemStyle={chartTooltipItemStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      cursor={{
+                        fill: isDarkMode
+                          ? "rgba(148, 163, 184, 0.12)"
+                          : "rgba(15, 23, 42, 0.06)",
+                      }}
                       formatter={(value) => formatCurrency(Number(value))}
                       itemSorter={(item) =>
                         item.value ? -Number(item.value) : 0
                       }
                     />
-                    <Legend wrapperStyle={{ bottom: 20 }} />
+                    <Legend
+                      wrapperStyle={{ bottom: 20, color: chartTextColor }}
+                    />
                     {/* Only show lines for salesmen who have data */}
                     {selectedChartSalesmen.map((salesmanId) => (
                       <Line

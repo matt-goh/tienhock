@@ -574,11 +574,6 @@ export const TienHockNavData: SidebarItem[] = [
         ],
       },
       {
-        name: "Summary",
-        path: "/sales/summary",
-        component: SalesSummaryPage,
-      },
-      {
         name: "Payments",
         path: "/sales/payments",
         component: PaymentPage,
@@ -614,6 +609,28 @@ export const TienHockNavData: SidebarItem[] = [
             component: AdjustmentDocsDetailsPage,
           },
         ],
+      },
+      {
+        name: "Sales by Products",
+        path: "/sales/summary/products",
+        component: SalesSummaryPage,
+        subItems: [
+          {
+            name: "Sales Summary",
+            path: "/sales/summary",
+            component: SalesSummaryPage,
+          },
+        ],
+      },
+      {
+        name: "Sales by Salesman",
+        path: "/sales/summary/salesman",
+        component: SalesSummaryPage,
+      },
+      {
+        name: "Sales by Customer",
+        path: "/sales/summary/customer",
+        component: SalesSummaryPage,
       },
     ],
   },

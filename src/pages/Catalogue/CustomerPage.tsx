@@ -8,6 +8,7 @@ import {
   IconPlus,
   IconRefresh,
   IconBuildingSkyscraper,
+  IconChartBar,
   IconX,
 } from "@tabler/icons-react";
 import { toast } from "react-hot-toast";
@@ -449,6 +450,13 @@ const CustomerPage: React.FC = () => {
             {branchGroupNames.length > 0
               ? t("Branches ({{total}})", { total: branchGroupNames.length })
               : t("Branches")}
+          </Button>
+          <Button
+            onClick={() => navigate("/sales/summary/customer")}
+            variant="outline"
+            icon={IconChartBar}
+          >
+            {t("Sales by Customer")}
           </Button>
           <Button
             onClick={() => navigate("/catalogue/customer/new")}
