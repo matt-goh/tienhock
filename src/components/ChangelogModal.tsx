@@ -21,6 +21,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-29",
+    ms: "Apabila anda membuka pelanggan atau kakitangan daripada senarai invois dan kembali, halaman invois serta kedudukan tatal kini dikekalkan, termasuk pada halaman kedua dan seterusnya.",
+    en: "When you open a customer or staff member from the invoice list and return, the invoice page and scroll position are now preserved, including on page 2 and later.",
+  },
+  {
+    date: "2026-08-29",
+    ms: "Setiap kad invois dalam senarai invois Tien Hock dan Jelly Polly kini mempunyai butang Cetak, supaya anda boleh mencetak satu invois terus tanpa memilihnya untuk tindakan pukal terlebih dahulu.",
+    en: "Each invoice card in the Tien Hock and Jelly Polly invoice lists now has a Print button, so you can print one invoice directly without selecting it for a bulk action first.",
+  },
+  {
+    date: "2026-08-29",
     ms: "Penapis Jurujual dan Cawangan pada halaman Pelanggan, serta penapis status dan jobs pada halaman Kakitangan, kini dipaparkan sebagai pilihan pill dalam bar penapis khas. Tajuk halaman, carian dan tindakan juga kini menggunakan susun atur yang lebih padat dan kekal kelihatan semasa menatal.",
     en: "Salesman and branch filters on the Customers page, and status and job filters on the Staff page, are now shown as pill choices in dedicated filter bars. Page titles, search and actions also use a more compact layout that stays visible while scrolling.",
   },
