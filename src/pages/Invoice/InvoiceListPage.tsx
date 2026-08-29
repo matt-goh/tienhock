@@ -537,26 +537,19 @@ const InvoiceListPage: React.FC = () => {
     }
   }, [currentPage, filters, searchTerm, initialParamsApplied]);
 
-  // Clear session state when navigating away from the app entirely
+  // Clear session state on a full page reload/exit. Keep it across in-app
+  // navigation so Back can restore this page and its scroll position.
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = (): void => {
       clearSessionState();
     };
 
-    // Listen for route changes
-    if (location.pathname.includes("/sales/invoice")) {
-      window.addEventListener("beforeunload", handleBeforeUnload);
-    }
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Clear session state when component unmounts and not navigating to another invoice page
-      const currentPath = window.location.pathname;
-      if (!currentPath.includes("/sales/invoice")) {
-        clearSessionState();
-      }
     };
-  }, [location, navigate]);
+  }, []);
 
   // Effect: Process customerId URL parameter ONCE after mount
   useEffect(() => {
@@ -1524,6 +1517,31 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
+  const handlePrintInvoice = async (invoiceId: string): Promise<void> => {
+    const toastId: string = toast.loading(
+      t("Preparing {{total}} invoice for printing...", { total: 1 })
+    );
+
+    try {
+      const invoiceData: ExtendedInvoiceData[] = await getInvoicesByIds([
+        invoiceId,
+      ]);
+      const invoiceToPrint: ExtendedInvoiceData | undefined = invoiceData[0];
+
+      if (!invoiceToPrint) {
+        toast.error(t("Failed to prepare print view"), { id: toastId });
+        return;
+      }
+
+      setSelectedInvoicesForPDF([invoiceToPrint]);
+      setShowSoloPrintOverlay(true);
+      toast.success(t("Opening print dialog..."), { id: toastId });
+    } catch (error: unknown) {
+      console.error("Error preparing invoice for print:", error);
+      toast.dismiss(toastId);
+    }
+  };
+
   // Bulk Print PDF Handler
   const handleBulkPrint = async () => {
     if (selectedInvoiceIds.size === 0) {
@@ -2080,6 +2098,7 @@ const InvoiceListPage: React.FC = () => {
               selectedInvoiceIds={selectedInvoiceIds}
               onSelectInvoice={handleSelectInvoice}
               onViewDetails={handleViewDetails}
+              onPrintInvoice={handlePrintInvoice}
               isLoading={false} // Grid itself isn't loading, page is
               error={null}
               customerNames={customerNames} // Pass customer names for display

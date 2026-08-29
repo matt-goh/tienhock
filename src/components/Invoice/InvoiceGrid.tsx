@@ -10,6 +10,7 @@ interface InvoiceGridProps {
   selectedInvoiceIds: Set<string>;
   onSelectInvoice: (invoiceId: string) => void;
   onViewDetails: (invoiceId: string) => void;
+  onPrintInvoice: (invoiceId: string) => Promise<void>;
   isLoading: boolean;
   error: string | null;
   customerNames: Record<string, string>;
@@ -20,6 +21,7 @@ const InvoiceGrid: React.FC<InvoiceGridProps> = ({
   selectedInvoiceIds,
   onSelectInvoice,
   onViewDetails,
+  onPrintInvoice,
   isLoading,
   error,
 }) => {
@@ -62,6 +64,7 @@ const InvoiceGrid: React.FC<InvoiceGridProps> = ({
           isSelected={selectedInvoiceIds.has(invoice.id)}
           onSelect={onSelectInvoice}
           onViewDetails={onViewDetails}
+          onPrintInvoice={onPrintInvoice}
         />
       ))}
     </div>

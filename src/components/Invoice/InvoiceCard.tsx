@@ -14,6 +14,8 @@ import {
   IconCircleCheck,
   IconFiles,
   IconMinus,
+  IconLoader2,
+  IconPrinter,
 } from "@tabler/icons-react";
 import {
   formatDisplayDate,
@@ -34,6 +36,7 @@ interface InvoiceCardProps {
   isSelected: boolean;
   onSelect: (id: string) => void;
   onViewDetails: (id: string) => void;
+  onPrintInvoice: (id: string) => Promise<void>;
   salesmanName?: string | null;
 }
 
@@ -270,6 +273,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   isSelected,
   onSelect,
   onViewDetails,
+  onPrintInvoice,
 }) => {
   const { date } = parseDatabaseTimestamp(invoice.createddate);
   const invoiceDisplayStatus: InvoiceDisplayStatus = getInvoiceDisplayStatus(
@@ -291,6 +295,11 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
   const { activeCompany } = useCompany();
   const navigate = useNavigate();
   const { t } = useTranslation("invoice");
+  const [isPreparingPrint, setIsPreparingPrint] =
+    React.useState<boolean>(false);
+  const invoiceDisplayId: string = `${
+    invoice.paymenttype === "CASH" ? "C" : "I"
+  }${invoice.id}`;
   const amountAdjustmentSummary: InvoiceAmountAdjustmentSummary =
     getAmountAdjustmentSummary(invoice);
 
@@ -321,6 +330,20 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
     onSelect(invoice.id);
   };
 
+  const handlePrintClick = async (
+    e: React.MouseEvent<HTMLButtonElement>
+  ): Promise<void> => {
+    e.stopPropagation();
+    if (isPreparingPrint) return;
+
+    setIsPreparingPrint(true);
+    try {
+      await onPrintInvoice(invoice.id);
+    } finally {
+      setIsPreparingPrint(false);
+    }
+  };
+
   return (
     <div
       className={`relative border rounded-lg overflow-hidden bg-white dark:bg-gray-800 transition-shadow duration-200 group
@@ -330,7 +353,7 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
             : "shadow-sm hover:shadow-md"
         }
         ${invoiceStatusStyle.border}
-        p-4 space-y-3`}
+        p-4`}
       onClick={handleCardClick} // Overall card click for navigation
     >
       {/* Header - Now includes checkbox and is clickable for selection */}
@@ -377,10 +400,10 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
       </div>
 
       {/* Body - Uses parent's horizontal padding */}
-      <div className="space-y-2">
+      <div className="mt-3">
         <p className="flex flex-col w-auto font-medium">
           <span
-            className="w-auto truncate text-default-800 dark:text-gray-200 hover:underline cursor-pointer"
+            className="w-fit max-w-full truncate text-default-800 dark:text-gray-200 hover:underline cursor-pointer"
             title={`${invoice.customerName} (${invoice.customerid})`}
             onClick={(e) => {
               e.stopPropagation();
@@ -419,78 +442,94 @@ const InvoiceCard: React.FC<InvoiceCardProps> = ({
       </div>
 
       {/* Footer - Uses parent's horizontal padding */}
-      <div className="flex flex-wrap gap-x-2 gap-y-1 items-center">
-        {/* Invoice Status - Make Unpaid and Overdue clickable */}
-        <span
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            invoiceStatusStyle.bg
-          } ${invoiceStatusStyle.text} ${
-            invoiceStatusStyle.label === "Unpaid" ||
-            invoiceStatusStyle.label === "Overdue"
-              ? "cursor-pointer hover:brightness-95"
-              : ""
-          }`}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (
+      <div className="flex items-end gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap gap-x-2 gap-y-1 items-center">
+          {/* Invoice Status - Make Unpaid and Overdue clickable */}
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              invoiceStatusStyle.bg
+            } ${invoiceStatusStyle.text} ${
               invoiceStatusStyle.label === "Unpaid" ||
               invoiceStatusStyle.label === "Overdue"
-            ) {
-              // Navigate directly to details page with payment form open
-              const basePath =
-                activeCompany.id === "jellypolly" ? "/jellypolly" : "";
-              navigate(`${basePath}/sales/invoice/${invoice.id}`, {
-                state: { showPaymentForm: true },
-              });
-            }
-          }}
-        >
-          {t(invoiceStatusStyle.label)}
-        </span>
-        {/* E-Invoice Status */}
-        {eInvoiceStatusInfo &&
-          EInvoiceIcon &&
-          (invoice.long_id ? (
+                ? "cursor-pointer hover:brightness-95"
+                : ""
+            }`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (
+                invoiceStatusStyle.label === "Unpaid" ||
+                invoiceStatusStyle.label === "Overdue"
+              ) {
+                // Navigate directly to details page with payment form open
+                const basePath =
+                  activeCompany.id === "jellypolly" ? "/jellypolly" : "";
+                navigate(`${basePath}/sales/invoice/${invoice.id}`, {
+                  state: { showPaymentForm: true },
+                });
+              }
+            }}
+          >
+            {t(invoiceStatusStyle.label)}
+          </span>
+          {/* E-Invoice Status */}
+          {eInvoiceStatusInfo &&
+            EInvoiceIcon &&
+            (invoice.long_id ? (
+              <a
+                href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
+                title={t("e-Invoice: {{status}}", {
+                  status: t(eInvoiceStatusInfo.text),
+                })}
+              >
+                <EInvoiceIcon size={14} className="mr-1" />
+                {t(eInvoiceStatusInfo.label)}
+              </a>
+            ) : (
+              <span
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
+                title={t("e-Invoice: {{status}}", {
+                  status: t(eInvoiceStatusInfo.text),
+                })}
+              >
+                <EInvoiceIcon size={14} className="mr-1" />
+                {t(eInvoiceStatusInfo.label)}
+              </span>
+            ))}
+          {/* Consolidated Status - add this */}
+          {consolidatedStatusInfo && ConsolidatedIcon && (
             <a
-              href={`https://myinvois.hasil.gov.my/${invoice.uuid}/share/${invoice.long_id}`}
+              href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color} hover:underline`}
-              title={t("e-Invoice: {{status}}", {
-                status: t(eInvoiceStatusInfo.text),
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${consolidatedStatusInfo.color} hover:underline`}
+              title={t("Part of consolidated invoice {{id}}", {
+                id: consolidatedStatusInfo.info.id,
               })}
             >
-              <EInvoiceIcon size={14} className="mr-1" />
-              {t(eInvoiceStatusInfo.label)}
+              <ConsolidatedIcon size={14} className="mr-1" />
+              {t("Consolidated")}
             </a>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handlePrintClick}
+          disabled={isPreparingPrint}
+          className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md border border-default-200 bg-default-50 text-default-600 opacity-100 transition-all hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 focus:outline-none focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 disabled:cursor-wait dark:border-gray-600 dark:bg-gray-700/60 dark:text-gray-300 dark:hover:border-indigo-500 dark:hover:bg-indigo-900/40 dark:hover:text-indigo-300 dark:focus-visible:ring-offset-gray-800 [@media(hover:hover)]:pointer-events-none [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:pointer-events-auto [@media(hover:hover)]:group-hover:opacity-100"
+          title={t("Print PDF")}
+          aria-label={t("Print PDF for {{id}}", { id: invoiceDisplayId })}
+        >
+          {isPreparingPrint ? (
+            <IconLoader2 size={17} stroke={1.8} className="animate-spin" />
           ) : (
-            <span
-              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-opacity-10 ${eInvoiceStatusInfo.color}`}
-              title={t("e-Invoice: {{status}}", {
-                status: t(eInvoiceStatusInfo.text),
-              })}
-            >
-              <EInvoiceIcon size={14} className="mr-1" />
-              {t(eInvoiceStatusInfo.label)}
-            </span>
-          ))}
-        {/* Consolidated Status - add this */}
-        {consolidatedStatusInfo && ConsolidatedIcon && (
-          <a
-            href={`https://myinvois.hasil.gov.my/${consolidatedStatusInfo.info.uuid}/share/${consolidatedStatusInfo.info.long_id}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${consolidatedStatusInfo.color} hover:underline`}
-            title={t("Part of consolidated invoice {{id}}", {
-              id: consolidatedStatusInfo.info.id,
-            })}
-          >
-            <ConsolidatedIcon size={14} className="mr-1" />
-            {t("Consolidated")}
-          </a>
-        )}
+            <IconPrinter size={17} stroke={1.8} />
+          )}
+        </button>
       </div>
     </div>
   );
