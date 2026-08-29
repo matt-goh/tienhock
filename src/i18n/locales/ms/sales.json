@@ -8,7 +8,7 @@
   "{{units}} units + {{packets}} PKT": "{{units}} unit + {{packets}} PKT",
   "Ramen Products Distribution": "Taburan Produk Ramen",
   "No Ramen products data available": "Tiada data produk Ramen tersedia",
-  "{{amount}} · {{quantity}} packets": "{{amount}} · {{quantity}} paket",
+  "{{amount}} · {{quantity}} units": "{{amount}} · {{quantity}} unit",
   "All Ramen Products": "Semua Produk Ramen",
   "Non-Ramen Qty": "Kuantiti Bukan Ramen",
   "Ramen (PKT)": "Ramen (PKT)",

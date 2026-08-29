@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-29",
+    ms: "Laporan Jualan mengikut Produk, laporan Jualan mengikut Jurujual dan PDF ringkasan jualan kini mengira kuantiti Ramen bersama semua produk lain sebagai unit. Jumlah tidak lagi dipecahkan kepada bukan Ramen dan paket Ramen, dan label PKT berulang telah dibuang. Setiap kad jurujual dalam laporan mengikut Produk turut menunjukkan pecahan unit mengikut setiap jenis produk yang dijual, termasuk Ramen, supaya pecahan sentiasa sepadan dengan jumlah keseluruhan.",
+    en: "Sales by Products, Sales by Salesman and sales-summary PDFs now count Ramen quantities together with all other products as units. Totals are no longer split into non-Ramen units and Ramen packets, and repeated PKT labels have been removed. Each salesman card in Sales by Products also shows units for every product type sold, including Ramen, so the breakdown always reconciles to the overall total.",
+  },
+  {
     date: "2026-08-28",
     ms: "Pembelian yang e-Invoisnya sudah sah kini tidak lagi menunjukkan butang Muat Semula E-Invois. Maklumat e-Invois yang sah masih boleh dibuka melalui butang E-Invoice Details.",
     en: "General purchases with a valid e-Invoice no longer show the Refresh E-Invoice button. You can still open the valid e-Invoice through the E-Invoice Details button.",

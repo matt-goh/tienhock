@@ -8,7 +8,7 @@
   "{{units}} units + {{packets}} PKT": "{{units}} 个单位 + {{packets}} PKT",
   "Ramen Products Distribution": "拉面产品分布",
   "No Ramen products data available": "暂无拉面产品数据",
-  "{{amount}} · {{quantity}} packets": "{{amount}} · {{quantity}} 包",
+  "{{amount}} · {{quantity}} units": "{{amount}} · {{quantity}} 个单位",
   "All Ramen Products": "所有拉面产品",
   "Non-Ramen Qty": "非拉面数量",
   "Ramen (PKT)": "拉面 (PKT)",
