@@ -20,11 +20,13 @@ import {
   Line,
   CartesianGrid,
 } from "recharts";
+import type { PieLabelRenderProps } from "recharts";
 import { useProductsCache } from "../../utils/invoice/useProductsCache";
 import Button from "../../components/Button";
 import SalesSummarySelectionTooltip from "../../components/Sales/SalesSummarySelectionTooltip";
 import HoverTooltip from "../../components/HoverTooltip";
 import { SalesSummaryScope } from "../../utils/sales/SalesSummaryPDF";
+import { useTheme } from "../../contexts/ThemeContext";
 import {
   reviveDate,
   usePersistedFilters,
@@ -77,6 +79,12 @@ const PRODUCT_TYPE_DISPLAY_ORDER: Record<string, number> = {
   JP: 4,
 };
 
+// Top five products by sales value in the latest 12-month reporting period.
+const DEFAULT_PRODUCT_MIX_PRODUCTS: Record<SalesSummaryScope, readonly string[]> = {
+  tienhock: ["2-BCM3", "2-BH", "1-MNL", "2-BNL(5)", "1-2UDG"],
+  jp: ["S-25ML", "MEQ-60ML", "MEQ-25ML", "S-60ML", "AQ-60ML"],
+};
+
 const getStableTypeColor = (type: string): string => {
   if (PRODUCT_TYPE_COLORS[type]) return PRODUCT_TYPE_COLORS[type];
 
@@ -111,6 +119,44 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   scope = "tienhock",
 }) => {
   const { t } = useTranslation("sales");
+  const { isDarkMode } = useTheme();
+  const chartTextColor: string = isDarkMode ? "#e5e7eb" : "#4b5563";
+  const chartGridColor: string = isDarkMode ? "#64748b" : "#d1d5db";
+  const chartTooltipStyle: React.CSSProperties = {
+    backgroundColor: isDarkMode ? "#111827" : "#ffffff",
+    border: `1px solid ${isDarkMode ? "#4b5563" : "#d1d5db"}`,
+    borderRadius: "0.5rem",
+    color: isDarkMode ? "#f9fafb" : "#111827",
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.18)",
+  };
+  const chartTooltipLabelStyle: React.CSSProperties = {
+    color: isDarkMode ? "#f9fafb" : "#111827",
+    fontWeight: 600,
+  };
+  const chartTooltipItemStyle: React.CSSProperties = {
+    color: isDarkMode ? "#e5e7eb" : "#374151",
+  };
+  const renderPieLabel = (
+    labelProps: PieLabelRenderProps
+  ): React.ReactElement | null => {
+    const { name, percent, quantity, x, y, textAnchor } = labelProps;
+    if ((percent ?? 0) <= 0.05) return null;
+
+    return (
+      <text
+        x={x}
+        y={y}
+        textAnchor={textAnchor as "start" | "middle" | "end"}
+        fill={chartTextColor}
+        stroke="none"
+        dominantBaseline="middle"
+      >
+        {`${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${Number(
+          quantity || 0
+        ).toLocaleString()})`}
+      </text>
+    );
+  };
   const isJp = scope === "jp";
   // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
@@ -237,27 +283,16 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
   // Initialize selected products when product options are available
   useEffect(() => {
     if (productOptions.length > 0) {
-      const categoryIds = isJp ? ["JP"] : ["MEE", "BH", "RAMEN", "OTH"];
-      const categoryOptions = productOptions
-        .filter((option) => categoryIds.includes(option.id))
-        .map((option) => option.id);
-
-      // Take up to the limit
-      const initialSelection = categoryOptions.slice(0, maxChartProducts);
-
-      // If we still have room, add some individual products
-      if (initialSelection.length < maxChartProducts) {
-        const individualProducts = productOptions
-          .filter((option) => !categoryIds.includes(option.id))
-          .slice(0, maxChartProducts - initialSelection.length)
-          .map((option) => option.id);
-
-        initialSelection.push(...individualProducts);
-      }
+      const availableProductIds = new Set(
+        productOptions.map((option) => option.id)
+      );
+      const initialSelection = DEFAULT_PRODUCT_MIX_PRODUCTS[scope]
+        .filter((productId) => availableProductIds.has(productId))
+        .slice(0, maxChartProducts);
 
       setSelectedChartProducts(initialSelection);
     }
-  }, [productOptions, maxChartProducts, isJp]);
+  }, [productOptions, maxChartProducts, scope]);
 
   // Get product type from product ID using cache
   const getProductType = (productId: string): string => {
@@ -739,6 +774,18 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
               >
                 {t("Salesman")}
               </button>
+              {scope === "tienhock" && (
+                <button
+                  onClick={() => onTabChange(2)}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    activeTab === 2
+                      ? "bg-white dark:bg-gray-600 text-default-900 dark:text-gray-100 shadow-sm"
+                      : "text-default-600 dark:text-gray-400 hover:text-default-900 dark:hover:text-gray-100"
+                  }`}
+                >
+                  {t("Customer")}
+                </button>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -1279,7 +1326,11 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
           </div>
 
           {/* Dashboard content - category doughnut charts without legends */}
-          <div className={`grid grid-cols-1 ${isJp ? "md:grid-cols-1" : "md:grid-cols-2 xl:grid-cols-4"} gap-6`}>
+          <div
+            className={`grid gap-6 ${
+              isJp ? "grid-cols-1" : "grid-cols-2 2xl:grid-cols-4"
+            }`}
+          >
             {/* BH Products Doughnut Chart */}
             {!isJp && (
             <div className="bg-white dark:bg-gray-800 rounded-lg border dark:border-gray-700 shadow p-4">
@@ -1296,11 +1347,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1312,6 +1359,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
                             t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
@@ -1371,11 +1421,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1387,6 +1433,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
                             t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
@@ -1446,11 +1495,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1462,6 +1507,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
                             t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
@@ -1519,11 +1567,7 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={({ name, percent, quantity }) =>
-                            percent > 0.05
-                              ? `${name.substring(0, 10)}${name.length > 10 ? ".." : ""} (${quantity?.toLocaleString() || 0})`
-                              : ""
-                          }
+                          label={renderPieLabel}
                           outerRadius={100}
                           innerRadius={50}
                           fill="#8884d8"
@@ -1535,6 +1579,9 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                           ))}
                         </Pie>
                         <Tooltip
+                          contentStyle={chartTooltipStyle}
+                          itemStyle={chartTooltipItemStyle}
+                          labelStyle={chartTooltipLabelStyle}
                           formatter={(value, _name, props) => [
                             t("{{amount}} · {{quantity}} units", {
                               amount: formatCurrency(Number(value)),
@@ -1667,14 +1714,24 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                     data={yearlyTrendData}
                     margin={{ top: 10, right: 40, left: 0, bottom: 0 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" />
+                    <CartesianGrid
+                      stroke={chartGridColor}
+                      strokeDasharray="3 3"
+                      strokeOpacity={isDarkMode ? 0.55 : 0.75}
+                    />
                     <XAxis
                       dataKey="month"
                       textAnchor="middle"
                       height={80}
                       tickMargin={15}
+                      tick={{ fill: chartTextColor, fontSize: 12 }}
+                      axisLine={{ stroke: chartGridColor }}
+                      tickLine={{ stroke: chartGridColor }}
                     />
                     <YAxis
+                      tick={{ fill: chartTextColor, fontSize: 12 }}
+                      axisLine={{ stroke: chartGridColor }}
+                      tickLine={{ stroke: chartGridColor }}
                       tickFormatter={(value: string | number | bigint) =>
                         new Intl.NumberFormat("en", {
                           notation: "compact",
@@ -1683,12 +1740,22 @@ const SalesByProductsPage: React.FC<SalesByProductsPageProps> = ({
                       }
                     />
                     <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      itemStyle={chartTooltipItemStyle}
+                      labelStyle={chartTooltipLabelStyle}
+                      cursor={{
+                        fill: isDarkMode
+                          ? "rgba(148, 163, 184, 0.12)"
+                          : "rgba(15, 23, 42, 0.06)",
+                      }}
                       formatter={(value: any) => formatCurrency(Number(value))}
                       itemSorter={(item) =>
                         item.value ? -Number(item.value) : 0
                       }
                     />
-                    <Legend wrapperStyle={{ bottom: 20 }} />
+                    <Legend
+                      wrapperStyle={{ bottom: 20, color: chartTextColor }}
+                    />
                     {yearlyTrendData.length > 0 &&
                       selectedChartProducts.map((key) => {
                           // Get display name for the line
