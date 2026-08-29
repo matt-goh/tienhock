@@ -475,7 +475,13 @@ const CustomerPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div
+          className="grid gap-6"
+          style={{
+            gridTemplateColumns:
+              "repeat(auto-fill, minmax(min(300px, 100%), 1fr))",
+          }}
+        >
           {paginatedCustomers.map((customer: EnhancedCustomerList) => (
             <CustomerCard
               key={customer.id}
