@@ -36,8 +36,6 @@ interface SalesmanData {
   name?: string;
   totalSales: number;
   totalQuantity: number;
-  ramenQuantity: number;
-  nonRamenQuantity: number;
   salesCount: number; // Total number of bills (invoices + cash bills)
   invoiceCount: number; // Number of invoices
   cashCount: number; // Number of cash bills
@@ -108,7 +106,6 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
   scope = "tienhock",
 }) => {
   const { t } = useTranslation("sales");
-  const isJp = scope === "jp";
   // Month derived from the time selection; drives the monthSelectionChanged event.
   const [selectedMonth, setSelectedMonth] = usePersistedMonth(
     `salesBySalesmanMonth:${scope}`
@@ -627,56 +624,21 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                             ))}
                         </div>
                       </th>
-                      {isJp ? (
-                        <th
-                          scope="col"
-                          className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
-                          onClick={() => handleSort("totalQuantity")}
-                        >
-                          <div className="flex items-center justify-end">
-                            {t("Total Quantity")}
-                            {sortConfig.key === "totalQuantity" &&
-                              (sortConfig.direction === "asc" ? (
-                                <IconSortAscending size={16} className="ml-1" />
-                              ) : (
-                                <IconSortDescending size={16} className="ml-1" />
-                              ))}
-                          </div>
-                        </th>
-                      ) : (
-                        <>
-                          <th
-                            scope="col"
-                            className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
-                            onClick={() => handleSort("nonRamenQuantity")}
-                          >
-                            <div className="flex items-center justify-end">
-                              {t("Non-Ramen Qty")}
-                              {sortConfig.key === "nonRamenQuantity" &&
-                                (sortConfig.direction === "asc" ? (
-                                  <IconSortAscending size={16} className="ml-1" />
-                                ) : (
-                                  <IconSortDescending size={16} className="ml-1" />
-                                ))}
-                            </div>
-                          </th>
-                          <th
-                            scope="col"
-                            className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
-                            onClick={() => handleSort("ramenQuantity")}
-                          >
-                            <div className="flex items-center justify-end">
-                              {t("Ramen (PKT)")}
-                              {sortConfig.key === "ramenQuantity" &&
-                                (sortConfig.direction === "asc" ? (
-                                  <IconSortAscending size={16} className="ml-1" />
-                                ) : (
-                                  <IconSortDescending size={16} className="ml-1" />
-                                ))}
-                            </div>
-                          </th>
-                        </>
-                      )}
+                      <th
+                        scope="col"
+                        className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
+                        onClick={() => handleSort("totalQuantity")}
+                      >
+                        <div className="flex items-center justify-end">
+                          {t("Total Quantity")}
+                          {sortConfig.key === "totalQuantity" &&
+                            (sortConfig.direction === "asc" ? (
+                              <IconSortAscending size={16} className="ml-1" />
+                            ) : (
+                              <IconSortDescending size={16} className="ml-1" />
+                            ))}
+                        </div>
+                      </th>
                       <th
                         scope="col"
                         className="px-4 py-2 text-right text-sm font-medium text-default-500 dark:text-gray-400 cursor-pointer"
@@ -709,20 +671,9 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
                           {(salesman.invoiceCount || 0).toLocaleString()}
                         </td>
-                        {isJp ? (
-                          <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
-                            {salesman.totalQuantity.toLocaleString()}
-                          </td>
-                        ) : (
-                          <>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
-                              {salesman.nonRamenQuantity.toLocaleString()}
-                            </td>
-                            <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-rose-700 dark:text-rose-300">
-                              {salesman.ramenQuantity.toLocaleString()}
-                            </td>
-                          </>
-                        )}
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-right text-default-700 dark:text-gray-200">
+                          {salesman.totalQuantity.toLocaleString()}
+                        </td>
                         <td className="px-4 py-2 whitespace-nowrap text-sm text-right font-medium">
                           {formatCurrency(salesman.totalSales)}
                         </td>
@@ -732,7 +683,7 @@ const SalesBySalesmanPage: React.FC<SalesBySalesmanPageProps> = ({
                   <tfoot className="bg-default-100 dark:bg-gray-700/50 sticky bottom-0 border-t dark:border-gray-600">
                     <tr>
                       <td
-                        colSpan={isJp ? 4 : 5}
+                        colSpan={4}
                         className="px-4 py-2 text-right text-sm font-medium"
                       >
                         {t("Total:")}
