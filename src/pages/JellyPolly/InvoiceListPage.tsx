@@ -8,10 +8,17 @@ import React, {
 } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { ExtendedInvoiceData, InvoiceFilters } from "../../types/types";
+import {
+  Employee,
+  ExtendedInvoiceData,
+  InvoiceFilters,
+} from "../../types/types";
 import Button from "../../components/Button";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import TimeNavigator from "../../components/TimeNavigator";
+import PillSelect, {
+  PillSelectOption,
+} from "../../components/PillSelect";
 import InvoiceFilterMenu from "../../components/Invoice/InvoiceFilterMenu";
 import InvoiceGrid from "../../components/Invoice/InvoiceGrid";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
@@ -52,7 +59,6 @@ import {
 import Pagination from "../../components/Invoice/Pagination";
 import JPConsolidatedInvoiceModal from "../../components/JellyPolly/JPConsolidatedInvoiceModal";
 import InvoiceDailyPrintMenu from "../../components/JellyPolly/InvoiceDailyPrintMenu";
-import StyledListbox from "../../components/StyledListbox";
 import { isZeroValueBill } from "../../utils/invoice/invoiceDisplayStatus";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 
@@ -315,7 +321,6 @@ const InvoiceListPage: React.FC = () => {
   const [selectedInvoicesTotal, setSelectedInvoicesTotal] = useState<number>(0);
   const [searchParams] = useSearchParams();
   const [initialParamsApplied, setInitialParamsApplied] = useState(false);
-  const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
 
   // Filters State - Initialized with dates from storage, others default
@@ -334,6 +339,14 @@ const InvoiceListPage: React.FC = () => {
     };
   }, [savedSessionState]);
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
+  const selectedSalesmanIds: ReadonlyArray<string> =
+    filters.salespersonId ?? [];
+  const selectedSalesmanId: string =
+    selectedSalesmanIds.length === 1
+      ? selectedSalesmanIds[0]
+      : selectedSalesmanIds.length > 1
+      ? "__multiple_salesmen__"
+      : "";
 
   const DEFAULT_FILTERS: InvoiceFilters = {
     dateRange: getInitialDates(), // This will be overridden in actual usage
@@ -374,16 +387,19 @@ const InvoiceListPage: React.FC = () => {
   // Fetch customer names based on IDs present in the currently loaded invoices
   const { customerNames } = useCustomerNames(customerIds);
 
-  // Salesman options for single selection dropdown
-  const salesmanOptions = useMemo(() => {
-    const options = [{ id: "", name: "All Salesmen" }];
-    return options.concat(
-      salesmen.map((s) => ({
-        id: s.id,
-        name: s.name || s.id,
-      }))
-    );
-  }, [salesmen]);
+  // Salesman options for the compact single-selection pill row
+  const salesmanOptions: ReadonlyArray<PillSelectOption<string>> = useMemo(
+    (): ReadonlyArray<PillSelectOption<string>> => [
+      { value: "", label: t("All Salesmen") },
+      ...salesmen.map(
+        (salesman: Employee): PillSelectOption<string> => ({
+          value: salesman.id,
+          label: salesman.name || salesman.id,
+        })
+      ),
+    ],
+    [salesmen, t]
+  );
 
   // Ref for external clearing (optional)
   const clearSelectionRef = useRef<(() => void) | null>(null);
@@ -712,29 +728,14 @@ const InvoiceListPage: React.FC = () => {
   };
 
   // Single Salesman Selection Handler
-  const handleSalesmanChange = useCallback((salesmanId: string | number) => {
-    setSelectedSalesmanId(String(salesmanId));
-    
+  const handleSalesmanChange = useCallback((salesmanId: string): void => {
     // Update filters to sync with the single selection
     const updatedFilters: InvoiceFilters = {
       ...filters,
-      salespersonId: salesmanId === "" ? null : [salesmanId as string],
+      salespersonId: salesmanId === "" ? null : [salesmanId],
     };
     handleApplyFilters(updatedFilters);
   }, [filters, handleApplyFilters]);
-
-  // Effect to sync selectedSalesmanId with filters when filters change externally
-  useEffect(() => {
-    const currentSalespersonIds = filters.salespersonId;
-    if (!currentSalespersonIds || currentSalespersonIds.length === 0) {
-      setSelectedSalesmanId("");
-    } else if (currentSalespersonIds.length === 1) {
-      setSelectedSalesmanId(currentSalespersonIds[0]);
-    } else {
-      // Multiple salesmen selected - show empty for single dropdown
-      setSelectedSalesmanId("");
-    }
-  }, [filters.salespersonId]);
 
   // Select/Deselect a single invoice
   const handleSelectInvoice = useCallback(
@@ -1599,10 +1600,10 @@ const InvoiceListPage: React.FC = () => {
             </div>
 
             {/* Right Group: Search and Main Filters */}
-            <div className="flex flex-col sm:flex-row items-center gap-2 w-full xl:w-auto">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap items-center justify-end gap-2 w-full xl:w-auto">
               {/* Search Input */}
               <div
-                className="relative flex-1 w-full sm:w-auto"
+                className="relative flex-1 w-full sm:min-w-40 sm:w-auto"
                 title={t(
                   "Search invoices by ID, Customer, Salesman, Products, Status, Payment Type, or Amount"
                 )}
@@ -1632,19 +1633,15 @@ const InvoiceListPage: React.FC = () => {
               </div>
 
               {/* Salesman Filter */}
-              <div className="w-full sm:w-40">
-                <StyledListbox
-                  value={selectedSalesmanId}
-                  onChange={handleSalesmanChange}
-                  options={salesmanOptions.map((option) => ({
-                    ...option,
-                    name:
-                      option.id === "" ? t("All Salesmen") : option.name,
-                  }))}
-                  placeholder={t("All Salesmen")}
-                  rounded="lg"
-                />
-              </div>
+              <PillSelect<string>
+                value={selectedSalesmanId}
+                onChange={handleSalesmanChange}
+                options={salesmanOptions}
+                className="max-w-full justify-end [&>button]:h-10"
+                ariaLabel={t("Salesman")}
+                size="md"
+                rounded="lg"
+              />
 
               {/* Filter Menu Button */}
               <div className="relative w-full sm:w-auto sm:flex-shrink-0">
@@ -1817,6 +1814,7 @@ const InvoiceListPage: React.FC = () => {
             </div>
           </div>
         </div>
+
         {/* --- Batch Action Bar --- */}
         <div
           className={`p-3 ${

@@ -36,9 +36,13 @@ const OPTIONS: ReadonlyArray<PillSelectOption<LeaveType>> = [
 />;
 ```
 
-Props: `value`, `onChange`, `options`, `disabled?`, `ariaLabel?`, `className?`, `size?`.
+Props: `value`, `onChange`, `options`, `disabled?`, `ariaLabel?`, `className?`, `size?`,
+`rounded?`.
 `title` renders as a hover tooltip (used for abbreviations like `TGA`); a per-option
 `disabled` keeps an inherited-but-unselectable value visible.
+
+`rounded` defaults to `"full"`, preserving the pill shape. Pass `rounded="lg"` only
+when the control should match nearby rounded buttons or inputs.
 
 #### `size` — pick this before anything else
 
