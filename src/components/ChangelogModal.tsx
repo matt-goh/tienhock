@@ -31,8 +31,8 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-08-29",
-    ms: "Penapis Jurujual dan Cawangan pada halaman Pelanggan, serta penapis status dan jobs pada halaman Kakitangan, kini dipaparkan sebagai pilihan pill dalam bar penapis khas. Tajuk halaman, carian dan tindakan juga kini menggunakan susun atur yang lebih padat dan kekal kelihatan semasa menatal.",
-    en: "Salesman and branch filters on the Customers page, and status and job filters on the Staff page, are now shown as pill choices in dedicated filter bars. Page titles, search and actions also use a more compact layout that stays visible while scrolling.",
+    ms: "Penapis Jurujual dan Cawangan pada halaman Pelanggan, penapis status dan jobs pada halaman Kakitangan, serta penapis Jurujual pada senarai invois Tien Hock dan Jelly Polly kini dipaparkan sebagai pilihan pill. Pada halaman Pelanggan dan Kakitangan, penapis menggunakan bar khas, manakala pilihan Jurujual pada senarai invois kekal di sebelah carian dan butang penapis. Tajuk halaman, carian dan tindakan pada halaman Pelanggan dan Kakitangan juga kini menggunakan susun atur yang lebih padat dan kekal kelihatan semasa menatal.",
+    en: "Salesman and branch filters on the Customers page, status and job filters on the Staff page, and Salesman filters on the Tien Hock and Jelly Polly invoice lists are now shown as pill choices. The Customers and Staff pages use dedicated filter bars, while the invoice-list Salesman choices remain beside Search and the Filter button. Page titles, search and actions on the Customers and Staff pages also use a more compact layout that stays visible while scrolling.",
   },
   {
     date: "2026-08-29",

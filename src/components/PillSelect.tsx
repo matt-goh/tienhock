@@ -22,6 +22,7 @@ export interface PillSelectEmptyOption {
 // form inputs it sits beside, so a pill row reads as a field of the same weight
 // rather than a lighter control floating next to one.
 export type PillSelectSize = "sm" | "md";
+export type PillSelectRounded = "full" | "lg";
 
 const SIZE_CLASSNAMES: Record<PillSelectSize, string> = {
   sm: "px-2.5 py-1 text-xs",
@@ -31,6 +32,11 @@ const SIZE_CLASSNAMES: Record<PillSelectSize, string> = {
 const ROW_CLASSNAMES: Record<PillSelectSize, string> = {
   sm: "gap-1.5",
   md: "gap-2 min-h-[38px]",
+};
+
+const ROUNDED_CLASSNAMES: Record<PillSelectRounded, string> = {
+  full: "rounded-full",
+  lg: "rounded-lg",
 };
 
 const SELECT_ONLY_CLASSNAMES: Record<PillSelectSize, string> = {
@@ -49,6 +55,7 @@ interface PillSelectBaseProps<T extends string> {
   ariaLabel?: string;
   className?: string;
   size?: PillSelectSize;
+  rounded?: PillSelectRounded;
 }
 
 interface SinglePillSelectProps<T extends string>
@@ -91,8 +98,10 @@ const PillSelect = <T extends string,>(
     ariaLabel,
     className = "",
     size = "sm",
+    rounded = "full",
   } = props;
   const isMultiple: boolean = props.selectionMode === "multiple";
+  const roundedClassName: string = ROUNDED_CLASSNAMES[rounded];
 
   const handleToggle = (
     option: PillSelectOption<T>,
@@ -127,7 +136,7 @@ const PillSelect = <T extends string,>(
           onClick={(): void => {
             if (props.value.length > 0) props.onChange([]);
           }}
-          className={`${SIZE_CLASSNAMES[size]} rounded-full border font-medium transition-colors select-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`${SIZE_CLASSNAMES[size]} ${roundedClassName} border font-medium transition-colors select-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${
             props.value.length === 0
               ? "border-sky-500 bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300"
               : "border-default-300 text-default-700 hover:bg-default-100 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
@@ -178,7 +187,7 @@ const PillSelect = <T extends string,>(
           return (
             <span
               key={option.value}
-              className={`inline-flex overflow-hidden rounded-full border transition-colors select-none whitespace-nowrap ${stateClassName} ${
+              className={`inline-flex overflow-hidden ${roundedClassName} border transition-colors select-none whitespace-nowrap ${stateClassName} ${
                 isDisabled ? "opacity-60" : ""
               }`}
             >
@@ -220,7 +229,7 @@ const PillSelect = <T extends string,>(
             title={option.title}
             disabled={isDisabled}
             onClick={(): void => handleToggle(option, active)}
-            className={`${SIZE_CLASSNAMES[size]} rounded-full border font-medium transition-colors select-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${stateClassName}`}
+            className={`${SIZE_CLASSNAMES[size]} ${roundedClassName} border font-medium transition-colors select-none whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-60 ${stateClassName}`}
           >
             {displayLabel}
           </button>
