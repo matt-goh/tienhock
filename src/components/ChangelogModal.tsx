@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-30",
+    ms: "Laporan Jualan mengikut Pelanggan kini menggabungkan pelanggan yang dipautkan sebagai cawangan di bawah jumlah kumpulan. Setiap kumpulan boleh dikembangkan untuk melihat setiap kedai, mengenal pasti cawangan utama dan membuka pecahan produk kedai. Carta dan trend juga mengikut kumpulan cawangan, manakala pelanggan tanpa kumpulan kekal dipaparkan secara individu.",
+    en: "Sales by Customer now rolls linked branch customers into group totals. Expand a group to see each store, identify the main branch and open that store's product breakdown. Charts and trends also follow branch groups, while customers without a group remain individual.",
+  },
+  {
     date: "2026-08-29",
     ms: "Analisis Campuran Produk kini memilih lima produk yang paling banyak menjana jualan secara automatik apabila dibuka, dengan pilihan berasingan untuk Tien Hock dan Jelly Polly. Produk pilihan masih boleh diubah.",
     en: "Product Mix Analysis now automatically selects the five highest-selling products when opened, with separate defaults for Tien Hock and Jelly Polly. You can still change the selected products.",

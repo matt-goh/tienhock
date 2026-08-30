@@ -6,6 +6,8 @@ import React, {
   useState,
 } from "react";
 import {
+  IconBuildingSkyscraper,
+  IconBuildingStore,
   IconChevronDown,
   IconChevronRight,
   IconSearch,
@@ -71,6 +73,43 @@ interface CustomerSalesData {
   products: CustomerProductData[];
 }
 
+interface CustomerBranchMember {
+  id: string;
+  name: string;
+  isMainBranch: boolean;
+  assignedSalesman: string | null;
+  phoneNumber: string | null;
+  city: string | null;
+  state: string | null;
+}
+
+interface CustomerBranchGroup {
+  id: number;
+  name: string;
+  members: CustomerBranchMember[];
+}
+
+interface CustomerSalesResponse {
+  customers: CustomerSalesData[];
+  branchGroups: CustomerBranchGroup[];
+}
+
+interface CustomerBranchSalesData extends CustomerSalesData {
+  isMainBranch: boolean;
+}
+
+interface CustomerSalesEntity extends CustomerSalesData {
+  entityKey: string;
+  kind: "branchGroup" | "customer";
+  branchGroupId: number | null;
+  members: CustomerBranchSalesData[];
+  allMemberIds: string[];
+  mappedMemberCount: number;
+  activeMemberCount: number;
+  isFilteredGroup: boolean;
+  chartLabel: string;
+}
+
 interface DateRange {
   start: Date;
   end: Date;
@@ -115,6 +154,15 @@ interface SalesByCustomerPageProps {
 }
 
 const MAX_CHART_CUSTOMERS = 5;
+const CUSTOMER_TABLE_COLUMNS: CustomerTableColumn[] = [
+  { key: "name", label: "Customer" },
+  { key: "cashCount", label: "Cash Bills", align: "right" },
+  { key: "invoiceCount", label: "Invoices", align: "right" },
+  { key: "salesCount", label: "Total Bills", align: "right" },
+  { key: "totalQuantity", label: "Total Quantity", align: "right" },
+  { key: "lastSaleDate", label: "Last Sale", align: "right" },
+  { key: "totalSales", label: "Total Sales", align: "right" },
+];
 const CUSTOMER_CHART_COLORS = [
   "#0284c7",
   "#059669",
@@ -181,6 +229,475 @@ const getCustomerSalesmen = (customer: CustomerSalesData): string => {
   return customer.assignedSalesman || "";
 };
 
+const getCustomerSearchText = (customer: CustomerSalesData): string =>
+  [
+    customer.id,
+    customer.name,
+    customer.assignedSalesman,
+    customer.phoneNumber,
+    customer.city,
+    customer.state,
+    ...customer.salesmen,
+  ]
+    .filter((value: string | null): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
+
+const createEmptyBranchSales = (
+  member: CustomerBranchMember
+): CustomerBranchSalesData => ({
+  id: member.id,
+  name: member.name || member.id,
+  assignedSalesman: member.assignedSalesman,
+  phoneNumber: member.phoneNumber,
+  city: member.city,
+  state: member.state,
+  totalSales: 0,
+  totalQuantity: 0,
+  totalFoc: 0,
+  totalReturns: 0,
+  salesCount: 0,
+  invoiceCount: 0,
+  cashCount: 0,
+  lastSaleDate: null,
+  salesmen: [],
+  products: [],
+  isMainBranch: member.isMainBranch,
+});
+
+const aggregateCustomerSales = (
+  id: string,
+  name: string,
+  customers: CustomerSalesData[]
+): CustomerSalesData => {
+  const products = new Map<string, CustomerProductData>();
+  const salesmen = new Set<string>();
+  let totalSales = 0;
+  let totalQuantity = 0;
+  let totalFoc = 0;
+  let totalReturns = 0;
+  let salesCount = 0;
+  let invoiceCount = 0;
+  let cashCount = 0;
+  let lastSaleDate: string | null = null;
+
+  customers.forEach((customer: CustomerSalesData): void => {
+    totalSales += customer.totalSales;
+    totalQuantity += customer.totalQuantity;
+    totalFoc += customer.totalFoc;
+    totalReturns += customer.totalReturns;
+    salesCount += customer.salesCount;
+    invoiceCount += customer.invoiceCount;
+    cashCount += customer.cashCount;
+    customer.salesmen.forEach((salesman: string): void => {
+      salesmen.add(salesman);
+    });
+
+    if (
+      customer.lastSaleDate &&
+      (!lastSaleDate ||
+        Number(customer.lastSaleDate) > Number(lastSaleDate))
+    ) {
+      lastSaleDate = customer.lastSaleDate;
+    }
+
+    customer.products.forEach((product: CustomerProductData): void => {
+      const existingProduct: CustomerProductData | undefined = products.get(
+        product.id
+      );
+      if (existingProduct) {
+        existingProduct.quantity += product.quantity;
+        existingProduct.totalSales += product.totalSales;
+        existingProduct.foc += product.foc;
+        existingProduct.returns += product.returns;
+        return;
+      }
+
+      products.set(product.id, { ...product });
+    });
+  });
+
+  return {
+    id,
+    name,
+    assignedSalesman: null,
+    phoneNumber: null,
+    city: null,
+    state: null,
+    totalSales,
+    totalQuantity,
+    totalFoc,
+    totalReturns,
+    salesCount,
+    invoiceCount,
+    cashCount,
+    lastSaleDate,
+    salesmen: Array.from(salesmen).sort(),
+    products: Array.from(products.values()).sort(
+      (firstProduct: CustomerProductData, secondProduct: CustomerProductData) =>
+        secondProduct.totalSales - firstProduct.totalSales
+    ),
+  };
+};
+
+const createBranchGroupEntity = (
+  group: CustomerBranchGroup,
+  members: CustomerBranchSalesData[],
+  allMemberIds: string[] = group.members.map(
+    (member: CustomerBranchMember): string => member.id
+  ),
+  mappedMemberCount: number = group.members.length,
+  isFilteredGroup: boolean = false
+): CustomerSalesEntity => {
+  const aggregate: CustomerSalesData = aggregateCustomerSales(
+    `branch-group-${group.id}`,
+    group.name,
+    members
+  );
+
+  return {
+    ...aggregate,
+    entityKey: `branch-group:${group.id}`,
+    kind: "branchGroup",
+    branchGroupId: group.id,
+    members,
+    allMemberIds,
+    mappedMemberCount,
+    activeMemberCount: members.filter(
+      (member: CustomerBranchSalesData): boolean => member.salesCount > 0
+    ).length,
+    isFilteredGroup,
+    chartLabel: `${group.name} (${mappedMemberCount})`,
+  };
+};
+
+const createStandaloneCustomerEntity = (
+  customer: CustomerSalesData
+): CustomerSalesEntity => ({
+  ...customer,
+  entityKey: `customer:${customer.id}`,
+  kind: "customer",
+  branchGroupId: null,
+  members: [{ ...customer, isMainBranch: false }],
+  allMemberIds: [customer.id],
+  mappedMemberCount: 1,
+  activeMemberCount: customer.salesCount > 0 ? 1 : 0,
+  isFilteredGroup: false,
+  chartLabel: customer.name,
+});
+
+interface CustomerProductBreakdownProps {
+  customer: CustomerSalesData;
+}
+
+const CustomerProductBreakdown: React.FC<CustomerProductBreakdownProps> = ({
+  customer,
+}) => {
+  const { t } = useTranslation("sales");
+
+  return (
+    <div>
+      <h4 className="mb-2 text-sm font-semibold text-default-800 dark:text-gray-100">
+        {t("Products bought by {{name}}", { name: customer.name })}
+      </h4>
+      {customer.products.length > 0 ? (
+        <div className="overflow-x-auto rounded-lg border border-sky-100 dark:border-sky-900/60">
+          <table className="min-w-full text-sm">
+            <thead className="bg-sky-100/70 text-default-600 dark:bg-sky-900/40 dark:text-gray-300">
+              <tr>
+                <th className="px-3 py-2 text-left font-medium">
+                  {t("Product ID")}
+                </th>
+                <th className="px-3 py-2 text-left font-medium">
+                  {t("Products")}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t("Qty")}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t("FOC")}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t("Returns")}
+                </th>
+                <th className="px-3 py-2 text-right font-medium">
+                  {t("Total Sales")}
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-sky-100 bg-white dark:divide-sky-900/50 dark:bg-gray-800">
+              {customer.products.map(
+                (product: CustomerProductData): React.ReactElement => (
+                  <tr key={product.id}>
+                    <td className="px-3 py-2 font-medium">{product.id}</td>
+                    <td className="px-3 py-2 text-default-600 dark:text-gray-300">
+                      {product.description}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {formatNumber(product.quantity)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {formatNumber(product.foc)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {formatNumber(product.returns)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium">
+                      {formatCurrency(product.totalSales)}
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed border-default-300 p-4 text-center text-sm text-default-500 dark:border-gray-600 dark:text-gray-400">
+          {t("No product sales in this period.")}
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface BranchGroupBreakdownProps {
+  entity: CustomerSalesEntity;
+  expandedCustomerIds: Set<string>;
+  onToggleCustomerProducts: (customerId: string) => void;
+}
+
+const BranchGroupBreakdown: React.FC<BranchGroupBreakdownProps> = ({
+  entity,
+  expandedCustomerIds,
+  onToggleCustomerProducts,
+}) => {
+  const { t } = useTranslation("sales");
+
+  return (
+    <div>
+      <div className="mb-3">
+        <h4 className="flex items-center gap-2 text-sm font-semibold text-default-800 dark:text-gray-100">
+          <IconBuildingStore
+            size={17}
+            className="text-indigo-500 dark:text-indigo-300"
+            aria-hidden="true"
+          />
+          {t("Branches in {{name}}", { name: entity.name })}
+        </h4>
+        <p className="mt-0.5 text-xs text-default-500 dark:text-gray-400">
+          {entity.isFilteredGroup
+            ? t(
+                "Showing {{shown}} of {{total}} branches matching your search",
+                {
+                  shown: entity.members.length,
+                  total: entity.mappedMemberCount,
+                }
+              )
+            : t("{{active}} of {{total}} branches had sales in this period", {
+                active: entity.activeMemberCount,
+                total: entity.mappedMemberCount,
+              })}
+        </p>
+      </div>
+
+      <div className="max-h-[480px] overflow-auto rounded-lg border border-indigo-100 bg-white dark:border-indigo-900/60 dark:bg-gray-800">
+        <table className="min-w-[1000px] w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-indigo-100/80 text-default-600 dark:bg-indigo-900/50 dark:text-gray-300">
+            <tr>
+              <th className="w-10 px-2 py-2" aria-hidden="true" />
+              {CUSTOMER_TABLE_COLUMNS.map(
+                (column: CustomerTableColumn): React.ReactElement => (
+                  <th
+                    key={column.key}
+                    scope="col"
+                    className={`px-3 py-2 font-medium ${
+                      column.align === "right" ? "text-right" : "text-left"
+                    }`}
+                  >
+                    {t(column.label)}
+                  </th>
+                )
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-indigo-100 dark:divide-indigo-900/50">
+            {entity.members.map(
+              (branch: CustomerBranchSalesData): React.ReactElement => {
+                const canExpand: boolean = branch.products.length > 0;
+                const isExpanded: boolean =
+                  canExpand && expandedCustomerIds.has(branch.id);
+                const productRowId: string = `branch-products-${encodeURIComponent(
+                  branch.id
+                )}`;
+                const salesmen: string = getCustomerSalesmen(branch);
+                const location: string = getCustomerLocation(branch);
+                const averageSale: number =
+                  branch.salesCount > 0
+                    ? branch.totalSales / branch.salesCount
+                    : 0;
+
+                return (
+                  <Fragment key={branch.id}>
+                    <tr
+                      tabIndex={canExpand ? 0 : undefined}
+                      aria-expanded={canExpand ? isExpanded : undefined}
+                      aria-controls={canExpand ? productRowId : undefined}
+                      title={
+                        canExpand
+                          ? t(
+                              isExpanded
+                                ? "Collapse products for {{name}}"
+                                : "Expand products for {{name}}",
+                              { name: branch.name }
+                            )
+                          : undefined
+                      }
+                      onClick={(): void => {
+                        if (canExpand) onToggleCustomerProducts(branch.id);
+                      }}
+                      onKeyDown={(
+                        event: React.KeyboardEvent<HTMLTableRowElement>
+                      ): void => {
+                        if (
+                          !canExpand ||
+                          (event.key !== "Enter" && event.key !== " ")
+                        ) {
+                          return;
+                        }
+                        event.preventDefault();
+                        onToggleCustomerProducts(branch.id);
+                      }}
+                      className={
+                        canExpand
+                          ? "cursor-pointer hover:bg-indigo-50 focus-visible:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:bg-indigo-950/30 dark:focus-visible:bg-sky-950/30"
+                          : "bg-default-50/50 text-default-500 dark:bg-gray-900/20 dark:text-gray-400"
+                      }
+                    >
+                      <td className="px-2 py-2 text-center">
+                        {canExpand && (
+                          <span
+                            className="inline-flex p-1 text-default-500 dark:text-gray-400"
+                            aria-hidden="true"
+                          >
+                            {isExpanded ? (
+                              <IconChevronDown size={16} />
+                            ) : (
+                              <IconChevronRight size={16} />
+                            )}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex flex-wrap items-center gap-1.5 font-medium text-default-900 dark:text-gray-100">
+                          {branch.isMainBranch ? (
+                            <IconBuildingSkyscraper
+                              size={16}
+                              className="text-indigo-500 dark:text-indigo-300"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <IconBuildingStore
+                              size={16}
+                              className="text-indigo-400 dark:text-indigo-300"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <span>{branch.name}</span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              branch.isMainBranch
+                                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-200"
+                                : "bg-default-100 text-default-600 dark:bg-gray-700 dark:text-gray-300"
+                            }`}
+                          >
+                            {t(branch.isMainBranch ? "Main branch" : "Branch")}
+                          </span>
+                          {branch.salesCount === 0 && (
+                            <span className="rounded-full bg-default-100 px-2 py-0.5 text-[10px] font-medium text-default-500 dark:bg-gray-700 dark:text-gray-400">
+                              {t("No sales in period")}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-default-500 dark:text-gray-400">
+                          {branch.id}
+                          {salesmen && (
+                            <>
+                              <span aria-hidden="true"> · </span>
+                              {salesmen}
+                            </>
+                          )}
+                        </div>
+                        {(location || branch.phoneNumber) && (
+                          <div className="text-xs text-default-400 dark:text-gray-500">
+                            {[location, branch.phoneNumber]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {branch.cashCount.toLocaleString("en-MY")}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {branch.invoiceCount.toLocaleString("en-MY")}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <div>{branch.salesCount.toLocaleString("en-MY")}</div>
+                        {branch.salesCount > 0 && (
+                          <div className="text-xs text-default-400 dark:text-gray-500">
+                            {t("Average / Bill")}: {formatCurrency(averageSale)}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {formatNumber(branch.totalQuantity)}
+                        {(branch.totalFoc > 0 || branch.totalReturns > 0) && (
+                          <div className="text-xs text-default-400 dark:text-gray-500">
+                            {t("FOC {{total}}", {
+                              total: formatNumber(branch.totalFoc),
+                            })}
+                            {" · "}
+                            {t("RTN {{total}}", {
+                              total: formatNumber(branch.totalReturns),
+                            })}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        {branch.lastSaleDate
+                          ? new Intl.DateTimeFormat("en-MY", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            }).format(new Date(Number(branch.lastSaleDate)))
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2 text-right font-semibold">
+                        {formatCurrency(branch.totalSales)}
+                      </td>
+                    </tr>
+
+                    {isExpanded && (
+                      <tr
+                        id={productRowId}
+                        className="bg-sky-50/50 dark:bg-sky-950/20"
+                      >
+                        <td colSpan={8} className="px-5 py-4">
+                          <CustomerProductBreakdown customer={branch} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              }
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
 const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
   activeTab,
   onTabChange,
@@ -224,6 +741,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
     }
   );
   const [customerData, setCustomerData] = useState<CustomerSalesData[]>([]);
+  const [branchGroups, setBranchGroups] = useState<CustomerBranchGroup[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -234,7 +752,10 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
   const [expandedCustomerIds, setExpandedCustomerIds] = useState<Set<string>>(
     () => new Set<string>()
   );
-  const [selectedChartCustomers, setSelectedChartCustomers] = useState<
+  const [expandedGroupKeys, setExpandedGroupKeys] = useState<Set<string>>(
+    () => new Set<string>()
+  );
+  const [selectedChartEntities, setSelectedChartEntities] = useState<
     string[]
   >([]);
   const [chartCustomerQuery, setChartCustomerQuery] = useState<string>("");
@@ -273,12 +794,31 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
           `/api/invoices/sales/customers?startDate=${startTimestamp}&endDate=${endTimestamp}&scope=${scope}`
         );
 
-        if (!Array.isArray(response)) {
+        const responseData: CustomerSalesResponse | null = Array.isArray(
+          response
+        )
+          ? {
+              customers: response as CustomerSalesData[],
+              branchGroups: [],
+            }
+          : response &&
+              typeof response === "object" &&
+              Array.isArray(
+                (response as Partial<CustomerSalesResponse>).customers
+              ) &&
+              Array.isArray(
+                (response as Partial<CustomerSalesResponse>).branchGroups
+              )
+            ? (response as CustomerSalesResponse)
+            : null;
+
+        if (!responseData) {
           throw new Error("Invalid response format");
         }
 
         if (!isCancelled) {
-          setCustomerData(response as CustomerSalesData[]);
+          setCustomerData(responseData.customers);
+          setBranchGroups(responseData.branchGroups);
         }
       } catch (fetchError: unknown) {
         if (isCancelled) return;
@@ -296,29 +836,107 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
     };
   }, [dateRange, scope, t]);
 
+  const customerEntities = useMemo<CustomerSalesEntity[]>(() => {
+    const salesByCustomerId = new Map<string, CustomerSalesData>(
+      customerData.map(
+        (customer: CustomerSalesData): [string, CustomerSalesData] => [
+          customer.id,
+          customer,
+        ]
+      )
+    );
+    const claimedMemberIds = new Set<string>();
+    const groupedSalesIds = new Set<string>();
+    const entities: CustomerSalesEntity[] = [];
+
+    [...branchGroups]
+      .sort(
+        (firstGroup: CustomerBranchGroup, secondGroup: CustomerBranchGroup) =>
+          firstGroup.id - secondGroup.id
+      )
+      .forEach((group: CustomerBranchGroup): void => {
+        const members: CustomerBranchSalesData[] = group.members
+          .filter((member: CustomerBranchMember): boolean => {
+            if (claimedMemberIds.has(member.id)) return false;
+            claimedMemberIds.add(member.id);
+            return true;
+          })
+          .map((member: CustomerBranchMember): CustomerBranchSalesData => {
+            const sales: CustomerSalesData | undefined = salesByCustomerId.get(
+              member.id
+            );
+            if (!sales) return createEmptyBranchSales(member);
+
+            groupedSalesIds.add(member.id);
+            return {
+              ...sales,
+              isMainBranch: member.isMainBranch,
+            };
+          })
+          .sort(
+            (
+              firstMember: CustomerBranchSalesData,
+              secondMember: CustomerBranchSalesData
+            ): number => {
+              if (firstMember.isMainBranch !== secondMember.isMainBranch) {
+                return firstMember.isMainBranch ? -1 : 1;
+              }
+              if (firstMember.totalSales !== secondMember.totalSales) {
+                return secondMember.totalSales - firstMember.totalSales;
+              }
+              return (
+                firstMember.name.localeCompare(secondMember.name) ||
+                firstMember.id.localeCompare(secondMember.id)
+              );
+            }
+          );
+
+        if (
+          !members.some(
+            (member: CustomerBranchSalesData): boolean => member.salesCount > 0
+          )
+        ) {
+          return;
+        }
+
+        entities.push(createBranchGroupEntity(group, members));
+      });
+
+    customerData.forEach((customer: CustomerSalesData): void => {
+      if (!groupedSalesIds.has(customer.id)) {
+        entities.push(createStandaloneCustomerEntity(customer));
+      }
+    });
+
+    return entities.sort(
+      (firstEntity: CustomerSalesEntity, secondEntity: CustomerSalesEntity) =>
+        secondEntity.totalSales - firstEntity.totalSales
+    );
+  }, [branchGroups, customerData]);
+
   useEffect((): void => {
-    const availableIds: string[] = customerData.map(
-      (customer: CustomerSalesData): string => customer.id
+    const availableKeys: string[] = customerEntities.map(
+      (entity: CustomerSalesEntity): string => entity.entityKey
     );
 
     if (initializedChartScopeRef.current !== scope) {
       initializedChartScopeRef.current = scope;
-      setSelectedChartCustomers(availableIds.slice(0, MAX_CHART_CUSTOMERS));
+      setSelectedChartEntities(availableKeys.slice(0, MAX_CHART_CUSTOMERS));
       setTrendData([]);
       return;
     }
 
-    setSelectedChartCustomers((currentSelection: string[]): string[] => {
-      const survivingIds: string[] = currentSelection.filter(
-        (customerId: string): boolean => availableIds.includes(customerId)
+    setSelectedChartEntities((currentSelection: string[]): string[] => {
+      const survivingKeys: string[] = currentSelection.filter(
+        (entityKey: string): boolean => availableKeys.includes(entityKey)
       );
-      if (survivingIds.length > 0 || availableIds.length === 0) {
-        return survivingIds.slice(0, MAX_CHART_CUSTOMERS);
+      if (survivingKeys.length > 0 || availableKeys.length === 0) {
+        return survivingKeys.slice(0, MAX_CHART_CUSTOMERS);
       }
-      return availableIds.slice(0, MAX_CHART_CUSTOMERS);
+      return availableKeys.slice(0, MAX_CHART_CUSTOMERS);
     });
     setTrendData([]);
-  }, [customerData, scope]);
+  }, [customerEntities, scope]);
 
   const handleTimeNavigatorChange = (range: {
     start: Date;
@@ -350,34 +968,72 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
     });
   };
 
-  const filteredAndSortedCustomers = useMemo<CustomerSalesData[]>(() => {
-    const normalizedQuery: string = searchQuery.trim().toLowerCase();
-    const filteredCustomers: CustomerSalesData[] = normalizedQuery
-      ? customerData.filter((customer: CustomerSalesData): boolean => {
-          const searchableText: string = [
-            customer.id,
-            customer.name,
-            customer.assignedSalesman,
-            customer.phoneNumber,
-            customer.city,
-            customer.state,
-            ...customer.salesmen,
-          ]
-            .filter((value: string | null): value is string => Boolean(value))
-            .join(" ")
-            .toLowerCase();
-          return searchableText.includes(normalizedQuery);
-        })
-      : [...customerData];
+  const toggleGroupBranches = (entityKey: string): void => {
+    setExpandedGroupKeys((currentKeys: Set<string>): Set<string> => {
+      const nextKeys = new Set<string>(currentKeys);
+      if (nextKeys.has(entityKey)) {
+        nextKeys.delete(entityKey);
+      } else {
+        nextKeys.add(entityKey);
+      }
+      return nextKeys;
+    });
+  };
 
-    return filteredCustomers.sort(
-      (firstCustomer: CustomerSalesData, secondCustomer: CustomerSalesData) => {
+  const filteredAndSortedEntities = useMemo<CustomerSalesEntity[]>(() => {
+    const normalizedQuery: string = searchQuery.trim().toLowerCase();
+    const filteredEntities: CustomerSalesEntity[] = normalizedQuery
+      ? customerEntities
+          .map(
+            (
+              entity: CustomerSalesEntity
+            ): CustomerSalesEntity | null => {
+              if (entity.kind === "customer") {
+                return getCustomerSearchText(entity).includes(normalizedQuery)
+                  ? entity
+                  : null;
+              }
+
+              if (entity.name.toLowerCase().includes(normalizedQuery)) {
+                return entity;
+              }
+
+              const matchingMembers: CustomerBranchSalesData[] =
+                entity.members.filter(
+                  (member: CustomerBranchSalesData): boolean =>
+                    getCustomerSearchText(member).includes(normalizedQuery)
+                );
+              if (matchingMembers.length === 0) return null;
+
+              const filteredGroup: CustomerBranchGroup = {
+                id: entity.branchGroupId as number,
+                name: entity.name,
+                members: [],
+              };
+              return createBranchGroupEntity(
+                filteredGroup,
+                matchingMembers,
+                entity.allMemberIds,
+                entity.mappedMemberCount,
+                true
+              );
+            }
+          )
+          .filter(
+            (
+              entity: CustomerSalesEntity | null
+            ): entity is CustomerSalesEntity => entity !== null
+          )
+      : [...customerEntities];
+
+    return filteredEntities.sort(
+      (firstEntity: CustomerSalesEntity, secondEntity: CustomerSalesEntity) => {
         const firstValue: string | number = getCustomerSortValue(
-          firstCustomer,
+          firstEntity,
           sortConfig.key
         );
         const secondValue: string | number = getCustomerSortValue(
-          secondCustomer,
+          secondEntity,
           sortConfig.key
         );
         const comparison: number =
@@ -387,22 +1043,27 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
         return sortConfig.direction === "asc" ? comparison : -comparison;
       }
     );
-  }, [customerData, searchQuery, sortConfig]);
+  }, [customerEntities, searchQuery, sortConfig]);
 
   const summary = useMemo(() => {
-    const totalSales: number = filteredAndSortedCustomers.reduce(
-      (sum: number, customer: CustomerSalesData): number =>
-        sum + customer.totalSales,
+    const totalSales: number = filteredAndSortedEntities.reduce(
+      (sum: number, entity: CustomerSalesEntity): number =>
+        sum + entity.totalSales,
       0
     );
-    const totalBills: number = filteredAndSortedCustomers.reduce(
-      (sum: number, customer: CustomerSalesData): number =>
-        sum + customer.salesCount,
+    const totalBills: number = filteredAndSortedEntities.reduce(
+      (sum: number, entity: CustomerSalesEntity): number =>
+        sum + entity.salesCount,
       0
     );
-    const totalQuantity: number = filteredAndSortedCustomers.reduce(
-      (sum: number, customer: CustomerSalesData): number =>
-        sum + customer.totalQuantity,
+    const totalQuantity: number = filteredAndSortedEntities.reduce(
+      (sum: number, entity: CustomerSalesEntity): number =>
+        sum + entity.totalQuantity,
+      0
+    );
+    const activeLocations: number = filteredAndSortedEntities.reduce(
+      (sum: number, entity: CustomerSalesEntity): number =>
+        sum + entity.activeMemberCount,
       0
     );
 
@@ -410,61 +1071,94 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
       totalSales,
       totalBills,
       totalQuantity,
-      activeCustomers: filteredAndSortedCustomers.length,
-      averageSalePerCustomer:
-        filteredAndSortedCustomers.length > 0
-          ? totalSales / filteredAndSortedCustomers.length
-          : 0,
+      activeLocations,
+      branchGroupCount: filteredAndSortedEntities.filter(
+        (entity: CustomerSalesEntity): boolean =>
+          entity.kind === "branchGroup"
+      ).length,
+      standaloneCount: filteredAndSortedEntities.filter(
+        (entity: CustomerSalesEntity): boolean => entity.kind === "customer"
+      ).length,
+      averageSalePerLocation:
+        activeLocations > 0 ? totalSales / activeLocations : 0,
     };
-  }, [filteredAndSortedCustomers]);
+  }, [filteredAndSortedEntities]);
 
-  const topCustomers = useMemo<CustomerSalesData[]>(
+  const topCustomers = useMemo<CustomerSalesEntity[]>(
     () =>
-      [...filteredAndSortedCustomers]
+      [...filteredAndSortedEntities]
         .sort(
-          (firstCustomer: CustomerSalesData, secondCustomer: CustomerSalesData) =>
-            secondCustomer.totalSales - firstCustomer.totalSales
+          (firstEntity: CustomerSalesEntity, secondEntity: CustomerSalesEntity) =>
+            secondEntity.totalSales - firstEntity.totalSales
         )
         .slice(0, 10),
-    [filteredAndSortedCustomers]
+    [filteredAndSortedEntities]
   );
 
-  const topCustomersByQuantity = useMemo<CustomerSalesData[]>(
+  const topCustomersByQuantity = useMemo<CustomerSalesEntity[]>(
     () =>
-      [...filteredAndSortedCustomers]
+      [...filteredAndSortedEntities]
         .sort(
-          (firstCustomer: CustomerSalesData, secondCustomer: CustomerSalesData) =>
-            secondCustomer.totalQuantity - firstCustomer.totalQuantity
+          (firstEntity: CustomerSalesEntity, secondEntity: CustomerSalesEntity) =>
+            secondEntity.totalQuantity - firstEntity.totalQuantity
         )
         .slice(0, 10),
-    [filteredAndSortedCustomers]
+    [filteredAndSortedEntities]
   );
 
   const chartCustomerOptions = useMemo(
     () =>
-      customerData.map((customer: CustomerSalesData) => ({
-        id: customer.id,
-        name: `${customer.name} (${customer.id})`,
+      customerEntities.map((entity: CustomerSalesEntity) => ({
+        id: entity.entityKey,
+        name:
+          entity.kind === "branchGroup"
+            ? t("{{name}} ({{total}} branches)", {
+                name: entity.name,
+                total: entity.mappedMemberCount,
+              })
+            : `${entity.name} (${entity.id})`,
       })),
-    [customerData]
+    [customerEntities, t]
   );
 
   const customerColors = useMemo<Record<string, string>>(() => {
     const colors: Record<string, string> = {};
-    selectedChartCustomers.forEach((customerId: string, index: number): void => {
-      colors[customerId] =
+    selectedChartEntities.forEach((entityKey: string, index: number): void => {
+      colors[entityKey] =
         CUSTOMER_CHART_COLORS[index % CUSTOMER_CHART_COLORS.length];
     });
     return colors;
-  }, [selectedChartCustomers]);
+  }, [selectedChartEntities]);
 
   const fetchCustomerTrendData = async (): Promise<void> => {
-    if (selectedChartCustomers.length === 0) return;
+    if (selectedChartEntities.length === 0) return;
     setIsGeneratingChart(true);
 
     try {
+      const selectedEntities: CustomerSalesEntity[] = selectedChartEntities
+        .map(
+          (entityKey: string): CustomerSalesEntity | undefined =>
+            customerEntities.find(
+              (entity: CustomerSalesEntity): boolean =>
+                entity.entityKey === entityKey
+            )
+        )
+        .filter(
+          (
+            entity: CustomerSalesEntity | undefined
+          ): entity is CustomerSalesEntity => entity !== undefined
+        );
+      const memberIds: string[] = Array.from(
+        new Set<string>(
+          selectedEntities.flatMap(
+            (entity: CustomerSalesEntity): string[] => entity.allMemberIds
+          )
+        )
+      );
+      if (memberIds.length === 0) return;
+
       const { startTimestamp, endTimestamp } = getTrendDateTimestamps();
-      const ids: string = encodeURIComponent(selectedChartCustomers.join(","));
+      const ids: string = encodeURIComponent(memberIds.join(","));
       const response: unknown = await api.get(
         `/api/invoices/sales/trends?type=customers&startDate=${startTimestamp}&endDate=${endTimestamp}&ids=${ids}&scope=${scope}`
       );
@@ -473,25 +1167,39 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
         throw new Error("Invalid response format");
       }
 
-      const typedResponse: CustomerTrendData[] =
-        response as CustomerTrendData[];
-      const hasSales: boolean = typedResponse.some(
+      const typedResponse: CustomerTrendData[] = response as CustomerTrendData[];
+      const rolledUpResponse: CustomerTrendData[] = typedResponse.map(
+        (monthData: CustomerTrendData): CustomerTrendData => {
+          const dataPoint: CustomerTrendData = { month: monthData.month };
+          selectedEntities.forEach((entity: CustomerSalesEntity): void => {
+            dataPoint[entity.entityKey] = entity.allMemberIds.reduce(
+              (sum: number, memberId: string): number =>
+                sum + Number(monthData[memberId] || 0),
+              0
+            );
+          });
+          return dataPoint;
+        }
+      );
+      const hasSales: boolean = rolledUpResponse.some(
         (monthData: CustomerTrendData): boolean =>
-          selectedChartCustomers.some(
-            (customerId: string): boolean =>
-              Number(monthData[customerId] || 0) !== 0
+          selectedEntities.some(
+            (entity: CustomerSalesEntity): boolean =>
+              Number(monthData[entity.entityKey] || 0) !== 0
           )
       );
 
       if (!hasSales) {
         setTrendData([]);
         toast.error(
-          t("No data found for the selected customers in the past year")
+          t(
+            "No data found for the selected customers or branch groups in the past year"
+          )
         );
         return;
       }
 
-      setTrendData(typedResponse);
+      setTrendData(rolledUpResponse);
       toast.success(t("Customer trend data generated successfully"));
     } catch (trendError: unknown) {
       console.error("Error fetching customer trend data:", trendError);
@@ -501,16 +1209,6 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
     }
   };
 
-  const tableColumns: CustomerTableColumn[] = [
-    { key: "name", label: "Customer" },
-    { key: "cashCount", label: "Cash Bills", align: "right" },
-    { key: "invoiceCount", label: "Invoices", align: "right" },
-    { key: "salesCount", label: "Total Bills", align: "right" },
-    { key: "totalQuantity", label: "Total Quantity", align: "right" },
-    { key: "lastSaleDate", label: "Last Sale", align: "right" },
-    { key: "totalSales", label: "Total Sales", align: "right" },
-  ];
-
   const summaryCards: SummaryCardData[] = [
     {
       label: t("Total Sales"),
@@ -518,8 +1216,8 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
       colorClass: "bg-sky-500 dark:bg-sky-400",
     },
     {
-      label: t("Active Customers"),
-      value: summary.activeCustomers.toLocaleString("en-MY"),
+      label: t("Active Customer Locations"),
+      value: summary.activeLocations.toLocaleString("en-MY"),
       colorClass: "bg-emerald-500 dark:bg-emerald-400",
     },
     {
@@ -533,8 +1231,8 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
       colorClass: "bg-indigo-500 dark:bg-indigo-400",
     },
     {
-      label: t("Average Sale per Customer"),
-      value: formatCurrency(summary.averageSalePerCustomer),
+      label: t("Average Sale per Location"),
+      value: formatCurrency(summary.averageSalePerLocation),
       colorClass: "bg-teal-500 dark:bg-teal-400",
     },
   ];
@@ -618,9 +1316,14 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                   {t("Customer Sales Details")}
                 </h3>
                 <p className="text-xs text-default-500 dark:text-gray-400">
-                  {t("{{total}} customers", {
-                    total: filteredAndSortedCustomers.length,
-                  })}
+                  {t(
+                    "{{groups}} branch groups, {{standalone}} standalone customers, {{locations}} active locations",
+                    {
+                      groups: summary.branchGroupCount,
+                      standalone: summary.standaloneCount,
+                      locations: summary.activeLocations,
+                    }
+                  )}
                 </p>
               </div>
               <div className="relative w-full sm:w-72">
@@ -650,13 +1353,13 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
               </div>
             </div>
 
-            {filteredAndSortedCustomers.length > 0 ? (
-              <div className="max-h-[600px] overflow-auto">
+            {filteredAndSortedEntities.length > 0 ? (
+              <div className="max-h-[700px] overflow-auto">
                 <table className="min-w-[1080px] w-full divide-y divide-default-200 dark:divide-gray-600">
                   <thead className="sticky top-0 z-10 bg-default-50 dark:bg-gray-700">
                     <tr>
                       <th className="w-10 px-2 py-2" aria-hidden="true" />
-                      {tableColumns.map(
+                      {CUSTOMER_TABLE_COLUMNS.map(
                         (column: CustomerTableColumn): React.ReactElement => (
                           <th
                             key={column.key}
@@ -689,36 +1392,50 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-default-100 dark:divide-gray-600">
-                    {filteredAndSortedCustomers.map(
-                      (customer: CustomerSalesData): React.ReactElement => {
-                        const isExpanded: boolean = expandedCustomerIds.has(
-                          customer.id
-                        );
-                        const productRowId: string = `customer-products-${encodeURIComponent(
-                          customer.id
+                    {filteredAndSortedEntities.map(
+                      (customer: CustomerSalesEntity): React.ReactElement => {
+                        const isBranchGroup: boolean =
+                          customer.kind === "branchGroup";
+                        const isExpanded: boolean = isBranchGroup
+                          ? expandedGroupKeys.has(customer.entityKey)
+                          : expandedCustomerIds.has(customer.id);
+                        const detailRowId: string = `customer-details-${encodeURIComponent(
+                          customer.entityKey
                         )}`;
-                        const salesmen: string = getCustomerSalesmen(customer);
-                        const location: string = getCustomerLocation(customer);
+                        const salesmen: string = isBranchGroup
+                          ? ""
+                          : getCustomerSalesmen(customer);
+                        const location: string = isBranchGroup
+                          ? ""
+                          : getCustomerLocation(customer);
                         const averageSale: number =
                           customer.salesCount > 0
                             ? customer.totalSales / customer.salesCount
                             : 0;
 
                         return (
-                          <Fragment key={customer.id}>
+                          <Fragment key={customer.entityKey}>
                             <tr
                               tabIndex={0}
                               aria-expanded={isExpanded}
-                              aria-controls={productRowId}
+                              aria-controls={detailRowId}
                               title={t(
-                                isExpanded
-                                  ? "Collapse products for {{name}}"
-                                  : "Expand products for {{name}}",
+                                isBranchGroup
+                                  ? isExpanded
+                                    ? "Collapse branches for {{name}}"
+                                    : "Expand branches for {{name}}"
+                                  : isExpanded
+                                    ? "Collapse products for {{name}}"
+                                    : "Expand products for {{name}}",
                                 { name: customer.name }
                               )}
-                              onClick={(): void =>
-                                toggleCustomerProducts(customer.id)
-                              }
+                              onClick={(): void => {
+                                if (isBranchGroup) {
+                                  toggleGroupBranches(customer.entityKey);
+                                } else {
+                                  toggleCustomerProducts(customer.id);
+                                }
+                              }}
                               onKeyDown={(
                                 event: React.KeyboardEvent<HTMLTableRowElement>
                               ): void => {
@@ -729,7 +1446,11 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                                   return;
                                 }
                                 event.preventDefault();
-                                toggleCustomerProducts(customer.id);
+                                if (isBranchGroup) {
+                                  toggleGroupBranches(customer.entityKey);
+                                } else {
+                                  toggleCustomerProducts(customer.id);
+                                }
                               }}
                               className="cursor-pointer hover:bg-default-50 focus-visible:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-500 dark:hover:bg-gray-700/50 dark:focus-visible:bg-sky-950/30"
                             >
@@ -746,19 +1467,56 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                                 </span>
                               </td>
                               <td className="px-4 py-2 text-sm">
-                                <div className="font-medium text-default-900 dark:text-gray-100">
-                                  {customer.name}
-                                </div>
-                                <div className="text-xs text-default-500 dark:text-gray-400">
-                                  {customer.id}
-                                  {salesmen ? ` · ${salesmen}` : ""}
-                                </div>
-                                {(location || customer.phoneNumber) && (
-                                  <div className="text-xs text-default-400 dark:text-gray-500">
-                                    {[location, customer.phoneNumber]
-                                      .filter(Boolean)
-                                      .join(" · ")}
-                                  </div>
+                                {isBranchGroup ? (
+                                  <>
+                                    <div className="flex flex-wrap items-center gap-2 font-medium text-default-900 dark:text-gray-100">
+                                      <IconBuildingSkyscraper
+                                        size={17}
+                                        className="text-indigo-500 dark:text-indigo-300"
+                                        aria-hidden="true"
+                                      />
+                                      <span>{customer.name}</span>
+                                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-200">
+                                        {t("Branch group")}
+                                      </span>
+                                    </div>
+                                    <div className="mt-0.5 text-xs text-default-500 dark:text-gray-400">
+                                      {t(
+                                        "{{active}} active of {{total}} branches",
+                                        {
+                                          active: customer.activeMemberCount,
+                                          total: customer.mappedMemberCount,
+                                        }
+                                      )}
+                                    </div>
+                                    {customer.isFilteredGroup && (
+                                      <div className="mt-0.5 text-xs font-medium text-sky-600 dark:text-sky-300">
+                                        {t("Matched branches only")}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="font-medium text-default-900 dark:text-gray-100">
+                                      {customer.name}
+                                    </div>
+                                    <div className="text-xs text-default-500 dark:text-gray-400">
+                                      {customer.id}
+                                      {salesmen && (
+                                        <>
+                                          <span aria-hidden="true"> · </span>
+                                          {salesmen}
+                                        </>
+                                      )}
+                                    </div>
+                                    {(location || customer.phoneNumber) && (
+                                      <div className="text-xs text-default-400 dark:text-gray-500">
+                                        {[location, customer.phoneNumber]
+                                          .filter(Boolean)
+                                          .join(" · ")}
+                                      </div>
+                                    )}
+                                  </>
                                 )}
                               </td>
                               <td className="px-4 py-2 text-right text-sm">
@@ -769,9 +1527,11 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                               </td>
                               <td className="px-4 py-2 text-right text-sm">
                                 <div>{customer.salesCount.toLocaleString("en-MY")}</div>
-                                <div className="text-xs text-default-400 dark:text-gray-500">
-                                  {t("Average / Bill")}: {formatCurrency(averageSale)}
-                                </div>
+                                {customer.salesCount > 0 && (
+                                  <div className="text-xs text-default-400 dark:text-gray-500">
+                                    {t("Average / Bill")}: {formatCurrency(averageSale)}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-2 text-right text-sm">
                                 {formatNumber(customer.totalQuantity)}
@@ -806,69 +1566,27 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
 
                             {isExpanded && (
                               <tr
-                                id={productRowId}
-                                className="bg-sky-50/50 dark:bg-sky-950/20"
+                                id={detailRowId}
+                                className={
+                                  isBranchGroup
+                                    ? "bg-indigo-50/60 dark:bg-indigo-950/20"
+                                    : "bg-sky-50/50 dark:bg-sky-950/20"
+                                }
                               >
                                 <td colSpan={8} className="px-6 py-4">
-                                  <h4 className="mb-2 text-sm font-semibold text-default-800 dark:text-gray-100">
-                                    {t("Products bought by {{name}}", {
-                                      name: customer.name,
-                                    })}
-                                  </h4>
-                                  <div className="overflow-x-auto rounded-lg border border-sky-100 dark:border-sky-900/60">
-                                    <table className="min-w-full text-sm">
-                                      <thead className="bg-sky-100/70 text-default-600 dark:bg-sky-900/40 dark:text-gray-300">
-                                        <tr>
-                                          <th className="px-3 py-2 text-left font-medium">
-                                            {t("Product ID")}
-                                          </th>
-                                          <th className="px-3 py-2 text-left font-medium">
-                                            {t("Products")}
-                                          </th>
-                                          <th className="px-3 py-2 text-right font-medium">
-                                            {t("Qty")}
-                                          </th>
-                                          <th className="px-3 py-2 text-right font-medium">
-                                            {t("FOC")}
-                                          </th>
-                                          <th className="px-3 py-2 text-right font-medium">
-                                            {t("Returns")}
-                                          </th>
-                                          <th className="px-3 py-2 text-right font-medium">
-                                            {t("Total Sales")}
-                                          </th>
-                                        </tr>
-                                      </thead>
-                                      <tbody className="divide-y divide-sky-100 bg-white dark:divide-sky-900/50 dark:bg-gray-800">
-                                        {customer.products.map(
-                                          (
-                                            product: CustomerProductData
-                                          ): React.ReactElement => (
-                                            <tr key={product.id}>
-                                              <td className="px-3 py-2 font-medium">
-                                                {product.id}
-                                              </td>
-                                              <td className="px-3 py-2 text-default-600 dark:text-gray-300">
-                                                {product.description}
-                                              </td>
-                                              <td className="px-3 py-2 text-right">
-                                                {formatNumber(product.quantity)}
-                                              </td>
-                                              <td className="px-3 py-2 text-right">
-                                                {formatNumber(product.foc)}
-                                              </td>
-                                              <td className="px-3 py-2 text-right">
-                                                {formatNumber(product.returns)}
-                                              </td>
-                                              <td className="px-3 py-2 text-right font-medium">
-                                                {formatCurrency(product.totalSales)}
-                                              </td>
-                                            </tr>
-                                          )
-                                        )}
-                                      </tbody>
-                                    </table>
-                                  </div>
+                                  {isBranchGroup ? (
+                                    <BranchGroupBreakdown
+                                      entity={customer}
+                                      expandedCustomerIds={expandedCustomerIds}
+                                      onToggleCustomerProducts={
+                                        toggleCustomerProducts
+                                      }
+                                    />
+                                  ) : (
+                                    <CustomerProductBreakdown
+                                      customer={customer}
+                                    />
+                                  )}
                                 </td>
                               </tr>
                             )}
@@ -899,7 +1617,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
           <div className="space-y-6">
             <div className="rounded-lg border bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800">
               <h2 className="mb-4 text-lg font-semibold">
-                {t("Top Customers by Sales")}
+                {t("Top Customers and Branch Groups by Sales")}
               </h2>
               {topCustomers.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -929,7 +1647,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                         />
                         <YAxis
                           type="category"
-                          dataKey="name"
+                          dataKey="chartLabel"
                           width={260}
                           interval={0}
                           tickMargin={8}
@@ -972,7 +1690,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
 
             <div className="rounded-lg border bg-white p-4 shadow dark:border-gray-700 dark:bg-gray-800">
               <h2 className="mb-4 text-lg font-semibold">
-                {t("Top Customers by Quantity")}
+                {t("Top Customers and Branch Groups by Quantity")}
               </h2>
               {topCustomersByQuantity.length > 0 ? (
                 <div className="overflow-x-auto">
@@ -988,7 +1706,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                           strokeOpacity={isDarkMode ? 0.55 : 0.75}
                         />
                         <XAxis
-                          dataKey="name"
+                          dataKey="chartLabel"
                           angle={-28}
                           textAnchor="end"
                           interval={0}
@@ -1047,7 +1765,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                   <FormCombobox
                     name="chartCustomers"
                     label=""
-                    value={selectedChartCustomers}
+                    value={selectedChartEntities}
                     onChange={(values: string | string[] | null): void => {
                       const valueArray: string[] = (
                         Array.isArray(values)
@@ -1060,12 +1778,12 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                       if (valueArray.length > MAX_CHART_CUSTOMERS) {
                         toast.error(
                           t(
-                            "Maximum {{total}} customers can be selected for the chart",
+                            "Maximum {{total}} customers or branch groups can be selected for the chart",
                             { total: MAX_CHART_CUSTOMERS }
                           )
                         );
                       }
-                      setSelectedChartCustomers(
+                      setSelectedChartEntities(
                         valueArray.slice(0, MAX_CHART_CUSTOMERS)
                       );
                       setTrendData([]);
@@ -1083,7 +1801,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                     void fetchCustomerTrendData();
                   }}
                   disabled={
-                    isGeneratingChart || selectedChartCustomers.length === 0
+                    isGeneratingChart || selectedChartEntities.length === 0
                   }
                 >
                   {isGeneratingChart ? t("Generating...") : t("Generate Chart")}
@@ -1132,20 +1850,20 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
                       }
                     />
                     <Legend wrapperStyle={{ color: chartTextColor }} />
-                    {selectedChartCustomers.map(
-                      (customerId: string): React.ReactElement => {
-                        const customer: CustomerSalesData | undefined =
-                          customerData.find(
-                            (candidate: CustomerSalesData): boolean =>
-                              candidate.id === customerId
+                    {selectedChartEntities.map(
+                      (entityKey: string): React.ReactElement => {
+                        const entity: CustomerSalesEntity | undefined =
+                          customerEntities.find(
+                            (candidate: CustomerSalesEntity): boolean =>
+                              candidate.entityKey === entityKey
                           );
                         return (
                           <Line
-                            key={customerId}
+                            key={entityKey}
                             type="monotone"
-                            dataKey={customerId}
-                            name={customer?.name || customerId}
-                            stroke={customerColors[customerId]}
+                            dataKey={entityKey}
+                            name={entity?.name || entityKey}
+                            stroke={customerColors[entityKey]}
                             strokeWidth={2}
                             dot={false}
                             activeDot={{ r: 4 }}
@@ -1159,7 +1877,7 @@ const SalesByCustomerPage: React.FC<SalesByCustomerPageProps> = ({
             ) : (
               <div className="flex h-80 items-center justify-center rounded border border-dashed border-default-300 px-4 text-center text-default-500 dark:border-gray-600 dark:text-gray-400">
                 {t(
-                  "Generate to view customer sales trends for the past 12 months"
+                  "Generate to view customer and branch-group sales trends for the past 12 months"
                 )}
               </div>
             )}
