@@ -3,7 +3,7 @@
 // from StaffFormPage so it can be reused by both the editable form and the
 // read-only StaffDetailsPage. All pay-code edits happen through the modals +
 // refreshPayCodeMappings() (immediate API calls), independent of any host form.
-import React, { useState, useCallback } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../../routes/utils/api";
@@ -44,6 +44,17 @@ import {
 } from "../../types/types";
 
 type PayCodeViewMode = "grouped" | "flat";
+
+const DEFAULT_COLLAPSED_GROUPS: readonly string[] = [
+  "employee-Tambahan",
+  "employee-Overtime",
+  "job-Base",
+  "job-Tambahan",
+  "job-Overtime",
+  "shared-Base",
+  "shared-Tambahan",
+  "shared-Overtime",
+];
 
 // A pay code is "customized" when any of its three rates overrides the default.
 // 0 is a real override (see EditEmployeePayCodeRatesModal), so this must test
@@ -111,16 +122,9 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
   const [payCodeSearchQuery, setPayCodeSearchQuery] = useState<string>("");
   const [payCodeViewMode, setPayCodeViewMode] =
     useState<PayCodeViewMode>("grouped");
-  // Initialize with all groups collapsed except employee Base and Tambahan.
+  // Initialize with all groups collapsed except employee Base.
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(
-    new Set([
-      "job-Base",
-      "job-Tambahan",
-      "job-Overtime",
-      "shared-Base",
-      "shared-Tambahan",
-      "shared-Overtime",
-    ])
+    (): Set<string> => new Set(DEFAULT_COLLAPSED_GROUPS)
   );
   const [batchDefaultLoading, setBatchDefaultLoading] = useState<string | null>(
     null
@@ -139,6 +143,10 @@ const StaffPayCodesSection: React.FC<StaffPayCodesSectionProps> = ({
     useState(false);
   const [selectedJobForBatchManage, setSelectedJobForBatchManage] =
     useState<Job | null>(null);
+
+  useEffect((): void => {
+    setCollapsedGroups(new Set(DEFAULT_COLLAPSED_GROUPS));
+  }, [company, employee.id]);
 
   const getAllPayCodesForEmployee = useCallback(() => {
     if (!id)

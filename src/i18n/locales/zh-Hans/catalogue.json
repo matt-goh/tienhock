@@ -903,5 +903,15 @@
   "e.g. DME-RA2": "例如 DME-RA2",
   "e.g. PM_1-PR2": "例如 PM_1-PR2",
   "Filter products by type": "按类型筛选产品",
-  "Cancelled": "已取消"
+  "Cancelled": "已取消",
+  "Payroll": "工资单",
+  "{{count}} record": "{{count}} 条记录",
+  "{{count}} records": "{{count}} 条记录",
+  "Payroll history could not be loaded.": "无法加载工资单历史记录。",
+  "No payroll records found for this staff.": "未找到此员工的工资单记录。",
+  "Gross": "总工资",
+  "Rounded Total": "取整总额",
+  "Net Pay": "净工资",
+  "Not available": "不可用",
+  "View payroll details for {{period}}": "查看 {{period}} 的工资单详情"
 }

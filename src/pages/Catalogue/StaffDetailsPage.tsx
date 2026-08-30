@@ -1,10 +1,10 @@
 // src/pages/Catalogue/StaffDetailsPage.tsx
 // Read-only "at a glance" view of a single staff member. All fields are shown
-// as plain text; the only editable part is the Associated Pay Codes section
-// (shared with StaffFormPage). An "Edit" button opens the full editable form
-// at /catalogue/staff/:id/edit.
+// as plain text; payroll rows link to their full details, and the only editable
+// part is the Associated Pay Codes section (shared with StaffFormPage). An
+// "Edit" button opens the full editable form at /catalogue/staff/:id/edit.
 import React, { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,6 +14,7 @@ import {
   IconUserPlus,
   IconExternalLink,
   IconChevronDown,
+  IconCash,
 } from "@tabler/icons-react";
 import { Popover, PopoverButton, PopoverPanel } from "@headlessui/react";
 import { Employee } from "../../types/types";
@@ -35,6 +36,42 @@ interface SameNameStaff {
   job: string[];
   isHead: boolean;
 }
+
+interface StaffPayrollHistoryResponse {
+  id: number | string;
+  year: number | string;
+  month: number | string;
+  job_type?: string | null;
+  section?: string | null;
+  gross_pay?: number | string | null;
+  net_pay?: number | string | null;
+  setelah_digenapkan?: number | string | null;
+}
+
+interface StaffPayrollSummary {
+  id: number;
+  year: number;
+  month: number;
+  jobType: string;
+  section: string;
+  grossPay: number | null;
+  displayedTotal: number | null;
+  isRoundedTotal: boolean;
+}
+
+const parsePayrollAmount = (
+  value: number | string | null | undefined
+): number | null => {
+  if (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  ) {
+    return null;
+  }
+  const amount: number = Number(value);
+  return Number.isFinite(amount) ? amount : null;
+};
 
 const mapDisplayNameToId = (
   displayName: string | undefined,
@@ -310,6 +347,211 @@ const Section: React.FC<{ title: string; children: React.ReactNode }> = ({
   </div>
 );
 
+const StaffPayrollQuickView: React.FC<{ staff: Employee }> = ({ staff }) => {
+  const { t, i18n } = useTranslation("catalogue");
+  const [payrolls, setPayrolls] = useState<StaffPayrollSummary[]>([]);
+  const [loadingPayrolls, setLoadingPayrolls] = useState<boolean>(true);
+  const [payrollError, setPayrollError] = useState<boolean>(false);
+  const [retryCount, setRetryCount] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled: boolean = false;
+
+    const fetchPayrolls = async (): Promise<void> => {
+      setLoadingPayrolls(true);
+      setPayrollError(false);
+
+      try {
+        const response: StaffPayrollHistoryResponse[] =
+          await api.get<StaffPayrollHistoryResponse[]>(
+            `/api/employee-payrolls/staff/${encodeURIComponent(
+              staff.id
+            )}/history`
+          );
+        const payrollHistory: StaffPayrollHistoryResponse[] = Array.isArray(
+          response
+        )
+          ? response
+          : [];
+        const matchingPayrolls: StaffPayrollSummary[] = payrollHistory
+          .flatMap(
+            (payroll: StaffPayrollHistoryResponse): StaffPayrollSummary[] => {
+              const payrollId: number = Number(payroll.id);
+              const year: number = Number(payroll.year);
+              const month: number = Number(payroll.month);
+              if (
+                !Number.isInteger(payrollId) ||
+                payrollId <= 0 ||
+                !Number.isInteger(year) ||
+                year <= 0 ||
+                !Number.isInteger(month) ||
+                month < 1 ||
+                month > 12
+              ) {
+                return [];
+              }
+
+              const netPay: number | null = parsePayrollAmount(payroll.net_pay);
+              const isRoundedTotal: boolean =
+                payroll.setelah_digenapkan != null;
+              return [
+                {
+                  id: payrollId,
+                  year,
+                  month,
+                  jobType: payroll.job_type || "",
+                  section: payroll.section || "",
+                  grossPay: parsePayrollAmount(payroll.gross_pay),
+                  displayedTotal: isRoundedTotal
+                    ? parsePayrollAmount(payroll.setelah_digenapkan)
+                    : netPay,
+                  isRoundedTotal,
+                },
+              ];
+            }
+          )
+          .sort(
+            (first: StaffPayrollSummary, second: StaffPayrollSummary): number =>
+              second.year - first.year ||
+              second.month - first.month ||
+              second.id - first.id
+          );
+
+        if (!cancelled) setPayrolls(matchingPayrolls);
+      } catch (fetchError: unknown) {
+        console.error("Error fetching staff payroll history:", fetchError);
+        if (!cancelled) {
+          setPayrolls([]);
+          setPayrollError(true);
+        }
+      } finally {
+        if (!cancelled) setLoadingPayrolls(false);
+      }
+    };
+
+    void fetchPayrolls();
+
+    return (): void => {
+      cancelled = true;
+    };
+  }, [staff.id, retryCount]);
+
+  const locale: string = i18n.resolvedLanguage || i18n.language || "en-MY";
+  const currencyFormatter: Intl.NumberFormat = new Intl.NumberFormat("en-MY", {
+    style: "currency",
+    currency: "MYR",
+  });
+  const periodFormatter: Intl.DateTimeFormat = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    year: "numeric",
+  });
+  const formatPeriod = (year: number, month: number): string =>
+    periodFormatter.format(new Date(year, month - 1, 1));
+  const formatPayrollAmount = (amount: number | null): string =>
+    amount === null ? t("Not available") : currencyFormatter.format(amount);
+
+  return (
+    <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700 bg-default-50/60 dark:bg-gray-900/20">
+      <div className="mb-2 flex items-center gap-2">
+        <IconCash
+          size={18}
+          aria-hidden={true}
+          className="text-emerald-600 dark:text-emerald-400"
+        />
+        <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">
+          {t("Payroll")}
+        </h2>
+        {!loadingPayrolls && !payrollError && (
+          <span className="rounded-full bg-white dark:bg-gray-800 px-2 py-0.5 text-xs text-default-500 dark:text-gray-400 border border-default-200 dark:border-gray-700">
+            {t(
+              payrolls.length === 1 ? "{{count}} record" : "{{count}} records",
+              { count: payrolls.length }
+            )}
+          </span>
+        )}
+      </div>
+
+      {loadingPayrolls ? (
+        <div className="flex h-20 items-center justify-center">
+          <LoadingSpinner size="sm" />
+        </div>
+      ) : payrollError ? (
+        <div className="flex h-16 items-center justify-between gap-3 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-3 text-sm text-amber-700 dark:text-amber-300">
+          <span>{t("Payroll history could not be loaded.")}</span>
+          <button
+            type="button"
+            onClick={(): void =>
+              setRetryCount((count: number): number => count + 1)
+            }
+            className="flex-shrink-0 font-medium hover:underline"
+          >
+            {t("Try again")}
+          </button>
+        </div>
+      ) : payrolls.length === 0 ? (
+        <p className="py-4 text-sm text-default-500 dark:text-gray-400">
+          {t("No payroll records found for this staff.")}
+        </p>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {payrolls.map((payroll: StaffPayrollSummary) => {
+            const period: string = formatPeriod(payroll.year, payroll.month);
+            const jobAndSection: string = [payroll.jobType, payroll.section]
+              .filter((value: string): boolean => Boolean(value))
+              .join(" · ");
+
+            return (
+              <Link
+                key={payroll.id}
+                to={`/payroll/employee-payroll/${payroll.id}`}
+                className="group min-w-[15rem] max-w-[15rem] rounded-md border border-default-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 transition-colors hover:border-sky-300 dark:hover:border-sky-600 hover:bg-sky-50/50 dark:hover:bg-sky-900/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900"
+                title={t("View payroll details for {{period}}", { period })}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-semibold text-default-800 dark:text-gray-100">
+                    {period}
+                  </span>
+                  <IconExternalLink
+                    size={15}
+                    aria-hidden={true}
+                    className="text-default-400 transition-colors group-hover:text-sky-600 dark:group-hover:text-sky-400"
+                  />
+                </div>
+                <p
+                  className="mt-0.5 truncate text-xs text-default-500 dark:text-gray-400"
+                  title={jobAndSection}
+                >
+                  {jobAndSection || t("None")}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-3 border-t border-default-100 dark:border-gray-700 pt-1.5">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-default-400 dark:text-gray-500">
+                      {t("Gross")}
+                    </p>
+                    <p className="text-xs font-medium text-default-700 dark:text-gray-200">
+                      {formatPayrollAmount(payroll.grossPay)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-default-400 dark:text-gray-500">
+                      {t(
+                        payroll.isRoundedTotal ? "Rounded Total" : "Net Pay"
+                      )}
+                    </p>
+                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                      {formatPayrollAmount(payroll.displayedTotal)}
+                    </p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const StaffDetailsPage: React.FC = () => {
   const navigate = useNavigate();
   const { t } = useTranslation("catalogue");
@@ -432,6 +674,8 @@ const StaffDetailsPage: React.FC = () => {
             {t("Edit")}
           </Button>
         </div>
+
+        <StaffPayrollQuickView staff={staff} />
 
         {/* Read-only fields */}
         <div className="px-6 py-5">
