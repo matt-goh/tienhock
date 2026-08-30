@@ -2025,7 +2025,89 @@ export default function (pool, config) {
             secondCustomer.totalSales - firstCustomer.totalSales
         );
 
-      res.json(customerData);
+      const reportCustomerIds = customerData
+        .map((customer) => customer.id)
+        .filter((customerId) => customerId !== "Unassigned");
+      let branchRows = [];
+
+      if (reportCustomerIds.length > 0) {
+        const branchResult = await pool.query(
+          `
+            WITH ranked_memberships AS (
+              SELECT
+                cbm.group_id,
+                cbm.customer_id,
+                cbm.is_main_branch,
+                ROW_NUMBER() OVER (
+                  PARTITION BY cbm.customer_id
+                  ORDER BY
+                    COALESCE(cbm.is_main_branch, false) DESC,
+                    cbm.id ASC
+                ) AS membership_rank
+              FROM customer_branch_mappings cbm
+            ),
+            canonical_memberships AS (
+              SELECT group_id, customer_id, is_main_branch
+              FROM ranked_memberships
+              WHERE membership_rank = 1
+            ),
+            relevant_groups AS (
+              SELECT DISTINCT group_id
+              FROM canonical_memberships
+              WHERE customer_id = ANY($1::varchar[])
+            )
+            SELECT
+              cbg.id AS group_id,
+              cbg.group_name,
+              cm.customer_id,
+              c.name AS customer_name,
+              cm.is_main_branch,
+              c.salesman AS assigned_salesman,
+              c.phone_number,
+              c.city,
+              c.state
+            FROM relevant_groups rg
+            JOIN customer_branch_groups cbg ON cbg.id = rg.group_id
+            JOIN canonical_memberships cm ON cm.group_id = cbg.id
+            LEFT JOIN customers c ON c.id = cm.customer_id
+            ORDER BY
+              cbg.id,
+              COALESCE(cm.is_main_branch, false) DESC,
+              c.name NULLS LAST,
+              cm.customer_id
+          `,
+          [reportCustomerIds]
+        );
+        branchRows = branchResult.rows;
+      }
+
+      const branchGroupMap = new Map();
+      branchRows.forEach((row) => {
+        const groupId = Number(row.group_id);
+
+        if (!branchGroupMap.has(groupId)) {
+          branchGroupMap.set(groupId, {
+            id: groupId,
+            name: row.group_name,
+            members: [],
+          });
+        }
+
+        branchGroupMap.get(groupId).members.push({
+          id: row.customer_id,
+          name: row.customer_name || row.customer_id,
+          isMainBranch: row.is_main_branch === true,
+          assignedSalesman: row.assigned_salesman || null,
+          phoneNumber: row.phone_number || null,
+          city: row.city || null,
+          state: row.state || null,
+        });
+      });
+
+      res.json({
+        customers: customerData,
+        branchGroups: Array.from(branchGroupMap.values()),
+      });
     } catch (error) {
       console.error("Error fetching customer sales data:", error);
       res.status(500).json({
