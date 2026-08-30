@@ -903,5 +903,15 @@
   "e.g. DME-RA2": "cth. DME-RA2",
   "e.g. PM_1-PR2": "cth. PM_1-PR2",
   "Filter products by type": "Tapis produk mengikut jenis",
-  "Cancelled": "Cancelled"
+  "Cancelled": "Cancelled",
+  "Payroll": "Payroll",
+  "{{count}} record": "{{count}} rekod",
+  "{{count}} records": "{{count}} rekod",
+  "Payroll history could not be loaded.": "Sejarah payroll tidak dapat dimuatkan.",
+  "No payroll records found for this staff.": "Tiada rekod payroll ditemui untuk kakitangan ini.",
+  "Gross": "Gaji Kasar",
+  "Rounded Total": "Jumlah Digenapkan",
+  "Net Pay": "Gaji Bersih (Net)",
+  "Not available": "Tidak tersedia",
+  "View payroll details for {{period}}": "Lihat butiran payroll untuk {{period}}"
 }
