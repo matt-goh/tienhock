@@ -25,6 +25,11 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
     en: "Sales by Customer now rolls linked branch customers into group totals. Expand a group to see each store, identify the main branch and open that store's product breakdown. Charts and trends also follow branch groups, while customers without a group remain individual.",
   },
   {
+    date: "2026-08-30",
+    ms: "Halaman butiran kakitangan kini memaparkan sejarah payroll secara padat, termasuk bulan, job/section, gaji kasar dan jumlah bersih atau digenapkan yang tersedia, dengan pautan terus ke halaman butiran setiap payroll. Bahagian kod gaji juga kini dibuka dengan kumpulan Base sahaja supaya halaman kekal ringkas.",
+    en: "Staff details now show a compact payroll history with the month, job/section, gross pay and the available net or rounded total, plus a direct link to each payroll's full details. The pay-code section also opens with only the Base group expanded to keep the page compact.",
+  },
+  {
     date: "2026-08-29",
     ms: "Analisis Campuran Produk kini memilih lima produk yang paling banyak menjana jualan secara automatik apabila dibuka, dengan pilihan berasingan untuk Tien Hock dan Jelly Polly. Produk pilihan masih boleh diubah.",
     en: "Product Mix Analysis now automatically selects the five highest-selling products when opened, with separate defaults for Tien Hock and Jelly Polly. You can still change the selected products.",
