@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-08-31",
+    ms: "Panduan sumber untuk Trial Balance, Income Statement, Balance Sheet dan CoGM kini menerangkan baki permulaan, aliran catatan jurnal dan stok akhir bulan yang benar-benar digunakan oleh laporan semasa. Laporan Green Target kini mempunyai panduan tersendiri untuk rekod Januari hingga Jun yang diimport, catatan bermula 1 Julai dan susun atur penyatanya. Panduan tersedia dalam Bahasa Melayu, Bahasa Inggeris dan Bahasa Cina Ringkas.",
+    en: "The source guides for Trial Balance, Income Statement, Balance Sheet and CoGM now explain the opening balances, journal flows and month-end stock actually used by the current reports. Green Target reports now have their own guides for the imported January-to-June records, postings from 1 July and their statement layout. Guides are available in BM, English and Simplified Chinese.",
+  },
+  {
     date: "2026-08-30",
     ms: "Halaman Pelanggan kini mempunyai pengurus Harga Khas bersebelahan pengurusan Cawangan. Anda boleh mencari, menambah, mengubah dan membuang semua harga pelanggan dari satu tempat. Kumpulan cawangan dipaparkan sebagai satu profil harga dikongsi supaya perubahan digunakan pada semua cawangan yang dipautkan, dan sebarang perbezaan harga antara cawangan ditandakan untuk disegerakkan.",
     en: "The Customers page now has a Custom Pricing manager beside Branch Management. You can search, add, edit and remove every customer price from one place. Branch groups appear as one shared pricing profile so changes apply to every linked branch, and any mismatched branch prices are flagged for synchronization.",

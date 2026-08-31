@@ -288,7 +288,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          {!isGT && <ReportSourceGuide report="income_statement" />}
+          <ReportSourceGuide report="income_statement" company={company} />
 
           <Button
             size="sm"
