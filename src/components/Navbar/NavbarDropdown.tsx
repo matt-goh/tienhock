@@ -248,7 +248,11 @@ export default function NavbarDropdown({
   }, []);
 
   const handleItemMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
     hoverTimeoutRef.current = setTimeout(() => {
+      hoverTimeoutRef.current = null;
       setHoveredItem(null);
     }, 150);
   }, []);
@@ -260,7 +264,11 @@ export default function NavbarDropdown({
   }, []);
 
   const handlePopoverMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
     hoverTimeoutRef.current = setTimeout(() => {
+      hoverTimeoutRef.current = null;
       setHoveredItem(null);
     }, 150);
   }, []);
