@@ -622,8 +622,7 @@ const TrialBalancePage: React.FC<TrialBalancePageProps> = ({
             onOpen={() => setIsOrderModalOpen(true)}
           />
 
-          {/* Source Guide (TH-specific) */}
-          {!isGreenTarget && <ReportSourceGuide report="trial_balance" />}
+          <ReportSourceGuide report="trial_balance" company={company} />
 
           <Button
             size="sm"

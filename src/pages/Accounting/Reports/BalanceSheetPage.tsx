@@ -261,7 +261,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          {!isGT && <ReportSourceGuide report="balance_sheet" />}
+          <ReportSourceGuide report="balance_sheet" company={company} />
 
           <Button
             size="sm"
