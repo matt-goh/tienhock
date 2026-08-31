@@ -45,7 +45,7 @@ export const refreshProductsCache = async (
     const cacheData: CachedProducts = {
       data,
       timestamp: Date.now(),
-      includesInactive,
+      includesInactive: includeInactive,
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
