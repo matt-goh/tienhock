@@ -21,6 +21,7 @@ import { StatusIndicator } from "./StatusIndicator"; // Assuming this exists
 export interface SelectOption {
   id: string | number;
   name: string;
+  searchText?: string;
   phone_number?: string | null;
   job?: string | null;
 }
@@ -358,7 +359,7 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
     query === ""
       ? options
       : options.filter((option) =>
-          option.name
+          (option.searchText || option.name)
             .toLowerCase()
             .replace(/\s+/g, "")
             .includes(query.toLowerCase().replace(/\s+/g, ""))

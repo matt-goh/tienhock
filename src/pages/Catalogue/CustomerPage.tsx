@@ -8,6 +8,7 @@ import {
   IconPlus,
   IconRefresh,
   IconBuildingSkyscraper,
+  IconCurrencyDollar,
   IconChartBar,
   IconX,
 } from "@tabler/icons-react";
@@ -26,6 +27,7 @@ import {
 import { refreshAccountCodesCache } from "../../utils/accounting/useAccountingCache";
 import { useSalesmanCache } from "../../utils/catalogue/useSalesmanCache";
 import BranchLinkageModal from "../../components/Catalogue/BranchLinkageModal";
+import CustomPricingManagerModal from "../../components/Catalogue/CustomPricingManagerModal";
 import { useScrollRestoration } from "../../hooks/useScrollRestoration";
 import { usePersistedFilters } from "../../hooks/usePersistedFilters";
 import PillSelect, { PillSelectOption } from "../../components/PillSelect";
@@ -94,6 +96,7 @@ const CustomerPage: React.FC = () => {
   );
   const { salesmen: salesmenData } = useSalesmanCache();
   const [isBranchModalOpen, setIsBranchModalOpen] = useState(false);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
   // Set when the modal is opened from a card so it lands on that group.
   const [branchModalCustomerId, setBranchModalCustomerId] = useState<
     string | undefined
@@ -425,7 +428,7 @@ const CustomerPage: React.FC = () => {
           />
         </div>
 
-        <div className="order-2 ml-auto md:order-3 md:ml-0 flex items-center gap-2 flex-shrink-0">
+        <div className="order-2 ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 md:order-3 md:ml-0">
           <Button
             onClick={async () => {
               try {
@@ -450,6 +453,14 @@ const CustomerPage: React.FC = () => {
             {branchGroupNames.length > 0
               ? t("Branches ({{total}})", { total: branchGroupNames.length })
               : t("Branches")}
+          </Button>
+          <Button
+            onClick={(): void => setIsPricingModalOpen(true)}
+            variant="outline"
+            icon={IconCurrencyDollar}
+            title={t("Manage all customer custom prices")}
+          >
+            {t("Custom Prices")}
           </Button>
           <Button
             onClick={() => navigate("/sales/summary/customer")}
@@ -530,6 +541,12 @@ const CustomerPage: React.FC = () => {
         onClose={() => setIsBranchModalOpen(false)}
         initialCustomerId={branchModalCustomerId}
       />
+      {isPricingModalOpen && (
+        <CustomPricingManagerModal
+          isOpen={isPricingModalOpen}
+          onClose={(): void => setIsPricingModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

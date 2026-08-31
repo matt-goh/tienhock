@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-30",
+    ms: "Halaman Pelanggan kini mempunyai pengurus Harga Khas bersebelahan pengurusan Cawangan. Anda boleh mencari, menambah, mengubah dan membuang semua harga pelanggan dari satu tempat. Kumpulan cawangan dipaparkan sebagai satu profil harga dikongsi supaya perubahan digunakan pada semua cawangan yang dipautkan, dan sebarang perbezaan harga antara cawangan ditandakan untuk disegerakkan.",
+    en: "The Customers page now has a Custom Pricing manager beside Branch Management. You can search, add, edit and remove every customer price from one place. Branch groups appear as one shared pricing profile so changes apply to every linked branch, and any mismatched branch prices are flagged for synchronization.",
+  },
+  {
+    date: "2026-08-30",
     ms: "Laporan Jualan mengikut Pelanggan kini menggabungkan pelanggan yang dipautkan sebagai cawangan di bawah jumlah kumpulan. Setiap kumpulan boleh dikembangkan untuk melihat setiap kedai, mengenal pasti cawangan utama dan membuka pecahan produk kedai. Carta dan trend juga mengikut kumpulan cawangan, manakala pelanggan tanpa kumpulan kekal dipaparkan secara individu.",
     en: "Sales by Customer now rolls linked branch customers into group totals. Expand a group to see each store, identify the main branch and open that store's product breakdown. Charts and trends also follow branch groups, while customers without a group remain individual.",
   },

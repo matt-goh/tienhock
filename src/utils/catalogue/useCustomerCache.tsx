@@ -26,16 +26,19 @@ const CACHE_DURATION = 1 * 60 * 60 * 1000; // 1 hour in milliseconds
 const CUSTOMERS_UPDATED_EVENT = "customers-updated";
 
 // Create a global function to trigger cache refresh
-export const refreshCustomersCache = async () => {
+export const refreshCustomersCache = async (
+  throwOnError: boolean = false
+): Promise<EnhancedCustomerList[] | null> => {
   try {
     // Remove the current cache
     localStorage.removeItem(CACHE_KEY);
 
     // Fetch new data
-    const data = await api.get("/api/customers");
+    const data: EnhancedCustomerList[] =
+      await api.get<EnhancedCustomerList[]>("/api/customers");
 
     // Store in cache
-    const cacheData = {
+    const cacheData: CachedCustomers = {
       data,
       timestamp: Date.now(),
     };
@@ -45,8 +48,11 @@ export const refreshCustomersCache = async () => {
     window.dispatchEvent(
       new CustomEvent(CUSTOMERS_UPDATED_EVENT, { detail: data })
     );
-  } catch (error) {
+    return data;
+  } catch (error: unknown) {
     console.error("Error refreshing customers cache:", error);
+    if (throwOnError) throw error;
+    return null;
   }
 };
 
