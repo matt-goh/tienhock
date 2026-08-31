@@ -684,6 +684,63 @@ export {
 export default function (pool) {
   const router = Router();
 
+  // Compact payroll history for a staff details page. Combined payrolls are
+  // included only when the requested staff ID participates in the saved
+  // employee/job mapping. Same-name matching is a legacy fallback for older
+  // rows that do not have a mapping.
+  router.get("/staff/:employeeId/history", async (req, res) => {
+    const { employeeId } = req.params;
+
+    try {
+      const result = await pool.query(
+        `
+          WITH requested_staff AS (
+            SELECT name
+            FROM staffs
+            WHERE id = $1
+          )
+          SELECT
+            ep.id,
+            ep.job_type,
+            ep.section,
+            ep.gross_pay,
+            ep.net_pay,
+            ep.setelah_digenapkan,
+            mp.year,
+            mp.month
+          FROM requested_staff rs
+          JOIN employee_payrolls ep ON TRUE
+          JOIN monthly_payrolls mp ON mp.id = ep.monthly_payroll_id
+          LEFT JOIN staffs s ON s.id = ep.employee_id
+          WHERE ep.employee_id = $1
+             OR COALESCE(ep.employee_job_mapping::jsonb, '{}'::jsonb) ? $1
+             OR (
+               (
+                 ep.employee_job_mapping IS NULL
+                 OR jsonb_typeof(ep.employee_job_mapping::jsonb)
+                    NOT IN ('object', 'array')
+                 OR ep.employee_job_mapping::jsonb
+                    IN ('{}'::jsonb, '[]'::jsonb)
+               )
+               AND BTRIM(COALESCE(rs.name, '')) <> ''
+               AND LOWER(BTRIM(COALESCE(s.name, ''))) =
+                   LOWER(BTRIM(COALESCE(rs.name, '')))
+             )
+          ORDER BY mp.year DESC, mp.month DESC, ep.id DESC
+        `,
+        [employeeId],
+      );
+
+      res.json(result.rows);
+    } catch (error) {
+      console.error("Error fetching staff payroll history:", error);
+      res.status(500).json({
+        message: "Error fetching staff payroll history",
+        error: error.message,
+      });
+    }
+  });
+
   // Get multiple employee payroll details with items
   router.get("/batch", async (req, res) => {
     const { ids } = req.query;

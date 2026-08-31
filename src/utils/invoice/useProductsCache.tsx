@@ -16,6 +16,7 @@ interface Product {
 interface CachedProducts {
   data: Product[];
   timestamp: number;
+  includesInactive?: boolean;
 }
 
 // Bump after the 1-PR RAMEN type repair so browsers do not retain its former
@@ -27,19 +28,24 @@ const PRODUCTS_UPDATED_EVENT = "products-updated";
 // Create a global function to refresh products cache
 // Always fetches ALL products (including inactive) to maintain cache consistency
 // Client-side filtering handles active/inactive display per component needs
-export const refreshProductsCache = async (includeInactive = true) => {
+export const refreshProductsCache = async (
+  includeInactive: boolean = true
+): Promise<void> => {
   try {
     // Remove the current cache
     localStorage.removeItem(CACHE_KEY);
 
     // Fetch all products (include inactive by default for admin views)
     const includeInactiveParam = includeInactive ? '&includeInactive=true' : '';
-    const data = await api.get(`/api/products?all${includeInactiveParam}`);
+    const data: Product[] = await api.get<Product[]>(
+      `/api/products?all${includeInactiveParam}`
+    );
 
     // Store in cache
-    const cacheData = {
+    const cacheData: CachedProducts = {
       data,
       timestamp: Date.now(),
+      includesInactive,
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
@@ -47,7 +53,7 @@ export const refreshProductsCache = async (includeInactive = true) => {
     window.dispatchEvent(
       new CustomEvent(PRODUCTS_UPDATED_EVENT, { detail: data })
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Error refreshing products cache:", error);
   }
 };
@@ -142,10 +148,16 @@ export const useProductsCache = (
         // Check cache first
         const cachedData = localStorage.getItem(CACHE_KEY);
         if (cachedData) {
-          const { data, timestamp }: CachedProducts = JSON.parse(cachedData);
+          const {
+            data,
+            timestamp,
+            includesInactive,
+          }: CachedProducts = JSON.parse(cachedData);
           const isExpired = Date.now() - timestamp > CACHE_DURATION;
+          const hasRequiredProductScope: boolean =
+            options?.includeInactive !== true || includesInactive === true;
 
-          if (!isExpired) {
+          if (!isExpired && hasRequiredProductScope) {
             setAllProducts(data);
             setProducts(filterProducts(data, type, options?.includeInactive));
             setIsLoading(false);
@@ -163,6 +175,7 @@ export const useProductsCache = (
       const cacheData: CachedProducts = {
         data,
         timestamp: Date.now(),
+        includesInactive: options?.includeInactive === true,
       };
       localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
 
