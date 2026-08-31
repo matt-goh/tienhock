@@ -19,6 +19,10 @@ type ChangelogEntry = {
 };
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+    date: "2026-08-31",
+    ms: "Popover tindakan pantas dalam menu navigasi kini kekal terbuka apabila anda bergerak pantas antara item menu yang mempunyai popover, termasuk dari Invois ke Dokumen Pelarasan.",
+    en: "Quick-action popovers in the navigation menu now stay open when you move quickly between menu items that have popovers, including from Invoice to Adjustment Docs.",
+  },
   {
     date: "2026-08-31",
     ms: "Panduan sumber untuk Trial Balance, Income Statement, Balance Sheet dan CoGM kini menerangkan baki permulaan, aliran catatan jurnal dan stok akhir bulan yang benar-benar digunakan oleh laporan semasa. Laporan Green Target kini mempunyai panduan tersendiri untuk rekod Januari hingga Jun yang diimport, catatan bermula 1 Julai dan susun atur penyatanya. Panduan tersedia dalam Bahasa Melayu, Bahasa Inggeris dan Bahasa Cina Ringkas.",
