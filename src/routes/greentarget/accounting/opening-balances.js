@@ -47,22 +47,36 @@ const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const ANCHOR_FORBIDDEN_ACCOUNTS = new Set(["DEBTOR", "BTFS"]);
 
 /**
+ * @param {string} accountCode
+ * @param {string | null | undefined} parentCode
+ * @returns {boolean}
+ */
+function isAnchorWriteForbidden(accountCode, parentCode) {
+  return (
+    ANCHOR_FORBIDDEN_ACCOUNTS.has(accountCode) || parentCode === "CD_SD"
+  );
+}
+
+/**
  * Guards one anchor write: the R8 period lock (an anchor ignores every posted
  * line before it, so a pre-open-date anchor silently rewrites the pinned
  * Jan-Jun legacy history) plus the forbidden accounts above.
  *
  * @param {string} accountCode
  * @param {string} asOfDate  yyyy-MM-dd
- * @param {{ deletion?: boolean }} [options]
+ * @param {{ deletion?: boolean, parentCode?: string | null }} [options]
  * @throws {Error & {status: number, code?: string}}
  */
 function assertAnchorWriteAllowed(accountCode, asOfDate, options = {}) {
   // Removing a forbidden anchor is always safe (and the single DELETE path
   // allows it); only a write that CREATES/REPLACES one is blocked.
-  if (!options.deletion && ANCHOR_FORBIDDEN_ACCOUNTS.has(accountCode)) {
+  if (
+    !options.deletion &&
+    isAnchorWriteForbidden(accountCode, options.parentCode)
+  ) {
     throw Object.assign(
       new Error(
-        `Account ${accountCode} cannot carry an opening-balance anchor (its balance comes from its children / its legacy blank printing).`
+        `Account ${accountCode} cannot carry an opening-balance anchor (its balance is managed by its children, the debtor sub-ledger, or its legacy blank printing).`
       ),
       { status: 400 }
     );
@@ -141,6 +155,25 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
           .json({ message: "as_of_date (YYYY-MM-DD) is required" });
       }
 
+      let editability = {
+        allowed: true,
+        reason_code: null,
+        open_date: null,
+      };
+      try {
+        assertGreenTargetAccountingDateUnlocked(
+          asOfDate,
+          "Opening balance anchor"
+        );
+      } catch (error) {
+        if (!isAccountingPeriodLockedError(error)) throw error;
+        editability = {
+          allowed: false,
+          reason_code: error.code || null,
+          open_date: error.open_date || null,
+        };
+      }
+
       const params = [asOfDate];
       const conditions = [];
 
@@ -203,6 +236,10 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
         ...row,
         amount: row.amount === null ? null : parseFloat(row.amount),
         sort_order: row.sort_order === null ? 0 : Number(row.sort_order),
+        opening_balance_write_allowed: !isAnchorWriteForbidden(
+          row.code,
+          row.parent_code
+        ),
       }));
 
       // Totals of the rows shown...
@@ -249,6 +286,7 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
           difference: parseFloat(dt.debit) - parseFloat(dt.credit),
         },
         available_dates: datesResult.rows,
+        editability,
       });
     } catch (error) {
       console.error("Error fetching Green Target opening balances:", error);
@@ -278,10 +316,15 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
     try {
       const codes = entries.map((e) => e.account_code);
       const existing = await client.query(
-        `SELECT code FROM greentarget.account_codes WHERE code = ANY($1::varchar[])`,
+        `SELECT code, parent_code
+           FROM greentarget.account_codes
+          WHERE code = ANY($1::varchar[])`,
         [codes]
       );
-      const knownCodes = new Set(existing.rows.map((r) => r.code));
+      const knownAccounts = new Map(
+        existing.rows.map((account) => [account.code, account])
+      );
+      const knownCodes = new Set(knownAccounts.keys());
       const unknown = codes.filter((c) => !knownCodes.has(c));
       if (unknown.length > 0) {
         return res.status(404).json({
@@ -294,6 +337,8 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
       for (const entry of entries) {
         assertAnchorWriteAllowed(entry.account_code, asOfDate, {
           deletion: entry.amount === null || entry.amount === undefined,
+          parentCode:
+            knownAccounts.get(entry.account_code)?.parent_code || null,
         });
         if (entry.amount !== null && entry.amount !== undefined) {
           const amountNum = parseFloat(entry.amount);
@@ -413,11 +458,11 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
         return res.status(400).json({ message: "amount must be a number" });
       }
 
-      assertAnchorWriteAllowed(accountCode, as_of_date);
-
       // Account must exist
       const acResult = await pool.query(
-        `SELECT 1 FROM greentarget.account_codes WHERE code = $1`,
+        `SELECT parent_code
+           FROM greentarget.account_codes
+          WHERE code = $1`,
         [accountCode]
       );
       if (acResult.rows.length === 0) {
@@ -425,6 +470,10 @@ export default function createGreenTargetOpeningBalancesRouter(pool) {
           .status(404)
           .json({ message: `Account ${accountCode} not found` });
       }
+
+      assertAnchorWriteAllowed(accountCode, as_of_date, {
+        parentCode: acResult.rows[0].parent_code,
+      });
 
       const result = await pool.query(
         `INSERT INTO greentarget.account_opening_balances

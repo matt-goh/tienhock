@@ -1,6 +1,6 @@
 // src/pages/Accounting/AccountCodeFormPage.tsx
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { Trans, useTranslation } from "react-i18next";
 import { api } from "../../routes/utils/api";
@@ -62,6 +62,25 @@ interface AccountCodeMutationPayload {
 
 export interface AccountCodeFormPageProps {
   company?: AccountingCacheCompany;
+}
+
+interface AccountCodeFormNavigationState {
+  returnToOpeningBalances?: {
+    company: AccountingCacheCompany;
+    asOfDate: string;
+  };
+  prefill?: {
+    fsNote?: string;
+    code?: string;
+  };
+}
+
+interface OpeningBalancesNavigationState {
+  openingBalanceAccount: {
+    company: AccountingCacheCompany;
+    asOfDate: string;
+    code: string;
+  };
 }
 
 interface FinancialStatementNote {
@@ -164,6 +183,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
 }: AccountCodeFormPageProps) => {
   const { t } = useTranslation("accounting");
   const navigate = useNavigate();
+  const location = useLocation();
   const { code } = useParams<{ code: string }>();
   const isEditMode: boolean = !!code;
   const isGreenTarget: boolean = company === "greentarget";
@@ -171,7 +191,38 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   const accountCodesPagePath: string = isGreenTarget
     ? "/greentarget/accounting/account-codes"
     : "/accounting/account-codes";
-  const goBack = useSmartBack(accountCodesPagePath);
+  const openingBalancesPagePath: string = isGreenTarget
+    ? "/greentarget/accounting/opening-balances"
+    : "/accounting/opening-balances";
+  const navigationState: AccountCodeFormNavigationState | null =
+    location.state && typeof location.state === "object"
+      ? (location.state as AccountCodeFormNavigationState)
+      : null;
+  const openingBalancesReturnCandidate =
+    navigationState?.returnToOpeningBalances;
+  const returnToOpeningBalances: {
+    company: AccountingCacheCompany;
+    asOfDate: string;
+  } | null =
+    openingBalancesReturnCandidate?.company === company &&
+    /^\d{4}-\d{2}-\d{2}$/.test(openingBalancesReturnCandidate.asOfDate)
+      ? openingBalancesReturnCandidate
+      : null;
+  const prefillFsNote: string =
+    !isEditMode &&
+    returnToOpeningBalances &&
+    typeof navigationState?.prefill?.fsNote === "string"
+      ? navigationState.prefill.fsNote
+      : "";
+  const prefillCode: string =
+    !isEditMode &&
+    returnToOpeningBalances &&
+    typeof navigationState?.prefill?.code === "string"
+      ? navigationState.prefill.code
+      : "";
+  const goBack = useSmartBack(
+    returnToOpeningBalances ? openingBalancesPagePath : accountCodesPagePath
+  );
 
   // Cached reference data
   const { ledgerTypes: allLedgerTypes, isLoading: ledgerTypesLoading } =
@@ -341,8 +392,11 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
           0
         ) + 1
       : 0;
-    const emptyFormData: AccountCodeFormData =
-      createEmptyFormData(defaultSortOrder);
+    const emptyFormData: AccountCodeFormData = {
+      ...createEmptyFormData(defaultSortOrder),
+      ...(prefillFsNote ? { fs_note: prefillFsNote } : {}),
+      ...(prefillCode ? { code: prefillCode } : {}),
+    };
     newFormInitializedRef.current = true;
     accountUpdatedAtRef.current = null;
     setFormData(emptyFormData);
@@ -359,6 +413,8 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
     allAccountCodes,
     isEditMode,
     isGreenTarget,
+    prefillCode,
+    prefillFsNote,
   ]);
 
   useEffect(() => {
@@ -450,11 +506,22 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
     }));
   };
 
+  const navigateToAccountPath = (path: string): void => {
+    if (returnToOpeningBalances) {
+      const nextNavigationState: AccountCodeFormNavigationState = {
+        returnToOpeningBalances,
+      };
+      navigate(path, { state: nextNavigationState });
+      return;
+    }
+    navigate(path);
+  };
+
   const requestNavigation = (path: string): void => {
     if (isFormChanged) {
       setPendingNavigation({ type: "path", path });
     } else {
-      navigate(path);
+      navigateToAccountPath(path);
     }
   };
 
@@ -481,7 +548,7 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
       return;
     }
 
-    navigate(targetNavigation.path);
+    navigateToAccountPath(targetNavigation.path);
   };
 
   // Form validation
@@ -585,7 +652,19 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
           console.error("Error refreshing account codes cache:", refreshError);
         }
       );
-      if (isEditMode) {
+      if (returnToOpeningBalances) {
+        const returnState: OpeningBalancesNavigationState = {
+          openingBalanceAccount: {
+            company,
+            asOfDate: returnToOpeningBalances.asOfDate,
+            code: submittedAccountCode,
+          },
+        };
+        navigate(openingBalancesPagePath, {
+          replace: true,
+          state: returnState,
+        });
+      } else if (isEditMode) {
         navigateBack();
       } else {
         // Show the account code just created. `replace` drops this form from
@@ -633,7 +712,11 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
           console.error("Error refreshing account codes cache:", refreshError);
         }
       );
-      navigate(accountCodesPagePath);
+      if (returnToOpeningBalances) {
+        navigate(openingBalancesPagePath, { replace: true });
+      } else {
+        navigate(accountCodesPagePath);
+      }
     } catch (err: unknown) {
       console.error("Error deleting account:", err);
       const errorMessage = err instanceof Error ? err.message : t("Failed to delete account code");
@@ -785,7 +868,13 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
   if (error) {
     return (
       <div className="container mx-auto px-4 py-6">
-        <BackButton fallbackPath={accountCodesPagePath} />
+        <BackButton
+          fallbackPath={
+            returnToOpeningBalances
+              ? openingBalancesPagePath
+              : accountCodesPagePath
+          }
+        />
         <div className="mt-4 p-4 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded">
           {t("Error:")} {error}
         </div>
@@ -800,7 +889,11 @@ const AccountCodeFormPage: React.FC<AccountCodeFormPageProps> = ({
         <div className="px-6 py-3 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton
-              fallbackPath={accountCodesPagePath}
+              fallbackPath={
+                returnToOpeningBalances
+                  ? openingBalancesPagePath
+                  : accountCodesPagePath
+              }
               onClick={isFormChanged ? handleBackClick : undefined}
             />
             <div className="h-6 w-px bg-default-300 dark:bg-gray-600"></div>
