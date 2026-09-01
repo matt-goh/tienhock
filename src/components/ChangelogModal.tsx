@@ -26,8 +26,8 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-08-31",
-    ms: "Halaman Opening Balances kini membantu anda mencari kod akaun yang tidak kelihatan dalam senarai. Anda juga boleh menambah kod baharu terus di bawah bahagian yang dipilih atau membuka kod sedia ada untuk mengubah butirannya. Selepas kod baharu disimpan, halaman kembali ke Opening Balances dan menunjukkan kod tersebut supaya amaun boleh dimasukkan jika berkenaan. Tarikh Green Target sebelum 1 Julai 2026 kini jelas ditunjukkan sebagai dikunci.",
-    en: "Opening Balances now helps you find account codes that are not visible in the list. You can also add a new code directly under a selected section or open an existing code to edit its details. After a new code is saved, the page returns to Opening Balances and shows that code so you can enter its amount where applicable. Green Target dates before 1 July 2026 are now clearly shown as locked.",
+    ms: "Halaman Opening Balances kini membantu anda mencari kod akaun yang tidak kelihatan dalam senarai. Anda juga boleh menambah kod baharu terus di bawah bahagian yang dipilih, atau klik kod akaun, butiran akaun atau ikon pensel untuk mengubah butirannya. Selepas kod baharu disimpan, halaman kembali ke Opening Balances dan menunjukkan kod tersebut supaya amaun boleh dimasukkan jika berkenaan. Tarikh Green Target sebelum 1 Julai 2026 kini jelas ditunjukkan sebagai dikunci.",
+    en: "Opening Balances now helps you find account codes that are not visible in the list. You can also add a new code directly under a selected section, or click an account code, its particulars or its pencil icon to edit its details. After a new code is saved, the page returns to Opening Balances and shows that code so you can enter its amount where applicable. Green Target dates before 1 July 2026 are now clearly shown as locked.",
   },
   {
     date: "2026-08-31",
