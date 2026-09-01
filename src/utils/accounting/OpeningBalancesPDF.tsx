@@ -12,6 +12,7 @@ import {
   StyleSheet,
   pdf,
 } from "@react-pdf/renderer";
+import { isValid, parse } from "date-fns";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
 
@@ -194,11 +195,15 @@ const formatLongDate = (iso: string): string => {
   return `${day} ${MONTHS[monthIndex] || parts[1]} ${parts[0]}`;
 };
 
+const formatYearEnded = (asOfDate: string): string => {
+  const parsedAsOfDate: Date = parse(asOfDate, "yyyy-MM-dd", new Date());
+  if (!isValid(parsedAsOfDate)) return asOfDate;
+  return `31 December ${parsedAsOfDate.getFullYear() - 1}`;
+};
+
 const OpeningBalancesPDFDocument: React.FC<{
   data: OpeningBalancesPDFData;
 }> = ({ data }) => {
-  const year: string = data.asOfDate.split("-")[0] || "";
-
   const totals = data.sections.reduce(
     (acc, section) => {
       section.rows.forEach((row) => {
@@ -227,7 +232,9 @@ const OpeningBalancesPDFDocument: React.FC<{
           </View>
           <View style={styles.headerLine}>
             <Text style={styles.headerLabel}>Year ended :</Text>
-            <Text style={styles.headerValue}>31 December {year}</Text>
+            <Text style={styles.headerValue}>
+              {formatYearEnded(data.asOfDate)}
+            </Text>
           </View>
           <View style={styles.headerLine}>
             <Text style={styles.headerLabel}>Subject :</Text>

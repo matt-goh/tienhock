@@ -112,6 +112,7 @@ export default function (pool) {
         ...row,
         amount: row.amount === null ? null : parseFloat(row.amount),
         sort_order: row.sort_order === null ? 0 : Number(row.sort_order),
+        opening_balance_write_allowed: true,
       }));
 
       // Totals of the rows shown...
@@ -158,6 +159,11 @@ export default function (pool) {
           difference: parseFloat(dt.debit) - parseFloat(dt.credit),
         },
         available_dates: datesResult.rows,
+        editability: {
+          allowed: true,
+          reason_code: null,
+          open_date: null,
+        },
       });
     } catch (error) {
       console.error("Error fetching opening balances:", error);

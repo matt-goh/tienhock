@@ -19,6 +19,17 @@ type ChangelogEntry = {
 };
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
+  {
+    date: "2026-08-31",
+    ms: "PDF Opening Balances kini menunjukkan Year ended sebagai 31 Disember tahun sebelumnya. Contohnya, opening balance pada 1 Januari 2026 menunjukkan 31 Disember 2025.",
+    en: "Opening Balances PDFs now show Year ended as 31 December of the previous year. For example, an opening balance dated 1 January 2026 shows 31 December 2025.",
+  },
+  {
+    date: "2026-08-31",
+    ms: "Halaman Opening Balances kini membantu anda mencari kod akaun yang tidak kelihatan dalam senarai. Anda juga boleh menambah kod baharu terus di bawah bahagian yang dipilih atau membuka kod sedia ada untuk mengubah butirannya. Selepas kod baharu disimpan, halaman kembali ke Opening Balances dan menunjukkan kod tersebut supaya amaun boleh dimasukkan jika berkenaan. Tarikh Green Target sebelum 1 Julai 2026 kini jelas ditunjukkan sebagai dikunci.",
+    en: "Opening Balances now helps you find account codes that are not visible in the list. You can also add a new code directly under a selected section or open an existing code to edit its details. After a new code is saved, the page returns to Opening Balances and shows that code so you can enter its amount where applicable. Green Target dates before 1 July 2026 are now clearly shown as locked.",
+  },
+  {
     date: "2026-08-31",
     ms: "Popover tindakan pantas dalam menu navigasi kini kekal terbuka apabila anda bergerak pantas antara item menu yang mempunyai popover, termasuk dari Invois ke Dokumen Pelarasan.",
     en: "Quick-action popovers in the navigation menu now stay open when you move quickly between menu items that have popovers, including from Invoice to Adjustment Docs.",
