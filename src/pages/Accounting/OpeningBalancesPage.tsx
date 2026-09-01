@@ -332,7 +332,15 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
         )}
       >
         <td className="px-3 py-1 font-mono text-xs text-default-800 dark:text-gray-200 whitespace-nowrap">
-          {account.code}
+          <button
+            type="button"
+            disabled={editDisabled}
+            onClick={() => onEditAccount(account.code)}
+            title={t("Edit Account Code")}
+            className="cursor-pointer text-left transition-colors hover:text-sky-600 hover:underline focus-visible:text-sky-600 focus-visible:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50 dark:hover:text-sky-400 dark:focus-visible:text-sky-400"
+          >
+            {account.code}
+          </button>
           {!account.is_active && (
             <span className="ml-1.5 text-[10px] uppercase text-rose-500 dark:text-rose-400">
               {t("inactive")}
@@ -340,7 +348,15 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
           )}
         </td>
         <td className="px-3 py-1 text-default-700 dark:text-gray-300">
-          {account.description}
+          <button
+            type="button"
+            disabled={editDisabled}
+            onClick={() => onEditAccount(account.code)}
+            title={t("Edit Account Code")}
+            className="cursor-pointer text-left transition-colors hover:text-sky-600 hover:underline focus-visible:text-sky-600 focus-visible:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50 dark:hover:text-sky-400 dark:focus-visible:text-sky-400"
+          >
+            {account.description}
+          </button>
           {showSetBalanceHint && (
             <span className="ml-2 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
               {t("Set opening balance")}
