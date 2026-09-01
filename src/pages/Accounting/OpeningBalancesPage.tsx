@@ -35,7 +35,11 @@ import {
   IconX,
   IconDeviceFloppy,
   IconAlertTriangle,
+  IconLock,
+  IconPencil,
+  IconPlus,
 } from "@tabler/icons-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import clsx from "clsx";
 import { format } from "date-fns";
 import Button from "../../components/Button";
@@ -75,6 +79,7 @@ interface OpeningBalanceAccount {
   notes: string | null;
   updated_at: string | null;
   other_anchor_count: number;
+  opening_balance_write_allowed?: boolean;
 }
 
 interface OpeningBalancesResponse {
@@ -88,6 +93,30 @@ interface OpeningBalancesResponse {
     difference: number;
   };
   available_dates: { as_of_date: string; count: number }[];
+  editability?: {
+    allowed: boolean;
+    reason_code: string | null;
+    open_date: string | null;
+  };
+}
+
+interface AccountCodeFormNavigationState {
+  returnToOpeningBalances: {
+    company: OpeningBalancesCompany;
+    asOfDate: string;
+  };
+  prefill?: {
+    fsNote?: string;
+    code?: string;
+  };
+}
+
+interface OpeningBalancesNavigationState {
+  openingBalanceAccount?: {
+    company: OpeningBalancesCompany;
+    asOfDate: string;
+    code: string;
+  };
 }
 
 // One row's editable state. Debit/Credit are kept as raw strings so a
@@ -248,30 +277,70 @@ interface BalanceRowProps {
   showNotes: boolean;
   isDirty: boolean;
   disabled: boolean;
+  clearDisabled: boolean;
+  editDisabled: boolean;
+  showSetBalanceHint: boolean;
+  showManagedElsewhereHint: boolean;
+  shouldFocus: boolean;
   onChange: (code: string, next: DraftRow) => void;
+  onEditAccount: (code: string) => void;
+  onFocusComplete: (code: string) => void;
 }
 
 // Memoised so typing in one cell doesn't re-render the whole sheet (the "all
 // accounts" view is a few thousand rows).
 const BalanceRow: React.FC<BalanceRowProps> = React.memo(
-  ({ account, draft, showNotes, isDirty, disabled, onChange }) => {
+  ({
+    account,
+    draft,
+    showNotes,
+    isDirty,
+    disabled,
+    clearDisabled,
+    editDisabled,
+    showSetBalanceHint,
+    showManagedElsewhereHint,
+    shouldFocus,
+    onChange,
+    onEditAccount,
+    onFocusComplete,
+  }) => {
     const { t } = useTranslation("accounting");
+    const rowRef = useRef<HTMLTableRowElement | null>(null);
+    const debitInputRef = useRef<HTMLInputElement | null>(null);
     const invalid: boolean = !isDraftValid(draft);
     const willDelete: boolean =
       account.amount !== null &&
       draft.debit.trim() === "" &&
       draft.credit.trim() === "";
 
+    useEffect(() => {
+      if (!shouldFocus) return;
+      rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (!disabled) debitInputRef.current?.focus();
+      onFocusComplete(account.code);
+    }, [account.code, disabled, onFocusComplete, shouldFocus]);
+
     return (
       <tr
+        ref={rowRef}
         className={clsx(
           "hover:bg-gray-50 dark:hover:bg-gray-700/50",
           willDelete && "bg-rose-50/60 dark:bg-rose-900/20",
-          !willDelete && isDirty && "bg-amber-50/60 dark:bg-amber-900/20"
+          !willDelete && isDirty && "bg-amber-50/60 dark:bg-amber-900/20",
+          shouldFocus && "bg-sky-50 dark:bg-sky-900/20"
         )}
       >
         <td className="px-3 py-1 font-mono text-xs text-default-800 dark:text-gray-200 whitespace-nowrap">
-          {account.code}
+          <button
+            type="button"
+            disabled={editDisabled}
+            onClick={() => onEditAccount(account.code)}
+            title={t("Edit Account Code")}
+            className="cursor-pointer text-left transition-colors hover:text-sky-600 hover:underline focus-visible:text-sky-600 focus-visible:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50 dark:hover:text-sky-400 dark:focus-visible:text-sky-400"
+          >
+            {account.code}
+          </button>
           {!account.is_active && (
             <span className="ml-1.5 text-[10px] uppercase text-rose-500 dark:text-rose-400">
               {t("inactive")}
@@ -279,7 +348,25 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
           )}
         </td>
         <td className="px-3 py-1 text-default-700 dark:text-gray-300">
-          {account.description}
+          <button
+            type="button"
+            disabled={editDisabled}
+            onClick={() => onEditAccount(account.code)}
+            title={t("Edit Account Code")}
+            className="cursor-pointer text-left transition-colors hover:text-sky-600 hover:underline focus-visible:text-sky-600 focus-visible:underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-50 dark:hover:text-sky-400 dark:focus-visible:text-sky-400"
+          >
+            {account.description}
+          </button>
+          {showSetBalanceHint && (
+            <span className="ml-2 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] font-medium text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+              {t("Set opening balance")}
+            </span>
+          )}
+          {showManagedElsewhereHint && (
+            <span className="ml-2 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+              {t("Opening balance is managed elsewhere")}
+            </span>
+          )}
           {account.other_anchor_count > 0 && (
             <span
               className="ml-1.5 text-[10px] text-sky-600 dark:text-sky-400"
@@ -293,6 +380,7 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
         </td>
         <td className="px-2 py-1 w-36">
           <input
+            ref={debitInputRef}
             type="text"
             inputMode="decimal"
             value={draft.debit}
@@ -345,22 +433,40 @@ const BalanceRow: React.FC<BalanceRowProps> = React.memo(
             />
           </td>
         )}
-        <td className="px-2 py-1 w-10 text-center">
-          {(draft.debit.trim() !== "" ||
-            draft.credit.trim() !== "" ||
-            draft.notes !== "") && (
+        <td className="px-2 py-1 w-20 text-center">
+          <div className="flex items-center justify-center gap-2">
             <button
               type="button"
-              disabled={disabled}
-              onClick={() =>
-                onChange(account.code, { debit: "", credit: "", notes: "" })
-              }
-              title={t("Clear this row (removes the opening balance on save)")}
-              className="text-default-400 dark:text-gray-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+              disabled={editDisabled}
+              onClick={() => onEditAccount(account.code)}
+              title={t("Edit Account Code")}
+              aria-label={t("Edit Account Code")}
+              className="text-default-400 transition-colors hover:text-sky-600 disabled:cursor-not-allowed disabled:opacity-50 dark:text-gray-500 dark:hover:text-sky-400"
             >
-              <IconX size={14} />
+              <IconPencil size={14} />
             </button>
-          )}
+            {(draft.debit.trim() !== "" ||
+              draft.credit.trim() !== "" ||
+              draft.notes !== "") && (
+              <button
+                type="button"
+                disabled={clearDisabled}
+                onClick={() =>
+                  onChange(account.code, {
+                    debit: "",
+                    credit: "",
+                    notes: "",
+                  })
+                }
+                title={t(
+                  "Clear this row (removes the opening balance on save)"
+                )}
+                className="text-default-400 dark:text-gray-500 hover:text-rose-500 dark:hover:text-rose-400 transition-colors"
+              >
+                <IconX size={14} />
+              </button>
+            )}
+          </div>
         </td>
       </tr>
     );
@@ -372,10 +478,16 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   company = "tienhock",
 }: OpeningBalancesPageProps) => {
   const { t } = useTranslation("accounting");
+  const navigate = useNavigate();
+  const location = useLocation();
   const openingBalancesApiPath: string =
     company === "greentarget"
       ? "/greentarget/api/opening-balances"
       : "/api/opening-balances";
+  const accountCodesPagePath: string =
+    company === "greentarget"
+      ? "/greentarget/accounting/account-codes"
+      : "/accounting/account-codes";
   const [data, setData] = useState<OpeningBalancesResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
@@ -393,6 +505,8 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   // the table head has to be offset by whatever it currently measures.
   const [pageHeaderHeight, setPageHeaderHeight] = useState<number>(0);
   const pageHeaderRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const fetchRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     const headerElement: HTMLDivElement | null = pageHeaderRef.current;
@@ -447,6 +561,58 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   const [showNotes, setShowNotes] = useState<boolean>(
     () => cached?.showNotes === true
   );
+  const [lookupAllAccounts, setLookupAllAccounts] = useState<boolean>(false);
+  const [focusAccountCode, setFocusAccountCode] = useState<string | null>(null);
+  const [loadedRequestKey, setLoadedRequestKey] = useState<string | null>(null);
+  const requestKey: string = JSON.stringify([
+    asOfDate,
+    lookupAllAccounts ? "all" : rowFilter,
+    debouncedSearch,
+    includeInactive,
+  ]);
+
+  // Account creation/editing returns here with a one-shot account code. Search
+  // the complete chart so a newly created account is visible before it has an
+  // opening balance, then focus its Debit field once the row has loaded.
+  useEffect(() => {
+    const navigationState: OpeningBalancesNavigationState | null =
+      location.state && typeof location.state === "object"
+        ? (location.state as OpeningBalancesNavigationState)
+        : null;
+    const returnedAccount = navigationState?.openingBalanceAccount;
+    if (
+      !returnedAccount ||
+      returnedAccount.company !== company ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(returnedAccount.asOfDate) ||
+      !returnedAccount.code.trim()
+    ) {
+      return;
+    }
+
+    const normalizedCode: string = returnedAccount.code.trim().toUpperCase();
+    fetchRequestIdRef.current += 1;
+    setLoading(true);
+    setData(null);
+    setDrafts({});
+    setLoadedRequestKey(null);
+    setAsOfDate(returnedAccount.asOfDate);
+    setSearchTerm(normalizedCode);
+    setDebouncedSearch(normalizedCode);
+    setIncludeInactive(true);
+    setLookupAllAccounts(true);
+    setFocusAccountCode(normalizedCode);
+    navigate(`${location.pathname}${location.search}${location.hash}`, {
+      replace: true,
+      state: null,
+    });
+  }, [
+    company,
+    location.hash,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+  ]);
 
   useEffect(() => {
     try {
@@ -500,6 +666,30 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
     () => Object.values(drafts).filter((d) => !isDraftValid(d)).length,
     [drafts]
   );
+  const searchRequestIsSettled: boolean = searchTerm === debouncedSearch;
+  const isCurrentRequestLoaded: boolean =
+    searchRequestIsSettled &&
+    !loading &&
+    !!data &&
+    loadedRequestKey === requestKey;
+  const isWriteLocked: boolean =
+    isCurrentRequestLoaded && data?.editability?.allowed === false;
+  const hasExactAccountCodeMatch: boolean = useMemo(
+    (): boolean =>
+      !!debouncedSearch.trim() &&
+      (data?.accounts || []).some(
+        (account: OpeningBalanceAccount): boolean =>
+          account.code.toUpperCase() === debouncedSearch.trim().toUpperCase()
+      ),
+    [data, debouncedSearch]
+  );
+  const shouldOfferCreateAccount: boolean =
+    lookupAllAccounts &&
+    searchRequestIsSettled &&
+    !loading &&
+    !!data &&
+    loadedRequestKey === requestKey &&
+    !hasExactAccountCodeMatch;
 
   // Warn on tab close / reload while edits are pending.
   useEffect(() => {
@@ -513,9 +703,11 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   }, [hasUnsavedChanges]);
 
   const fetchBalances = useCallback(async (): Promise<void> => {
+    const requestId: number = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
     const params = new URLSearchParams();
     params.set("as_of_date", asOfDate);
-    params.set("filter", rowFilter);
+    params.set("filter", lookupAllAccounts ? "all" : rowFilter);
     if (debouncedSearch) params.set("search", debouncedSearch);
     if (includeInactive) params.set("include_inactive", "true");
 
@@ -525,24 +717,30 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
       const response = await api.get<OpeningBalancesResponse>(
         `${openingBalancesApiPath}?${params.toString()}`
       );
+      if (fetchRequestIdRef.current !== requestId) return;
       setData(response);
+      setLoadedRequestKey(requestKey);
       const nextDrafts: Record<string, DraftRow> = {};
       response.accounts.forEach((account) => {
         nextDrafts[account.code] = toDraft(account);
       });
       setDrafts(nextDrafts);
     } catch (err) {
+      if (fetchRequestIdRef.current !== requestId) return;
       console.error("Error fetching opening balances:", err);
+      setLoadedRequestKey(null);
       setError(t("Failed to fetch opening balances. Please try again later."));
     } finally {
-      setLoading(false);
+      if (fetchRequestIdRef.current === requestId) setLoading(false);
     }
   }, [
     asOfDate,
     rowFilter,
     debouncedSearch,
     includeInactive,
+    lookupAllAccounts,
     openingBalancesApiPath,
+    requestKey,
     t,
   ]);
 
@@ -552,7 +750,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
 
   useScrollRestoration(
     company === "tienhock" ? "opening-balances" : `opening-balances:${company}`,
-    !loading && !!data
+    isCurrentRequestLoaded
   );
 
   const handleDraftChange = useCallback(
@@ -562,6 +760,94 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
     []
   );
 
+  const handleFocusComplete = useCallback((code: string): void => {
+    setFocusAccountCode((currentCode: string | null): string | null =>
+      currentCode?.toUpperCase() === code.toUpperCase() ? null : currentCode
+    );
+  }, []);
+
+  const handleSearchAllAccounts = (): void => {
+    if (hasUnsavedChanges) {
+      toast.error(t("Save or discard your changes first"));
+      return;
+    }
+    const search: string = searchTerm.trim();
+    if (!search) {
+      searchInputRef.current?.focus();
+      toast.error(t("Enter a code or description first"));
+      return;
+    }
+    if (
+      !lookupAllAccounts ||
+      !includeInactive ||
+      debouncedSearch !== search
+    ) {
+      setLoading(true);
+    }
+    setSearchTerm(search);
+    setDebouncedSearch(search);
+    setIncludeInactive(true);
+    setLookupAllAccounts(true);
+  };
+
+  const handleCreateAccount = (
+    fsNote: string | null = null,
+    useSearchAsCode: boolean = false
+  ): void => {
+    if (hasUnsavedChanges) {
+      toast.error(t("Save or discard your changes first"));
+      return;
+    }
+
+    const trimmedSearch: string = searchTerm.trim();
+    const allowedCodePattern: RegExp =
+      company === "greentarget"
+        ? /^[A-Za-z0-9 ._-]+$/
+        : /^[A-Za-z0-9._-]+$/;
+    const suggestedCode: string =
+      useSearchAsCode &&
+      trimmedSearch.length > 0 &&
+      allowedCodePattern.test(trimmedSearch)
+        ? trimmedSearch.toUpperCase()
+        : "";
+    const navigationState: AccountCodeFormNavigationState = {
+      returnToOpeningBalances: { company, asOfDate },
+      ...(fsNote || suggestedCode
+        ? {
+            prefill: {
+              ...(fsNote ? { fsNote } : {}),
+              ...(suggestedCode ? { code: suggestedCode } : {}),
+            },
+          }
+        : {}),
+    };
+
+    navigate(`${accountCodesPagePath}/new`, { state: navigationState });
+  };
+
+  const handleEditAccount = useCallback(
+    (code: string): void => {
+      if (hasUnsavedChanges) {
+        toast.error(t("Save or discard your changes first"));
+        return;
+      }
+      const navigationState: AccountCodeFormNavigationState = {
+        returnToOpeningBalances: { company, asOfDate },
+      };
+      navigate(`${accountCodesPagePath}/${encodeURIComponent(code)}`, {
+        state: navigationState,
+      });
+    },
+    [
+      accountCodesPagePath,
+      asOfDate,
+      company,
+      hasUnsavedChanges,
+      navigate,
+      t,
+    ]
+  );
+
   const handleDateChange = (start: Date): void => {
     const next: string = format(start, "yyyy-MM-dd");
     if (next === asOfDate) return;
@@ -569,6 +855,8 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
       toast.error(t("Save or discard your changes before switching date"));
       return;
     }
+    setLookupAllAccounts(false);
+    setFocusAccountCode(null);
     setAsOfDate(next);
   };
 
@@ -577,8 +865,22 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
     setShowDiscardDialog(false);
   };
 
+  const handleRefresh = (): void => {
+    if (hasUnsavedChanges) {
+      toast.error(t("Save or discard your changes first"));
+      return;
+    }
+    void fetchBalances();
+  };
+
   const handleSave = async (): Promise<void> => {
-    if (!hasUnsavedChanges) return;
+    if (!hasUnsavedChanges || !isCurrentRequestLoaded) return;
+    if (isWriteLocked) {
+      toast.error(
+        t("Opening balances for this date are locked and cannot be changed")
+      );
+      return;
+    }
     if (invalidCount > 0) {
       toast.error(t("Fix the highlighted amounts before saving"));
       return;
@@ -635,6 +937,24 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
     });
     return Array.from(map.values());
   }, [data]);
+
+  useEffect(() => {
+    if (!focusAccountCode || !data) return;
+    const focusedAccount: OpeningBalanceAccount | undefined =
+      data.accounts.find(
+        (account: OpeningBalanceAccount): boolean =>
+          account.code.toUpperCase() === focusAccountCode.toUpperCase()
+      );
+    if (!focusedAccount) return;
+
+    const sectionKey: string = focusedAccount.fs_note || "__none__";
+    setCollapsedSections((previousSections: Set<string>): Set<string> => {
+      if (!previousSections.has(sectionKey)) return previousSections;
+      const nextSections = new Set(previousSections);
+      nextSections.delete(sectionKey);
+      return nextSections;
+    });
+  }, [data, focusAccountCode]);
 
   // Section subtotals follow the DRAFT values so the sheet stays arithmetically
   // honest while editing.
@@ -709,7 +1029,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
   };
 
   const handlePrintPDF = async (): Promise<void> => {
-    if (!data) return;
+    if (!data || !isCurrentRequestLoaded) return;
     if (hasUnsavedChanges) {
       toast.error(t("Save your changes before printing"));
       return;
@@ -743,7 +1063,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
     }
   };
 
-  const dateTotals = data?.date_totals;
+  const dateTotals = isCurrentRequestLoaded ? data?.date_totals : undefined;
   const isBalanced: boolean =
     !!dateTotals && Math.abs(dateTotals.difference) < 0.005;
   const colSpan: number = showNotes ? 6 : 5;
@@ -775,30 +1095,35 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
           />
 
           {/* Existing anchor dates as one-click chips */}
-          {(data?.available_dates || []).map((entry) => (
-            <button
-              key={entry.as_of_date}
-              type="button"
-              onClick={() => handleDateChange(parseLocalDate(entry.as_of_date)!)}
-              className={clsx(
-                "px-2 py-1 rounded-full text-xs border transition-colors",
-                entry.as_of_date === asOfDate
-                  ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-300"
-                  : "border-default-200 text-default-600 hover:border-sky-300 dark:border-gray-700 dark:text-gray-400"
-              )}
-              title={t("{{count}} opening balances on this date", {
-                count: entry.count,
-              })}
-            >
-              {formatDisplayDate(entry.as_of_date)} ({entry.count})
-            </button>
-          ))}
+          {(isCurrentRequestLoaded ? data?.available_dates || [] : []).map(
+            (entry) => (
+              <button
+                key={entry.as_of_date}
+                type="button"
+                onClick={() =>
+                  handleDateChange(parseLocalDate(entry.as_of_date)!)
+                }
+                className={clsx(
+                  "px-2 py-1 rounded-full text-xs border transition-colors",
+                  entry.as_of_date === asOfDate
+                    ? "border-sky-400 bg-sky-50 text-sky-700 dark:border-sky-600 dark:bg-sky-900/30 dark:text-sky-300"
+                    : "border-default-200 text-default-600 hover:border-sky-300 dark:border-gray-700 dark:text-gray-400"
+                )}
+                title={t("{{count}} opening balances on this date", {
+                  count: entry.count,
+                })}
+              >
+                {formatDisplayDate(entry.as_of_date)} ({entry.count})
+              </button>
+            )
+          )}
 
           <div className="relative">
             <IconSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             {/* Searching reloads the sheet, so it is locked while edits are
                 pending rather than silently discarding them. */}
             <input
+              ref={searchInputRef}
               type="text"
               placeholder={t("Search code or description...")}
               value={searchTerm}
@@ -808,10 +1133,64 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                   ? t("Save or discard your changes before searching")
                   : undefined
               }
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 pr-3 py-1.5 w-56 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
+              onChange={(e: React.ChangeEvent<HTMLInputElement>): void => {
+                const nextSearch: string = e.target.value;
+                setSearchTerm(nextSearch);
+                if (!nextSearch.trim()) {
+                  setLookupAllAccounts(false);
+                  setFocusAccountCode(null);
+                }
+              }}
+              className="pl-8 pr-8 py-1.5 w-56 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-60 disabled:cursor-not-allowed"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                disabled={hasUnsavedChanges}
+                onClick={(): void => {
+                  setSearchTerm("");
+                  setDebouncedSearch("");
+                  setLookupAllAccounts(false);
+                  setFocusAccountCode(null);
+                }}
+                title={t("Clear search")}
+                aria-label={t("Clear search")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-700 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:text-gray-200"
+              >
+                <IconX size={14} />
+              </button>
+            )}
           </div>
+
+          <Button
+            type="button"
+            size="sm"
+            variant={lookupAllAccounts ? "filled" : "outline"}
+            color="sky"
+            onClick={handleSearchAllAccounts}
+            disabled={hasUnsavedChanges}
+            title={
+              hasUnsavedChanges
+                ? t("Save or discard your changes before searching")
+                : t("Code not listed?")
+            }
+          >
+            {t("Code not listed?")}
+          </Button>
+
+          {shouldOfferCreateAccount && (data?.accounts.length || 0) > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              color="sky"
+              icon={IconPlus}
+              iconSize={15}
+              onClick={() => handleCreateAccount(null, true)}
+            >
+              {t("Add account code")}
+            </Button>
+          )}
 
           <Listbox
             value={rowFilter}
@@ -820,6 +1199,8 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                 toast.error(t("Save or discard your changes before filtering"));
                 return;
               }
+              setLookupAllAccounts(false);
+              setFocusAccountCode(null);
               setRowFilter(value);
             }}
           >
@@ -920,7 +1301,12 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             icon={IconDeviceFloppy}
             iconSize={16}
             onClick={handleSave}
-            disabled={saving || !hasUnsavedChanges}
+            disabled={
+              saving ||
+              !hasUnsavedChanges ||
+              !isCurrentRequestLoaded ||
+              isWriteLocked
+            }
           >
             {saving
               ? t("Saving...")
@@ -939,7 +1325,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             icon={allSectionsCollapsed ? IconChevronRight : IconChevronDown}
             iconSize={16}
             onClick={handleToggleAllSections}
-            disabled={sections.length === 0}
+            disabled={!isCurrentRequestLoaded || sections.length === 0}
           >
             {allSectionsCollapsed ? t("Expand all") : t("Collapse all")}
           </Button>
@@ -948,9 +1334,13 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             variant="outline"
             icon={IconRefresh}
             iconSize={16}
-            onClick={fetchBalances}
+            onClick={handleRefresh}
             disabled={loading || saving}
-            title={t("Refresh")}
+            title={
+              hasUnsavedChanges
+                ? t("Save or discard your changes first")
+                : t("Refresh")
+            }
             additionalClasses={loading ? "[&_svg]:animate-spin" : ""}
           />
           <Button
@@ -959,7 +1349,7 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
             icon={IconPrinter}
             iconSize={16}
             onClick={handlePrintPDF}
-            disabled={exporting || !data}
+            disabled={exporting || !isCurrentRequestLoaded}
           >
             {exporting ? t("Preparing...") : t("Print")}
           </Button>
@@ -1014,16 +1404,30 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
       )}
       </div>
 
+      {isWriteLocked && data?.editability?.open_date && (
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          <IconLock className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>
+            {t(
+              "Green Target opening balances before {{date}} are locked. Choose {{date}} or a later date to add, change, or remove a balance.",
+              { date: formatDisplayDate(data.editability.open_date) }
+            )}
+          </span>
+        </div>
+      )}
+
       {error && (
         <div className="mb-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-red-700 dark:text-red-300">{error}</p>
         </div>
       )}
 
-      {loading && !data ? (
-        <div className="flex items-center justify-center h-96">
-          <LoadingSpinner />
-        </div>
+      {!isCurrentRequestLoaded ? (
+        !error ? (
+          <div className="flex items-center justify-center h-96">
+            <LoadingSpinner />
+          </div>
+        ) : null
       ) : (
         // No overflow wrapper anywhere above the table: an `overflow` ancestor
         // becomes the sticky containing block, which would pin the column
@@ -1070,8 +1474,13 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                   )}
                   <th
                     style={{ top: pageHeaderHeight }}
-                    className={clsx(headerCellClasses, "w-10 rounded-tr-lg")}
-                  />
+                    className={clsx(
+                      headerCellClasses,
+                      "w-20 text-center rounded-tr-lg"
+                    )}
+                  >
+                    {t("Actions")}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -1081,7 +1490,26 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                       colSpan={colSpan}
                       className="px-4 py-8 text-center text-gray-500 dark:text-gray-400"
                     >
-                      {t("No accounts match the current filters")}
+                      {lookupAllAccounts ? (
+                        <div className="flex flex-col items-center gap-3">
+                          <span>{t("No accounts found")}</span>
+                          {shouldOfferCreateAccount && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              color="sky"
+                              icon={IconPlus}
+                              iconSize={15}
+                              onClick={() => handleCreateAccount(null, true)}
+                            >
+                              {t("Add account code")}
+                            </Button>
+                          )}
+                        </div>
+                      ) : (
+                        t("No accounts match the current filters")
+                      )}
                     </td>
                   </tr>
                 ) : (
@@ -1138,6 +1566,31 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                             <span className="font-normal text-xs text-default-400 dark:text-gray-500">
                               ({section.accounts.length})
                             </span>
+                            {section.note && (
+                              <button
+                                type="button"
+                                onClick={(
+                                  event: React.MouseEvent<HTMLButtonElement>
+                                ): void => {
+                                  event.stopPropagation();
+                                  handleCreateAccount(section.note);
+                                }}
+                                onKeyDown={(
+                                  event: React.KeyboardEvent<HTMLButtonElement>
+                                ): void => event.stopPropagation()}
+                                title={t("Add account code under {{name}}", {
+                                  name: section.name,
+                                })}
+                                aria-label={t(
+                                  "Add account code under {{name}}",
+                                  { name: section.name }
+                                )}
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-sky-300 bg-white text-sky-600 transition-colors hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-sky-700 dark:bg-gray-800 dark:text-sky-400 dark:hover:bg-sky-900/30"
+                                disabled={saving || !isCurrentRequestLoaded}
+                              >
+                                <IconPlus size={13} />
+                              </button>
+                            )}
                             {counts.dirty > 0 && (
                               <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                                 {t("{{count}} unsaved", {
@@ -1181,8 +1634,32 @@ const OpeningBalancesPage: React.FC<OpeningBalancesPageProps> = ({
                             }
                             showNotes={showNotes}
                             isDirty={dirtyCodeSet.has(account.code)}
-                            disabled={saving}
+                            disabled={
+                              saving ||
+                              !isCurrentRequestLoaded ||
+                              isWriteLocked ||
+                              account.opening_balance_write_allowed === false
+                            }
+                            clearDisabled={
+                              saving || !isCurrentRequestLoaded || isWriteLocked
+                            }
+                            editDisabled={saving || !isCurrentRequestLoaded}
+                            showSetBalanceHint={
+                              lookupAllAccounts &&
+                              account.amount === null &&
+                              account.opening_balance_write_allowed !== false &&
+                              !isWriteLocked
+                            }
+                            showManagedElsewhereHint={
+                              account.opening_balance_write_allowed === false
+                            }
+                            shouldFocus={
+                              focusAccountCode?.toUpperCase() ===
+                              account.code.toUpperCase()
+                            }
                             onChange={handleDraftChange}
+                            onEditAccount={handleEditAccount}
+                            onFocusComplete={handleFocusComplete}
                           />
                         ))}
                     </Fragment>

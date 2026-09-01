@@ -21,6 +21,21 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-08-31",
+    ms: "PDF Opening Balances kini menunjukkan Year ended sebagai 31 Disember tahun sebelumnya. Contohnya, opening balance pada 1 Januari 2026 menunjukkan 31 Disember 2025.",
+    en: "Opening Balances PDFs now show Year ended as 31 December of the previous year. For example, an opening balance dated 1 January 2026 shows 31 December 2025.",
+  },
+  {
+    date: "2026-08-31",
+    ms: "Halaman Opening Balances kini membantu anda mencari kod akaun yang tidak kelihatan dalam senarai. Anda juga boleh menambah kod baharu terus di bawah bahagian yang dipilih, atau klik kod akaun, butiran akaun atau ikon pensel untuk mengubah butirannya. Selepas kod baharu disimpan, halaman kembali ke Opening Balances dan menunjukkan kod tersebut supaya amaun boleh dimasukkan jika berkenaan. Tarikh Green Target sebelum 1 Julai 2026 kini jelas ditunjukkan sebagai dikunci.",
+    en: "Opening Balances now helps you find account codes that are not visible in the list. You can also add a new code directly under a selected section, or click an account code, its particulars or its pencil icon to edit its details. After a new code is saved, the page returns to Opening Balances and shows that code so you can enter its amount where applicable. Green Target dates before 1 July 2026 are now clearly shown as locked.",
+  },
+  {
+    date: "2026-08-31",
+    ms: "Popover tindakan pantas dalam menu navigasi kini kekal terbuka apabila anda bergerak pantas antara item menu yang mempunyai popover, termasuk dari Invois ke Dokumen Pelarasan.",
+    en: "Quick-action popovers in the navigation menu now stay open when you move quickly between menu items that have popovers, including from Invoice to Adjustment Docs.",
+  },
+  {
+    date: "2026-08-31",
     ms: "Panduan sumber untuk Trial Balance, Income Statement, Balance Sheet dan CoGM kini menerangkan baki permulaan, aliran catatan jurnal dan stok akhir bulan yang benar-benar digunakan oleh laporan semasa. Laporan Green Target kini mempunyai panduan tersendiri untuk rekod Januari hingga Jun yang diimport, catatan bermula 1 Julai dan susun atur penyatanya. Panduan tersedia dalam Bahasa Melayu, Bahasa Inggeris dan Bahasa Cina Ringkas.",
     en: "The source guides for Trial Balance, Income Statement, Balance Sheet and CoGM now explain the opening balances, journal flows and month-end stock actually used by the current reports. Green Target reports now have their own guides for the imported January-to-June records, postings from 1 July and their statement layout. Guides are available in BM, English and Simplified Chinese.",
   },
