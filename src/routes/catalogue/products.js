@@ -348,8 +348,10 @@ export default function (pool) {
           : `WHERE ${typeFilter}`;
         query = `SELECT id, description, price_per_unit, type, is_active, sort_order FROM products ${whereClause}`;
       } else {
-        // Default: Return the primary saleable product types (excluding tax)
-        const typeFilter = "type IN ('BH', 'MEE', 'RAMEN', 'JP')";
+        // Keep the default response compatible with salesman app versions that
+        // do not yet support the RAMEN product type. RAMEN remains available
+        // through ?all and explicit filters such as ?type=RAMEN.
+        const typeFilter = "type IN ('BH', 'MEE', 'JP')";
         whereClause = activeFilter
           ? `WHERE ${typeFilter} AND ${activeFilter}`
           : `WHERE ${typeFilter}`;
