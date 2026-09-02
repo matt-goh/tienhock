@@ -21,8 +21,13 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-02",
-    ms: "Penyegerakan aplikasi jurujual kini berfungsi semula selepas penambahan produk Ramen. Produk Ramen kekal tersedia dalam sistem pejabat, manakala telefon jurujual yang belum menyokong jenis produk baharu tidak lagi gagal semasa memuat turun maklumat terkini.",
-    en: "Salesman app synchronization now works again after Ramen products were introduced. Ramen remains available in the office system, while salesman phones that do not yet support the new product type no longer fail when downloading the latest information.",
+    ms: "Apabila aplikasi jurujual menghantar beberapa bil, masalah pada satu bil kini tidak lagi membatalkan bil lain atau menandakannya sebagai berjaya secara salah. Hanya bil yang disimpan sepenuhnya diteruskan ke e-Invois, manakala bil bermasalah dilaporkan sebagai gagal supaya boleh dicuba semula.",
+    en: "When the salesman app submits multiple bills, a problem with one bill no longer rolls back other valid bills or incorrectly marks them as successful. Only fully saved bills proceed to e-Invoice, while problem bills are returned as failed so they can be retried.",
+  },
+  {
+    date: "2026-09-02",
+    ms: "Penyegerakan aplikasi jurujual kini berfungsi semula selepas penambahan produk Ramen. Produk Ramen kekal tersedia pada telefon jurujual melalui kategori produk yang serasi, manakala sistem pejabat terus menggunakan jenis Ramen sebenar.",
+    en: "Salesman app synchronization now works again after Ramen products were introduced. Ramen products remain available on salesman phones through a compatible product category, while the office system continues using the actual Ramen type.",
   },
   {
     date: "2026-08-31",

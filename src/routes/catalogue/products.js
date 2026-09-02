@@ -349,13 +349,17 @@ export default function (pool) {
         query = `SELECT id, description, price_per_unit, type, is_active, sort_order FROM products ${whereClause}`;
       } else {
         // Keep the default response compatible with salesman app versions that
-        // do not yet support the RAMEN product type. RAMEN remains available
-        // through ?all and explicit filters such as ?type=RAMEN.
-        const typeFilter = "type IN ('BH', 'MEE', 'JP')";
+        // only understand the legacy product types. Ramen products remain
+        // saleable on those phones under MEE, while ?all and explicit filters
+        // such as ?type=RAMEN continue to expose their real type to office apps.
+        const typeFilter = "type IN ('BH', 'MEE', 'RAMEN', 'JP')";
         whereClause = activeFilter
           ? `WHERE ${typeFilter} AND ${activeFilter}`
           : `WHERE ${typeFilter}`;
-        query = `SELECT id, description, price_per_unit, type, is_active, sort_order FROM products ${whereClause}`;
+        query = `SELECT id, description, price_per_unit,
+                        CASE WHEN type = 'RAMEN' THEN 'MEE' ELSE type END AS type,
+                        is_active, sort_order
+                   FROM products ${whereClause}`;
       }
 
       const result = await pool.query(query);

@@ -3098,6 +3098,8 @@ export default function (pool, config) {
       await client.query("BEGIN");
 
       for (const invoice of invoicePayloads) {
+        const billNumber = String(invoice.billNumber);
+
         // Transform input (Map mobile fields to NEW schema fields)
 
         // Check if the invoice is CASH type
@@ -3105,7 +3107,7 @@ export default function (pool, config) {
         const totalPayable = Number(invoice.totalAmountPayable || 0);
 
         const transformedInvoice = {
-          id: String(invoice.billNumber),
+          id: billNumber,
           salespersonid: invoice.salespersonId,
           customerid: invoice.customerId,
           createddate: invoice.createdDate || Date.now().toString(),
@@ -3127,16 +3129,22 @@ export default function (pool, config) {
           einvoice_status: null,
         };
 
+        // PostgreSQL keeps a transaction aborted after a statement error.
+        // Isolate each invoice so its failure can be rolled back before the
+        // next item is processed.
+        await client.query("SAVEPOINT invoice_item");
+
         try {
           const checkQuery = "SELECT id FROM invoices WHERE id = $1";
           const checkResult = await client.query(checkQuery, [
             transformedInvoice.id,
           ]);
           if (checkResult.rows.length > 0) {
-            throw {
-              code: "DUPLICATE_DB",
-              message: `Invoice ${transformedInvoice.id} already exists in database`,
-            };
+            const duplicateError = new Error(
+              `Invoice ${transformedInvoice.id} already exists in database`
+            );
+            duplicateError.code = "DUPLICATE_DB";
+            throw duplicateError;
           }
 
           // --- Fetch Product Descriptions ---
@@ -3165,6 +3173,7 @@ export default function (pool, config) {
               uuid, submission_uid, long_id, datetime_validated, is_consolidated,
               consolidated_invoices, einvoice_status, balance_due
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            ON CONFLICT (id) DO NOTHING
             RETURNING *`;
           const invoiceResult = await client.query(insertInvoiceQuery, [
             transformedInvoice.id,
@@ -3186,6 +3195,13 @@ export default function (pool, config) {
             transformedInvoice.einvoice_status,
             transformedInvoice.balance_due,
           ]);
+          if (invoiceResult.rows.length === 0) {
+            const duplicateError = new Error(
+              `Invoice ${transformedInvoice.id} already exists in database`
+            );
+            duplicateError.code = "DUPLICATE_DB";
+            throw duplicateError;
+          }
           const savedInvoice = invoiceResult.rows[0];
 
           // Prepare and Insert Products (Order Details)
@@ -3231,21 +3247,9 @@ export default function (pool, config) {
             }
           }
 
-          // Post the invoice-owned journal (CASH bills: DR CH_REV1 / CR CASH_SALES
-          // plus the auto-collection payment row dated to the invoice's LOCAL date —
-          // never the submission time). Non-lock failures remain recoverable so
-          // the journal can self-heal later; a locked date aborts the batch.
-          try {
-            await syncSalesJournalEntry(client, savedInvoice, null);
-          } catch (salesJournalError) {
-            if (isAccountingPeriodLockedError(salesJournalError)) {
-              throw salesJournalError;
-            }
-            console.error(
-              `Failed to post sales journal for invoice ${savedInvoice.id}:`,
-              salesJournalError
-            );
-          }
+          // The invoice, its lines, sales journal, auto-collection row and
+          // customer credit must succeed or fail together.
+          await syncSalesJournalEntry(client, savedInvoice, null);
 
           // Update customer credit if INVOICE type - NO CHANGE HERE
           if (savedInvoice.paymenttype === "INVOICE") {
@@ -3256,8 +3260,9 @@ export default function (pool, config) {
             );
           }
 
-          // Prepare data for the subsequent e-invoice step
-          savedInvoiceDataForEInvoice.push({
+          // Prepare data for the subsequent e-invoice step, but expose it only
+          // after this invoice's savepoint has been released successfully.
+          const savedInvoiceForEInvoice = {
             ...savedInvoice, // Use the actual data saved to DB
             orderDetails: orderDetailsForEInvoice,
             // Add derived fields if needed by EInvoiceTemplate
@@ -3266,9 +3271,23 @@ export default function (pool, config) {
               .toTimeString()
               .substring(0, 5),
             type: savedInvoice.paymenttype,
-          });
+          };
+
+          await client.query("RELEASE SAVEPOINT invoice_item");
+          savedInvoiceDataForEInvoice.push(savedInvoiceForEInvoice);
           dbResults.success.push({ billNumber: savedInvoice.id }); // Minimal success info for DB step
         } catch (error) {
+          try {
+            await client.query("ROLLBACK TO SAVEPOINT invoice_item");
+            await client.query("RELEASE SAVEPOINT invoice_item");
+          } catch (savepointError) {
+            console.error(
+              `Failed to recover transaction after invoice ${billNumber}:`,
+              savepointError
+            );
+            throw savepointError;
+          }
+
           if (isAccountingPeriodLockedError(error)) {
             throw error;
           }
@@ -3279,7 +3298,7 @@ export default function (pool, config) {
             });
           } else {
             console.error(
-              `Error processing invoice ${invoice.billNumber} for DB save:`,
+              `Error processing invoice ${billNumber} for DB save:`,
               error
             );
             dbResults.errors.push({
@@ -3326,10 +3345,23 @@ export default function (pool, config) {
         }
       }
 
-      // Commit successful DB inserts/updates
-      await client.query("COMMIT");
+      // Commit successful DB inserts/updates. PostgreSQL can answer COMMIT
+      // with ROLLBACK after an unnoticed transaction abort, so verify the
+      // command before any invoice is sent to MyInvois or reported as saved.
+      const commitResult = await client.query("COMMIT");
+      if (commitResult.command !== "COMMIT") {
+        const commitError = new Error(
+          "Invoice batch transaction was not committed"
+        );
+        commitError.code = "TRANSACTION_NOT_COMMITTED";
+        throw commitError;
+      }
     } catch (dbError) {
-      await client.query("ROLLBACK");
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error("Failed to roll back invoice batch:", rollbackError);
+      }
       console.error("Critical error during database processing:", dbError);
       if (isAccountingPeriodLockedError(dbError)) {
         return res.status(dbError.status).json({
@@ -3373,10 +3405,12 @@ export default function (pool, config) {
           (einvoiceResults.acceptedDocuments?.length > 0 ||
             einvoiceResults.rejectedDocuments?.length > 0)
         ) {
+          // Each external result is persisted independently. A shared
+          // transaction would be poisoned by the first caught UPDATE error
+          // and could silently roll back otherwise successful UUID/status
+          // updates for every other invoice.
           const updateClient = await pool.connect();
           try {
-            await updateClient.query("BEGIN");
-
             // Update Accepted
             if (einvoiceResults.acceptedDocuments?.length > 0) {
               const updateAcceptedQuery = `
@@ -3457,12 +3491,10 @@ export default function (pool, config) {
                 }
               }
             }
-            await updateClient.query("COMMIT");
           } catch (error) {
-            await updateClient.query("ROLLBACK");
             einvoiceUpdateErrors.push({
               invoiceId: " general",
-              type: "transaction",
+              type: "status_update",
               error: error.message,
             });
           } finally {
@@ -3558,11 +3590,13 @@ export default function (pool, config) {
         let error = null;
 
         const dbSuccess = dbResults.success.find(
-          (r) => r.billNumber === billNo
+          (r) => String(r.billNumber) === billNo
         );
-        const dbError = dbResults.errors.find((r) => r.billNumber === billNo);
+        const dbError = dbResults.errors.find(
+          (r) => String(r.billNumber) === billNo
+        );
         const dbDuplicate = dbResults.duplicates.find(
-          (r) => r.billNumber === billNo
+          (r) => String(r.billNumber) === billNo
         );
         const einvAccepted = einvoiceResults?.acceptedDocuments?.find(
           (d) => d.internalId === billNo
