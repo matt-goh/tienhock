@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-02",
+    ms: "Penyegerakan aplikasi jurujual kini berfungsi semula selepas penambahan produk Ramen. Produk Ramen kekal tersedia dalam sistem pejabat, manakala telefon jurujual yang belum menyokong jenis produk baharu tidak lagi gagal semasa memuat turun maklumat terkini.",
+    en: "Salesman app synchronization now works again after Ramen products were introduced. Ramen remains available in the office system, while salesman phones that do not yet support the new product type no longer fail when downloading the latest information.",
+  },
+  {
     date: "2026-08-31",
     ms: "PDF Opening Balances kini menunjukkan Year ended sebagai 31 Disember tahun sebelumnya. Contohnya, opening balance pada 1 Januari 2026 menunjukkan 31 Disember 2025.",
     en: "Opening Balances PDFs now show Year ended as 31 December of the previous year. For example, an opening balance dated 1 January 2026 shows 31 December 2025.",
