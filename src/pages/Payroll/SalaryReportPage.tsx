@@ -6,7 +6,6 @@ import {
   IconFileText,
   IconPrinter,
   IconFileExport,
-  IconLink,
   IconInfoCircle,
   IconChevronRight,
 } from "@tabler/icons-react";
@@ -315,7 +314,6 @@ const SalaryReportPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState<boolean>(false);
   const [isGeneratingExport, setIsGeneratingExport] = useState<boolean>(false);
-  const [showExportDialog, setShowExportDialog] = useState<boolean>(false);
   const [showColumnGuide, setShowColumnGuide] = useState<boolean>(false);
   // Annual → Breakdown is paginated one location at a time to keep the UI light;
   // printing follows the current page (that one location).
@@ -339,13 +337,6 @@ const SalaryReportPage: React.FC = () => {
   const batchDropdownTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   // Which batch is currently being generated (e.g. "2-print"), to disable buttons.
   const [batchPrintingKey, setBatchPrintingKey] = useState<string | null>(null);
-  const [exportYear, setExportYear] = useState<number>(
-    new Date().getFullYear()
-  );
-  const [exportMonth, setExportMonth] = useState<number>(
-    new Date().getMonth() + 1
-  );
-
   // Sub-view mode for Employee tab
   const [employeeViewMode, setEmployeeViewMode] = usePersistedFilters<
     "individual" | "location"
@@ -651,26 +642,6 @@ const SalaryReportPage: React.FC = () => {
     pinjamViewMode === "mid_month" ? "1/2 Bulan" : "Gaji/Genap";
   const activePinjamReportLabel: string =
     pinjamViewMode === "mid_month" ? "Mid-Month Pinjam" : "Pinjam";
-
-  // Generate year and month options
-  const yearOptions = useMemo(() => {
-    const years = [];
-    const startYear = new Date().getFullYear() - 5; // Go back 5 years
-    const endYear = new Date().getFullYear(); // Current year
-    for (let year = endYear; year >= startYear; year--) {
-      years.push({ id: year, name: year.toString() });
-    }
-    return years;
-  }, []);
-
-  const monthOptions = useMemo(
-    () =>
-      Array.from({ length: 12 }, (_, i) => ({
-        id: i + 1,
-        name: getMonthName(i + 1),
-      })),
-    []
-  );
 
   // Handle year change (keeps the selected month, swaps the year)
   const handleYearChange = (newYear: number) => {
@@ -1376,26 +1347,6 @@ const SalaryReportPage: React.FC = () => {
         )}
       </div>
     );
-  };
-
-  // Text Export Generation
-  const generateExportURL = () => {
-    // Determine server URL based on environment
-    const isProduction = window.location.hostname === "tienhock.com";
-    const baseURL = isProduction
-      ? "https://api.tienhock.com"
-      : "http://localhost:5001";
-    const url = `${baseURL}/api/excel/payment-export?year=${exportYear}&month=${exportMonth}&api_key=REMOVED_SECRET`;
-
-    navigator.clipboard
-      .writeText(url)
-      .then(() => {
-        toast.success(t("Export URL copied to clipboard!"));
-        setShowExportDialog(false);
-      })
-      .catch(() => {
-        toast.error(t("Failed to copy URL to clipboard"));
-      });
   };
 
   const generateTextExport = async () => {
@@ -2659,85 +2610,6 @@ const SalaryReportPage: React.FC = () => {
       </div>
     );
   };
-
-  // Export Dialog Component
-  const ExportDialog = () => (
-    <Transition appear show={showExportDialog} as={React.Fragment}>
-      <Dialog
-        as="div"
-        className="fixed inset-0 z-50"
-        onClose={() => setShowExportDialog(false)}
-      >
-        <div className="min-h-screen px-4 text-center">
-          <TransitionChild
-            as={React.Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <DialogPanel
-              className="fixed inset-0 bg-black opacity-30"
-              onClick={() => setShowExportDialog(false)}
-            />
-          </TransitionChild>
-
-          <span
-            className="inline-block h-screen align-middle"
-            aria-hidden="true"
-          >
-            &#8203;
-          </span>
-
-          <TransitionChild
-            as={React.Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0 scale-95"
-            enterTo="opacity-100 scale-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100 scale-100"
-            leaveTo="opacity-0 scale-95"
-          >
-            <DialogPanel
-              className="inline-block w-full max-w-md p-6 my-8 text-left align-middle transition-all transform bg-white dark:bg-gray-800 shadow-xl rounded-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <DialogTitle
-                as="h3"
-                className="text-lg font-medium leading-6 text-default-900 dark:text-gray-100"
-              >{t("Export Link Generator")}</DialogTitle>
-              <div className="mt-4 space-y-4">
-                <FormListbox
-                  name="exportYear"
-                  label={t("Year")}
-                  value={exportYear.toString()}
-                  onChange={(value) => setExportYear(Number(value))}
-                  options={yearOptions}
-                />
-                <FormListbox
-                  name="exportMonth"
-                  label={t("Month")}
-                  value={exportMonth.toString()}
-                  onChange={(value) => setExportMonth(Number(value))}
-                  options={monthOptions}
-                />
-              </div>
-              <div className="flex justify-end space-x-3 mt-6">
-                <Button
-                  onClick={() => setShowExportDialog(false)}
-                  variant="outline"
-                  size="sm"
-                >{t("Cancel")}</Button>
-                <Button onClick={generateExportURL} color="blue" size="sm">{t("Copy URL")}</Button>
-              </div>
-            </DialogPanel>
-          </TransitionChild>
-        </div>
-      </Dialog>
-    </Transition>
-  );
 
   const columnGuideText =
     columnGuideLanguage === "bm"
@@ -4042,13 +3914,6 @@ const SalaryReportPage: React.FC = () => {
                     }
                     size="sm"
                   >{t("Export")}</Button>
-                  <Button
-                    onClick={() => setShowExportDialog(true)}
-                    icon={IconLink}
-                    color="orange"
-                    variant="outline"
-                    size="sm"
-                  >{t("Export Link")}</Button>
                 </>
               )}
             </div>
@@ -4193,13 +4058,6 @@ const SalaryReportPage: React.FC = () => {
                       }
                       size="sm"
                     >{t("Export")}</Button>
-                    <Button
-                      onClick={() => setShowExportDialog(true)}
-                      icon={IconLink}
-                      color="orange"
-                      variant="outline"
-                      size="sm"
-                    >{t("Export Link")}</Button>
                   </>
                 )}
               </div>
@@ -4384,8 +4242,6 @@ const SalaryReportPage: React.FC = () => {
         )}
       </div>
 
-      {/* Export Dialog */}
-      <ExportDialog />
       <ColumnGuideDialog />
 
       {/* Loading overlay while a PDF is being generated for print/download */}

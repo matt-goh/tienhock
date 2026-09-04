@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-04",
+    ms: "Pautan eksport Power Query untuk rekod kakitangan dan laporan gaji telah dibuang untuk melindungi data sensitif. Eksport fail biasa dalam aplikasi kekal tersedia dan terus berfungsi seperti sebelum ini.",
+    en: "Power Query export links for staff records and salary reports have been removed to protect sensitive data. The normal in-app file exports remain available and continue to work as before.",
+  },
+  {
     date: "2026-09-03",
     ms: "Pengumuran baki dalam Penyata Akaun Green Target kini meletakkan invois bulan penyata di ruangan Semasa dan menggunakan bayaran untuk menjelaskan hutang tertua terlebih dahulu. Amaun Semasa, 1 Bulan, 2 Bulan dan Lebih 3 Bulan kini sepadan dengan baki belum dibayar sebenar.",
     en: "Green Target Statement of Account ageing now places invoices from the statement month under Current and applies payments to the oldest debt first. The Current, 1 Month, 2 Months and Over 3 Months amounts now match the actual outstanding balance.",
