@@ -3,13 +3,12 @@
 ## Live migration 3 Sep 2026 - Danish primary salary location / August JVSL
 
 `dev/migrations/2026-09-03_restore_danish_primary_salary_location.sql` is applied to dev and
-pending production. It is intentionally still present in `dev/migrations/`; remove it and move this
-entry into the normal removed-migration history only after the same guarded file succeeds in
-production.
+production. It is intentionally still present in `dev/migrations/` until it is removed per the
+project convention; then move this entry into the normal removed-migration history.
 
 | File | What it does | Status |
 |------|--------------|--------|
-| `2026-09-03_restore_danish_primary_salary_location.sql` | Restores Danish's canonical ordered staff locations from `18,09` to `09,18`, preserving any extra locations. The first value is the Salary Report/JVSL department: `09` is Mesin Bihun, while `18` is the supplemental Insentif Tidak Tetap bucket excluded from JVSL. This returns August gross RM1,284.08 + rounding RM0.52 + employer EPF RM138.00 + employer SOCSO RM21.85 = **RM1,444.45** to Mesin & Sangkut Bihun, reconciling the user-provided JVSL RM146,353.55 preview to the RM147,798.00 Payroll Summary. The companion shared multi-select fix preserves incoming location order so ordinary staff edits cannot silently recreate the defect. Guarded, idempotent and fail-closed; it refuses the data change if `JVSL/08/26` already exists because saved journal lines do not rebuild automatically. | dev applied 2026-09-03 (idempotence verified); prod pending |
+| `2026-09-03_restore_danish_primary_salary_location.sql` | Restores Danish's canonical ordered staff locations from `18,09` to `09,18`, preserving any extra locations. The first value is the Salary Report/JVSL department: `09` is Mesin Bihun, while `18` is the supplemental Insentif Tidak Tetap bucket excluded from JVSL. This returns August gross RM1,284.08 + rounding RM0.52 + employer EPF RM138.00 + employer SOCSO RM21.85 = **RM1,444.45** to Mesin & Sangkut Bihun, reconciling the user-provided JVSL RM146,353.55 preview to the RM147,798.00 Payroll Summary. The companion shared multi-select fix preserves incoming location order so ordinary staff edits cannot silently recreate the defect. Guarded, idempotent and fail-closed; it refuses the data change if `JVSL/08/26` already exists because saved journal lines do not rebuild automatically. | dev applied 2026-09-03 (idempotence verified); prod applied 2026-09-03 |
 
 ---
 
