@@ -345,10 +345,26 @@ export const FormCombobox: React.FC<ComboboxProps> = ({
   // Find selected option(s) based on incoming ID(s)
   const selectedOptions = React.useMemo(() => {
     if (isMultiple) {
-      const valuesArray = Array.isArray(value)
+      const valuesArray: string[] = Array.isArray(value)
         ? value.map((v) => v?.toString())
         : [];
-      return options.filter((opt) => valuesArray.includes(opt.id.toString()));
+      const optionsById: Map<string, SelectOption> = new Map(
+        options.map((option: SelectOption): [string, SelectOption] => [
+          option.id.toString(),
+          option,
+        ])
+      );
+
+      // Keep the caller's value order. Some ordered multi-selects use the first
+      // item as the primary choice (staff locations drive Salary Report/JVSL
+      // grouping), so rebuilding this array in the options' alphabetical order
+      // silently changes business meaning when the form is edited.
+      return valuesArray
+        .map((id: string): SelectOption | undefined => optionsById.get(id))
+        .filter(
+          (option: SelectOption | undefined): option is SelectOption =>
+            option !== undefined
+        );
     } else {
       const stringValue = value?.toString();
       return options.find((opt) => opt.id.toString() === stringValue) ?? null;
