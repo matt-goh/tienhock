@@ -274,7 +274,7 @@ const CompanyHeader: React.FC<{ companyInfo: CompanyInfo; companyName?: string }
           TEL : {TIENHOCK_INFO.phone} & 714306
         </Text>
         <Text style={styles.companyDetails}>
-          FAX : 088-726452 H/P : 016-8328244
+          FAX : 088-726452 H/P : 016-8329291
         </Text>
         <Text style={styles.companyDetails}>GST ID NO : 000397869056</Text>
       </View>
