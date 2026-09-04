@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-03",
+    ms: "Pengumuran baki dalam Penyata Akaun Green Target kini meletakkan invois bulan penyata di ruangan Semasa dan menggunakan bayaran untuk menjelaskan hutang tertua terlebih dahulu. Amaun Semasa, 1 Bulan, 2 Bulan dan Lebih 3 Bulan kini sepadan dengan baki belum dibayar sebenar.",
+    en: "Green Target Statement of Account ageing now places invoices from the statement month under Current and applies payments to the oldest debt first. The Current, 1 Month, 2 Months and Over 3 Months amounts now match the actual outstanding balance.",
+  },
+  {
+    date: "2026-09-03",
     ms: "Penjana Baucar Green Target kini mempunyai Ringkasan Payroll yang boleh dicetak, menunjukkan pecahan Pengarah dan Kakitangan serta jumlah yang diselaraskan dengan baucar JWDR dan JBSL bagi bulan yang dipilih.",
     en: "The Green Target Voucher Generator now includes a printable Payroll Summary with Director and Staff breakdowns and totals reconciled to the selected month's JWDR and JBSL vouchers.",
   },

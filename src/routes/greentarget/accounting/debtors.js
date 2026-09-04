@@ -64,38 +64,79 @@ const useDescendantAggregation = (startStr) =>
   startStr >= DEBTOR_SUBLEDGER_CUTOVER;
 
 /**
- * FIFO-age signed monthly net buckets into the four report buckets.
- * @param {Map<string, number>} monthlyCents Keyed by yyyy-MM.
+ * @typedef {Object} MonthlyAgingMovement
+ * @property {number} openingCents
+ * @property {number} debitCents
+ * @property {number} creditCents
+ */
+
+/**
+ * Return the mutable movement totals for one month, creating them if needed.
+ * @param {Map<string, MonthlyAgingMovement>} monthlyMovements
+ * @param {string} key yyyy-MM.
+ * @returns {MonthlyAgingMovement}
+ */
+const getMonthlyAgingMovement = (monthlyMovements, key) => {
+  let movement = monthlyMovements.get(key);
+  if (!movement) {
+    movement = { openingCents: 0, debitCents: 0, creditCents: 0 };
+    monthlyMovements.set(key, movement);
+  }
+  return movement;
+};
+
+/**
+ * FIFO-age monthly debits and credits into the four report buckets. Debits
+ * enter their document month before that month's credits consume the oldest
+ * outstanding debit, so a receipt does not net away new invoices first.
+ * @param {Map<string, MonthlyAgingMovement>} monthlyMovements Keyed by yyyy-MM.
  * @param {number} periodYear
  * @param {number} periodMonth
  */
-const ageMonthlyCents = (monthlyCents, periodYear, periodMonth) => {
+const ageMonthlyCents = (monthlyMovements, periodYear, periodMonth) => {
   /** @type {Array<{ key: string, amountCents: number }>} */
   const buckets = [];
-  const monthKeys = [...monthlyCents.keys()].sort();
+  const monthKeys = [...monthlyMovements.keys()].sort();
+
+  /**
+   * @param {string} key yyyy-MM.
+   * @param {number} signedCents Debit-positive signed amount.
+   * @returns {void}
+   */
+  const applySignedMovement = (key, signedCents) => {
+    let remainingMovement = signedCents;
+    if (remainingMovement > 0) {
+      for (const bucket of buckets) {
+        if (remainingMovement <= 0) break;
+        if (bucket.amountCents >= 0) continue;
+        const used = Math.min(-bucket.amountCents, remainingMovement);
+        bucket.amountCents += used;
+        remainingMovement -= used;
+      }
+      if (remainingMovement > 0) {
+        buckets.push({ key, amountCents: remainingMovement });
+      }
+    } else if (remainingMovement < 0) {
+      let remainingCredit = -remainingMovement;
+      for (const bucket of buckets) {
+        if (remainingCredit <= 0) break;
+        if (bucket.amountCents <= 0) continue;
+        const used = Math.min(bucket.amountCents, remainingCredit);
+        bucket.amountCents -= used;
+        remainingCredit -= used;
+      }
+      if (remainingCredit > 0) {
+        buckets.push({ key, amountCents: -remainingCredit });
+      }
+    }
+  };
 
   for (const key of monthKeys) {
-    let net = monthlyCents.get(key) || 0;
-    if (net > 0) {
-      for (const bucket of buckets) {
-        if (net <= 0) break;
-        if (bucket.amountCents >= 0) continue;
-        const used = Math.min(-bucket.amountCents, net);
-        bucket.amountCents += used;
-        net -= used;
-      }
-      if (net > 0) buckets.push({ key, amountCents: net });
-    } else if (net < 0) {
-      let remaining = -net;
-      for (const bucket of buckets) {
-        if (remaining <= 0) break;
-        if (bucket.amountCents <= 0) continue;
-        const used = Math.min(bucket.amountCents, remaining);
-        bucket.amountCents -= used;
-        remaining -= used;
-      }
-      if (remaining > 0) buckets.push({ key, amountCents: -remaining });
-    }
+    const movement = monthlyMovements.get(key);
+    if (!movement) continue;
+    applySignedMovement(key, movement.openingCents);
+    applySignedMovement(key, movement.debitCents);
+    applySignedMovement(key, -movement.creditCents);
   }
 
   const ageOf = (key) => {
@@ -289,10 +330,9 @@ export default function createGreenTargetDebtorsRouter(pool) {
   /**
    * Monthly FIFO aging for every direct TD child as at the period end, rolled
    * forward from each scoped account's latest applicable anchor. Each month's
-   * net movement is a
-   * signed bucket: positive nets first offset carried credit buckets, negative
-   * nets consume positive buckets oldest-first, any excess crediting the
-   * current month. Buckets always sum to the child's ledger close.
+   * debits enter that month before credits consume positive buckets
+   * oldest-first; any excess becomes a credit balance in the current month.
+   * Buckets always sum to the child's ledger close.
    *
    * Returns a Map of account code ->
    * { current_month, one_month, two_months, three_months_plus } (RM, 2dp).
@@ -376,7 +416,8 @@ export default function createGreenTargetDebtorsRouter(pool) {
          SELECT scope.root_code,
                 EXTRACT(YEAR FROM je.entry_date)::integer AS y,
                 EXTRACT(MONTH FROM je.entry_date)::integer AS m,
-                SUM(jel.debit_amount - jel.credit_amount) AS net
+                SUM(jel.debit_amount) AS debit,
+                SUM(jel.credit_amount) AS credit
            FROM anchored_scope scope
            JOIN greentarget.journal_entry_lines jel
              ON jel.account_code = scope.account_code
@@ -399,9 +440,8 @@ export default function createGreenTargetDebtorsRouter(pool) {
         monthlyByCode.set(row.root_code, months);
       }
       if (row.anchor_month) {
-        months.set(
-          row.anchor_month,
-          (months.get(row.anchor_month) || 0) + cents(row.amount)
+        getMonthlyAgingMovement(months, row.anchor_month).openingCents += cents(
+          row.amount
         );
       }
     }
@@ -412,7 +452,9 @@ export default function createGreenTargetDebtorsRouter(pool) {
         monthlyByCode.set(row.root_code, months);
       }
       const key = `${row.y}-${pad2(row.m)}`;
-      months.set(key, (months.get(key) || 0) + cents(row.net));
+      const movement = getMonthlyAgingMovement(months, key);
+      movement.debitCents += cents(row.debit);
+      movement.creditCents += cents(row.credit);
     }
 
     const agingByCode = new Map();
@@ -445,7 +487,8 @@ export default function createGreenTargetDebtorsRouter(pool) {
     const monthlyResult = await pool.query(
       `SELECT EXTRACT(YEAR FROM je.entry_date)::integer AS y,
               EXTRACT(MONTH FROM je.entry_date)::integer AS m,
-              SUM(jel.debit_amount - jel.credit_amount) AS net
+              SUM(jel.debit_amount) AS debit,
+              SUM(jel.credit_amount) AS credit
          FROM greentarget.journal_entry_lines jel
          JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
         WHERE je.status = 'posted'
@@ -459,11 +502,14 @@ export default function createGreenTargetDebtorsRouter(pool) {
 
     const months = new Map();
     if (anchor) {
-      months.set(anchor.anchor_month, cents(anchor.amount));
+      getMonthlyAgingMovement(months, anchor.anchor_month).openingCents +=
+        cents(anchor.amount);
     }
     for (const row of monthlyResult.rows) {
       const key = `${row.y}-${pad2(row.m)}`;
-      months.set(key, (months.get(key) || 0) + cents(row.net));
+      const movement = getMonthlyAgingMovement(months, key);
+      movement.debitCents += cents(row.debit);
+      movement.creditCents += cents(row.credit);
     }
     return ageMonthlyCents(months, periodYear, periodMonth);
   };
@@ -762,7 +808,8 @@ export default function createGreenTargetDebtorsRouter(pool) {
       const monthlyResult = await pool.query(
         `SELECT EXTRACT(YEAR FROM je.entry_date)::integer AS y,
                 EXTRACT(MONTH FROM je.entry_date)::integer AS m,
-                SUM(jel.debit_amount - jel.credit_amount) AS net
+                SUM(jel.debit_amount) AS debit,
+                SUM(jel.credit_amount) AS credit
            FROM greentarget.journal_entry_lines jel
            JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
           WHERE je.status = 'posted'
@@ -775,11 +822,14 @@ export default function createGreenTargetDebtorsRouter(pool) {
       );
       const months = new Map();
       if (anchor) {
-        months.set(anchor.anchor_month, cents(anchor.amount));
+        getMonthlyAgingMovement(months, anchor.anchor_month).openingCents +=
+          cents(anchor.amount);
       }
       for (const row of monthlyResult.rows) {
         const key = `${row.y}-${pad2(row.m)}`;
-        months.set(key, (months.get(key) || 0) + cents(row.net));
+        const movement = getMonthlyAgingMovement(months, key);
+        movement.debitCents += cents(row.debit);
+        movement.creditCents += cents(row.credit);
       }
       const aging = ageMonthlyCents(months, periodYear, periodMonth);
 
