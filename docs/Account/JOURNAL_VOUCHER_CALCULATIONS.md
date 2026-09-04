@@ -358,6 +358,24 @@ Any future change to JVSL composition must be made in `buildJvslFromSalaryReport
 where a component's source changes, in the salary report), never duplicated.
 (The old `buildJvslLines()`/`computeJvslRoundingByLocation()` are superseded.)
 
+### August 2026 Danish location-order omission (fixed 3 Sep 2026)
+
+The August Payroll Summary correctly included Danish's full worker cost, but the JVSL preview was
+RM1,444.45 lower. Danish's canonical `staffs.location` value had been silently reordered from
+`["09","18"]` to `["18","09"]` by the shared staff multi-select. Salary reports intentionally use
+the canonical Head's first assigned location as the primary department, so his August payroll went
+to location 18 (Insentif Tidak Tetap), which is a supplemental commission bucket outside the JVSL
+department model, instead of location 09 (Mesin Bihun) as confirmed by his `BH_DEPAN` job mapping.
+
+The exact omitted JV cost was gross RM1,284.08 + rounding RM0.52 + employer EPF RM138.00 +
+employer SOCSO RM21.85 = RM1,444.45. The guarded
+`2026-09-03_restore_danish_primary_salary_location.sql` migration restores `09` as his first
+location, and `FormCombobox` now preserves the caller's ordered values instead of reconstructing
+multi-selections in alphabetical option order. JVDR uses its separate fixed director grouping and
+was never affected. If `JVSL/08/26` already exists, do not assume the location correction changes
+its saved lines: the migration refuses that state so the journal can be inspected and rebuilt
+atomically.
+
 ## Data Sources Summary
 
 ### JVSL per-location figures (from the Salary Report)

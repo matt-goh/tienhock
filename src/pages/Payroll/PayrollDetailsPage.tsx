@@ -1971,7 +1971,7 @@ const EmployeePayrollDetailsPage: React.FC = () => {
                   );
                 })()}
             </div>
-            <div className="border-t border-default-200 dark:border-gray-600 mt-auto pt-3">
+            <div className="border-t border-default-200 dark:border-gray-600 mt-2 lg:mt-auto pt-3">
               <div className="flex justify-between font-semibold">
                 <span className="text-default-800 dark:text-gray-100">
                   {t("Gross Pay")}

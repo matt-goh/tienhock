@@ -20,6 +20,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-03",
+    ms: "Pengumuran baki dalam Penyata Akaun Green Target kini meletakkan invois bulan penyata di ruangan Semasa dan menggunakan bayaran untuk menjelaskan hutang tertua terlebih dahulu. Amaun Semasa, 1 Bulan, 2 Bulan dan Lebih 3 Bulan kini sepadan dengan baki belum dibayar sebenar.",
+    en: "Green Target Statement of Account ageing now places invoices from the statement month under Current and applies payments to the oldest debt first. The Current, 1 Month, 2 Months and Over 3 Months amounts now match the actual outstanding balance.",
+  },
+  {
+    date: "2026-09-03",
+    ms: "Penjana Baucar Green Target kini mempunyai Ringkasan Payroll yang boleh dicetak, menunjukkan pecahan Pengarah dan Kakitangan serta jumlah yang diselaraskan dengan baucar JWDR dan JBSL bagi bulan yang dipilih.",
+    en: "The Green Target Voucher Generator now includes a printable Payroll Summary with Director and Staff breakdowns and totals reconciled to the selected month's JWDR and JBSL vouchers.",
+  },
+  {
+    date: "2026-09-03",
+    ms: "Penjana Baucar Payroll kini memasukkan semula RM1,444.45 kos gaji Danish di bawah Mesin & Sangkut Bihun untuk JVSL Ogos 2026. Susunan lokasi utamanya telah dibetulkan, dan borang kakitangan tidak lagi menukar susunan lokasi yang dipilih secara senyap. Pratonton JVSL kini sepadan dengan Ringkasan Payroll RM147,798.00; amaun itu tidak perlu ditambah secara manual. JVDR tidak terjejas.",
+    en: "The Payroll Voucher Generator now includes Danish's RM1,444.45 payroll cost under Mesin & Sangkut Bihun for the August 2026 JVSL. His primary location order has been corrected, and the staff form no longer silently rearranges selected locations. The JVSL preview now matches the RM147,798.00 Payroll Summary; the amount does not need to be added manually. JVDR is unaffected.",
+  },
+  {
     date: "2026-09-02",
     ms: "Apabila aplikasi jurujual menghantar beberapa bil, masalah pada satu bil kini tidak lagi membatalkan bil lain atau menandakannya sebagai berjaya secara salah. Hanya bil yang disimpan sepenuhnya diteruskan ke e-Invois, manakala bil bermasalah dilaporkan sebagai gagal supaya boleh dicuba semula.",
     en: "When the salesman app submits multiple bills, a problem with one bill no longer rolls back other valid bills or incorrectly marks them as successful. Only fully saved bills proceed to e-Invoice, while problem bills are returned as failed so they can be retried.",

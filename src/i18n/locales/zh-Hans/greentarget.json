@@ -1,4 +1,7 @@
 {
+  "Failed to print payroll summary": "打印工资汇总失败",
+  "Payroll Summary": "工资汇总",
+  "Print the Director/Workers payroll summary that reconciles to these vouchers": "打印与这些凭证相符的董事/员工工资汇总",
   "#": "#",
   "(Credit Note amount: RM {{amount}})": "（贷项通知单金额：RM {{amount}}）",
   "(Every rental still waiting to be invoiced — pick one or more from the same customer)": "（每个尚未开票的租赁项目 — 从同一客户中选择一个或多个）",
