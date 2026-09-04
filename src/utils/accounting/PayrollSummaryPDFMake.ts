@@ -8,7 +8,10 @@ import pdfMake from "pdfmake/build/pdfmake";
 import * as pdfFonts from "pdfmake/build/vfs_fonts";
 import { TDocumentDefinitions, TableCell, Content } from "pdfmake/interfaces";
 import TienHockLogo from "../tienhock.png";
-import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import {
+  type CompanyInfo,
+  TIENHOCK_INFO,
+} from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
 
 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || pdfFonts;
@@ -51,6 +54,13 @@ export interface PayrollSummaryPDFData {
   grand_total: number;
 }
 
+export interface PayrollSummaryPDFOptions {
+  companyInfo?: CompanyInfo;
+  logoUrl?: string;
+  directorVoucherLabel?: string;
+  workersVoucherLabel?: string;
+}
+
 const colors = {
   textPrimary: "#0f172a",
   textSecondary: "#475569",
@@ -70,28 +80,35 @@ const fmt = (n: number): string =>
         maximumFractionDigits: 2,
       }).format(n);
 
-let cachedLogoDataUrl: string | null | undefined;
-const loadLogoDataUrl = async (): Promise<string | null> => {
-  if (cachedLogoDataUrl !== undefined) return cachedLogoDataUrl;
+const cachedLogoDataUrls = new Map<string, string | null>();
+const loadLogoDataUrl = async (logoUrl: string): Promise<string | null> => {
+  if (cachedLogoDataUrls.has(logoUrl)) {
+    return cachedLogoDataUrls.get(logoUrl) ?? null;
+  }
   try {
-    const response = await fetch(TienHockLogo);
+    const response = await fetch(logoUrl);
     const blob = await response.blob();
-    cachedLogoDataUrl = await new Promise<string>((resolve, reject) => {
+    const logoDataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = () => reject(new Error("Failed to read logo"));
       reader.readAsDataURL(blob);
     });
+    cachedLogoDataUrls.set(logoUrl, logoDataUrl);
+    return logoDataUrl;
   } catch (err) {
     console.warn("Payroll summary PDF: could not load logo", err);
-    cachedLogoDataUrl = null;
+    cachedLogoDataUrls.set(logoUrl, null);
+    return null;
   }
-  return cachedLogoDataUrl;
 };
 
 const buildDocDefinition = (
   data: PayrollSummaryPDFData,
-  logoDataUrl: string | null
+  logoDataUrl: string | null,
+  companyInfo: CompanyInfo,
+  directorVoucherLabel: string,
+  workersVoucherLabel: string
 ): TDocumentDefinitions => {
   const th = (text: string, extra: HeaderCellOptions = {}): TableCell => ({
     text,
@@ -181,9 +198,9 @@ const buildDocDefinition = (
       {
         width: "*",
         stack: [
-          { text: TIENHOCK_INFO.name, style: "companyName" },
-          { text: `(${TIENHOCK_INFO.reg_no})`, style: "companyDetail" },
-          { text: TIENHOCK_INFO.address_pdf, style: "companyDetail" },
+          { text: companyInfo.name, style: "companyName" },
+          { text: `(${companyInfo.reg_no})`, style: "companyDetail" },
+          { text: companyInfo.address_pdf, style: "companyDetail" },
         ],
       },
       {
@@ -208,12 +225,12 @@ const buildDocDefinition = (
           body: [
             [
               { text: data.jvdr_ref, style: "jvRef" },
-              { text: "JV-DIRECTOR", style: "jvRef" },
+              { text: directorVoucherLabel, style: "jvRef" },
               { text: fmt(data.jvdr_total), style: "jvVal", alignment: "right" },
             ],
             [
               { text: data.jvsl_ref, style: "jvRef" },
-              { text: "JV-WORKERS", style: "jvRef" },
+              { text: workersVoucherLabel, style: "jvRef" },
               { text: fmt(data.jvsl_total), style: "jvVal", alignment: "right" },
             ],
             [
@@ -244,7 +261,7 @@ const buildDocDefinition = (
   )}/${generatedAt.getFullYear()} ${pad(generatedAt.getHours())}:${pad(generatedAt.getMinutes())}`;
 
   return {
-    info: { title: `Payroll Summary ${data.periodLabel}`, author: TIENHOCK_INFO.name },
+    info: { title: `Payroll Summary ${data.periodLabel}`, author: companyInfo.name },
     pageSize: "A4",
     pageOrientation: "landscape",
     pageMargins: [18, 20, 18, 28],
@@ -307,15 +324,28 @@ const buildDocDefinition = (
 };
 
 export const generatePayrollSummaryPDF = async (
-  data: PayrollSummaryPDFData
+  data: PayrollSummaryPDFData,
+  options: PayrollSummaryPDFOptions = {}
 ): Promise<void> => {
-  const logoDataUrl = await loadLogoDataUrl();
-  const docDefinition = buildDocDefinition(data, logoDataUrl);
+  const companyInfo: CompanyInfo = options.companyInfo ?? TIENHOCK_INFO;
+  const logoUrl: string = options.logoUrl ?? TienHockLogo;
+  const directorVoucherLabel: string =
+    options.directorVoucherLabel ?? "JV-DIRECTOR";
+  const workersVoucherLabel: string =
+    options.workersVoucherLabel ?? "JV-WORKERS";
+  const logoDataUrl = await loadLogoDataUrl(logoUrl);
+  const docDefinition = buildDocDefinition(
+    data,
+    logoDataUrl,
+    companyInfo,
+    directorVoucherLabel,
+    workersVoucherLabel
+  );
   const pdfBlob: Blob = await new Promise<Blob>((resolve) => {
     pdfMake.createPdf(docDefinition).getBlob(resolve);
   });
   printPdfBlob(
     pdfBlob,
-    `Payroll Summary ${data.periodLabel} - ${TIENHOCK_INFO.name}`
+    `Payroll Summary ${data.periodLabel} - ${companyInfo.name}`
   );
 };

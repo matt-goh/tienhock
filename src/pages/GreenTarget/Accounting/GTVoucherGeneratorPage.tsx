@@ -18,6 +18,12 @@ import ListboxSelect from "../../../components/ListboxSelect";
 import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import {
+  generatePayrollSummaryPDF,
+  type PayrollSummaryPDFData,
+} from "../../../utils/accounting/PayrollSummaryPDFMake";
+import { GREENTARGET_INFO } from "../../../utils/invoice/einvoice/companyInfo";
+import GreenTargetLogo from "../../../utils/GreenTargetLogo.png";
+import {
   IconFileInvoice,
   IconCheck,
   IconAlertCircle,
@@ -25,10 +31,25 @@ import {
   IconAlertTriangle,
   IconChevronDown,
   IconChevronUp,
+  IconTableExport,
 } from "@tabler/icons-react";
 
 const API_BASE = "/greentarget/api/journal-vouchers";
 const JOURNAL_DETAILS_PATH = "/greentarget/accounting/journal-entries";
+const MONTH_NAMES: string[] = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 interface JournalLine {
   account_code: string;
@@ -87,6 +108,7 @@ const GTVoucherGeneratorPage: React.FC = () => {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [generating, setGenerating] = useState<boolean>(false);
+  const [printingSummary, setPrintingSummary] = useState<boolean>(false);
   const [confirming, setConfirming] = useState<"JBSL" | "JWDR" | "ALL" | null>(null);
   const [branches, setBranches] = useState<BranchMapping[]>([]);
   const [showBranches, setShowBranches] = useState<boolean>(false);
@@ -191,6 +213,36 @@ const GTVoucherGeneratorPage: React.FC = () => {
       toast.error(error?.message || t("Failed to save branch"));
     } finally {
       setSavingBranch(null);
+    }
+  };
+
+  const handlePrintSummary = async (): Promise<void> => {
+    setPrintingSummary(true);
+    try {
+      const summary = (await api.get(
+        `${API_BASE}/payroll-summary/${year}/${month}`
+      )) as Omit<PayrollSummaryPDFData, "periodLabel">;
+      await generatePayrollSummaryPDF(
+        {
+          ...summary,
+          periodLabel: `${MONTH_NAMES[month - 1]} ${year}`,
+        },
+        {
+          companyInfo: GREENTARGET_INFO,
+          logoUrl: GreenTargetLogo,
+          directorVoucherLabel: "DIRECTOR REMUNERATION",
+          workersVoucherLabel: "STAFF SALARY WAGES",
+        }
+      );
+    } catch (error: unknown) {
+      console.error("Error printing Green Target payroll summary:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : t("Failed to print payroll summary");
+      toast.error(message);
+    } finally {
+      setPrintingSummary(false);
     }
   };
 
@@ -343,6 +395,20 @@ const GTVoucherGeneratorPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Button
+            color="default"
+            variant="outline"
+            size="md"
+            icon={IconTableExport}
+            iconPosition="left"
+            disabled={loading || printingSummary}
+            onClick={handlePrintSummary}
+            title={t(
+              "Print the Director/Workers payroll summary that reconciles to these vouchers"
+            )}
+          >
+            {printingSummary ? t("Preparing...") : t("Payroll Summary")}
+          </Button>
           <MonthNavigator
             selectedMonth={selectedMonth}
             onChange={setSelectedMonth}

@@ -1,4 +1,7 @@
 {
+  "Failed to print payroll summary": "Gagal mencetak ringkasan payroll",
+  "Payroll Summary": "Ringkasan Payroll",
+  "Print the Director/Workers payroll summary that reconciles to these vouchers": "Cetak ringkasan payroll Pengarah/Pekerja yang selaras dengan baucar ini",
   "#": "#",
   "(Credit Note amount: RM {{amount}})": "(Amaun Credit Note: RM {{amount}})",
   "(Every rental still waiting to be invoiced — pick one or more from the same customer)": "(Setiap sewaan yang masih menunggu untuk diinvois — pilih satu atau lebih daripada pelanggan yang sama)",

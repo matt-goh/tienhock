@@ -121,6 +121,16 @@ export default function (pool) {
               ep.gross_pay,
               ep.net_pay,
               ep.digenapkan,
+              COALESCE((
+                SELECT SUM(pi.amount)
+                  FROM greentarget.payroll_items pi
+                  LEFT JOIN public.pay_codes pc ON pc.id = pi.pay_code_id
+                 WHERE pi.employee_payroll_id = ep.id
+                   AND (
+                     pi.work_log_type = 'bonus'
+                     OR pc.report_column = 'BONUS'
+                   )
+              ), 0) AS bonus,
               COALESCE(SUM(CASE WHEN pd.deduction_type = 'epf' THEN pd.employer_amount END), 0) AS epf_employer,
               COALESCE(SUM(CASE WHEN pd.deduction_type = 'epf' THEN pd.employee_amount END), 0) AS epf_employee,
               COALESCE(SUM(CASE WHEN pd.deduction_type = 'socso' THEN pd.employer_amount END), 0) AS socso_employer,
@@ -312,6 +322,65 @@ export default function (pool) {
     return map;
   };
 
+  const buildPayrollSummaryRow = (rows) => {
+    const row = {
+      gaji: 0,
+      bonus: 0,
+      gaji_kasar: 0,
+      epf_m: 0,
+      epf_p: 0,
+      epf_total: 0,
+      socso_m: 0,
+      socso_p: 0,
+      socso_total: 0,
+      sip_m: 0,
+      sip_p: 0,
+      sip_total: 0,
+      pcb: 0,
+      jumlah_gaji: 0,
+      digenapkan: 0,
+      gaji_bersih: 0,
+      jv_total: 0,
+    };
+
+    for (const payrollRow of rows) {
+      row.bonus += num(payrollRow.bonus);
+      row.gaji_kasar += num(payrollRow.gross_pay);
+      row.epf_m += num(payrollRow.epf_employer);
+      row.epf_p += num(payrollRow.epf_employee);
+      row.socso_m += num(payrollRow.socso_employer);
+      row.socso_p += num(payrollRow.socso_employee);
+      row.sip_m += num(payrollRow.sip_employer);
+      row.sip_p += num(payrollRow.sip_employee);
+      row.pcb += num(payrollRow.pcb);
+      row.jumlah_gaji += num(payrollRow.net_pay);
+      row.digenapkan += num(payrollRow.digenapkan);
+      row.gaji_bersih += round2(
+        num(payrollRow.net_pay) + num(payrollRow.digenapkan)
+      );
+    }
+
+    Object.keys(row).forEach((key) => {
+      row[key] = round2(row[key]);
+    });
+    row.gaji = round2(row.gaji_kasar - row.bonus);
+    row.epf_total = round2(row.epf_m + row.epf_p);
+    row.socso_total = round2(row.socso_m + row.socso_p);
+    row.sip_total = round2(row.sip_m + row.sip_p);
+    row.jv_total = round2(
+      row.gaji_kasar + row.digenapkan + row.epf_m + row.socso_m + row.sip_m
+    );
+    return row;
+  };
+
+  const addPayrollSummaryRows = (left, right) => {
+    const total = {};
+    Object.keys(left).forEach((key) => {
+      total[key] = round2(left[key] + right[key]);
+    });
+    return total;
+  };
+
   // ==================== ENDPOINTS ====================
 
   // GET /preview/:year/:month - exact lines both vouchers would post.
@@ -374,6 +443,47 @@ export default function (pool) {
       console.error("Error previewing GT vouchers:", error);
       res.status(500).json({
         message: "Error previewing vouchers",
+        error: error.message,
+      });
+    }
+  });
+
+  // GET /payroll-summary/:year/:month - Director/staff reconciliation sheet
+  // using the same processed payroll values that build JWDR and JBSL.
+  router.get("/payroll-summary/:year/:month", async (req, res) => {
+    try {
+      const year = parseInt(req.params.year);
+      const month = parseInt(req.params.month);
+      if (!year || !month || month < 1 || month > 12) {
+        return res.status(400).json({ message: "Invalid year or month" });
+      }
+
+      const payrollRows = await fetchPayrollRows(pool, year, month);
+      const director = buildPayrollSummaryRow(
+        payrollRows.filter((row) => DIRECTOR_IDS.includes(row.employee_id))
+      );
+      const workers = buildPayrollSummaryRow(
+        payrollRows.filter((row) => !DIRECTOR_IDS.includes(row.employee_id))
+      );
+      const total = addPayrollSummaryRows(director, workers);
+      const refs = voucherRefs(year, month);
+
+      res.json({
+        year,
+        month,
+        jvdr_ref: refs.JWDR,
+        jvsl_ref: refs.JBSL,
+        director,
+        workers,
+        total,
+        jvdr_total: director.jv_total,
+        jvsl_total: workers.jv_total,
+        grand_total: round2(director.jv_total + workers.jv_total),
+      });
+    } catch (error) {
+      console.error("Error building GT payroll summary:", error);
+      res.status(500).json({
+        message: "Error building payroll summary",
         error: error.message,
       });
     }
