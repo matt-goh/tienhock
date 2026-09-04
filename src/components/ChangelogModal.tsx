@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-03",
+    ms: "Penjana Baucar Payroll kini memasukkan semula RM1,444.45 kos gaji Danish di bawah Mesin & Sangkut Bihun untuk JVSL Ogos 2026. Susunan lokasi utamanya telah dibetulkan, dan borang kakitangan tidak lagi menukar susunan lokasi yang dipilih secara senyap. Pratonton JVSL kini sepadan dengan Ringkasan Payroll RM147,798.00; amaun itu tidak perlu ditambah secara manual. JVDR tidak terjejas.",
+    en: "The Payroll Voucher Generator now includes Danish's RM1,444.45 payroll cost under Mesin & Sangkut Bihun for the August 2026 JVSL. His primary location order has been corrected, and the staff form no longer silently rearranges selected locations. The JVSL preview now matches the RM147,798.00 Payroll Summary; the amount does not need to be added manually. JVDR is unaffected.",
+  },
+  {
     date: "2026-09-02",
     ms: "Apabila aplikasi jurujual menghantar beberapa bil, masalah pada satu bil kini tidak lagi membatalkan bil lain atau menandakannya sebagai berjaya secara salah. Hanya bil yang disimpan sepenuhnya diteruskan ke e-Invois, manakala bil bermasalah dilaporkan sebagai gagal supaya boleh dicuba semula.",
     en: "When the salesman app submits multiple bills, a problem with one bill no longer rolls back other valid bills or incorrectly marks them as successful. Only fully saved bills proceed to e-Invoice, while problem bills are returned as failed so they can be retried.",
