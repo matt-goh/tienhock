@@ -60,7 +60,11 @@ jobs:
           # Copy env file to server
           scp -i ~/.ssh/deploy_key /tmp/.env ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }}:~/tienhock-app/.env
 
-          ssh -i ~/.ssh/deploy_key ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }} << 'EOF'
+          ssh \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            -i ~/.ssh/deploy_key \
+            ${{ secrets.HETZNER_USERNAME }}@${{ secrets.HETZNER_HOST }} << 'EOF'
             set -euo pipefail
             cd ~/tienhock-app
 
