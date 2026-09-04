@@ -73,9 +73,11 @@ jobs:
             # Stash any local changes (package-lock.json, etc.) to prevent pull conflicts
             git stash --include-untracked
 
-            # Pull latest changes
+            # Align the deployment checkout exactly with the production ref.
+            # This also survives intentional repository-history rewrites.
+            git fetch origin production
             git checkout production
-            git pull origin production
+            git reset --hard origin/production
 
             # Install, validate, and reload the Git-tracked system Nginx site.
             # Requires the one-time bootstrap documented in prod/server/README.md.
