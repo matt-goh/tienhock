@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-03",
+    ms: "Penjana Baucar Green Target kini mempunyai Ringkasan Payroll yang boleh dicetak, menunjukkan pecahan Pengarah dan Kakitangan serta jumlah yang diselaraskan dengan baucar JWDR dan JBSL bagi bulan yang dipilih.",
+    en: "The Green Target Voucher Generator now includes a printable Payroll Summary with Director and Staff breakdowns and totals reconciled to the selected month's JWDR and JBSL vouchers.",
+  },
+  {
+    date: "2026-09-03",
     ms: "Penjana Baucar Payroll kini memasukkan semula RM1,444.45 kos gaji Danish di bawah Mesin & Sangkut Bihun untuk JVSL Ogos 2026. Susunan lokasi utamanya telah dibetulkan, dan borang kakitangan tidak lagi menukar susunan lokasi yang dipilih secara senyap. Pratonton JVSL kini sepadan dengan Ringkasan Payroll RM147,798.00; amaun itu tidak perlu ditambah secara manual. JVDR tidak terjejas.",
     en: "The Payroll Voucher Generator now includes Danish's RM1,444.45 payroll cost under Mesin & Sangkut Bihun for the August 2026 JVSL. His primary location order has been corrected, and the staff form no longer silently rearranges selected locations. The JVSL preview now matches the RM147,798.00 Payroll Summary; the amount does not need to be added manually. JVDR is unaffected.",
   },
