@@ -86,9 +86,9 @@ right. Before editing an ERP line, check the original receipt — three of June'
 
 ## Database
 
-Defaults to the dev Docker DB (`localhost:5434`, `postgres/REMOVED_SECRET`,
-`tienhock`); override with `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER` /
-`DB_PASSWORD`. To tie out production directly, run on the server with
+Defaults to the dev Docker DB host, port, name and user (`localhost:5434`,
+`tienhock`, `postgres`). `DB_PASSWORD` is required; override the other values
+with `DB_HOST` / `DB_PORT` / `DB_NAME` / `DB_USER`. To tie out production directly, run on the server with
 `DB_HOST=localhost DB_PORT=5432 DB_NAME=tienhock_prod DB_USER=postgres`.
 
 ## Future sessions

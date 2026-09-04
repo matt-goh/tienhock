@@ -13,6 +13,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Validate mobile API key configuration
+        env:
+          MOBILE_API_KEY_SHA256: ${{ secrets.MOBILE_API_KEY_SHA256 }}
+        run: |
+          if [[ ! "$MOBILE_API_KEY_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
+            echo "MOBILE_API_KEY_SHA256 must be a 64-character SHA-256 digest." >&2
+            exit 1
+          fi
+
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
@@ -43,6 +52,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION=${{ secrets.AWS_REGION }}
           S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
+          MOBILE_API_KEY_SHA256=${{ secrets.MOBILE_API_KEY_SHA256 }}
           ENVFILE
 
       - name: Deploy to Hetzner

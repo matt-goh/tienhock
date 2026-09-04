@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { format } from "date-fns";
-import { IconUsers, IconArrowLeft, IconFileExport, IconLink } from "@tabler/icons-react";
+import { IconUsers, IconArrowLeft, IconFileExport } from "@tabler/icons-react";
 import { useNavigate } from "react-router-dom";
 import { Employee } from "../../types/types";
 import { useStaffsCache } from "../../utils/catalogue/useStaffsCache";
@@ -102,20 +102,6 @@ const StaffRecords = () => {
     "staff-records",
     !loading && activeEmployees.length > 0
   );
-
-  // Export URL Generation
-  const generateExportURL = () => {
-    // Determine server URL based on environment
-    const isProduction = window.location.hostname === 'tienhock.com';
-    const baseURL = isProduction ? 'https://api.tienhock.com' : 'http://localhost:5001';
-    const url = `${baseURL}/api/excel/staff-records-export?api_key=REMOVED_SECRET`;
-    
-    navigator.clipboard.writeText(url).then(() => {
-      toast.success(t("Export URL copied to clipboard!"));
-    }).catch(() => {
-      toast.error(t("Failed to copy URL to clipboard"));
-    });
-  };
 
   // Text Export Generation
   const generateTextExport = async () => {
@@ -243,15 +229,6 @@ const StaffRecords = () => {
             size="sm"
           >
             {t("export", { ns: "common" })}
-          </Button>
-          <Button
-            onClick={generateExportURL}
-            icon={IconLink}
-            color="orange"
-            variant="outline"
-            size="sm"
-          >
-            {t("Export Link")}
           </Button>
         </div>
       </div>

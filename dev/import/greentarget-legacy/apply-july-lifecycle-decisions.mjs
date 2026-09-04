@@ -24,11 +24,17 @@
 // Usage:
 //   node dev/import/greentarget-legacy/apply-july-lifecycle-decisions.mjs
 //   node dev/import/greentarget-legacy/apply-july-lifecycle-decisions.mjs --apply
+import "dotenv/config";
 import { createDatabasePool } from "../../../src/routes/utils/db-pool.js";
 import { syncGTSalesJournalEntry } from "../../../src/routes/greentarget/accounting/sales-journal.js";
 
 const APPLY = process.argv.includes("--apply");
 const ACTOR = "gt-july-parity-backfill";
+const databasePassword = process.env.DB_PASSWORD;
+
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
 
 /** Invoices whose hand-cancelled S journal the user chose to restore. */
 const RESTORE_INVOICES = [
@@ -266,7 +272,7 @@ async function main() {
     user: process.env.DB_USER || "postgres",
     host: process.env.DB_HOST || "localhost",
     database: process.env.DB_NAME || "tienhock",
-    password: process.env.DB_PASSWORD || "REMOVED_SECRET",
+    password: databasePassword,
     port: Number(process.env.DB_PORT || 5434),
   });
   const client = await pool.connect();

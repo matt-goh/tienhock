@@ -1,12 +1,18 @@
 // Dump current June 2026 BIHUN unit-cost rows from the live engine vs boss-corrected targets.
+import "dotenv/config";
 import pg from "pg";
 import { computeEstimatedReport } from "../../src/routes/stock/estimated-report-engine.js";
+
+const databasePassword = process.env.DB_PASSWORD;
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
 
 const pool = new pg.Pool({
   host: "localhost",
   port: 5434,
   user: "postgres",
-  password: "REMOVED_SECRET",
+  password: databasePassword,
   database: "tienhock",
 });
 

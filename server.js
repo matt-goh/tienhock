@@ -19,13 +19,18 @@ const app = express();
 const port = 5000;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const databasePassword = process.env.DB_PASSWORD;
+
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
 
 // Create enhanced PostgreSQL pool (defaults match dev Docker config)
 export const pool = createDatabasePool({
   user: process.env.DB_USER || "postgres",
   host: process.env.DB_HOST || "localhost",
   database: process.env.DB_NAME || "tienhock",
-  password: process.env.DB_PASSWORD || "REMOVED_SECRET",
+  password: databasePassword,
   port: process.env.DB_PORT || 5434,
 });
 

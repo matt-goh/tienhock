@@ -83,7 +83,7 @@ Two entries added at the top of `CHANGELOG_ENTRIES` in `src/components/Changelog
 ## 3. Verification already performed (evidence, not assumption)
 
 - **Typecheck:** `npx tsc --noEmit` → **0 errors** project-wide.
-- **Endpoints** (`api-key: REMOVED_SECRET`) against real July 2026 payroll: JP 7 employees, GT 8; totals reconcile (`Σ final_total == summary.total_final`); GT `bank_data` is 6 of 8 because it filters zero payouts (correct).
+- **Endpoints** (using the then-current middleware credential) against real July 2026 payroll: JP 7 employees, GT 8; totals reconcile (`Σ final_total == summary.total_final`); GT `bank_data` is 6 of 8 because it filters zero payouts (correct).
 - **JP HEAD rollup:** temp pinjam under sub-ID `HAFIZ_MP` (120.50) merged with `HAFIZ`'s own (80.00) into one 200.50 row. ✔
 - **mid_month exclusion:** a `mid_month` row never leaked into the report. ✔
 - **Advance add-back (end-to-end, via the real processor):** created a RM50 advance for FAREL through `POST /jellypolly/api/incentives` → gaji_bersih 167.96→217.96, setelah 68, gaji_genap 18; `18 + 50 = 68` ✔; and 18 matched the processor's independently stored `setelah_digenapkan` ✔. Advance then deleted; baseline restored.
@@ -188,10 +188,10 @@ TH additionally has a **Monthly/Yearly period toggle** on its Employee/Location/
 ## 7. Dev / test recipes
 
 ```bash
-# Auth-free API calls (middleware accepts an api-key header)
-curl -s -H "api-key: REMOVED_SECRET" \
+# Authenticated API calls (copy an active development session ID)
+curl -s -H "x-session-id: $TIENHOCK_SESSION_ID" \
   "http://localhost:5000/jellypolly/api/salary-report?year=2026&month=7"
-curl -s -H "api-key: REMOVED_SECRET" \
+curl -s -H "x-session-id: $TIENHOCK_SESSION_ID" \
   "http://localhost:5000/jellypolly/api/pinjam-records/summary?year=2026&month=7"
 
 # DB

@@ -10,6 +10,7 @@
  *   node dev/import/greentarget-legacy/verify-multi-allocation-receipt.mjs
  */
 
+import "dotenv/config";
 import express from "express";
 
 import createGreenTargetPaymentsRouter from "../../../src/routes/greentarget/payments.js";
@@ -24,12 +25,17 @@ const invoiceNumberA = `VI-A-${suffix}`;
 const invoiceNumberB = `VI-B-${suffix}`;
 const postedReference = `VR-${suffix}`;
 const pendingReference = `VP-${suffix}`;
+const databasePassword = process.env.DB_PASSWORD;
+
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
 
 const pool = createDatabasePool({
   user: process.env.DB_USER || "postgres",
   host: process.env.DB_HOST || "localhost",
   database: process.env.DB_NAME || "tienhock",
-  password: process.env.DB_PASSWORD || "REMOVED_SECRET",
+  password: databasePassword,
   port: Number(process.env.DB_PORT || 5434),
 });
 

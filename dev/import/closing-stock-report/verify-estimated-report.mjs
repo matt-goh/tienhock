@@ -35,6 +35,11 @@ const SCALE = { money: 100, quantity: 1000, unit: 1000000 };
 const Q10_GAP_CENTS = { mee: 21661, bihun: 20721 };
 /** @type {Readonly<Record<string, number>>} */
 const HANDWRITTEN_ADD_BACK_UNITS = { mee: 0.466813, bihun: 0.221409 };
+const databasePassword = process.env.DB_PASSWORD;
+
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
 
 /** @typedef {"money" | "quantity" | "unit"} Measure */
 /** @typedef {"PASS" | "EXPECTED" | "FAIL"} Status */
@@ -1734,7 +1739,7 @@ try {
     user: process.env.DB_USER || "postgres",
     host: process.env.DB_HOST || "localhost",
     database: process.env.DB_NAME || "tienhock",
-    password: process.env.DB_PASSWORD || "REMOVED_SECRET",
+    password: databasePassword,
     port: Number(process.env.DB_PORT || 5434),
   });
   client = await db.connect();

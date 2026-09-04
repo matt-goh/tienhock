@@ -25,14 +25,15 @@
 //   transcription shape; extra fields are ignored).
 //
 // DATABASE
-//   Defaults to the dev Docker DB (localhost:5434, postgres/REMOVED_SECRET,
-//   tienhock). Override with DB_HOST / DB_PORT / DB_NAME / DB_USER /
-//   DB_PASSWORD. Run it against whichever database holds the books being
-//   tallied (dev is refreshed from prod regularly).
+//   Defaults to the dev Docker DB host/port/name/user. DB_PASSWORD is required.
+//   Override the other values with DB_HOST / DB_PORT / DB_NAME / DB_USER. Run
+//   it against whichever database holds the books being tallied (dev is
+//   refreshed from prod regularly).
 //
 // This tool only READS the ERP database. It never writes.
 import fs from "node:fs";
 import path from "node:path";
+import "dotenv/config";
 import pg from "pg";
 
 const args = process.argv.slice(2);
@@ -113,11 +114,16 @@ const fold = JSON.parse(
 );
 const aliasOf = (c) => fold.aliases[c] ?? c;
 
+const databasePassword = process.env.DB_PASSWORD;
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
+
 const pool = new pg.Pool({
   host: process.env.DB_HOST ?? "localhost",
   port: Number(process.env.DB_PORT ?? 5434),
   user: process.env.DB_USER ?? "postgres",
-  password: process.env.DB_PASSWORD ?? "REMOVED_SECRET",
+  password: databasePassword,
   database: process.env.DB_NAME ?? "tienhock",
 });
 

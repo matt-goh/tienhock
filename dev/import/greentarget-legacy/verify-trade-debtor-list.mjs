@@ -8,6 +8,7 @@
  *   node dev/import/greentarget-legacy/verify-trade-debtor-list.mjs
  */
 
+import "dotenv/config";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -26,6 +27,11 @@ const SOURCE_SHA256 =
 const USER_AUDIT_SHA256 =
   "15a83afe4617366cdeeeb03befa6d81cc13f6e32bc9bc4aa8dfdc939a4cb4a0";
 const SOURCE_ONLY = process.argv.includes("--source-only");
+const databasePassword = process.env.DB_PASSWORD;
+
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
 const POST_CUTOVER_CODES = new Set([
   "CD-ZEXIE",
   "CD-MIZAN",
@@ -69,7 +75,7 @@ const pool = createDatabasePool({
   user: process.env.DB_USER || "postgres",
   host: process.env.DB_HOST || "localhost",
   database: process.env.DB_NAME || "tienhock",
-  password: process.env.DB_PASSWORD || "REMOVED_SECRET",
+  password: databasePassword,
   port: Number(process.env.DB_PORT || 5434),
 });
 

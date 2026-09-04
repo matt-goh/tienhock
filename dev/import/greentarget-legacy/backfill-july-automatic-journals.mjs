@@ -8,6 +8,7 @@
 //   node dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs
 //   node dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs --apply-safe
 //   node dev/import/greentarget-legacy/backfill-july-automatic-journals.mjs --apply
+import "dotenv/config";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createDatabasePool } from "../../../src/routes/utils/db-pool.js";
@@ -24,6 +25,11 @@ const PERIOD_START = "2026-07-01";
 const PERIOD_END = "2026-08-01";
 const BACKFILL_ACTOR = "gt-july-parity-backfill";
 const CONTROL_ACCOUNT = "CD_SD";
+const databasePassword = process.env.DB_PASSWORD;
+
+if (!databasePassword) {
+  throw new Error("DB_PASSWORD must be configured");
+}
 const EXPECTED_SOURCE_SHA256 =
   "fe0b5989e73d11aa7dcfe0b062b4fec0405beefc79b2ad1d18322d52a80a29d0";
 const CHILD_EVIDENCE_PATH = fileURLToPath(
@@ -146,7 +152,7 @@ const pool = createDatabasePool({
   user: process.env.DB_USER || "postgres",
   host: process.env.DB_HOST || "localhost",
   database: process.env.DB_NAME || "tienhock",
-  password: process.env.DB_PASSWORD || "REMOVED_SECRET",
+  password: databasePassword,
   port: Number(process.env.DB_PORT || 5434),
 });
 
