@@ -210,6 +210,51 @@ test("allows the safe read-only product flags but not the type filter", async ()
   assert.equal(unknownParam.nextCalls, 0);
 });
 
+test("accepts the logged salesman sync query and rejects unsupported variants", async () => {
+  const allowed = await runMiddleware(
+    createRequest({
+      originalUrl: "/api/staffs/get-salesmen?fields=minimal",
+      path: "/staffs/get-salesmen",
+      headers: { "api-key": mobileApiKey },
+      query: { fields: "minimal" },
+    })
+  );
+  assert.equal(allowed.nextCalls, 1);
+  assert.equal(allowed.req.apiKey, true);
+
+  /** @type {Record<string, unknown>[]} */
+  const rejectedQueries = [
+    { fields: "full" },
+    { fields: "" },
+    { fields: ["minimal", "minimal"] },
+    { fields: { value: "minimal" } },
+    { fields: "minimal", extra: "true" },
+  ];
+  for (const query of rejectedQueries) {
+    const rejected = await runMiddleware(
+      createRequest({
+        originalUrl: "/api/staffs/get-salesmen",
+        path: "/staffs/get-salesmen",
+        headers: { "api-key": mobileApiKey },
+        query,
+      })
+    );
+    assert.equal(rejected.res.statusCode, 403);
+    assert.equal(rejected.nextCalls, 0);
+  }
+
+  const otherEndpoint = await runMiddleware(
+    createRequest({
+      originalUrl: "/api/customers/get-customers?fields=minimal",
+      path: "/customers/get-customers",
+      headers: { "api-key": mobileApiKey },
+      query: { fields: "minimal" },
+    })
+  );
+  assert.equal(otherEndpoint.res.statusCode, 403);
+  assert.equal(otherEndpoint.nextCalls, 0);
+});
+
 test("allows only the supported minimal-response query on mobile submissions", async () => {
   const minimal = await runMiddleware(
     createRequest({

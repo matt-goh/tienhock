@@ -309,11 +309,10 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         all: "true", // Add this to get all invoices without pagination
       });
 
-      // Tien Hock also offers cash bills whose counter cash has not been fully
-      // accounted for: they are always 'paid', so the status filter alone
-      // would hide a same-day sale that was partly paid by transfer/online.
+      // This unpaid-invoice picker only collects outstanding credit invoices.
+      // A cash bill's automatic collection is not an outstanding balance.
       if (useGroupedReceipt) {
-        params.append("settleable", "true");
+        params.append("paymentType", "INVOICE");
       }
 
       params.append("startDate", invoiceDateRange.start.getTime().toString());
@@ -340,8 +339,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           .map((payment) => payment.invoice_id)
       );
 
-      const filteredInvoices = invoices.filter(
-        (invoice) =>
+      const filteredInvoices: InvoiceData[] = invoices.filter(
+        (invoice: InvoiceData): boolean =>
+          (!useGroupedReceipt || invoice.paymenttype === "INVOICE") &&
           (useGroupedReceipt || !invoicesWithPendingPayments.has(invoice.id)) &&
           (invoice.settleable_amount !== undefined
             ? Number(invoice.settleable_amount)
@@ -552,10 +552,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   /**
    * How much a payment may still be recorded against an invoice.
    *
-   * A credit invoice exposes its outstanding balance. A Tien Hock CASH bill is
-   * settled the moment it is issued, so what it can still take is the counter
-   * cash held in CH_REV1 — recording a transfer/online receipt against it says
-   * that part of the sale was banked rather than taken over the counter.
+   * Tien Hock credit invoices expose their outstanding balance less any amount
+   * already covered by pending cheques.
    * Companies whose endpoint does not report it fall back to the balance due.
    */
   const settleableOf = (invoice: InvoiceData): number =>
@@ -570,6 +568,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const hasCashBillSelected: boolean = selectedInvoices.some(
     (item: InvoicePaymentAllocation) => isCashBill(item.invoice)
   );
+
+  /** Display references (e.g. C54283) of the selected cash bills, for the hint. */
+  const selectedCashBillRefs: string = selectedInvoices
+    .filter((item: InvoicePaymentAllocation) => isCashBill(item.invoice))
+    .map((item: InvoicePaymentAllocation) => `C${item.invoice.id}`)
+    .join(", ");
 
   /**
    * Only a credit invoice can be overpaid. A cash bill carries no balance at
@@ -1207,6 +1211,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       ariaLabel={t("Payment method")}
                     size="md"
                     />
+                    {hasCashBillSelected && (
+                      <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                        {t(
+                          "Cash and Cheque are not available because bill {{id}} is a cash bill that was already received in cash. Use bank transfer or online instead.",
+                          { id: selectedCashBillRefs }
+                        )}
+                      </p>
+                    )}
                   </div>
                   {groupPaymentMethod !== "cash" && (
                     <div>

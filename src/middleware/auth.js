@@ -144,7 +144,9 @@ function isAllowedMobileApiRequest(req, requestPath) {
     );
   }
 
+  // Installed phones also send fields=minimal when downloading salesmen.
   const supportsMinimalResponse =
+    canonicalRequestPath === "/api/staffs/get-salesmen" ||
     canonicalRequestPath === "/api/invoices/submit-invoices" ||
     canonicalRequestPath === "/api/einvoice/submit";
 
