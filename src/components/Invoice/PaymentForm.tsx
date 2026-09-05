@@ -571,6 +571,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     (item: InvoicePaymentAllocation) => isCashBill(item.invoice)
   );
 
+  /** Display references (e.g. C54283) of the selected cash bills, for the hint. */
+  const selectedCashBillRefs: string = selectedInvoices
+    .filter((item: InvoicePaymentAllocation) => isCashBill(item.invoice))
+    .map((item: InvoicePaymentAllocation) => `C${item.invoice.id}`)
+    .join(", ");
+
   /**
    * Only a credit invoice can be overpaid. A cash bill carries no balance at
    * all, so comparing against it would flag every amount as an overpayment.
@@ -1207,6 +1213,14 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                       ariaLabel={t("Payment method")}
                     size="md"
                     />
+                    {hasCashBillSelected && (
+                      <p className="mt-2 text-xs text-amber-700 dark:text-amber-300">
+                        {t(
+                          "Cash and Cheque are not available because bill {{id}} is a cash bill that was already received in cash. Use bank transfer or online instead.",
+                          { id: selectedCashBillRefs }
+                        )}
+                      </p>
+                    )}
                   </div>
                   {groupPaymentMethod !== "cash" && (
                     <div>

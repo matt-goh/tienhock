@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-05",
+    ms: "Bentuk bayaran kini memaparkan notis ringkas yang menerangkan sebab pilihan Tunai dan Cek hilang apabila bil tunai dipilih. Jika anda memilih bil yang sudah diterima dalam tunai, aplikasi menunjukkan sebabnya supaya anda tahu untuk menggunakan pindahan bank atau online sebaliknya.",
+    en: "The payment form now shows a short note explaining why the Cash and Cheque options disappear when a cash bill is selected. If you pick a bill that was already received in cash, the app explains why so you know to use bank transfer or online instead.",
+  },
+  {
     date: "2026-09-04",
     ms: "Penyegerakan aplikasi jurujual kini berfungsi semula selepas kemas kini keselamatan. Telefon jurujual yang sebelum ini gagal memuat turun senarai jurujual, pelanggan dan produk dengan mesej 'Synchronize failed' kini boleh menyegerakkan semula seperti biasa.",
     en: "Salesman app synchronization works again after the security update. Salesman phones that previously failed to download the latest salesmen, customers and products with a 'Synchronize failed' message can now sync normally.",
