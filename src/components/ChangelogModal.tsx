@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-05",
+    ms: "Bil tunai tidak lagi muncul dalam senarai invois belum dibayar di halaman Bayaran Tien Hock. Hanya invois kredit yang masih berbaki boleh dipilih, dan pilihan Cek kekal tersedia apabila beberapa invois dipilih untuk bayaran cek yang sama.",
+    en: "Cash bills no longer appear in the unpaid invoice list on Tien Hock Payments. Only credit invoices with an outstanding balance can be selected, and Cheque remains available when selecting multiple invoices for the same cheque payment.",
+  },
+  {
+    date: "2026-09-05",
     ms: "Masalah penyegerakan aplikasi jurujual yang terhenti semasa memuat turun senarai jurujual selepas kemas kini keselamatan telah dibetulkan.",
     en: "Fixed salesman app synchronization stopping while downloading the salesman list after the security update.",
   },
