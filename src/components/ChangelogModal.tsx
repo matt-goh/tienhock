@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-05",
+    ms: "Masalah penyegerakan aplikasi jurujual yang terhenti semasa memuat turun senarai jurujual selepas kemas kini keselamatan telah dibetulkan.",
+    en: "Fixed salesman app synchronization stopping while downloading the salesman list after the security update.",
+  },
+  {
+    date: "2026-09-05",
     ms: "Bentuk bayaran kini memaparkan notis ringkas yang menerangkan sebab pilihan Tunai dan Cek hilang apabila bil tunai dipilih. Jika anda memilih bil yang sudah diterima dalam tunai, aplikasi menunjukkan sebabnya supaya anda tahu untuk menggunakan pindahan bank atau online sebaliknya.",
     en: "The payment form now shows a short note explaining why the Cash and Cheque options disappear when a cash bill is selected. If you pick a bill that was already received in cash, the app explains why so you know to use bank transfer or online instead.",
   },
