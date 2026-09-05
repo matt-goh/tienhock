@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-04",
+    ms: "Penyegerakan aplikasi jurujual kini berfungsi semula selepas kemas kini keselamatan. Telefon jurujual yang sebelum ini gagal memuat turun senarai jurujual, pelanggan dan produk dengan mesej 'Synchronize failed' kini boleh menyegerakkan semula seperti biasa.",
+    en: "Salesman app synchronization works again after the security update. Salesman phones that previously failed to download the latest salesmen, customers and products with a 'Synchronize failed' message can now sync normally.",
+  },
+  {
+    date: "2026-09-04",
     ms: "Pautan eksport Power Query untuk rekod kakitangan dan laporan gaji telah dibuang untuk melindungi data sensitif. Eksport fail biasa dalam aplikasi kekal tersedia dan terus berfungsi seperti sebelum ini.",
     en: "Power Query export links for staff records and salary reports have been removed to protect sensitive data. The normal in-app file exports remain available and continue to work as before.",
   },

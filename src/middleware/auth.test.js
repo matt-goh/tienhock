@@ -156,6 +156,60 @@ test("rejects a valid mobile key on non-mobile and unsafe-query routes", async (
   assert.equal(nestedInvoiceRoute.nextCalls, 0);
 });
 
+test("allows the safe read-only product flags but not the type filter", async () => {
+  const allProducts = await runMiddleware(
+    createRequest({
+      originalUrl: "/api/products?all=true",
+      path: "/products",
+      headers: { "api-key": mobileApiKey },
+      query: { all: "true" },
+    })
+  );
+  assert.equal(allProducts.nextCalls, 1);
+
+  const bareAll = await runMiddleware(
+    createRequest({
+      originalUrl: "/api/products?all",
+      path: "/products",
+      headers: { "api-key": mobileApiKey },
+      query: { all: "" },
+    })
+  );
+  assert.equal(bareAll.nextCalls, 1);
+
+  const withInactive = await runMiddleware(
+    createRequest({
+      originalUrl: "/api/products?all&includeInactive=true",
+      path: "/products",
+      headers: { "api-key": mobileApiKey },
+      query: { all: "", includeInactive: "true" },
+    })
+  );
+  assert.equal(withInactive.nextCalls, 1);
+
+  const unsafeType = await runMiddleware(
+    createRequest({
+      originalUrl: "/api/products?type=MEE",
+      path: "/products",
+      headers: { "api-key": mobileApiKey },
+      query: { type: "MEE" },
+    })
+  );
+  assert.equal(unsafeType.res.statusCode, 403);
+  assert.equal(unsafeType.nextCalls, 0);
+
+  const unknownParam = await runMiddleware(
+    createRequest({
+      originalUrl: "/api/products?foo=bar",
+      path: "/products",
+      headers: { "api-key": mobileApiKey },
+      query: { foo: "bar" },
+    })
+  );
+  assert.equal(unknownParam.res.statusCode, 403);
+  assert.equal(unknownParam.nextCalls, 0);
+});
+
 test("allows only the supported minimal-response query on mobile submissions", async () => {
   const minimal = await runMiddleware(
     createRequest({

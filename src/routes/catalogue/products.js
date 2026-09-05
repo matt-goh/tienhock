@@ -318,7 +318,11 @@ export default function (pool) {
     try {
       // Check for specific type filters and includeInactive flag
       const { type, all, includeInactive } = req.query;
-      const cacheKey = `${CACHE_KEYS.PRODUCTS}:${all !== undefined ? 'all' : type || 'default'}:${includeInactive === 'true' ? 'all' : 'active'}`;
+      // The salesman app authenticates with the mobile api-key (req.apiKey ===
+      // true); office users come in with a session. Keep their cache entries
+      // separate because salesman/office see different product sets.
+      const isSalesman = req.apiKey === true;
+      const cacheKey = `${CACHE_KEYS.PRODUCTS}:${isSalesman ? 'salesman' : 'office'}:${all !== undefined ? 'all' : type || 'default'}:${includeInactive === 'true' ? 'all' : 'active'}`;
 
       // Check cache first
       const cached = cache.get(cacheKey);
@@ -332,10 +336,28 @@ export default function (pool) {
       // Build WHERE clause for is_active filtering
       const activeFilter = includeInactive === 'true' ? '' : 'is_active = true';
 
+      // Legacy-compatible salesman catalogue: only BH/MEE/RAMEN/JP products,
+      // with RAMEN surfaced as MEE. BUNDLE/OTH stay out of salesman phones
+      // (the previous default response never included them).
+      const salesmanTypeFilter = "type IN ('BH', 'MEE', 'RAMEN', 'JP')";
+      const salesmanSelect = `id, description, price_per_unit,
+                                     CASE WHEN type = 'RAMEN' THEN 'MEE' ELSE type END AS type,
+                                     is_active, sort_order`;
+
       if (all !== undefined) {
-        // Return all products with all columns /api/products?all
-        whereClause = activeFilter ? `WHERE ${activeFilter}` : '';
-        query = `SELECT * FROM products ${whereClause}`;
+        if (isSalesman) {
+          // Salesman phones still want the legacy type set and the RAMEN->MEE
+          // mapping, matching the no-query default. Office keeps the real
+          // catalog (all types, real type column) via SELECT *.
+          whereClause = activeFilter
+            ? `WHERE ${salesmanTypeFilter} AND ${activeFilter}`
+            : `WHERE ${salesmanTypeFilter}`;
+          query = `SELECT ${salesmanSelect} FROM products ${whereClause}`;
+        } else {
+          // Return all products with all columns /api/products?all (office)
+          whereClause = activeFilter ? `WHERE ${activeFilter}` : '';
+          query = `SELECT * FROM products ${whereClause}`;
+        }
       } else if (type) {
         // Filter by specific type(s) /api/products?type=JP or /api/products?type=MEE,BH
         const types = type
@@ -349,17 +371,11 @@ export default function (pool) {
         query = `SELECT id, description, price_per_unit, type, is_active, sort_order FROM products ${whereClause}`;
       } else {
         // Keep the default response compatible with salesman app versions that
-        // only understand the legacy product types. Ramen products remain
-        // saleable on those phones under MEE, while ?all and explicit filters
-        // such as ?type=RAMEN continue to expose their real type to office apps.
-        const typeFilter = "type IN ('BH', 'MEE', 'RAMEN', 'JP')";
+        // only understand the legacy product types.
         whereClause = activeFilter
-          ? `WHERE ${typeFilter} AND ${activeFilter}`
-          : `WHERE ${typeFilter}`;
-        query = `SELECT id, description, price_per_unit,
-                        CASE WHEN type = 'RAMEN' THEN 'MEE' ELSE type END AS type,
-                        is_active, sort_order
-                   FROM products ${whereClause}`;
+          ? `WHERE ${salesmanTypeFilter} AND ${activeFilter}`
+          : `WHERE ${salesmanTypeFilter}`;
+        query = `SELECT ${salesmanSelect} FROM products ${whereClause}`;
       }
 
       const result = await pool.query(query);

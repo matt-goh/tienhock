@@ -124,6 +124,26 @@ function isAllowedMobileApiRequest(req, requestPath) {
     );
   }
 
+  // The salesman app downloads its product catalogue with the supported
+  // read-only filters. Permit only the injection-safe `all` / `includeInactive`
+  // flags (both are used as bare booleans by the products route). `type` stays
+  // blocked because products.js interpolates it directly into SQL.
+  if (canonicalRequestPath === "/api/products") {
+    return (
+      queryEntries.length >= 1 &&
+      queryEntries.length <= 2 &&
+      queryEntries.every(([key, value]) => {
+        if (key === "all") {
+          return value === "" || value === "true" || value === "false";
+        }
+        if (key === "includeInactive") {
+          return value === "true" || value === "false";
+        }
+        return false;
+      })
+    );
+  }
+
   const supportsMinimalResponse =
     canonicalRequestPath === "/api/invoices/submit-invoices" ||
     canonicalRequestPath === "/api/einvoice/submit";
