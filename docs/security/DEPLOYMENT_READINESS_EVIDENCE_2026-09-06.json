@@ -209,5 +209,28 @@
     ],
     "businessRecordsChangedByVerification": false,
     "employeePasswordsChanged": false
+  },
+  "subsequentCorsPreflightCorrection": {
+    "localDateMalaysia": "2026-09-07",
+    "productionCodeRevisionBeforeCorrection": "a6a01e3bd1f7c9f4d5ac9e81413f15e92674c5d3",
+    "originalBackupPreflightStatus": 403,
+    "originalFailure": "Unauthenticated OPTIONS reached the backup administrator guard",
+    "correction": "System Nginx returns 204 for OPTIONS with the existing CORS allowlists before proxying",
+    "nginxValidationAndReloadPassed": true,
+    "backendProcessIdBeforeAndAfter": 2799199,
+    "verifiedFrontendOrigins": ["https://tienhock.com", "https://greentarget.tienhock.com"],
+    "verifiedPreflightsPerOrigin": [
+      { "path": "/api/backup/list", "requestedMethod": "GET", "status": 204 },
+      { "path": "/api/backup/create", "requestedMethod": "POST", "status": 204 },
+      { "path": "/api/staffs/MATTHEW", "requestedMethod": "PATCH", "status": 204 }
+    ],
+    "requestedHeadersVerified": ["content-type", "x-session-id"],
+    "credentialedCorsVerified": true,
+    "unauthenticatedBackupGetStatus": 401,
+    "existingMobileSalesmenMinimalStatus": 200,
+    "existingMobileBackupGetStatus": 403,
+    "untrustedOriginReceivesNoAllowOrigin": true,
+    "businessRecordsChanged": false,
+    "configurationCorrectionPublished": false
   }
 }
