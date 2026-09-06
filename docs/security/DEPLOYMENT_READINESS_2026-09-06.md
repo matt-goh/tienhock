@@ -1,10 +1,28 @@
 # Deployment preparation — 6 September 2026
 
-The database account, deployment secret and server prerequisites are prepared. **The security application changes have not been deployed.** The existing production process and its environment remain in place. This record supersedes the unverified infrastructure status in the 5 September remediation report.
+**Production rollout completed on 7 September 2026, around 00:49 Malaysia time (6 September UTC).** The security backend now runs with `tienhock_app`; both frontend domains serve the cookie-session release. The preparation record below is historical; the rollout results supersede its pending-deployment statements.
+
+## Production rollout and deployment failure recovery
+
+GitHub Actions run [34045948125](https://github.com/matt-goh/tienhock/actions/runs/34045948125) checked out production revision `3128603352573caaf8b93c78a3f5665ef3d8e8b4`, installed dependencies and passed its frontend build/type check. It then failed before PM2 restart: the inline preflight used a named dynamic `pg.Client` import, which is undefined with the installed CommonJS package on Node 20.19.6. The earlier preparation verified the privilege-check helper, but missed this exact workflow import. The local workflow now imports the default export and calls `new pg.Client(...)`; that exact corrected command passed against production. **The workflow correction still needs committing and publishing through the normal master-to-production release process. Re-running the old failed run alone will use its old command.**
+
+Completed the remaining restart directly over SSH without repeating the successful build. PM2 changed from PID 2745956 to 2798625 and remained online without further restarts throughout verification. A read-only PostgreSQL activity check after mobile requests confirmed the running application connects as `tienhock_app`. The environment file is mode 600 and the mobile-key digest is unchanged.
+
+Nginx had reported a successful reload, but its error log showed that switching from the wildcard listener to loopback failed with `Address already in use`. After validating the configuration, a brief Nginx restart applied the address change. Verified listeners: Nginx on `127.0.0.1:80` and `[::1]:80`, Node on `127.0.0.1:5000`, PostgreSQL on loopback port 5432. Cloudflare Tunnel traffic remained reachable afterward. Future deployments can reload the now-established loopback listener normally; a successful reload command alone is insufficient evidence that a listener change took effect.
+
+Live verification after both restarts:
+
+- All five mobile download routes returned HTTP 200 with the installed app's existing credential, including `/api/staffs/get-salesmen?fields=minimal` from commit `3c08e5b2c226bb55e2f8c4509cee0ae5f78c37ac`.
+- The mobile key received HTTP 403 for backup administration and unsupported `fields=full`.
+- Unauthenticated office requests received HTTP 401 with the correct CORS origin for each frontend domain; an untrusted origin received HTTP 403.
+- Both frontend HTML pages and their JavaScript asset returned HTTP 200, with the new cookie-session code present. These are delivery checks, not an interactive sign-in test.
+- The public restore-status endpoint returned HTTP 200 with `IDLE`.
+
+The GitHub run remains marked failed because recovery was completed over SSH. Existing employees must refresh and sign in again. An actual browser sign-in, installed-phone invoice submission, full business regression and the next scheduled backup still need checking. No employee password or business record was changed by these verification requests. Known dependency advisories remain outside this deployment-command fix.
 
 ## Completed
 
-- Created `tienhock_app` on the production PostgreSQL server, enabled login with a generated password, and applied the tracked role setup. It has normal business-data permissions in all three schemas without database ownership, superuser, role creation, replication or row-security bypass. Both the deployment preflight and the application's production TLS pool passed against `tienhock_prod`.
+- Created `tienhock_app` on the production PostgreSQL server, enabled login with a generated password, and applied the tracked role setup. It has normal business-data permissions in all three schemas without database ownership, superuser, role creation, replication or row-security bypass. The privilege-check helper and the application's production TLS pool passed against `tienhock_prod`; the exact workflow command was corrected during the subsequent rollout described above.
 - Created the GitHub Actions secret **`ERP_DB_PASSWORD`**. The pending workflow uses it for the backend's `DB_PASSWORD` environment variable and checks that it is present before connecting to Hetzner. The older GitHub secret `DB_PASSWORD` stays unchanged so the currently deployed workflow remains usable until rollout. No password values are recorded here.
 - Confirmed **MILTI, TIMOTHY.G, HELEN and MATTHEW** are active OFFICE accounts in production. No live employee passwords, identities or business records were changed.
 - Confirmed `production_worker_orders` exists. The role has DML grants on 100 public, 49 Green Target and 36 Jelly Polly tables. Existing application tables and sequences are owned by postgres; the reviewed schemas contain no SECURITY DEFINER functions.
@@ -41,7 +59,7 @@ Passed:
 
 The test process was stopped. No frontend build, type check or lint was run, in accordance with the repository instructions. A real installed-phone submission, invoice persistence, external MyInvois submission and full business-workflow regression remain unverified. Previous authentication unit/HTTP tests also passed under test and production settings.
 
-## Remaining release steps
+## Release checklist recorded before rollout
 
 1. Review and commit the intended pending changes, including the new untracked helper files and workflow. No push or deployment was performed during this preparation.
 2. Deploy the backend and Cloudflare Pages frontend together during the agreed quiet window. The existing workflow installs Nginx and restarts PM2. Its database preflight is now configured to pass with the prepared role; normal build/deployment checks still have to pass.
