@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-07",
+    ms: "Masalah yang menghalang pentadbir daripada memuatkan senarai sandaran selepas kemas kini keselamatan telah dibetulkan.",
+    en: "Fixed an issue preventing administrators from loading the backup list after the security update.",
+  },
+  {
     date: "2026-09-05",
     ms: "Hanya pentadbir yang dilantik boleh mengurus akses pejabat dan sandaran; pemulihan penuh sistem production dibuat oleh pentadbir pelayan. Sandaran automatik dibuat setiap hari, dengan amaran jika tiada sandaran terkini. Anda perlu log masuk semula selepas kemas kini ini menggunakan kata laluan sedia ada. Simpanan berkelompok untuk gaji dan katalog juga dilindungi supaya ralat tidak meninggalkan perubahan separuh siap.",
     en: "Only designated administrators can manage office access and backups; full production recovery is handled by the server administrator. Automatic backups run daily, with a warning when no recent backup is available. Sign in again after this update using your existing password. Payroll and catalogue batch saves also protect against incomplete changes when an error occurs.",

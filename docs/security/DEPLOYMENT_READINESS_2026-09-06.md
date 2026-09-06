@@ -20,6 +20,12 @@ Live verification after both restarts:
 
 The GitHub run remains marked failed because recovery was completed over SSH. Existing employees must refresh and sign in again. An actual browser sign-in, installed-phone invoice submission, full business regression and the next scheduled backup still need checking. No employee password or business record was changed by these verification requests. Known dependency advisories remain outside this deployment-command fix.
 
+## Browser preflight correction — 7 September Malaysia time
+
+The first live browser backup check exposed a missing production preflight handler: `OPTIONS /api/backup/list` reached the backend administrator guard without a session cookie and returned HTTP 403. The earlier rollout checks covered actual GET responses but missed this browser preflight. Nginx now answers OPTIONS with HTTP 204 before proxying, using the existing exact-origin, method, header and credential allowlists. Actual requests still pass through authentication and administrator checks.
+
+Applied the tracked configuration correction to Hetzner with the existing deployment helper; `nginx -t` and reload passed. PM2 remained at PID 2799199 throughout this correction. Live preflights for GET backup listing, POST backup creation and PATCH staff updates passed on both frontend origins. Unauthenticated backup GETs still returned HTTP 401; an untrusted origin received no `Access-Control-Allow-Origin`. These checks did not create backups or edit staff records. The Nginx correction is also in the local working tree and must be published before the next production deployment so that deployment retains it.
+
 ## Completed
 
 - Created `tienhock_app` on the production PostgreSQL server, enabled login with a generated password, and applied the tracked role setup. It has normal business-data permissions in all three schemas without database ownership, superuser, role creation, replication or row-security bypass. The privilege-check helper and the application's production TLS pool passed against `tienhock_prod`; the exact workflow command was corrected during the subsequent rollout described above.
