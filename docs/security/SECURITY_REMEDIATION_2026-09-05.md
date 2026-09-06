@@ -1,8 +1,8 @@
 # Security remediation — 5 September 2026
 
-This implements the repository changes for the first ten findings in the [original review](SECURITY_REVIEW_2026-09-04.md). It is **not a production deployment or a compliance certificate**. The [6 September deployment preparation](DEPLOYMENT_READINESS_2026-09-06.md) subsequently created and tested the production runtime role, configured the deployment secret and rehearsed a restore. Live business records, employee passwords and application code were not changed.
+This records the repository changes for the first ten findings in the [original review](SECURITY_REVIEW_2026-09-04.md). It is **not a compliance certificate**. The [deployment readiness and rollout record](DEPLOYMENT_READINESS_2026-09-06.md) documents the later production role setup, recovery rehearsal and completed application rollout on 7 September Malaysia time. Its rollout section supersedes the historical cutover checklist below.
 
-**The database-role and secret prerequisites are now prepared; the application release is still pending.** The new server intentionally refuses privileged production database connections. Per the owner's updated decision, existing shared OFFICE passwords remain: there is no password-reset migration or personal-password setup step. Employees must sign in again because browser sessions now use server-issued cookies.
+**The application is now running with the restricted database role.** The server intentionally refuses privileged production database connections. Per the owner's updated decision, existing shared OFFICE passwords remain: there is no password-reset migration or personal-password setup step. Employees must sign in again because browser sessions now use server-issued cookies. The rollout record lists outstanding manual checks and the workflow correction still awaiting publication.
 
 ## Decisions already applied
 

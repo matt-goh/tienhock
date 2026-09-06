@@ -1,6 +1,6 @@
 {
   "date": "2026-09-06",
-  "scope": "Deployment prerequisites prepared; new application not deployed",
+  "scope": "Historical preparation snapshot; subsequentProductionRollout records the completed live deployment",
   "productionCodeRevision": "cc3a7f07ae956d372a1884015cc6e838ea252950",
   "runtimeDatabaseRole": {
     "name": "tienhock_app",
@@ -152,5 +152,62 @@
     "publicRestoreStatus": "IDLE",
     "applicationDeployed": false
   },
-  "temporaryCandidateDirectoryRemoved": true
+  "temporaryCandidateDirectoryRemoved": true,
+  "subsequentProductionRollout": {
+    "verifiedAtUtc": "2026-09-06T16:49:17.682056+00:00",
+    "localDateMalaysia": "2026-09-07",
+    "productionCodeRevision": "3128603352573caaf8b93c78a3f5665ef3d8e8b4",
+    "githubActionsRun": 34045948125,
+    "githubActionsConclusion": "failure; remaining deployment steps completed over SSH",
+    "workflowBuildAndTypeCheckPassedBeforeFailure": true,
+    "failure": "Named dynamic pg.Client import was undefined for the installed CommonJS package on Node 20.19.6",
+    "correction": "Import the default pg export and construct pg.Client",
+    "exactCorrectedWorkflowPreflightPassedOnProduction": true,
+    "workflowCorrectionPublished": false,
+    "processIdBefore": 2745956,
+    "processIdAfter": 2798625,
+    "pm2Status": "online",
+    "additionalRestartsDuringVerification": 0,
+    "observedDatabaseConnections": [{ "role": "tienhock_app", "connections": 1 }],
+    "environmentFileMode": "0600",
+    "mobileDigestUnchanged": true,
+    "nginx": {
+      "configurationMatchesTrackedSource": true,
+      "reloadInitiallyFailedToApplyListenerChange": true,
+      "reloadFailure": "bind() to 127.0.0.1:80 failed (98: Address already in use)",
+      "configurationValidationPassed": true,
+      "restartAppliedListenerChange": true,
+      "serviceStatus": "active",
+      "listeners": ["127.0.0.1:80", "[::1]:80"]
+    },
+    "nodeListener": "127.0.0.1:5000",
+    "postgresListeners": ["127.0.0.1:5432", "[::1]:5432"],
+    "publicRestoreStatus": { "httpStatus": 200, "status": "IDLE" },
+    "liveMobileReadsWithExistingCredential": [
+      { "path": "/api/staffs/get-salesmen?fields=minimal", "status": 200 },
+      { "path": "/api/invoices/ids", "status": 200 },
+      { "path": "/api/customers/get-customers", "status": 200 },
+      { "path": "/api/products?all&includeInactive=true", "status": 200 },
+      { "path": "/api/customer-products/all", "status": 200 }
+    ],
+    "liveNegativeChecks": [
+      { "path": "/api/backup/list", "authentication": "mobile", "status": 403 },
+      { "path": "/api/staffs/get-salesmen?fields=full", "authentication": "mobile", "status": 403 },
+      { "path": "/api/sessions/state", "origin": "https://untrusted.invalid", "status": 403 },
+      { "path": "/api/sessions/state", "origin": "https://tienhock.com", "authentication": "none", "status": 401, "corsOriginMatches": true },
+      { "path": "/api/sessions/state", "origin": "https://greentarget.tienhock.com", "authentication": "none", "status": 401, "corsOriginMatches": true }
+    ],
+    "frontendDelivery": [
+      { "domain": "https://tienhock.com", "htmlStatus": 200, "scriptStatus": 200, "cookieSessionMarkerPresent": true },
+      { "domain": "https://greentarget.tienhock.com", "htmlStatus": 200, "scriptStatus": 200, "cookieSessionMarkerPresent": true }
+    ],
+    "remainingManualChecks": [
+      "interactive browser sign-in with an existing employee account",
+      "installed-phone invoice submission and ERP reconciliation",
+      "full business workflow regression",
+      "next scheduled backup"
+    ],
+    "businessRecordsChangedByVerification": false,
+    "employeePasswordsChanged": false
+  }
 }

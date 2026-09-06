@@ -106,7 +106,7 @@ jobs:
             NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
             # Read-only preflight: fail before restarting if the security cutover is incomplete.
-            node --input-type=module -e 'import "dotenv/config"; const { Client } = await import("pg"); const { assertProductionDatabaseRole } = await import("./src/routes/utils/database-security.js"); const c = new Client({host:process.env.DB_HOST,port:Number(process.env.DB_PORT),user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME}); await c.connect(); try { await assertProductionDatabaseRole(c); } finally { await c.end(); }'
+            node --input-type=module -e 'import "dotenv/config"; const { default: pg } = await import("pg"); const { assertProductionDatabaseRole } = await import("./src/routes/utils/database-security.js"); const c = new pg.Client({host:process.env.DB_HOST,port:Number(process.env.DB_PORT),user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME}); await c.connect(); try { await assertProductionDatabaseRole(c); } finally { await c.end(); }'
             chmod 600 .env
 
             # Restart application with PM2

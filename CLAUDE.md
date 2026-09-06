@@ -72,7 +72,7 @@ reconciliation workflow, start with `docs/Account/AUDIT_2026_READ_FIRST.md`.
 - PostgreSQL with connection pooling
 - Maintenance mode support for database operations
 - Environment variables for database configuration
-- Production runtime role `tienhock_app` was provisioned and validated on 2026-09-06 with DML access in public/greentarget/jellypolly and no owner/superuser powers. GitHub Actions secret `ERP_DB_PASSWORD` supplies the application environment variable `DB_PASSWORD`; the existing live process keeps its old connection until the coordinated deployment. See `docs/security/DEPLOYMENT_READINESS_2026-09-06.md`.
+- Production runtime role `tienhock_app` was provisioned and validated on 2026-09-06 with DML access in public/greentarget/jellypolly and no owner/superuser powers. GitHub Actions secret `ERP_DB_PASSWORD` supplies the application environment variable `DB_PASSWORD`; the live application switched to this role on 2026-09-07 Malaysia time. See `docs/security/DEPLOYMENT_READINESS_2026-09-06.md` for rollout verification and the workflow import correction awaiting publication.
 
 #### Database Schema (90 tables)
 

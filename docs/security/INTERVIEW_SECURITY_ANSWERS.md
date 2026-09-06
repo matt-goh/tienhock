@@ -1,14 +1,10 @@
 # Conversational security answers
 
-Updated for the [5 September remediation](SECURITY_REMEDIATION_2026-09-05.md). The changes are in the repository. The [6 September preparation](DEPLOYMENT_READINESS_2026-09-06.md) verified the restricted database role, an independent recovery copy, a restore and backend checks with restored data. Production application rollout, installed-phone verification and ongoing protected-backup policies remain pending. Do not describe the application changes as live before deployment.
+Updated for the [5 September remediation](SECURITY_REMEDIATION_2026-09-05.md) and [production rollout](DEPLOYMENT_READINESS_2026-09-06.md), completed on 7 September Malaysia time. The restricted database role and security backend are live; both frontend domains serve the cookie-session release. An independent recovery copy and restore were verified. Live mobile downloads passed, while interactive sign-in, installed-phone submission and ongoing protected-backup policies still need checking.
 
 **“Can somebody just sabotage all the data anytime they want?”**
 
-“The APIs require authentication, and I’ve fixed the identified injection paths and restricted backup administration. Shared staff passwords and the legacy mobile key remain weaknesses, so I wouldn’t claim sabotage is impossible. Deployment and ongoing backup protection are still pending; we have verified one independent recovery copy and restore.”
-
-After deployment, with the independently stored recovery copy and continued backup checks:
-
-“Ordinary sessions cannot administer office access or restore the database, but shared credentials mean administrator impersonation remains possible. Staff can still edit business records, so we also keep protected, tested recovery copies. The legacy mobile key is another remaining limitation.”
+“The APIs require authentication, backup administration is restricted, and the app cannot drop or recreate the database. Authorized users can still damage business records, especially with shared credentials. We have tested an independent recovery copy, but stronger ongoing backup protection is still being set up.”
 
 **“What did you actually improve?”**
 
@@ -24,7 +20,7 @@ After deployment, with the independently stored recovery copy and continued back
 
 **“Can you recover from an attack?”**
 
-“We now have daily backup code and visible failure handling. I’m not promising recovery until a copy is protected from the app’s credentials and we’ve rehearsed restoring the database and its documents. A scheduled job alone isn’t enough evidence.”
+“We restored an independent production backup into a separate database and checked its row counts and accounting totals. Daily backups and failure handling are deployed, but we still need to verify the next scheduled run and establish ongoing protected retention. I wouldn’t promise recovery from an untested backup.”
 
 **“Does Cloudflare make the app secure?”**
 
