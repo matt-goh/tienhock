@@ -1,8 +1,11 @@
 // src/routes/admin/backup.js
 import express from 'express';
-import { exec, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { randomBytes } from 'crypto';
-import { promisify } from 'util';
+import os from 'node:os';
+import path from 'node:path';
+import { requireSecurityAdmin, logSecurityAction } from '../../middleware/security.js';
+import { backupCommand, backupFilePath, validBackupFilename, assertBackupFile, listLocalBackupFiles, createLocalBackup } from '../../utils/backup-files.js';
 import fs from 'fs';
 import pg from 'pg';
 import { DB_NAME, DB_USER, DB_HOST, DB_PASSWORD, DB_PORT, NODE_ENV } from '../../configs/config.js';
@@ -10,7 +13,6 @@ import { uploadBackupToS3, listS3Backups, deleteS3Backup, downloadS3Backup } fro
 import { isS3BackupEnabled } from '../../configs/config.js';
 
 const { Client } = pg;
-const execAsync = promisify(exec);
 const router = express.Router();
 
 class RestoredDatabaseStructureError extends Error {}
@@ -115,6 +117,13 @@ export default function backupRouter(pool) {
   const isSqlReplacementEnabled = NODE_ENV === 'development'
     && (process.platform === 'win32' || process.platform === 'darwin');
   const backupDir = '/var/backups/postgres';
+  let creatingBackup = false;
+  router.use((req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    if ((req.method === 'GET' && req.path === '/restore/status')
+      || (isSqlReplacementEnabled && req.method === 'POST' && req.path === '/upload-sql')) return next();
+    return requireSecurityAdmin(req, res, next);
+  });
 
   // Docker container names based on environment (use db container which has pg tools)
   const getContainerName = () => {
@@ -242,11 +251,11 @@ export default function backupRouter(pool) {
       await runProcess('docker', [
         'exec',
         '--env',
-        `PGPASSWORD=${password}`,
+        'PGPASSWORD',
         getContainerName(),
         tool,
         ...args,
-      ], { timeoutMs: RESTORE_PROCESS_TIMEOUT_MS });
+      ], { env: { ...process.env, PGPASSWORD: password }, timeoutMs: RESTORE_PROCESS_TIMEOUT_MS });
       return;
     }
 
@@ -358,38 +367,30 @@ export default function backupRouter(pool) {
     }
   };
 
-  // Execute a command - either directly or via docker exec
-  const executeCommand = async (command, options = {}) => {
-    if (shouldUseDockerExec()) {
-      // Running on Windows/Mac dev, use docker exec
-      const containerName = getContainerName();
-      const dockerCommand = `docker exec ${containerName} bash -c "${command.replace(/"/g, '\\"')}"`;
-      return execAsync(dockerCommand, options);
-    } else {
-      // Running on Linux (production Hetzner or Docker container), execute directly
-      return execAsync(command, options);
-    }
-  };
+  const listLocalBackups = () => listLocalBackupFiles(env);
 
-  // List backup files stored locally inside the Docker container (dev fallback)
-  const listLocalBackups = async () => {
-    const envBackupDir = `${backupDir}/${env}`;
+  /** @param {string} filename @returns {Promise<string>} */
+  const ensureLocalBackup = async (filename) => {
+    const filePath = backupFilePath(env, filename);
+    await backupCommand('test', ['!', '-L', filePath]);
+    try { await assertBackupFile(env, filename); return filePath; } catch { /* Fetch a missing dump below. */ }
+    if (!shouldUseDockerExec()) {
+      const downloaded = await downloadS3Backup(filename, env, `${backupDir}/${env}`);
+      if (!downloaded) throw new Error('Backup file not found');
+      return downloaded;
+    }
+    const temporaryDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'erp-backup-'));
     try {
-      const command = `find "${envBackupDir}" -maxdepth 1 -name "*.gz" -exec stat -c "%n %s %Y" {} \\; 2>/dev/null || echo ""`;
-      const { stdout } = await executeCommand(command);
-      const lines = stdout.trim().split('\n').filter(l => l.trim());
-      return lines.map(line => {
-        const parts = line.trim().split(' ');
-        if (parts.length < 3) return null;
-        const mtime = parseInt(parts[parts.length - 1], 10);
-        const size = parseInt(parts[parts.length - 2], 10);
-        const fullPath = parts.slice(0, parts.length - 2).join(' ');
-        const filename = fullPath.split('/').pop();
-        if (!filename || isNaN(size) || isNaN(mtime)) return null;
-        return { filename, size, lastModified: new Date(mtime * 1000) };
-      }).filter(Boolean);
-    } catch {
-      return [];
+      const downloaded = await downloadS3Backup(filename, env, temporaryDirectory);
+      if (!downloaded) throw new Error('Backup file not found');
+      await backupCommand('mkdir', ['-p', '-m', '700', `${backupDir}/${env}`]);
+      await runProcess('docker', ['cp', downloaded, `${getContainerName()}:${filePath}`]);
+      await backupCommand('chmod', ['600', filePath]);
+      return filePath;
+    } finally {
+      // Only the validated filename and freshly created, empty temporary directory.
+      fs.rmSync(path.join(temporaryDirectory, filename), { force: true });
+      fs.rmdirSync(temporaryDirectory);
     }
   };
 
@@ -938,7 +939,6 @@ export default function backupRouter(pool) {
    * @returns {Promise<boolean>}
    */
   async function restoreDatabase(backupPath) {
-    let cachedSessions = [];
     const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
     const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
 
@@ -952,79 +952,11 @@ export default function backupRouter(pool) {
       // Set maintenance mode
       pool.pool.maintenanceMode = true;
 
-      // Phase 1: Cache active sessions
-      try {
-        const { rows } = await pool.query(`
-          SELECT
-            created_at,
-            last_active,
-            session_id,
-            staff_id,
-            status
-          FROM active_sessions
-          WHERE status = 'active'
-          AND last_active > NOW() - INTERVAL '7 days'
-        `);
-        cachedSessions = rows;
-      } catch (error) {
-        console.warn('Failed to cache sessions:', error);
-        // Continue with restore even if session caching fails
-      }
-
-      // Phase 2: Database restore
       restoreState.phase = 'DATABASE_RESTORE';
-
-      const restoreCommand = `PGPASSWORD=${DB_PASSWORD} pg_restore -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d ${DB_NAME} --clean --if-exists -v "${backupPath}"`;
-
-      await executeCommand(restoreCommand);
-
-      // Phase 3: Session restoration
-      if (cachedSessions.length > 0) {
-        restoreState.phase = 'SESSION_RESTORE';
-        try {
-          // Ensure active_sessions table exists
-          await pool.query(`
-            CREATE TABLE IF NOT EXISTS active_sessions (
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-              last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-              session_id VARCHAR(255) PRIMARY KEY,
-              staff_id VARCHAR(255),
-              status VARCHAR(50) DEFAULT 'active'
-            )
-          `);
-
-          // Reinsert sessions in batches
-          const batchSize = 50;
-          for (let i = 0; i < cachedSessions.length; i += batchSize) {
-            const batch = cachedSessions.slice(i, i + batchSize);
-            const values = batch.map(session => `(
-              '${session.created_at.toISOString()}',
-              NOW(),
-              '${session.session_id}',
-              ${session.staff_id ? `'${session.staff_id}'` : 'NULL'},
-              'active'
-            )`).join(',');
-
-            await pool.query(`
-              INSERT INTO active_sessions (
-                created_at,
-                last_active,
-                session_id,
-                staff_id,
-                status
-              )
-              VALUES ${values}
-              ON CONFLICT (session_id)
-              DO UPDATE SET
-                last_active = EXCLUDED.last_active,
-                status = EXCLUDED.status
-            `);
-          }
-        } catch (error) {
-          console.error('Failed to restore sessions:', error);
-          // Continue even if session restore fails
-        }
-      }
+      await runPostgresTool('pg_restore', ['-h', dbHost, '-p', String(dbPort), '-U', DB_USER, '-d', DB_NAME,
+        '--clean', '--if-exists', '--single-transaction', '--exit-on-error', '--no-owner', '--no-privileges', backupPath]);
+      // Never revive browser sessions embedded in an old database dump.
+      await pool.query('DELETE FROM active_sessions');
 
       // Complete restore
       pool.pool.maintenanceMode = false;
@@ -1284,115 +1216,42 @@ export default function backupRouter(pool) {
   }
 
   router.post('/create', async (req, res) => {
+    if (pool.pool.maintenanceMode || creatingBackup) return res.status(409).json({ message: 'A backup operation is already in progress' });
+    const name = req.body?.name;
+    if (name !== undefined && name !== '' && (typeof name !== 'string' || name.length > 80)) return res.status(400).json({ message: 'Invalid backup name' });
+    creatingBackup = true;
     try {
-      if (pool.pool.maintenanceMode) {
-        return res.status(503).json({
-          error: 'Service temporarily unavailable',
-          message: 'Database restore in progress. Please try again in a few moments.'
-        });
-      }
-
-      const { name } = req.body;
-      let customName = '';
-
-      if (name) {
-        // Sanitize the custom name by removing special characters and spaces
-        customName = name.replace(/[^a-zA-Z0-9_-]/g, '_');
-      }
-
-      const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
-      const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
-      const envBackupDir = `${backupDir}/${env}`;
-
-      // Generate timestamp
-      const now = new Date();
-      const timestamp = now.getFullYear().toString() +
-        (now.getMonth() + 1).toString().padStart(2, '0') +
-        now.getDate().toString().padStart(2, '0') + '_' +
-        now.getHours().toString().padStart(2, '0') +
-        now.getMinutes().toString().padStart(2, '0') +
-        now.getSeconds().toString().padStart(2, '0');
-
-      // Create backup filename
-      const backupFilename = customName
-        ? `${customName}_${timestamp}.gz`
-        : `backup_${DB_NAME}_${timestamp}.gz`;
-
-      const backupPath = `${envBackupDir}/${backupFilename}`;
-
-      // Ensure backup directory exists and run pg_dump
-      const command = `mkdir -p "${envBackupDir}" && PGPASSWORD=${DB_PASSWORD} pg_dump -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d ${DB_NAME} -F c -b -v -f "${backupPath}" && echo "[${env}] Backup completed: ${backupFilename}" >> "${envBackupDir}/backup.log"`;
-
-      const { stdout, stderr } = await executeCommand(command);
-      if (stderr) console.error('Backup stderr:', stderr);
-
-      // Upload to S3 and delete local file after success.
-      // When S3 is the backup store, /list reads from S3 — so await the upload
-      // before responding, otherwise the frontend's immediate refresh runs
-      // before the upload finishes and the new backup is missing until a manual
-      // refresh. When S3 is disabled (dev), the local pg_dump file already
-      // exists, so keep the upload fire-and-forget.
-      if (isS3BackupEnabled()) {
-        try {
-          const uploaded = await uploadBackupToS3(backupPath, backupFilename, env);
-          if (uploaded) {
-            console.log(`[S3 Backup] Synced: ${backupFilename}`);
-            // Delete local file after successful S3 upload
-            try {
-              await executeCommand(`rm -f "${backupPath}"`);
-              console.log(`[Backup] Deleted local file: ${backupFilename}`);
-            } catch (err) {
-              console.warn(`[Backup] Failed to delete local file: ${err.message}`);
-            }
-          }
-        } catch (err) {
-          console.warn(`[S3 Backup] Skipped or failed: ${err.message}`);
-        }
-      }
-
+      const backup = await createLocalBackup(env, name ? name.replace(/[^a-zA-Z0-9_-]/g, '_') : 'backup');
+      if (isS3BackupEnabled()) await uploadBackupToS3(backup.filePath, backup.filename, env);
+      else if (env === 'production') throw new Error('Off-server backup storage is not configured');
+      logSecurityAction(req, 'backup_created', backup.filename);
       res.json({ message: 'Backup created successfully' });
     } catch (error) {
       console.error('Backup failed:', error);
-      res.status(500).json({ error: 'Backup failed', details: error.message });
-    }
+      res.status(500).json({ message: 'Backup failed. Any completed local copy has been retained; check server logs.' });
+    } finally { creatingBackup = false; }
   });
 
   router.post('/delete', async (req, res) => {
+    const filename = req.body?.filename;
+    if (!validBackupFilename(filename)) return res.status(400).json({ message: 'Invalid backup filename' });
+    if (pool.pool.maintenanceMode || creatingBackup) return res.status(409).json({ message: 'A backup operation is already in progress' });
+    creatingBackup = true;
     try {
-      if (pool.pool.maintenanceMode) {
-        return res.status(503).json({
-          error: 'Service temporarily unavailable',
-          message: 'Database restore in progress. Please try again in a few moments.'
-        });
-      }
-
-      const { filename } = req.body;
-      if (!filename) {
-        return res.status(400).json({ error: 'Filename is required' });
-      }
-
-      const envBackupDir = `${backupDir}/${env}`;
-      const filePath = `${envBackupDir}/${filename}`;
-
-      // Delete the local backup file
-      const deleteCommand = `rm -f "${filePath}"`;
-      await executeCommand(deleteCommand);
-
-      // Delete from S3
+      const backups = isS3BackupEnabled() ? await listS3Backups(env) : await listLocalBackups();
+      if (!backups.some((backup) => backup.filename !== filename)) return res.status(409).json({ message: 'The only available backup cannot be deleted' });
       await deleteS3Backup(filename, env);
-
-      // Log deletion
-      const logCommand = `echo "[${env}] Backup deleted: ${filename} at $(date -Iseconds)" >> "${envBackupDir}/backup.log"`;
-      await executeCommand(logCommand);
-
+      await backupCommand('rm', ['-f', '--', backupFilePath(env, filename)]);
+      logSecurityAction(req, 'backup_deleted', filename);
       res.json({ message: 'Backup deleted successfully' });
     } catch (error) {
-      console.error('Delete failed:', error);
-      res.status(500).json({ error: 'Delete failed', details: error.message });
-    }
+      console.error('Backup deletion failed:', error);
+      res.status(500).json({ message: 'Backup deletion failed' });
+    } finally { creatingBackup = false; }
   });
 
   router.get('/list', async (req, res) => {
+    if (env === 'production' && !isS3BackupEnabled()) return res.status(503).json({ message: 'Off-server backup storage is not configured' });
     try {
       let rawBackups;
 
@@ -1429,21 +1288,6 @@ export default function backupRouter(pool) {
   });
 
   router.get('/download/:filename', async (req, res) => {
-    let downloadedBackupPath = null;
-    let cleanupStarted = false;
-
-    const cleanupDownloadedBackup = async () => {
-      if (!downloadedBackupPath || cleanupStarted) return;
-      cleanupStarted = true;
-
-      try {
-        await executeCommand(`rm -f "${downloadedBackupPath}"`);
-        console.log(`[Download] Cleaned up downloaded backup file: ${downloadedBackupPath}`);
-      } catch (fileCleanupError) {
-        console.warn(`[Download] Failed to cleanup backup file: ${fileCleanupError.message}`);
-      }
-    };
-
     try {
       if (pool.pool.maintenanceMode) {
         return res.status(503).json({
@@ -1457,7 +1301,7 @@ export default function backupRouter(pool) {
         return res.status(400).json({ error: 'Filename is required' });
       }
 
-      if (filename.includes('/') || filename.includes('\\')) {
+      if (!validBackupFilename(filename)) {
         return res.status(400).json({ error: 'Invalid filename' });
       }
 
@@ -1465,49 +1309,8 @@ export default function backupRouter(pool) {
       const filePath = `${envBackupDir}/${filename}`;
       const containerName = getContainerName();
 
-      // Check if file exists locally, if not download from S3
-      let fileExists = false;
-      try {
-        await executeCommand(`test -f "${filePath}"`);
-        fileExists = true;
-        console.log(`[Download] Using local file: ${filePath}`);
-      } catch {
-        console.log(`[Download] File not found locally, downloading from S3...`);
-      }
-
-      if (!fileExists) {
-        // Download from S3 - need to handle dev vs prod differently
-        if (shouldUseDockerExec()) {
-          // Dev: Download to host, then copy into Docker container
-          const tempHostPath = `./${filename}`;
-          const downloadedPath = await downloadS3Backup(filename, env, '.');
-          if (!downloadedPath) {
-            return res.status(404).json({ error: 'Backup file not found in S3' });
-          }
-
-          // Ensure directory exists in container and copy file into Docker
-          await executeCommand(`mkdir -p "${envBackupDir}"`);
-          await execAsync(`docker cp "${tempHostPath}" ${containerName}:${filePath}`);
-
-          // Clean up temp file on host
-          try {
-            fs.unlinkSync(tempHostPath);
-          } catch (cleanupErr) {
-            console.warn(`[Download] Failed to cleanup temp host file: ${cleanupErr.message}`);
-          }
-
-          console.log(`[Download] Downloaded from S3 and copied to Docker: ${filePath}`);
-          downloadedBackupPath = filePath;
-        } else {
-          // Production: Download directly to local filesystem
-          const downloadedPath = await downloadS3Backup(filename, env, envBackupDir);
-          if (!downloadedPath) {
-            return res.status(404).json({ error: 'Backup file not found in S3' });
-          }
-          console.log(`[Download] Downloaded from S3: ${downloadedPath}`);
-          downloadedBackupPath = downloadedPath;
-        }
-      }
+      await ensureLocalBackup(filename);
+      logSecurityAction(req, 'backup_download', filename);
 
       // Convert .gz to .sql filename for download
       const sqlFilename = filename.replace('.gz', '.sql');
@@ -1536,9 +1339,11 @@ export default function backupRouter(pool) {
           'pg_restore',
           ...pgRestoreArgs
         ], {
+          windowsHide: true,
           stdio: ['ignore', 'pipe', 'pipe']
         })
         : spawn('pg_restore', pgRestoreArgs, {
+          windowsHide: true,
           stdio: ['ignore', 'pipe', 'pipe']
         });
 
@@ -1552,7 +1357,6 @@ export default function backupRouter(pool) {
 
       restoreProcess.on('error', async (error) => {
         console.error('Failed to start pg_restore:', error);
-        await cleanupDownloadedBackup();
 
         if (!res.headersSent) {
           res.status(500).json({ error: 'Download failed', details: error.message });
@@ -1564,7 +1368,6 @@ export default function backupRouter(pool) {
       restoreProcess.on('close', async (code, signal) => {
         processClosed = true;
         console.log(`pg_restore process exited with code ${code}${signal ? ` and signal ${signal}` : ''}`);
-        await cleanupDownloadedBackup();
 
         if (code !== 0 && !res.writableEnded) {
           const message = signal
@@ -1587,7 +1390,6 @@ export default function backupRouter(pool) {
       });
 
     } catch (error) {
-      await cleanupDownloadedBackup();
       console.error('Download failed:', error);
       if (!res.headersSent) {
         res.status(500).json({ error: 'Download failed', details: error.message });
@@ -1596,12 +1398,15 @@ export default function backupRouter(pool) {
   });
 
   router.post('/restore', async (req, res) => {
-    const { filename } = req.body;
-    if (!filename) {
-      return res.status(400).json({ error: 'Filename is required' });
+    const filename = req.body?.filename;
+    if (!validBackupFilename(filename)) {
+      return res.status(400).json({ message: 'Invalid backup filename' });
     }
 
-    if (restoreState.status === 'RESTORING') {
+    // The runtime database role has no DDL/ownership privileges in production.
+    // Restores there are performed using the documented server maintenance procedure.
+    if (env === 'production') return res.status(403).json({ message: 'Production restoration requires server maintenance access' });
+    if (restoreState.status === 'RESTORING' || creatingBackup) {
       return res.status(503).json({
         error: 'Service unavailable',
         message: 'A restore operation is already in progress'
@@ -1622,31 +1427,10 @@ export default function backupRouter(pool) {
         status: 'RESTORING'
       });
 
-      const envBackupDir = `${backupDir}/${env}`;
-      let backupPath = `${envBackupDir}/${filename}`;
-
-      // Check if file exists locally, if not download from S3
-      try {
-        await executeCommand(`test -f "${backupPath}"`);
-        console.log(`[Restore] Using local file: ${backupPath}`);
-      } catch {
-        console.log(`[Restore] File not found locally, downloading from S3...`);
-        const downloadedPath = await downloadS3Backup(filename, env, envBackupDir);
-        if (!downloadedPath) {
-          throw new Error('Failed to download backup from S3');
-        }
-        backupPath = downloadedPath;
-      }
-
+      const backupPath = await ensureLocalBackup(filename);
       await restoreDatabase(backupPath);
-
-      // Clean up downloaded file after restore
-      try {
-        await executeCommand(`rm -f "${backupPath}"`);
-        console.log(`[Restore] Cleaned up local file: ${filename}`);
-      } catch (err) {
-        console.warn(`[Restore] Failed to cleanup local file: ${err.message}`);
-      }
+      logSecurityAction(req, 'backup_restored', filename);
+      // Retain the source dump for recovery and subsequent downloads.
 
     } catch (error) {
       console.error('Restore failed:', error);

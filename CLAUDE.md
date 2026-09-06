@@ -72,6 +72,7 @@ reconciliation workflow, start with `docs/Account/AUDIT_2026_READ_FIRST.md`.
 - PostgreSQL with connection pooling
 - Maintenance mode support for database operations
 - Environment variables for database configuration
+- Production runtime role `tienhock_app` was provisioned and validated on 2026-09-06 with DML access in public/greentarget/jellypolly and no owner/superuser powers. GitHub Actions secret `ERP_DB_PASSWORD` supplies the application environment variable `DB_PASSWORD`; the existing live process keeps its old connection until the coordinated deployment. See `docs/security/DEPLOYMENT_READINESS_2026-09-06.md`.
 
 #### Database Schema (90 tables)
 
@@ -168,8 +169,8 @@ Phase 3 June parity corrections are guarded by `dev/migrations/2026-07-28_estima
 
 **Staff & Employees:**
 
-- `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location (ordered JSONB array: the canonical Head's first assigned location is the employee's primary Salary Report/JVSL department; supplemental incentive/leave locations follow it. The shared multi-select preserves this order. `2026-09-03_restore_danish_primary_salary_location.sql` restores Danish from `18,09` to `09,18`, putting his RM1,444.45 August JVSL cost back under Mesin Bihun), date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password, updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports), epf_age_override, epf_nationality_override, socso_age_override, sip_age_override (per-staff statutory contribution overrides; NULL = auto from birthdate/nationality. age overrides: 'under_60'|'over_60'|'none' where 'none' = not eligible; epf_nationality_override: 'local'|'foreign'. Honoured by payroll EPF/SOCSO/SIP calculation)
-- `active_sessions` - session_id, staff_id, last_active, created_at, status
+- `staffs` - id (no whitespace allowed), name, telephone_no, email, gender, nationality, birthdate, address, job, location (ordered JSONB array: the canonical Head's first assigned location is the employee's primary Salary Report/JVSL department; supplemental incentive/leave locations follow it. The shared multi-select preserves this order. `2026-09-03_restore_danish_primary_salary_location.sql` restores Danish from `18,09` to `09,18`, putting his RM1,444.45 August JVSL cost back under Mesin Bihun), date_joined, ic_no, bank_account_number, epf_no, income_tax_no, socso_no, document, payment_type, payment_preference, race, agama, date_resigned, password (existing shared OFFICE credentials retained by owner decision; NULL disables login; new OFFICE access reuses the provisioning security administrator's stored hash), updated_at, marital_status, spouse_employment_status, number_of_children, kwsp_number, department, head_staff_id (references staffs.id - for same-name staff, indicates who is the "Head" for location determination in salary reports), epf_age_override, epf_nationality_override, socso_age_override, sip_age_override (per-staff statutory contribution overrides; NULL = auto from birthdate/nationality. age overrides: 'under_60'|'over_60'|'none' where 'none' = not eligible; epf_nationality_override: 'local'|'foreign'. Honoured by payroll EPF/SOCSO/SIP calculation)
+- `active_sessions` - session_id, staff_id, last_active, created_at, status. Browser sessions use server-generated 256-bit tokens in host-only HttpOnly cookies (Secure in production), with 8-hour idle and 12-hour absolute limits. Logout and office-access changes revoke sessions. Security administrators: MILTI, TIMOTHY.G, HELEN, MATTHEW (server allowlist).
 - `bookmarks` - id, staff_id, name
 - `account_code_favourites` - id, staff_id (FK staffs), account_code (FK account_codes), created_at (unique: staff_id, account_code). Per-user Chart of Accounts favourites; rows are removed automatically when the staff or account code is deleted
 
@@ -316,7 +317,7 @@ JP has its OWN catalogue — nothing is shared with the TH staff/pay-code tables
 
 Catalogue:
 
-- `jellypolly.staffs` - full TH staffs shape (incl. statutory override columns and `head_staff_id` for the HEAD/sub-ID system). JP staff are managed on the JP Catalogue → Staff pages.
+- `jellypolly.staffs` - TH business/payroll staff shape (OFFICE authentication is public.staffs-only) (incl. statutory override columns and `head_staff_id` for the HEAD/sub-ID system). JP staff are managed on the JP Catalogue → Staff pages.
 - `jellypolly.jobs` - id, name, section. Seeded: JP_OFFICE, JP_MAINTEN, JP_SALESMAN, JP_SALESMAN_IKUT, JP_ICE_POLLY, JP_JELLY_CUP, JP_PLASTIC, JP_PACKING.
 - `jellypolly.pay_codes` - TH pay_codes shape (incl. report_column; rate_unit CHECK mirrors the public units Hour/Bill/Day/Bag/Ctn/Trip/Fixed/Percent/Tray/Kg/Karung/Bundle/PKT/PCS after `2026-08-24_repair_ramen_product_and_jp_pkt_pcs.sql`). Salesman commission codes are named after the JP PRODUCT ids (S-25ML, MEQ-60ML, ...) so the salesman entry maps each sold product to the same-id pay code (TH convention).
 - `jellypolly.job_pay_codes`, `jellypolly.employee_pay_codes` - TH shapes, FKs to jellypolly.jobs/staffs/pay_codes. Salesman product codes are mapped to BOTH salesman jobs; JP_SALESMAN_IKUT carries lower override rates.

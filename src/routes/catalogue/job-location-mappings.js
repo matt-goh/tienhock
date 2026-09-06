@@ -126,321 +126,441 @@ export default function (pool) {
 
   // POST / - Create new job-location mapping
   router.post("/", async (req, res) => {
-    const { job_id, location_code, is_active = true } = req.body;
-
-    if (!job_id || !location_code) {
-      return res.status(400).json({
-        message: "job_id and location_code are required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Validate location code exists in DB
-      const locationCheck = await pool.query(
-        "SELECT id, name FROM locations WHERE id = $1",
-        [location_code]
-      );
-      if (locationCheck.rows.length === 0) {
-        const locationMap = await getLocationMap(pool);
+      const { job_id, location_code, is_active = true } = req.body;
+
+      if (!job_id || !location_code) {
         return res.status(400).json({
-          message: `Invalid location_code. Must be one of: ${Object.keys(locationMap).join(", ")}`,
+          message: "job_id and location_code are required",
         });
       }
 
-      await pool.query("BEGIN");
+      try {
+        // Validate location code exists in DB
+        const locationCheck = await (transactionClient || pool).query(
+          "SELECT id, name FROM locations WHERE id = $1",
+          [location_code]
+        );
+        if (locationCheck.rows.length === 0) {
+          const locationMap = await getLocationMap((transactionClient || pool));
+          return res.status(400).json({
+            message: `Invalid location_code. Must be one of: ${Object.keys(locationMap).join(", ")}`,
+          });
+        }
 
-      // Check if job exists
-      const jobCheck = await pool.query("SELECT 1 FROM jobs WHERE id = $1", [job_id]);
-      if (jobCheck.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Job not found" });
-      }
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      // Check if mapping already exists
-      const existingCheck = await pool.query(
-        "SELECT 1 FROM job_location_mappings WHERE job_id = $1",
-        [job_id]
-      );
-      if (existingCheck.rows.length > 0) {
-        await pool.query("ROLLBACK");
-        return res.status(409).json({
-          message: "This job already has a location mapping. Use PUT to update.",
+        // Check if job exists
+        const jobCheck = await (transactionClient || pool).query("SELECT 1 FROM jobs WHERE id = $1", [job_id]);
+        if (jobCheck.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Job not found" });
+        }
+
+        // Check if mapping already exists
+        const existingCheck = await (transactionClient || pool).query(
+          "SELECT 1 FROM job_location_mappings WHERE job_id = $1",
+          [job_id]
+        );
+        if (existingCheck.rows.length > 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(409).json({
+            message: "This job already has a location mapping. Use PUT to update.",
+          });
+        }
+
+        const insertQuery = `
+          INSERT INTO job_location_mappings (job_id, location_code, is_active)
+          VALUES ($1, $2, $3)
+          RETURNING *
+        `;
+        const result = await (transactionClient || pool).query(insertQuery, [job_id, location_code, is_active]);
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        const mapping = {
+          ...result.rows[0],
+          location_name: locationCheck.rows[0].name,
+        };
+
+        res.status(201).json({
+          message: "Job location mapping created successfully",
+          mapping,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error creating job location mapping:", error);
+        res.status(500).json({
+          message: "Error creating job location mapping",
+          error: error.message,
         });
       }
-
-      const insertQuery = `
-        INSERT INTO job_location_mappings (job_id, location_code, is_active)
-        VALUES ($1, $2, $3)
-        RETURNING *
-      `;
-      const result = await pool.query(insertQuery, [job_id, location_code, is_active]);
-
-      await pool.query("COMMIT");
-
-      const mapping = {
-        ...result.rows[0],
-        location_name: locationCheck.rows[0].name,
-      };
-
-      res.status(201).json({
-        message: "Job location mapping created successfully",
-        mapping,
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error creating job location mapping:", error);
-      res.status(500).json({
-        message: "Error creating job location mapping",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // PUT /:jobId - Update location for a job
   router.put("/:jobId", async (req, res) => {
-    const { jobId } = req.params;
-    const { location_code, is_active } = req.body;
-
-    if (!location_code && is_active === undefined) {
-      return res.status(400).json({
-        message: "At least one of location_code or is_active must be provided",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      let locationName = null;
+      const { jobId } = req.params;
+      const { location_code, is_active } = req.body;
 
-      // Validate location code if provided
-      if (location_code) {
-        const locationCheck = await pool.query(
-          "SELECT id, name FROM locations WHERE id = $1",
-          [location_code]
-        );
-        if (locationCheck.rows.length === 0) {
-          const locationMap = await getLocationMap(pool);
-          return res.status(400).json({
-            message: `Invalid location_code. Must be one of: ${Object.keys(locationMap).join(", ")}`,
-          });
-        }
-        locationName = locationCheck.rows[0].name;
+      if (!location_code && is_active === undefined) {
+        return res.status(400).json({
+          message: "At least one of location_code or is_active must be provided",
+        });
       }
 
-      await pool.query("BEGIN");
+      try {
+        let locationName = null;
 
-      // Check if mapping exists
-      const existingCheck = await pool.query(
-        "SELECT * FROM job_location_mappings WHERE job_id = $1",
-        [jobId]
-      );
-
-      if (existingCheck.rows.length === 0) {
-        // If no mapping exists and we have a location_code, create one
+        // Validate location code if provided
         if (location_code) {
-          const insertQuery = `
-            INSERT INTO job_location_mappings (job_id, location_code, is_active)
-            VALUES ($1, $2, $3)
-            RETURNING *
-          `;
-          const result = await pool.query(insertQuery, [
-            jobId,
-            location_code,
-            is_active !== undefined ? is_active : true,
-          ]);
-
-          await pool.query("COMMIT");
-
-          return res.status(201).json({
-            message: "Job location mapping created successfully",
-            mapping: {
-              ...result.rows[0],
-              location_name: locationName,
-            },
-          });
-        } else {
-          await pool.query("ROLLBACK");
-          return res.status(404).json({ message: "Job location mapping not found" });
+          const locationCheck = await (transactionClient || pool).query(
+            "SELECT id, name FROM locations WHERE id = $1",
+            [location_code]
+          );
+          if (locationCheck.rows.length === 0) {
+            const locationMap = await getLocationMap((transactionClient || pool));
+            return res.status(400).json({
+              message: `Invalid location_code. Must be one of: ${Object.keys(locationMap).join(", ")}`,
+            });
+          }
+          locationName = locationCheck.rows[0].name;
         }
-      }
 
-      // Build update query dynamically
-      const updates = [];
-      const values = [];
-      let paramIndex = 1;
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      if (location_code) {
-        updates.push(`location_code = $${paramIndex++}`);
-        values.push(location_code);
-      }
-
-      if (is_active !== undefined) {
-        updates.push(`is_active = $${paramIndex++}`);
-        values.push(is_active);
-      }
-
-      updates.push(`updated_at = CURRENT_TIMESTAMP`);
-      values.push(jobId);
-
-      const updateQuery = `
-        UPDATE job_location_mappings
-        SET ${updates.join(", ")}
-        WHERE job_id = $${paramIndex}
-        RETURNING *
-      `;
-
-      const result = await pool.query(updateQuery, values);
-
-      // Fetch the location name for response
-      if (!locationName && result.rows[0].location_code) {
-        const locResult = await pool.query(
-          "SELECT name FROM locations WHERE id = $1",
-          [result.rows[0].location_code]
+        // Check if mapping exists
+        const existingCheck = await (transactionClient || pool).query(
+          "SELECT * FROM job_location_mappings WHERE job_id = $1",
+          [jobId]
         );
-        locationName = locResult.rows[0]?.name || result.rows[0].location_code;
+
+        if (existingCheck.rows.length === 0) {
+          // If no mapping exists and we have a location_code, create one
+          if (location_code) {
+            const insertQuery = `
+              INSERT INTO job_location_mappings (job_id, location_code, is_active)
+              VALUES ($1, $2, $3)
+              RETURNING *
+            `;
+            const result = await (transactionClient || pool).query(insertQuery, [
+              jobId,
+              location_code,
+              is_active !== undefined ? is_active : true,
+            ]);
+
+            if (transactionClient) {
+              await transactionClient.query("COMMIT");
+              transactionClient.release();
+              transactionClient = null;
+            }
+
+            return res.status(201).json({
+              message: "Job location mapping created successfully",
+              mapping: {
+                ...result.rows[0],
+                location_name: locationName,
+              },
+            });
+          } else {
+            if (transactionClient) {
+              await transactionClient.query("ROLLBACK");
+              transactionClient.release();
+              transactionClient = null;
+            }
+            return res.status(404).json({ message: "Job location mapping not found" });
+          }
+        }
+
+        // Build update query dynamically
+        const updates = [];
+        const values = [];
+        let paramIndex = 1;
+
+        if (location_code) {
+          updates.push(`location_code = $${paramIndex++}`);
+          values.push(location_code);
+        }
+
+        if (is_active !== undefined) {
+          updates.push(`is_active = $${paramIndex++}`);
+          values.push(is_active);
+        }
+
+        updates.push(`updated_at = CURRENT_TIMESTAMP`);
+        values.push(jobId);
+
+        const updateQuery = `
+          UPDATE job_location_mappings
+          SET ${updates.join(", ")}
+          WHERE job_id = $${paramIndex}
+          RETURNING *
+        `;
+
+        const result = await (transactionClient || pool).query(updateQuery, values);
+
+        // Fetch the location name for response
+        if (!locationName && result.rows[0].location_code) {
+          const locResult = await (transactionClient || pool).query(
+            "SELECT name FROM locations WHERE id = $1",
+            [result.rows[0].location_code]
+          );
+          locationName = locResult.rows[0]?.name || result.rows[0].location_code;
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        const mapping = {
+          ...result.rows[0],
+          location_name: locationName,
+        };
+
+        res.json({
+          message: "Job location mapping updated successfully",
+          mapping,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error updating job location mapping:", error);
+        res.status(500).json({
+          message: "Error updating job location mapping",
+          error: error.message,
+        });
       }
-
-      await pool.query("COMMIT");
-
-      const mapping = {
-        ...result.rows[0],
-        location_name: locationName,
-      };
-
-      res.json({
-        message: "Job location mapping updated successfully",
-        mapping,
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error updating job location mapping:", error);
-      res.status(500).json({
-        message: "Error updating job location mapping",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // DELETE /:jobId - Remove location mapping for a job
   router.delete("/:jobId", async (req, res) => {
-    const { jobId } = req.params;
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { jobId } = req.params;
 
-      const deleteQuery = `
-        DELETE FROM job_location_mappings
-        WHERE job_id = $1
-        RETURNING *
-      `;
-      const result = await pool.query(deleteQuery, [jobId]);
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      if (result.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Job location mapping not found" });
+        const deleteQuery = `
+          DELETE FROM job_location_mappings
+          WHERE job_id = $1
+          RETURNING *
+        `;
+        const result = await (transactionClient || pool).query(deleteQuery, [jobId]);
+
+        if (result.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Job location mapping not found" });
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.json({
+          message: "Job location mapping deleted successfully",
+          deleted: result.rows[0],
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error deleting job location mapping:", error);
+        res.status(500).json({
+          message: "Error deleting job location mapping",
+          error: error.message,
+        });
       }
-
-      await pool.query("COMMIT");
-
-      res.json({
-        message: "Job location mapping deleted successfully",
-        deleted: result.rows[0],
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error deleting job location mapping:", error);
-      res.status(500).json({
-        message: "Error deleting job location mapping",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // POST /batch - Batch create/update mappings
   router.post("/batch", async (req, res) => {
-    const { mappings } = req.body;
-
-    if (!mappings || !Array.isArray(mappings) || mappings.length === 0) {
-      return res.status(400).json({
-        message: "An array of mappings is required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Fetch valid location codes from DB
-      const locationMap = await getLocationMap(pool);
-      const validLocationCodes = Object.keys(locationMap);
+      const { mappings } = req.body;
 
-      // Validate all entries
-      for (const entry of mappings) {
-        const { job_id, location_code } = entry;
-        if (!job_id || !location_code) {
-          return res.status(400).json({
-            message: "All entries must have job_id and location_code",
-            invalid_entry: entry,
-          });
-        }
-        if (!validLocationCodes.includes(location_code)) {
-          return res.status(400).json({
-            message: `Invalid location_code: ${location_code}. Valid codes are: ${validLocationCodes.join(", ")}`,
-            invalid_entry: entry,
-          });
-        }
-      }
-
-      await pool.query("BEGIN");
-
-      const results = [];
-      const errors = [];
-
-      for (const entry of mappings) {
-        const { job_id, location_code, is_active = true } = entry;
-
-        try {
-          // Upsert - insert or update if exists
-          const upsertQuery = `
-            INSERT INTO job_location_mappings (job_id, location_code, is_active)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (job_id)
-            DO UPDATE SET
-              location_code = EXCLUDED.location_code,
-              is_active = EXCLUDED.is_active,
-              updated_at = CURRENT_TIMESTAMP
-            RETURNING *
-          `;
-          const result = await pool.query(upsertQuery, [job_id, location_code, is_active]);
-          results.push({
-            ...result.rows[0],
-            location_name: locationMap[location_code],
-          });
-        } catch (error) {
-          errors.push({
-            job_id,
-            location_code,
-            message: error.code === "23503" ? "Invalid job_id" : error.message,
-          });
-        }
-      }
-
-      if (results.length > 0) {
-        await pool.query("COMMIT");
-        res.status(200).json({
-          message: `Successfully processed ${results.length} of ${mappings.length} mappings`,
-          mappings: results,
-          errors: errors.length > 0 ? errors : undefined,
+      if (!mappings || !Array.isArray(mappings) || mappings.length === 0) {
+        return res.status(400).json({
+          message: "An array of mappings is required",
         });
-      } else {
-        await pool.query("ROLLBACK");
-        res.status(400).json({
-          message: "Failed to process any mappings",
-          errors,
+      }
+
+      try {
+        // Fetch valid location codes from DB
+        const locationMap = await getLocationMap((transactionClient || pool));
+        const validLocationCodes = Object.keys(locationMap);
+
+        // Validate all entries
+        for (const entry of mappings) {
+          const { job_id, location_code } = entry;
+          if (!job_id || !location_code) {
+            return res.status(400).json({
+              message: "All entries must have job_id and location_code",
+              invalid_entry: entry,
+            });
+          }
+          if (!validLocationCodes.includes(location_code)) {
+            return res.status(400).json({
+              message: `Invalid location_code: ${location_code}. Valid codes are: ${validLocationCodes.join(", ")}`,
+              invalid_entry: entry,
+            });
+          }
+        }
+
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
+
+        const results = [];
+        const errors = [];
+
+        for (const entry of mappings) {
+          const { job_id, location_code, is_active = true } = entry;
+
+          await transactionClient.query("SAVEPOINT security_batch_item");
+          try {
+            // Upsert - insert or update if exists
+            const upsertQuery = `
+              INSERT INTO job_location_mappings (job_id, location_code, is_active)
+              VALUES ($1, $2, $3)
+              ON CONFLICT (job_id)
+              DO UPDATE SET
+                location_code = EXCLUDED.location_code,
+                is_active = EXCLUDED.is_active,
+                updated_at = CURRENT_TIMESTAMP
+              RETURNING *
+            `;
+            const result = await (transactionClient || pool).query(upsertQuery, [job_id, location_code, is_active]);
+            results.push({
+              ...result.rows[0],
+              location_name: locationMap[location_code],
+            });
+          } catch (error) {
+            await transactionClient.query("ROLLBACK TO SAVEPOINT security_batch_item");
+            errors.push({
+              job_id,
+              location_code,
+              message: error.code === "23503" ? "Invalid job_id" : error.message,
+            });
+          } finally {
+            await transactionClient.query("RELEASE SAVEPOINT security_batch_item");
+          }
+        }
+
+        if (results.length > 0) {
+          if (transactionClient) {
+            await transactionClient.query("COMMIT");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          res.status(200).json({
+            message: `Successfully processed ${results.length} of ${mappings.length} mappings`,
+            mappings: results,
+            errors: errors.length > 0 ? errors : undefined,
+          });
+        } else {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          res.status(400).json({
+            message: "Failed to process any mappings",
+            errors,
+          });
+        }
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error in batch mapping:", error);
+        res.status(500).json({
+          message: "Error processing batch mapping",
+          error: error.message,
         });
       }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error in batch mapping:", error);
-      res.status(500).json({
-        message: "Error processing batch mapping",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 

@@ -9,6 +9,9 @@
 
 # misc
 .env
+.env.*
+!.env.example
+!.env.*.example
 dev/docker-compose.yml
 prod/docker-compose.yml
 

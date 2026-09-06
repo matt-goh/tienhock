@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const login = async (ic_no: string, password: string) => {
+  const login = async (ic_no: string, password: string): Promise<void> => {
     try {
       const session = await sessionService.login(ic_no, password);
       if (session.user) {

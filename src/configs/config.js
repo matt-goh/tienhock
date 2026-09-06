@@ -20,9 +20,14 @@ const getDefaultApiBaseUrl = () => {
   const env = isBrowser
     ? (import.meta.env?.MODE || "development")
     : (process.env.NODE_ENV || "development");
-  return env === "development"
-    ? "http://localhost:5000"
-    : "https://api.tienhock.com";
+  if (env === "development") {
+    // Keep the frontend and API on the same site for Strict session cookies.
+    const hostname = isBrowser && window.location.hostname === "127.0.0.1"
+      ? "127.0.0.1"
+      : "localhost";
+    return `http://${hostname}:5000`;
+  }
+  return "https://api.tienhock.com";
 };
 
 export const {

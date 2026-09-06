@@ -1,0 +1,156 @@
+{
+  "date": "2026-09-06",
+  "scope": "Deployment prerequisites prepared; new application not deployed",
+  "productionCodeRevision": "cc3a7f07ae956d372a1884015cc6e838ea252950",
+  "runtimeDatabaseRole": {
+    "name": "tienhock_app",
+    "database": "tienhock_prod",
+    "created": true,
+    "loginEnabled": true,
+    "superuser": false,
+    "createDatabase": false,
+    "createRole": false,
+    "replication": false,
+    "bypassRowSecurity": false,
+    "startupPrivilegePreflightPassed": true,
+    "productionPoolTlsConnectionPassed": true,
+    "businessTableGrants": {
+      "public": 100,
+      "greentarget": 49,
+      "jellypolly": 36
+    },
+    "runtimeRoleDumpCreationPassed": true
+  },
+  "deploymentSecret": {
+    "name": "ERP_DB_PASSWORD",
+    "created": true,
+    "githubApiStatus": 201,
+    "updatedAt": "2026-09-06T04:11:39Z",
+    "workflowMapsTo": "DB_PASSWORD",
+    "previousSecretUnchanged": true
+  },
+  "productionAdministratorIdsVerified": [
+    "MILTI",
+    "TIMOTHY.G",
+    "HELEN",
+    "MATTHEW"
+  ],
+  "recovery": {
+    "localDirectory": "C:\\Users\\matia\\TienHock-Recovery\\2026-09-06",
+    "serverDirectory": "/var/backups/postgres/security-rollout-2026-09-06",
+    "dumpBytes": 5056352,
+    "dumpSha256": "452fbb5b09ee9d5670e4cf4ca2af830c241867ec1d17e634b5099849c1ee373f",
+    "localHashMatches": true,
+    "restoredBusinessTables": 185,
+    "sessionsExcluded": true,
+    "tablesCompared": 184,
+    "rowCountMismatches": [],
+    "journalTotalsMatch": true,
+    "referencedSupportingDocuments": 0,
+    "testDatabaseRemoved": true
+  },
+  "candidateBackend": {
+    "sourceArchiveSha256": "8b138ee145859f3a41b44502b1adb27ed14bf897282934907ede114664449e55",
+    "sourceArchiveFiles": 725,
+    "nodeVersion": "20.19.6",
+    "databaseVersion": "16.15",
+    "boundTo": "127.0.0.1:5055",
+    "processUser": "tienhock",
+    "database": "isolated restored copy",
+    "stoppedAfterChecks": true,
+    "candidateStarted": true,
+    "externalIntegrationCredentialsProvided": false,
+    "mobileReads": [
+      {
+        "path": "/api/staffs/get-salesmen?fields=minimal",
+        "status": 200
+      },
+      {
+        "path": "/api/invoices/ids",
+        "status": 200
+      },
+      {
+        "path": "/api/customers/get-customers",
+        "status": 200
+      },
+      {
+        "path": "/api/products?all&includeInactive=true",
+        "status": 200
+      },
+      {
+        "path": "/api/customer-products/all",
+        "status": 200
+      }
+    ],
+    "officeLogin": true,
+    "officeReads": [
+      {
+        "path": "/api/sessions/state",
+        "status": 200
+      },
+      {
+        "path": "/api/staffs",
+        "status": 200
+      },
+      {
+        "path": "/api/products",
+        "status": 200
+      },
+      {
+        "path": "/api/customers",
+        "status": 200
+      },
+      {
+        "path": "/greentarget/api/customers",
+        "status": 200
+      },
+      {
+        "path": "/jellypolly/api/staffs",
+        "status": 200
+      }
+    ],
+    "negativeChecks": [
+      {
+        "path": "/api/staffs/get-salesmen?fields=full",
+        "status": 403
+      },
+      {
+        "path": "/api/backup/list",
+        "status": 403
+      },
+      {
+        "path": "/api/sessions/state",
+        "status": 403
+      }
+    ]
+  },
+  "nginx": {
+    "existingHelperInstalled": true,
+    "existingConfigValid": true,
+    "candidateConfigValid": true,
+    "liveConfigReloaded": false
+  },
+  "workflowYamlParsed": true,
+  "workflowCredentialMappingVerified": true,
+  "notPerformed": [
+    "frontend build/type check/lint",
+    "full business workflow regression",
+    "installed-phone verification",
+    "mobile invoice persistence test",
+    "external MyInvois submission",
+    "Cloudflare Pages deployment",
+    "PM2 application deployment/restart",
+    "provider credential rotation",
+    "permanent backup retention/immutability policy"
+  ],
+  "liveApplication": {
+    "processIdBefore": 2745956,
+    "processIdAfter": 2745956,
+    "environmentUnchanged": true,
+    "mobileDigestUnchanged": true,
+    "databaseRoleUntilDeployment": "postgres",
+    "publicRestoreStatus": "IDLE",
+    "applicationDeployed": false
+  },
+  "temporaryCandidateDirectoryRemoved": true
+}

@@ -1,3 +1,4 @@
+import { isSecurityAdmin, logSecurityAction } from "../../middleware/security.js";
 // src/routes/staff.js
 import { Router } from "express";
 import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
@@ -19,6 +20,21 @@ export default function (pool) {
     return jobArray.includes("OFFICE");
   }
 
+  /** Reuse the provisioning administrator's existing shared OFFICE credential.
+   * @param {{ query: Function }} executor
+   * @param {string} administratorId
+   * @returns {Promise<string>}
+   */
+  async function getSharedOfficePassword(executor, administratorId) {
+    if (!isSecurityAdmin(administratorId)) throw new Error("Security administrator access required");
+    const result = await executor.query(`SELECT password FROM public.staffs WHERE id = $1 AND job ? 'OFFICE'
+      AND (date_resigned IS NULL OR date_resigned > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')::date)`, [administratorId]);
+    /** @type {unknown} */
+    const password = result.rows[0]?.password;
+    if (typeof password !== "string" || !password) throw new Error("Administrator login credential is unavailable");
+    return password;
+  }
+
   function getStaffIdValidationError(id, fieldName = "Staff ID") {
     if (!id || typeof id !== "string") {
       return `${fieldName} is required`;
@@ -31,8 +47,6 @@ export default function (pool) {
     return null;
   }
 
-  // Default password hash for OFFICE staff
-  const DEFAULT_PASSWORD_HASH = "$2a$10$LCpAl1V5h9xwjFrRtlIiD.jg.ZgCba4n7tUHFFxqNZTHjXh.9IQYy";
 
   // Get staff members
   router.get("/", async (req, res) => {
@@ -174,6 +188,9 @@ export default function (pool) {
         return res.status(400).json({ message: idValidationError });
       }
 
+      if ((shouldSetPassword(job) || isSecurityAdmin(id)) && !isSecurityAdmin(req.staffId)) {
+        return res.status(403).json({ message: "Only security administrators can create office accounts" });
+      }
       // Check for duplicate ID
       const isDuplicateId = await checkDuplicateStaffId(id);
       if (isDuplicateId) {
@@ -182,9 +199,8 @@ export default function (pool) {
           .json({ message: "A staff member with this ID already exists" });
       }
 
-      // Check if staff has OFFICE job and set password accordingly
-      const hasOfficeJob = shouldSetPassword(job);
-      const password = hasOfficeJob ? DEFAULT_PASSWORD_HASH : null;
+      // Preserve the company's shared-password workflow without a credential in source.
+      const password = shouldSetPassword(job) ? await getSharedOfficePassword(pool, req.staffId) : null;
 
       // Check if there are existing staff with the same name and get their head_staff_id
       let headStaffId = null;
@@ -256,7 +272,7 @@ export default function (pool) {
 
       res.status(201).json({
         message: "Staff member created successfully",
-        staff: result.rows[0],
+        staff: { ...result.rows[0], password: undefined },
       });
     } catch (error) {
       console.error("Error creating staff member:", error);
@@ -510,6 +526,9 @@ export default function (pool) {
   // Batch update staff jobs (MUST be before /:id route)
   router.put("/batch-job-update", async (req, res) => {
     const { jobId, addEmployees, removeEmployees } = req.body;
+    if (jobId === "OFFICE" && !isSecurityAdmin(req.staffId)) {
+      return res.status(403).json({ message: "Only security administrators can change office access" });
+    }
 
     if (!jobId) {
       return res.status(400).json({ message: "Job ID is required" });
@@ -522,6 +541,10 @@ export default function (pool) {
 
         let addedCount = 0;
         let removedCount = 0;
+        /** @type {string|null} */
+        const sharedOfficePassword = jobId === "OFFICE" && addEmployees?.length
+          ? await getSharedOfficePassword(client, req.staffId)
+          : null;
 
         // Add job to employees
         if (addEmployees && addEmployees.length > 0) {
@@ -557,7 +580,14 @@ export default function (pool) {
           }
         }
 
+        if (jobId === "OFFICE") {
+          const affected = [...(addEmployees || []), ...(removeEmployees || [])];
+          if (sharedOfficePassword) await client.query("UPDATE staffs SET password = COALESCE(password, $2) WHERE id = ANY($1) AND job ? 'OFFICE'", [addEmployees || [], sharedOfficePassword]);
+          await client.query("UPDATE active_sessions SET status = 'ended' WHERE staff_id = ANY($1)", [affected]);
+          await client.query("UPDATE staffs SET password = NULL WHERE id = ANY($1) AND NOT (job ? 'OFFICE')", [removeEmployees || []]);
+        }
         await client.query("COMMIT");
+        if (jobId === "OFFICE") logSecurityAction(req, "office_membership_changed");
 
         // Invalidate cache
         cache.invalidatePrefix(CACHE_KEYS.STAFFS);
@@ -709,6 +739,17 @@ export default function (pool) {
       try {
         await client.query("BEGIN");
 
+        const previousResult = await client.query("SELECT *, date_resigned IS DISTINCT FROM $2::date AS resignation_changed FROM staffs WHERE id = $1 FOR UPDATE", [id, dateResigned || null]);
+        const previous = previousResult.rows[0];
+        if (!previous) throw new Error("Staff member not found");
+        const previousOffice = shouldSetPassword(previous.job);
+        const nextOffice = shouldSetPassword(job);
+        const accessChanged = previousOffice !== nextOffice || ((previousOffice || nextOffice) &&
+          ((newId && newId !== id) || (icNo || null) !== (previous.ic_no || null) || previous.resignation_changed));
+        if ((accessChanged || (newId !== id && isSecurityAdmin(newId))) && !isSecurityAdmin(req.staffId)) {
+          await client.query("ROLLBACK");
+          return res.status(403).json({ message: "Only security administrators can change login identity or office access" });
+        }
         let updateId = id;
         if (newId && newId !== id) {
           // Check if the new ID already exists
@@ -720,9 +761,11 @@ export default function (pool) {
           updateId = newId;
         }
 
-        // Check if staff has OFFICE job and set password accordingly
+        // Keep existing credentials; administrators provision new OFFICE access.
         const hasOfficeJob = shouldSetPassword(job);
-        const password = hasOfficeJob ? DEFAULT_PASSWORD_HASH : null;
+        const password = hasOfficeJob
+          ? (previousOffice ? previous.password : await getSharedOfficePassword(client, req.staffId))
+          : null;
 
         const query = `
           UPDATE staffs
@@ -774,6 +817,10 @@ export default function (pool) {
         ];
 
         const result = await client.query(query, values);
+        if (accessChanged) {
+          await client.query("UPDATE active_sessions SET status = 'ended' WHERE staff_id = ANY($1)", [[id, updateId]]);
+
+        }
 
         if (result.rows.length === 0) {
           throw new Error("Staff member not found");
@@ -781,12 +828,14 @@ export default function (pool) {
 
         await client.query("COMMIT");
 
+        if (accessChanged) logSecurityAction(req, "account_access_changed", updateId);
+
         // Invalidate cache
         cache.invalidatePrefix(CACHE_KEYS.STAFFS);
 
         res.json({
           message: "Staff member updated successfully",
-          staff: result.rows[0],
+          staff: { ...result.rows[0], password: undefined },
         });
       } catch (error) {
         await client.query("ROLLBACK");
@@ -811,6 +860,12 @@ export default function (pool) {
       try {
         await client.query("BEGIN");
 
+        const target = await client.query("SELECT job FROM staffs WHERE id = $1 FOR UPDATE", [id]);
+        if ((shouldSetPassword(target.rows[0]?.job) || isSecurityAdmin(id)) && !isSecurityAdmin(req.staffId)) {
+          await client.query("ROLLBACK");
+          return res.status(403).json({ message: "Only security administrators can delete office accounts" });
+        }
+        await client.query("UPDATE active_sessions SET status = 'ended' WHERE staff_id = $1", [id]);
         // Delete related records from dependent tables first
         await client.query(
           "DELETE FROM employee_leave_balances WHERE employee_id = $1",
@@ -837,7 +892,7 @@ export default function (pool) {
 
         res.json({
           message: "Staff member deleted successfully",
-          staff: result.rows[0],
+          staff: { ...result.rows[0], password: undefined },
         });
       } catch (error) {
         await client.query("ROLLBACK");

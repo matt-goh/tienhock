@@ -2,8 +2,9 @@
 // S3 backup utilities for syncing PostgreSQL backups to AWS S3
 
 import { S3Client, PutObjectCommand, ListObjectsV2Command, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { randomBytes } from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
+import { backupsUseDocker, backupDirectory, backupFilePath, backupCommand, validBackupFilename, assertBackupFile, listLocalBackupFiles, createLocalBackup } from './backup-files.js';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -20,7 +21,6 @@ import {
   NODE_ENV
 } from '../configs/config.js';
 
-const execAsync = promisify(exec);
 
 // Initialize S3 client (lazy - only when needed)
 let s3Client = null;
@@ -106,325 +106,118 @@ export async function deleteObjectFromS3(s3Key) {
   return true;
 }
 
-// Check if we should use docker exec (only for Windows/Mac development)
-const shouldUseDockerExec = () => {
-  // On Windows/Mac, we use docker exec to run commands in the DB container
-  // On production Linux (Hetzner), we run commands directly (no Docker)
-  return (process.platform === 'win32' || process.platform === 'darwin');
-};
-
-// Get Docker container name based on environment
-const getContainerName = () => {
-  const env = NODE_ENV || 'development';
-  if (env === 'development') return 'tienhock_dev_db';
-  if (env === 'production') return 'tienhock_prod_db';
-  return 'tienhock_dev_db';
-};
-
-// Execute a command - either directly or via docker exec
-const executeCommand = async (command, options = {}) => {
-  if (shouldUseDockerExec()) {
-    // Running on Windows/Mac dev, use docker exec
-    const containerName = getContainerName();
-    const dockerCommand = `docker exec ${containerName} bash -c "${command.replace(/"/g, '\\"')}"`;
-    return execAsync(dockerCommand, options);
-  } else {
-    // Running on Linux (production Hetzner or Docker container), execute directly
-    return execAsync(command, options);
-  }
-};
-
-/**
- * Upload a backup file to S3
- * @param {string} localFilePath - Full path to the local backup file
- * @param {string} filename - Filename for S3 key
- * @param {string} env - Environment (development/production)
- * @returns {Promise<boolean>} - True if upload succeeded, false if skipped
- */
-export async function uploadBackupToS3(localFilePath, filename, env) {
-  if (!isS3BackupEnabled()) {
-    // Silently skip - don't log to avoid noise when S3 is intentionally disabled
-    return false;
-  }
-
-  try {
-    const client = getS3Client();
-    if (!client) {
-      console.warn('[S3 Backup] S3 client not initialized');
-      return false;
-    }
-    const s3Key = `${env}/${filename}`;
-
-    // Read file from Docker container or local filesystem
-    let fileBuffer;
-
-    if (shouldUseDockerExec()) {
-      // Running on Windows/Mac host, read via docker exec and pipe
-      const { stdout } = await execAsync(
-        `docker exec ${getContainerName()} cat "${localFilePath}"`,
-        { encoding: 'buffer', maxBuffer: 50 * 1024 * 1024 } // 50MB buffer
-      );
-      fileBuffer = stdout;
-    } else {
-      // Running on Linux (production Hetzner), read directly from filesystem
-      fileBuffer = fs.readFileSync(localFilePath);
-    }
-
-    await client.send(new PutObjectCommand({
-      Bucket: S3_BUCKET_NAME,
-      Key: s3Key,
-      Body: fileBuffer,
-      ContentType: 'application/gzip',
-      Metadata: {
-        'backup-env': env,
-        'backup-date': new Date().toISOString(),
-      },
-    }));
-
-    console.log(`[S3 Backup] Uploaded: ${s3Key}`);
-    return true;
-  } catch (error) {
-    console.warn(`[S3 Backup] Upload failed: ${error.message}`);
-    return false;
-  }
-}
-
-/**
- * List all backups in S3 for an environment
- * @param {string} env - Environment (development/production)
- * @returns {Promise<Array>} - Array of backup objects
- */
+/** @typedef {{key: string, filename: string, size: number, lastModified: Date}} BackupObject */
+/** @param {string} env @returns {Promise<BackupObject[]>} */
 export async function listS3Backups(env) {
-  if (!isS3BackupEnabled()) {
-    return [];
-  }
-
-  try {
-    const client = getS3Client();
-    const response = await client.send(new ListObjectsV2Command({
-      Bucket: S3_BUCKET_NAME,
-      Prefix: `${env}/`,
-    }));
-
-    return (response.Contents || []).map(obj => ({
-      key: obj.Key,
-      filename: path.basename(obj.Key),
-      size: obj.Size,
-      lastModified: obj.LastModified,
-    }));
-  } catch (error) {
-    console.warn(`[S3 Backup] Failed to list backups: ${error.message}`);
-    return [];
-  }
+  backupDirectory(env);
+  if (!isS3BackupEnabled()) return [];
+  const client = getRequiredS3Client();
+  /** @type {BackupObject[]} */
+  const backups = [];
+  /** @type {string|undefined} */
+  let token;
+  do {
+    const response = await client.send(new ListObjectsV2Command({ Bucket: S3_BUCKET_NAME, Prefix: `${env}/`, ContinuationToken: token }));
+    for (const object of response.Contents || []) {
+      const key = object.Key || '';
+      const relative = key.slice(env.length + 1);
+      const filename = relative.startsWith('backups/') ? relative.slice(8) : relative;
+      // Accept only new backups and legacy root-level dumps, never purchase attachments.
+      if (validBackupFilename(filename) && object.LastModified) backups.push({
+        key, filename, size: object.Size || 0, lastModified: object.LastModified,
+      });
+    }
+    token = response.IsTruncated ? response.NextContinuationToken : undefined;
+    if (response.IsTruncated && !token) throw new Error('S3 returned incomplete pagination');
+  } while (token);
+  return backups.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
 }
 
-/**
- * Delete a specific backup from S3
- * @param {string} filename - Filename to delete
- * @param {string} env - Environment (development/production)
- * @returns {Promise<boolean>} - True if deleted successfully
- */
+/** @param {string} localFilePath @param {string} filename @param {string} env @returns {Promise<boolean>} */
+export async function uploadBackupToS3(localFilePath, filename, env) {
+  if (localFilePath !== backupFilePath(env, filename)) throw new Error('Invalid backup path');
+  if (!isS3BackupEnabled()) return false;
+  await assertBackupFile(env, filename);
+  const size = Number((await backupCommand('stat', ['-c', '%s', localFilePath])).stdout);
+  const body = backupsUseDocker ? (await backupCommand('cat', [localFilePath], true)).stdout : fs.createReadStream(localFilePath);
+  try { await getRequiredS3Client().send(new PutObjectCommand({
+    Bucket: S3_BUCKET_NAME, Key: `${env}/backups/${filename}`, Body: body, ContentLength: size,
+    ContentType: 'application/octet-stream', ChecksumAlgorithm: 'SHA256',
+    Metadata: { 'backup-env': env, 'backup-date': new Date().toISOString() },
+  })); } finally { if (!backupsUseDocker) body.destroy(); }
+  return true;
+}
+
+/** @param {string} filename @param {string} env @returns {Promise<boolean>} */
 export async function deleteS3Backup(filename, env) {
-  if (!isS3BackupEnabled()) {
-    return false;
+  backupFilePath(env, filename);
+  if (!isS3BackupEnabled()) return false;
+  for (const backup of (await listS3Backups(env)).filter((entry) => entry.filename === filename)) {
+    await getRequiredS3Client().send(new DeleteObjectCommand({ Bucket: S3_BUCKET_NAME, Key: backup.key }));
   }
-
-  try {
-    const client = getS3Client();
-    const s3Key = `${env}/${filename}`;
-
-    await client.send(new DeleteObjectCommand({
-      Bucket: S3_BUCKET_NAME,
-      Key: s3Key,
-    }));
-
-    console.log(`[S3 Backup] Deleted: ${s3Key}`);
-    return true;
-  } catch (error) {
-    console.warn(`[S3 Backup] Failed to delete ${filename}: ${error.message}`);
-    return false;
-  }
+  return true;
 }
 
-/**
- * Download a backup from S3 to local filesystem
- * @param {string} filename - Filename to download
- * @param {string} env - Environment (development/production)
- * @param {string} localDir - Local directory to save to
- * @returns {Promise<string|null>} - Local file path if successful, null otherwise
- */
+/** @param {string} filename @param {string} env @param {string} localDir @returns {Promise<string|null>} */
 export async function downloadS3Backup(filename, env, localDir) {
-  if (!isS3BackupEnabled()) {
-    return null;
-  }
-
+  backupFilePath(env, filename);
+  if (!isS3BackupEnabled()) return null;
+  const backup = (await listS3Backups(env)).find((entry) => entry.filename === filename);
+  if (!backup) return null;
+  const response = await getRequiredS3Client().send(new GetObjectCommand({ Bucket: S3_BUCKET_NAME, Key: backup.key, ChecksumMode: 'ENABLED' }));
+  if (!response.Body) throw new Error('Empty backup response');
+  fs.mkdirSync(localDir, { recursive: true, mode: 0o700 });
+  const localPath = path.resolve(localDir, filename);
+  const temporaryPath = `${localPath}.${randomBytes(8).toString('hex')}.partial`;
   try {
-    const client = getS3Client();
-    const s3Key = `${env}/${filename}`;
-    const localPath = `${localDir}/${filename}`;
-
-    // Ensure local directory exists
-    if (!fs.existsSync(localDir)) {
-      fs.mkdirSync(localDir, { recursive: true });
-    }
-
-    const response = await client.send(new GetObjectCommand({
-      Bucket: S3_BUCKET_NAME,
-      Key: s3Key,
-    }));
-
-    // Convert stream to buffer and write to file
-    const chunks = [];
-    for await (const chunk of response.Body) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-    fs.writeFileSync(localPath, buffer);
-
-    console.log(`[S3 Backup] Downloaded: ${s3Key} -> ${localPath}`);
+    await pipeline(response.Body, fs.createWriteStream(temporaryPath, { flags: 'wx', mode: 0o600 }));
+    fs.renameSync(temporaryPath, localPath);
     return localPath;
-  } catch (error) {
-    console.warn(`[S3 Backup] Failed to download ${filename}: ${error.message}`);
-    return null;
-  }
+  } finally { fs.rmSync(temporaryPath, { force: true }); }
 }
 
-/**
- * Delete old S3 backups beyond retention period
- * @param {string} env - Environment (development/production)
- * @param {number} retentionDays - Number of days to retain backups (default: 1095 = 3 years)
- * @returns {Promise<number>} - Number of backups deleted
- */
+/** @param {string} env @param {number} [retentionDays] @returns {Promise<number>} */
 export async function deleteOldS3Backups(env, retentionDays = 1095) {
-  if (!isS3BackupEnabled()) {
-    return 0;
-  }
-
-  try {
-    const client = getS3Client();
-    const backups = await listS3Backups(env);
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
-
-    let deletedCount = 0;
-
-    for (const backup of backups) {
-      if (backup.lastModified < cutoffDate) {
-        await client.send(new DeleteObjectCommand({
-          Bucket: S3_BUCKET_NAME,
-          Key: backup.key,
-        }));
-        console.log(`[S3 Backup] Deleted old backup: ${backup.key}`);
-        deletedCount++;
-      }
+  if (!Number.isInteger(retentionDays) || retentionDays < 180) throw new Error('Invalid backup retention period');
+  const cutoff = Date.now() - retentionDays * 86400000;
+  let deleted = 0;
+  for (const backup of await listS3Backups(env)) {
+    if (backup.lastModified.getTime() < cutoff) {
+      await getRequiredS3Client().send(new DeleteObjectCommand({ Bucket: S3_BUCKET_NAME, Key: backup.key }));
+      deleted += 1;
     }
-
-    if (deletedCount > 0) {
-      console.log(`[S3 Backup] Cleaned up ${deletedCount} old backups`);
-    }
-
-    return deletedCount;
-  } catch (error) {
-    console.warn(`[S3 Backup] Failed to delete old backups: ${error.message}`);
-    return 0;
   }
+  return deleted;
 }
 
-/**
- * Sync all local backups to S3 (uploads missing files)
- * @param {string} localBackupDir - Local backup directory path
- * @param {string} env - Environment (development/production)
- * @returns {Promise<number>} - Number of backups synced
- */
+/** @param {string} localBackupDir @param {string} env @returns {Promise<number>} */
 export async function syncLocalToS3(localBackupDir, env) {
-  if (!isS3BackupEnabled()) {
-    // Silently skip - don't log to avoid noise when S3 is intentionally disabled
-    return 0;
+  if (localBackupDir !== backupDirectory(env)) throw new Error('Invalid backup directory');
+  if (!isS3BackupEnabled()) return 0;
+  const remoteNames = new Set((await listS3Backups(env)).map((entry) => entry.filename));
+  let count = 0;
+  for (const backup of await listLocalBackupFiles(env)) {
+    if (!remoteNames.has(backup.filename)) {
+      await uploadBackupToS3(backupFilePath(env, backup.filename), backup.filename, env);
+      count += 1;
+    }
   }
-
-  try {
-    // Get list of local backups
-    const listCommand = `find "${localBackupDir}" -maxdepth 1 -name "*.gz" -printf "%f\\n" 2>/dev/null || true`;
-    const { stdout } = await executeCommand(listCommand);
-    const localFiles = stdout.trim().split('\n').filter(f => f.trim());
-
-    if (localFiles.length === 0) {
-      console.log('[S3 Backup] No local backups to sync');
-      return 0;
-    }
-
-    // Get list of S3 backups
-    const s3Backups = await listS3Backups(env);
-    const s3Filenames = new Set(s3Backups.map(b => b.filename));
-
-    // Upload missing files
-    let syncedCount = 0;
-    for (const filename of localFiles) {
-      if (!s3Filenames.has(filename)) {
-        const localPath = `${localBackupDir}/${filename}`;
-        const uploaded = await uploadBackupToS3(localPath, filename, env);
-        if (uploaded) {
-          syncedCount++;
-        }
-      }
-    }
-
-    if (syncedCount > 0) {
-      console.log(`[S3 Backup] Synced ${syncedCount} backups to S3`);
-    } else {
-      console.log('[S3 Backup] All backups already synced');
-    }
-
-    return syncedCount;
-  } catch (error) {
-    console.warn(`[S3 Backup] Sync failed: ${error.message}`);
-    return 0;
-  }
+  return count;
 }
 
-/**
- * Create an automatic backup (weekly)
- * This replaces the monthly logic from backup.sh
- * @returns {Promise<boolean>} - True if backup succeeded
+/** A fresh daily dump; failures propagate to the scheduler and failed uploads keep the local copy.
+ * @returns {Promise<boolean>}
  */
 export async function createAutoBackup() {
   const env = NODE_ENV || 'development';
-  const backupDir = `/var/backups/postgres/${env}`;
-  const dbHost = shouldUseDockerExec() ? 'localhost' : DB_HOST;
-  const dbPort = shouldUseDockerExec() ? '5432' : DB_PORT;
-
-  try {
-    // Generate timestamp
-    const now = new Date();
-    const timestamp = now.getFullYear().toString() +
-      (now.getMonth() + 1).toString().padStart(2, '0') +
-      now.getDate().toString().padStart(2, '0') + '_' +
-      now.getHours().toString().padStart(2, '0') +
-      now.getMinutes().toString().padStart(2, '0') +
-      now.getSeconds().toString().padStart(2, '0');
-
-    const backupFilename = `auto_weekly_${DB_NAME}_${timestamp}.gz`;
-    const backupPath = `${backupDir}/${backupFilename}`;
-
-    console.log(`[Auto Backup] Creating weekly backup: ${backupFilename}`);
-
-    // Ensure backup directory exists and run pg_dump
-    const command = `mkdir -p "${backupDir}" && PGPASSWORD=${DB_PASSWORD} pg_dump -h ${dbHost} -p ${dbPort} -U ${DB_USER} -d ${DB_NAME} -F c -b -v -f "${backupPath}" && echo "[${env}] Auto weekly backup completed: ${backupFilename}" >> "${backupDir}/backup.log"`;
-
-    await executeCommand(command);
-
-    console.log(`[Auto Backup] Backup created successfully: ${backupFilename}`);
-
-    // Upload to S3 if configured
-    await uploadBackupToS3(backupPath, backupFilename, env);
-
-    // Delete local backups older than 180 days (same as backup.sh)
-    const cleanupCommand = `find "${backupDir}" -name "*.gz" -mtime +180 -delete 2>/dev/null || true`;
-    await executeCommand(cleanupCommand);
-
-    return true;
-  } catch (error) {
-    console.error(`[Auto Backup] Failed: ${error.message}`);
-    return false;
+  const backup = await createLocalBackup(env, 'auto_daily');
+  if (env === 'production' && !isS3BackupEnabled()) throw new Error('Off-server backup storage is not configured');
+  await uploadBackupToS3(backup.filePath, backup.filename, env);
+  // Retain local recovery copies for 180 days, and only prune after a successful backup.
+  for (const old of await listLocalBackupFiles(env)) {
+    if (old.lastModified.getTime() < Date.now() - 180 * 86400000) {
+      await backupCommand('rm', ['-f', '--', backupFilePath(env, old.filename)]);
+    }
   }
+  return true;
 }

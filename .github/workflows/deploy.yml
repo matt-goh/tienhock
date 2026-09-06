@@ -22,6 +22,17 @@ jobs:
             exit 1
           fi
 
+      - name: Validate runtime database credential
+        # ERP_DB_PASSWORD is separate so preparing this release does not change
+        # the credential used by the previous production workflow.
+        env:
+          ERP_DB_PASSWORD: ${{ secrets.ERP_DB_PASSWORD }}
+        run: |
+          if [[ -z "$ERP_DB_PASSWORD" ]]; then
+            echo "ERP_DB_PASSWORD must be configured for the tienhock_app database role." >&2
+            exit 1
+          fi
+
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
@@ -31,14 +42,15 @@ jobs:
 
       - name: Create env file
         run: |
+          umask 077
           cat > /tmp/.env << 'ENVFILE'
           NODE_ENV=production
           HOST=127.0.0.1
           PORT=5000
-          DB_USER=postgres
+          DB_USER=tienhock_app
           DB_HOST=localhost
           DB_NAME=tienhock_prod
-          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          DB_PASSWORD=${{ secrets.ERP_DB_PASSWORD }}
           DB_PORT=5432
           REACT_APP_API_BASE_URL=https://api.tienhock.com
           MYINVOIS_API_BASE_URL=https://api.myinvois.hasil.gov.my
@@ -90,6 +102,10 @@ jobs:
 
             # Build frontend
             NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
+            # Read-only preflight: fail before restarting if the security cutover is incomplete.
+            node --input-type=module -e 'import "dotenv/config"; const { Client } = await import("pg"); const { assertProductionDatabaseRole } = await import("./src/routes/utils/database-security.js"); const c = new Client({host:process.env.DB_HOST,port:Number(process.env.DB_PORT),user:process.env.DB_USER,password:process.env.DB_PASSWORD,database:process.env.DB_NAME}); await c.connect(); try { await assertProductionDatabaseRole(c); } finally { await c.end(); }'
+            chmod 600 .env
 
             # Restart application with PM2
             pm2 restart tienhock-server || pm2 start ecosystem.config.cjs

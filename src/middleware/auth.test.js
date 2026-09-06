@@ -1,14 +1,29 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { once } from "node:events";
 import test from "node:test";
+import express from "express";
 
 const mobileApiKey = "existing-mobile-key";
-process.env.NODE_ENV = "test";
+process.env.NODE_ENV = process.env.AUTH_TEST_ENV === "production" ? "production" : "test";
 process.env.MOBILE_API_KEY_SHA256 = createHash("sha256")
   .update(mobileApiKey, "utf8")
   .digest("hex");
 
 const { authMiddleware } = await import("./auth.js?auth-middleware-test");
+const { SESSION_COOKIE } = await import("./security.js");
+const { default: sessionsRouter } = await import("../routes/auth/sessions.js");
+const { default: staffRouter } = await import("../routes/catalogue/staffs.js");
+const { default: authRouter } = await import("../routes/auth/auth.js");
+const { default: bcrypt } = await import("bcryptjs");
+/** @type {string} */
+const browserOrigin = process.env.NODE_ENV === "production"
+  ? "https://tienhock.com"
+  : "http://localhost:3000";
+/** @type {string} */
+const browserSessionId = "s".repeat(43);
+/** @type {Record<string, string>} */
+const browserHeaders = { origin: browserOrigin, cookie: `${SESSION_COOKIE}=${browserSessionId}` };
 
 /**
  * @param {{
@@ -40,6 +55,8 @@ function createRequest(overrides = {}) {
     query: {},
     body: {},
     socket: { remoteAddress: "203.0.113.10" },
+    /** @param {string} name @returns {string | string[] | undefined} */
+    get(name) { return headers[name.toLowerCase()]; },
     ...overrides,
     headers,
     rawHeaders,
@@ -50,6 +67,7 @@ function createRequest(overrides = {}) {
  * @returns {{
  *   statusCode: number,
  *   body: unknown,
+ *   headersSent: boolean,
  *   status: (statusCode: number) => any,
  *   json: (body: unknown) => any
  * }}
@@ -58,12 +76,14 @@ function createResponse() {
   return {
     statusCode: 200,
     body: undefined,
+    headersSent: false,
     status(statusCode) {
       this.statusCode = statusCode;
       return this;
     },
     json(body) {
       this.body = body;
+      this.headersSent = true;
       return this;
     },
   };
@@ -329,8 +349,8 @@ test("rejects invalid, duplicate, and ambiguous authentication headers", async (
   assert.equal(ambiguous.res.statusCode, 400);
 });
 
-test("session initialization requires authentication and cannot switch identity", async () => {
-  const sessionId = "sess_1700000000000_abcdefg";
+test("session initialization requires a cookie and binds identity to its session", async () => {
+  const sessionId = browserSessionId;
   const authenticatedPool = createPool(async (queryText) => {
     if (queryText === "SELECT 1") {
       return { rows: [{}] };
@@ -352,7 +372,7 @@ test("session initialization requires authentication and cannot switch identity"
       method: "POST",
       originalUrl: "/api/sessions/initialize",
       path: "/sessions/initialize",
-      headers: { "x-session-id": sessionId },
+      headers: { origin: browserOrigin, "x-session-id": sessionId },
       body: { sessionId, staffId: null },
     })
   );
@@ -364,20 +384,21 @@ test("session initialization requires authentication and cannot switch identity"
       method: "POST",
       originalUrl: "/api/sessions/initialize",
       path: "/sessions/initialize",
-      headers: { "x-session-id": sessionId },
+      headers: browserHeaders,
       body: { sessionId, staffId: "OTHER_STAFF" },
     }),
     authenticatedPool
   );
-  assert.equal(impersonation.res.statusCode, 403);
-  assert.equal(impersonation.nextCalls, 0);
+  assert.equal(impersonation.nextCalls, 1);
+  assert.equal(impersonation.req.staffId, "OFFICE_1");
+  assert.equal(impersonation.req.session.session_id, sessionId);
 
   const matchingIdentity = await runMiddleware(
     createRequest({
       method: "POST",
       originalUrl: "/api/sessions/initialize",
       path: "/sessions/initialize",
-      headers: { "x-session-id": sessionId },
+      headers: browserHeaders,
       body: { sessionId, staffId: "OFFICE_1" },
     }),
     authenticatedPool
@@ -386,8 +407,9 @@ test("session initialization requires authentication and cannot switch identity"
 });
 
 test("session authentication requires an active office staff record", async () => {
+  /** @type {{ queryText: string, values?: unknown[] }[]} */
   const queries = [];
-  const sessionId = "sess_1700000000000_abcdefg";
+  const sessionId = browserSessionId;
   const pool = createPool(async (queryText, values) => {
     queries.push({ queryText, values });
     if (queryText === "SELECT 1") {
@@ -410,7 +432,7 @@ test("session authentication requires an active office staff record", async () =
     createRequest({
       originalUrl: "/api/dashboard",
       path: "/dashboard",
-      headers: { "x-session-id": sessionId },
+      headers: browserHeaders,
     }),
     pool
   );
@@ -426,16 +448,19 @@ test("session authentication requires an active office staff record", async () =
   assert.match(sessionQuery, /s\.staff_id IS NOT NULL/);
   assert.match(sessionQuery, /st\.job \? 'OFFICE'/);
   assert.match(sessionQuery, /st\.date_resigned/);
+  assert.match(sessionQuery, /s\.last_active > NOW\(\) - INTERVAL '8 hours'/);
+  assert.match(sessionQuery, /s\.created_at > NOW\(\) - INTERVAL '12 hours'/);
+  assert.deepEqual(queries.find(({ queryText }) => queryText.includes("FROM active_sessions"))?.values, [sessionId]);
 });
 
 test("session state requests do not bypass active-office validation", async () => {
+  /** @type {string[]} */
   const queries = [];
-  const sessionId = "sess_1700000000000_abcdefg";
   const result = await runMiddleware(
     createRequest({
-      originalUrl: `/api/sessions/state/${sessionId}`,
-      path: `/sessions/state/${sessionId}`,
-      headers: { "x-session-id": sessionId },
+      originalUrl: "/api/sessions/state",
+      path: "/sessions/state",
+      headers: browserHeaders,
     }),
     createPool(async (queryText) => {
       queries.push(queryText);
@@ -449,4 +474,231 @@ test("session state requests do not bypass active-office validation", async () =
     queries.some((queryText) => queryText.includes("FROM active_sessions")),
     true
   );
+});
+
+/** Run requests against an ephemeral loopback server, never the real ERP.
+ * @param {import('express').Express} app
+ * @param {(baseUrl: string) => Promise<void>} run
+ * @returns {Promise<void>}
+ */
+async function withHttpApp(app, run) {
+  const server = app.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  try {
+    const address = /** @type {import('node:net').AddressInfo} */ (server.address());
+    await run(`http://127.0.0.1:${address.port}`);
+  } finally {
+    const closed = once(server, "close");
+    server.close();
+    server.closeAllConnections();
+    await closed;
+  }
+}
+
+test("mobile HTTP routes work without office cookies or a browser origin", async () => {
+  const app = express();
+  const authenticate = authMiddleware(createPool(async () => {
+    throw new Error("Mobile authentication must not query office accounts or sessions");
+  }));
+  for (const prefix of ["/api", "/greentarget/api", "/jellypolly/api"]) app.use(prefix, authenticate);
+  app.use((req, res) => res.json({ mobile: req.apiKey === true }));
+  /** @type {[string, string][]} */
+  const routes = [
+    ["GET", "/api/staffs/get-salesmen"],
+    ["GET", "/api/staffs/get-salesmen?fields=minimal"],
+    ["GET", "/api/staffs/get-salesmen/?fields=minimal"],
+    ["GET", "/api/invoices/ids"],
+    ["GET", "/api/customers/get-customers"],
+    ["GET", "/api/products"],
+    ["GET", "/api/products?all"],
+    ["GET", "/api/products?all=true&includeInactive=true"],
+    ["GET", "/api/customer-products/all"],
+    ["GET", "/api/customer-products/all?customerId=NEW%20FRESHMART"],
+    ["POST", "/api/invoices/submit-invoices"],
+    ["POST", "/api/invoices/submit-invoices?fields=minimal"],
+    ["POST", "/api/einvoice/submit"],
+    ["POST", "/api/einvoice/submit?fields=minimal"],
+    ["DELETE", "/api/invoices/MOBILE-TEST_123"],
+  ];
+  await withHttpApp(app, async (baseUrl) => {
+    for (const [method, path] of routes) {
+      const response = await fetch(`${baseUrl}${path}`, { method, headers: { "api-key": mobileApiKey } });
+      assert.equal(response.status, 200, `${method} ${path}`);
+      assert.deepEqual(await response.json(), { mobile: true });
+      assert.equal(response.headers.get("set-cookie"), null);
+    }
+    const withOrigin = await fetch(`${baseUrl}/api/staffs/get-salesmen?fields=minimal`, {
+      headers: { "api-key": mobileApiKey, origin: "capacitor://localhost", cookie: "erp_session=stale" },
+    });
+    assert.equal(withOrigin.status, 200);
+    assert.deepEqual(await withOrigin.json(), { mobile: true });
+
+    for (const path of [
+      "/api/staffs/get-salesmen?fields=minimal&fields=minimal",
+      "/api/staffs/get-salesmen?fields[value]=minimal",
+      "/api/products?type=MEE",
+      "/api/backup/list",
+      "/greentarget/api/customers",
+      "/jellypolly/api/invoices",
+    ]) {
+      const response = await fetch(`${baseUrl}${path}`, { headers: { "api-key": mobileApiKey } });
+      assert.equal(response.status, 403, path);
+      await response.json();
+    }
+  });
+});
+
+test("salesman sync reaches the actual staff route and retains its response shape", async () => {
+  /** @type {{ id: string, name: string, email: string }[]} */
+  const salesmen = [{ id: "SALESMAN_FIXTURE", name: "Test Salesman", email: "salesman@example.invalid" }];
+  /** @type {string[]} */
+  const queries = [];
+  const pool = createPool(async (queryText) => {
+    queries.push(queryText);
+    assert.match(queryText, /job::jsonb \? 'SALESMAN'/);
+    return { rows: salesmen };
+  });
+  const app = express();
+  app.use("/api", authMiddleware(pool));
+  app.use("/api/staffs", staffRouter(pool));
+  await withHttpApp(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/staffs/get-salesmen?fields=minimal`, {
+      headers: { "api-key": mobileApiKey },
+    });
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), salesmen);
+  });
+  assert.equal(queries.length, 1);
+});
+
+test("office cookies require an approved origin and old bearer headers cannot log in", async () => {
+  for (const origin of [undefined, "https://untrusted.example"]) {
+    const result = await runMiddleware(createRequest({
+      headers: { cookie: browserHeaders.cookie, ...(origin ? { origin } : {}) },
+    }));
+    assert.equal(result.res.statusCode, 403);
+    assert.equal(result.nextCalls, 0);
+  }
+  for (const headers of [
+    { origin: browserOrigin, "x-session-id": browserSessionId },
+    { origin: browserOrigin, cookie: `${SESSION_COOKIE}=short` },
+    { origin: browserOrigin, cookie: `${browserHeaders.cookie}; ${browserHeaders.cookie}` },
+  ]) {
+    const result = await runMiddleware(createRequest({ headers }));
+    assert.equal(result.res.statusCode, 401);
+    assert.equal(result.nextCalls, 0);
+  }
+});
+
+test("session initialization HTTP response ignores a client-selected staff ID and token", async () => {
+  const pool = createPool(async (queryText) => {
+    if (queryText === "SELECT 1") return { rows: [{}] };
+    assert.match(queryText, /FROM active_sessions/);
+    return { rows: [{ session_id: browserSessionId, staff_id: "OFFICE_1", staff_name: "Office User",
+      staff_job: ["OFFICE"], last_active: new Date(), status: "active" }] };
+  });
+  const app = express();
+  app.use(express.json());
+  app.use("/api", authMiddleware(pool));
+  app.use("/api/sessions", sessionsRouter(pool));
+  await withHttpApp(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/sessions/initialize`, {
+      method: "POST", headers: { ...browserHeaders, "content-type": "application/json" },
+      body: JSON.stringify({ staffId: "MATTHEW", sessionId: "attacker-selected-token" }),
+    });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.equal(data.staff.id, "OFFICE_1");
+    assert.equal(data.staff.isSecurityAdmin, false);
+    assert.equal(data.sessionId, undefined);
+  });
+});
+
+test("existing shared-password login issues a secure session without a password migration", async () => {
+  const password = "test-only-shared-office-password";
+  const hash = await bcrypt.hash(password, 4);
+  /** @type {string[]} */
+  const queries = [];
+  /** @type {unknown} */
+  let issuedSession;
+  /** @type {boolean} */
+  let released = false;
+  const query = async (/** @type {string} */ queryText, /** @type {unknown[]} */ values = []) => {
+    queries.push(queryText);
+    assert.doesNotMatch(queryText, /password_reset_required|UPDATE staffs/);
+    if (queryText.includes("SELECT id, name")) return { rows: [{ id: "MATTHEW", name: "Admin Fixture", password: hash, ic_no: "test-office-ic", job: ["OFFICE"] }] };
+    if (queryText.includes("SELECT password")) return { rows: [{ password: hash }] };
+    if (queryText.includes("INSERT INTO active_sessions")) issuedSession = values[0];
+    return { rows: [] };
+  };
+  const pool = { ...createPool(query), connect: async () => ({ query, release: () => { released = true; } }) };
+  const app = express();
+  app.use(express.json());
+  app.use("/api/auth", authRouter(pool));
+  await withHttpApp(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/auth/login`, {
+      method: "POST", headers: { origin: browserOrigin, "content-type": "application/json" },
+      body: JSON.stringify({ ic_no: "test-office-ic", password, sessionId: "attacker-selected-token", new_password: "ignored-old-form-field" }),
+    });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.equal(data.user.id, "MATTHEW");
+    assert.equal(data.user.isSecurityAdmin, true);
+    assert.equal(data.user.password, undefined);
+    assert.equal(data.sessionId, "cookie-session");
+    assert.match(/** @type {string} */ (issuedSession), /^[A-Za-z0-9_-]{43}$/);
+    const cookie = response.headers.get("set-cookie") || "";
+    assert.ok(cookie.startsWith(`${SESSION_COOKIE}=${issuedSession};`));
+    assert.match(cookie, /HttpOnly/);
+    assert.match(cookie, /SameSite=Strict/);
+    assert.doesNotMatch(cookie, /Domain=/);
+    if (process.env.NODE_ENV === "production") assert.match(cookie, /Secure/);
+  });
+  assert.equal(released, true);
+  assert.ok(queries.includes("BEGIN") && queries.includes("COMMIT"));
+});
+
+test("only an administrator can provision an OFFICE account with the existing shared credential", async () => {
+  /** @type {string} */
+  const sharedHash = await bcrypt.hash("test-only-shared-office-password", 4);
+  /** @type {unknown} */
+  let provisionedPassword;
+  /** @type {number} */
+  let inserts = 0;
+  const pool = createPool(async (queryText, values = []) => {
+    if (queryText === "SELECT 1") return { rows: [{}] };
+    if (queryText.includes("FROM active_sessions")) return { rows: [{
+      session_id: values[0], staff_id: values[0] === browserSessionId ? "MATTHEW" : "OFFICE_1",
+      staff_name: "Office Fixture", staff_job: ["OFFICE"], last_active: new Date(), status: "active",
+    }] };
+    if (queryText.includes("SELECT password")) {
+      assert.deepEqual(values, ["MATTHEW"]);
+      return { rows: [{ password: sharedHash }] };
+    }
+    if (queryText.includes("INSERT INTO staffs")) {
+      provisionedPassword = values[27];
+      inserts += 1;
+      return { rows: [{ id: values[0], password: provisionedPassword }] };
+    }
+    return { rows: [] };
+  });
+  const app = express();
+  app.use(express.json());
+  app.use("/api", authMiddleware(pool));
+  app.use("/api/staffs", staffRouter(pool));
+  await withHttpApp(app, async (baseUrl) => {
+    const body = JSON.stringify({ id: "NEW_OFFICE_FIXTURE", name: "New Office", job: ["OFFICE"], location: [] });
+    const allowed = await fetch(`${baseUrl}/api/staffs`, {
+      method: "POST", headers: { ...browserHeaders, "content-type": "application/json" }, body,
+    });
+    assert.equal(allowed.status, 201);
+    assert.equal((await allowed.json()).staff.password, undefined);
+    assert.equal(provisionedPassword, sharedHash);
+    const forbidden = await fetch(`${baseUrl}/api/staffs`, {
+      method: "POST", headers: { origin: browserOrigin, cookie: `${SESSION_COOKIE}=${"o".repeat(43)}`, "content-type": "application/json" }, body,
+    });
+    assert.equal(forbidden.status, 403);
+    await forbidden.json();
+  });
+  assert.equal(inserts, 1);
 });

@@ -28,7 +28,7 @@ export default function (pool) {
 
     try {
       let query = `
-      SELECT 
+      SELECT
         dwl.*,
         COUNT(DISTINCT dwle.employee_id) as total_workers,
         CAST(COALESCE(SUM(dwle.total_hours), 0) AS NUMERIC(10, 2)) as total_hours
@@ -132,7 +132,7 @@ export default function (pool) {
 
       // Get leave records for this work log
       const leaveRecordsQuery = `
-      SELECT 
+      SELECT
         lr.*,
         CAST(lr.amount_paid AS NUMERIC(10, 2)) as amount_paid,
         s.name as employee_name
@@ -164,7 +164,7 @@ export default function (pool) {
       const entriesWithActivities = await Promise.all(
         entriesResult.rows.map(async (entry) => {
           const activitiesQuery = `
-          SELECT 
+          SELECT
             dwla.*,
             CAST(dwla.hours_applied AS NUMERIC(10, 2)) as hours_applied,
             CAST(dwla.units_produced AS NUMERIC(10, 2)) as units_produced,
@@ -236,214 +236,144 @@ export default function (pool) {
 
   // Update existing work log status
   router.put("/:id", async (req, res) => {
-    const { id } = req.params;
-    const {
-      logDate,
-      shift,
-      dayType,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries, // New field for leave data
-    } = req.body;
-
-    if (
-      (!employeeEntries || employeeEntries.length === 0) &&
-      (!leaveEntries || leaveEntries.length === 0)
-    ) {
-      return res.status(400).json({
-        message: "At least one employee entry or leave entry is required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
-
-      // Check if the work log exists and is not processed
-      const checkQuery = `
-      SELECT status FROM daily_work_logs WHERE id = $1
-    `;
-      const checkResult = await pool.query(checkQuery, [id]);
-
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Work log not found" });
-      }
-
-      if (checkResult.rows[0].status === "Processed") {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot edit processed work log",
-        });
-      }
-
-      // Update main work log
-      const updateQuery = `
-        UPDATE daily_work_logs
-        SET log_date = $1, shift = $2, day_type = $3, section = $4, 
-            context_data = $5, status = $6, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $7
-      `;
-
-      await pool.query(updateQuery, [
+      const { id } = req.params;
+      const {
         logDate,
         shift,
         dayType,
         section,
-        contextData || {},
+        contextData,
         status,
-        id,
-      ]);
+        employeeEntries,
+        leaveEntries, // New field for leave data
+      } = req.body;
 
-      // Clear out old leave records and work entries associated with this work log
-      await pool.query("DELETE FROM leave_records WHERE work_log_id = $1", [
-        id,
-      ]);
-      await pool.query(
-        "DELETE FROM daily_work_log_entries WHERE work_log_id = $1",
-        [id]
-      );
-
-      // Insert updated employee entries and activities
-      if (employeeEntries && employeeEntries.length > 0) {
-        for (const entry of employeeEntries) {
-          const { employeeId, jobType, hours, activities } = entry;
-
-          // Insert employee entry
-          const entryQuery = `
-          INSERT INTO daily_work_log_entries (
-            work_log_id, employee_id, job_id, total_hours,
-            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled,
-            force_ot_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-          RETURNING id
-        `;
-
-          const entryResult = await pool.query(entryQuery, [
-            id,
-            employeeId,
-            jobType,
-            hours,
-            entry.followingSalesmanId || null,
-            entry.muatMeeBags || 0,
-            entry.muatBihunBags || 0,
-            entry.locationType || "Local",
-            entry.isDoubled || false,
-            entry.forceOTHours || 0,
-          ]);
-
-          const entryId = entryResult.rows[0].id;
-
-          // Insert activities for this employee entry
-          if (activities && activities.length > 0) {
-            // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
-            const overtimeThreshold = getOvertimeThreshold(logDate);
-            const forceOT = entry.forceOTHours || 0;
-
-            for (const activity of activities) {
-              if (activity.isSelected) {
-                let hoursApplied = null;
-                if (activity.rateUnit === "Hour") {
-                  if (activity.payType === "Overtime") {
-                    // BH_OT_STIM (JAGA STIM) uses ONLY the forced-OT column; all
-                    // other OT pay codes use ONLY natural OT (hours beyond the
-                    // day's threshold). Mirrors calculateActivityAmount.ts so
-                    // hours_applied matches calculated_amount.
-                    hoursApplied =
-                      activity.payCodeId === "BH_OT_STIM"
-                        ? forceOT
-                        : Math.max(0, hours - overtimeThreshold);
-                  } else {
-                    // Regular hours capped at OT threshold so OT hours
-                    // are not double-counted in base pay quantity.
-                    hoursApplied = Math.min(hours, overtimeThreshold);
-                  }
-                }
-
-                const activityQuery = `
-                INSERT INTO daily_work_log_activities (
-                  log_entry_id, pay_code_id, hours_applied,
-                  units_produced, rate_used, calculated_amount,
-                  is_manually_added, foc_units
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-              `;
-
-                await pool.query(activityQuery, [
-                  entryId,
-                  activity.payCodeId,
-                  hoursApplied,
-                  activity.unitsProduced
-                    ? parseFloat(activity.unitsProduced)
-                    : null,
-                  parseFloat(activity.rate),
-                  parseFloat(activity.calculatedAmount),
-                  false,
-                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
-                ]);
-              }
-            }
-          }
-        }
+      if (
+        (!employeeEntries || employeeEntries.length === 0) &&
+        (!leaveEntries || leaveEntries.length === 0)
+      ) {
+        return res.status(400).json({
+          message: "At least one employee entry or leave entry is required",
+        });
       }
 
-      // Insert updated leave records if any
-      if (
-        leaveEntries &&
-        Array.isArray(leaveEntries) &&
-        leaveEntries.length > 0
-      ) {
-        for (const leave of leaveEntries) {
-          const { employeeId, leaveType, amount_paid, activities } = leave;
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-          // Get employee's primary job for the leave entry
-          const employeeJobQuery = `
-            SELECT job FROM staffs WHERE id = $1
-          `;
-          const employeeJobResult = await pool.query(employeeJobQuery, [employeeId]);
-          const employeeJobs = employeeJobResult.rows[0]?.job || [];
-          const primaryJob = employeeJobs.length > 0 ? employeeJobs[0] : null;
+        // Check if the work log exists and is not processed
+        const checkQuery = `
+        SELECT status FROM daily_work_logs WHERE id = $1
+      `;
+        const checkResult = await (transactionClient || pool).query(checkQuery, [id]);
 
-          if (!primaryJob) {
-            throw new Error(`Employee ${employeeId} has no job assigned`);
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
           }
+          return res.status(404).json({ message: "Work log not found" });
+        }
 
-          // Insert leave record
-          const leaveQuery = `
-            INSERT INTO leave_records (
-              employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
-            ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)
-          `;
-          await pool.query(leaveQuery, [
-            employeeId,
-            logDate,
-            leaveType,
-            id, // Use the existing work log ID from params
-            1.0,
-            amount_paid || 0,
-          ]);
+        if (checkResult.rows[0].status === "Processed") {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Cannot edit processed work log",
+          });
+        }
 
-          // Create a leave entry in daily_work_log_entries for activities
-          const leaveEntryQuery = `
+        // Update main work log
+        const updateQuery = `
+          UPDATE daily_work_logs
+          SET log_date = $1, shift = $2, day_type = $3, section = $4,
+              context_data = $5, status = $6, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $7
+        `;
+
+        await (transactionClient || pool).query(updateQuery, [
+          logDate,
+          shift,
+          dayType,
+          section,
+          contextData || {},
+          status,
+          id,
+        ]);
+
+        // Clear out old leave records and work entries associated with this work log
+        await (transactionClient || pool).query("DELETE FROM leave_records WHERE work_log_id = $1", [
+          id,
+        ]);
+        await (transactionClient || pool).query(
+          "DELETE FROM daily_work_log_entries WHERE work_log_id = $1",
+          [id]
+        );
+
+        // Insert updated employee entries and activities
+        if (employeeEntries && employeeEntries.length > 0) {
+          for (const entry of employeeEntries) {
+            const { employeeId, jobType, hours, activities } = entry;
+
+            // Insert employee entry
+            const entryQuery = `
             INSERT INTO daily_work_log_entries (
-              work_log_id, employee_id, job_id, total_hours
-            ) VALUES ($1, $2, $3, $4)
+              work_log_id, employee_id, job_id, total_hours,
+              following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled,
+              force_ot_hours
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
           `;
-          const leaveEntryResult = await pool.query(leaveEntryQuery, [
-            id,
-            employeeId,
-            primaryJob, // Use employee's primary job
-            8, // Standard 8 hours for leave
-          ]);
 
-          const leaveEntryId = leaveEntryResult.rows[0].id;
+            const entryResult = await (transactionClient || pool).query(entryQuery, [
+              id,
+              employeeId,
+              jobType,
+              hours,
+              entry.followingSalesmanId || null,
+              entry.muatMeeBags || 0,
+              entry.muatBihunBags || 0,
+              entry.locationType || "Local",
+              entry.isDoubled || false,
+              entry.forceOTHours || 0,
+            ]);
 
-          // Insert leave activities
-          if (activities && activities.length > 0) {
-            for (const activity of activities) {
-              if (activity.isSelected) {
-                const activityQuery = `
+            const entryId = entryResult.rows[0].id;
+
+            // Insert activities for this employee entry
+            if (activities && activities.length > 0) {
+              // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
+              const overtimeThreshold = getOvertimeThreshold(logDate);
+              const forceOT = entry.forceOTHours || 0;
+
+              for (const activity of activities) {
+                if (activity.isSelected) {
+                  let hoursApplied = null;
+                  if (activity.rateUnit === "Hour") {
+                    if (activity.payType === "Overtime") {
+                      // BH_OT_STIM (JAGA STIM) uses ONLY the forced-OT column; all
+                      // other OT pay codes use ONLY natural OT (hours beyond the
+                      // day's threshold). Mirrors calculateActivityAmount.ts so
+                      // hours_applied matches calculated_amount.
+                      hoursApplied =
+                        activity.payCodeId === "BH_OT_STIM"
+                          ? forceOT
+                          : Math.max(0, hours - overtimeThreshold);
+                    } else {
+                      // Regular hours capped at OT threshold so OT hours
+                      // are not double-counted in base pay quantity.
+                      hoursApplied = Math.min(hours, overtimeThreshold);
+                    }
+                  }
+
+                  const activityQuery = `
                   INSERT INTO daily_work_log_activities (
                     log_entry_id, pay_code_id, hours_applied,
                     units_produced, rate_used, calculated_amount,
@@ -451,281 +381,335 @@ export default function (pool) {
                   ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 `;
 
-                await pool.query(activityQuery, [
-                  leaveEntryId,
-                  activity.payCodeId,
-                  activity.hoursApplied,
-                  activity.unitsProduced || null,
-                  parseFloat(activity.rate),
-                  parseFloat(activity.calculatedAmount),
-                  false,
-                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
-                ]);
+                  await (transactionClient || pool).query(activityQuery, [
+                    entryId,
+                    activity.payCodeId,
+                    hoursApplied,
+                    activity.unitsProduced
+                      ? parseFloat(activity.unitsProduced)
+                      : null,
+                    parseFloat(activity.rate),
+                    parseFloat(activity.calculatedAmount),
+                    false,
+                    activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
+                  ]);
+                }
               }
             }
           }
         }
+
+        // Insert updated leave records if any
+        if (
+          leaveEntries &&
+          Array.isArray(leaveEntries) &&
+          leaveEntries.length > 0
+        ) {
+          for (const leave of leaveEntries) {
+            const { employeeId, leaveType, amount_paid, activities } = leave;
+
+            // Get employee's primary job for the leave entry
+            const employeeJobQuery = `
+              SELECT job FROM staffs WHERE id = $1
+            `;
+            const employeeJobResult = await (transactionClient || pool).query(employeeJobQuery, [employeeId]);
+            const employeeJobs = employeeJobResult.rows[0]?.job || [];
+            const primaryJob = employeeJobs.length > 0 ? employeeJobs[0] : null;
+
+            if (!primaryJob) {
+              throw new Error(`Employee ${employeeId} has no job assigned`);
+            }
+
+            // Insert leave record
+            const leaveQuery = `
+              INSERT INTO leave_records (
+                employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
+              ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)
+            `;
+            await (transactionClient || pool).query(leaveQuery, [
+              employeeId,
+              logDate,
+              leaveType,
+              id, // Use the existing work log ID from params
+              1.0,
+              amount_paid || 0,
+            ]);
+
+            // Create a leave entry in daily_work_log_entries for activities
+            const leaveEntryQuery = `
+              INSERT INTO daily_work_log_entries (
+                work_log_id, employee_id, job_id, total_hours
+              ) VALUES ($1, $2, $3, $4)
+              RETURNING id
+            `;
+            const leaveEntryResult = await (transactionClient || pool).query(leaveEntryQuery, [
+              id,
+              employeeId,
+              primaryJob, // Use employee's primary job
+              8, // Standard 8 hours for leave
+            ]);
+
+            const leaveEntryId = leaveEntryResult.rows[0].id;
+
+            // Insert leave activities
+            if (activities && activities.length > 0) {
+              for (const activity of activities) {
+                if (activity.isSelected) {
+                  const activityQuery = `
+                    INSERT INTO daily_work_log_activities (
+                      log_entry_id, pay_code_id, hours_applied,
+                      units_produced, rate_used, calculated_amount,
+                      is_manually_added, foc_units
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                  `;
+
+                  await (transactionClient || pool).query(activityQuery, [
+                    leaveEntryId,
+                    activity.payCodeId,
+                    activity.hoursApplied,
+                    activity.unitsProduced || null,
+                    parseFloat(activity.rate),
+                    parseFloat(activity.calculatedAmount),
+                    false,
+                    activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
+                  ]);
+                }
+              }
+            }
+          }
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.json({
+          message: "Work log updated successfully",
+          workLogId: id,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error updating daily work log:", error);
+        res.status(500).json({
+          message: "Error updating daily work log",
+          error: error.message,
+        });
       }
-
-      await pool.query("COMMIT");
-
-      res.json({
-        message: "Work log updated successfully",
-        workLogId: id,
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error updating daily work log:", error);
-      res.status(500).json({
-        message: "Error updating daily work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Delete work log (only if not processed)
   router.delete("/:id", async (req, res) => {
-    const { id } = req.params;
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { id } = req.params;
 
-      // Check if the work log is processed
-      const checkQuery = `
-      SELECT status FROM daily_work_logs WHERE id = $1
-    `;
-      const checkResult = await pool.query(checkQuery, [id]);
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Work log not found" });
-      }
+        // Check if the work log is processed
+        const checkQuery = `
+        SELECT status FROM daily_work_logs WHERE id = $1
+      `;
+        const checkResult = await (transactionClient || pool).query(checkQuery, [id]);
 
-      if (checkResult.rows[0].status === "Processed") {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot delete processed work log",
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Work log not found" });
+        }
+
+        if (checkResult.rows[0].status === "Processed") {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Cannot delete processed work log",
+          });
+        }
+
+        // Delete leave records first (foreign key constraint)
+        await (transactionClient || pool).query("DELETE FROM leave_records WHERE work_log_id = $1", [id]);
+
+        // Delete daily work log activities
+        await (transactionClient || pool).query(`
+          DELETE FROM daily_work_log_activities
+          WHERE log_entry_id IN (
+            SELECT id FROM daily_work_log_entries WHERE work_log_id = $1
+          )
+        `, [id]);
+
+        // Delete daily work log entries
+        await (transactionClient || pool).query("DELETE FROM daily_work_log_entries WHERE work_log_id = $1", [id]);
+
+        // Finally delete the work log
+        const deleteQuery = `
+        DELETE FROM daily_work_logs
+        WHERE id = $1
+        RETURNING id
+      `;
+
+        await (transactionClient || pool).query(deleteQuery, [id]);
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.json({ message: "Work log deleted successfully" });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error deleting work log:", error);
+        res.status(500).json({
+          message: "Error deleting work log",
+          error: error.message,
         });
       }
-
-      // Delete leave records first (foreign key constraint)
-      await pool.query("DELETE FROM leave_records WHERE work_log_id = $1", [id]);
-
-      // Delete daily work log activities
-      await pool.query(`
-        DELETE FROM daily_work_log_activities 
-        WHERE log_entry_id IN (
-          SELECT id FROM daily_work_log_entries WHERE work_log_id = $1
-        )
-      `, [id]);
-
-      // Delete daily work log entries
-      await pool.query("DELETE FROM daily_work_log_entries WHERE work_log_id = $1", [id]);
-
-      // Finally delete the work log
-      const deleteQuery = `
-      DELETE FROM daily_work_logs
-      WHERE id = $1
-      RETURNING id
-    `;
-
-      await pool.query(deleteQuery, [id]);
-      await pool.query("COMMIT");
-
-      res.json({ message: "Work log deleted successfully" });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error deleting work log:", error);
-      res.status(500).json({
-        message: "Error deleting work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Create a new daily work log
   router.post("/", async (req, res) => {
-    const {
-      logDate,
-      shift,
-      dayType,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries, // New field for leave data
-    } = req.body;
-
-    if (
-      (!employeeEntries || employeeEntries.length === 0) &&
-      (!leaveEntries || leaveEntries.length === 0)
-    ) {
-      return res.status(400).json({
-        message: "At least one employee entry or leave entry is required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
-
-      // Insert main work log
-      const workLogQuery = `
-        INSERT INTO daily_work_logs (
-          log_date, shift, day_type, section, context_data, status
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id
-      `;
-
-      const workLogResult = await pool.query(workLogQuery, [
+      const {
         logDate,
         shift,
         dayType,
         section,
-        contextData || {},
+        contextData,
         status,
-      ]);
+        employeeEntries,
+        leaveEntries, // New field for leave data
+      } = req.body;
 
-      const workLogId = workLogResult.rows[0].id;
+      if (
+        (!employeeEntries || employeeEntries.length === 0) &&
+        (!leaveEntries || leaveEntries.length === 0)
+      ) {
+        return res.status(400).json({
+          message: "At least one employee entry or leave entry is required",
+        });
+      }
 
-      // Insert employee entries and activities for working employees
-      if (employeeEntries && employeeEntries.length > 0) {
-        for (const entry of employeeEntries) {
-          const { employeeId, jobType, hours, activities } = entry;
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-          // Insert employee entry
-          const entryQuery = `
-          INSERT INTO daily_work_log_entries (
-            work_log_id, employee_id, job_id, total_hours,
-            following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled,
-            force_ot_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        // Insert main work log
+        const workLogQuery = `
+          INSERT INTO daily_work_logs (
+            log_date, shift, day_type, section, context_data, status
+          ) VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING id
         `;
 
-          const entryResult = await pool.query(entryQuery, [
-            workLogId,
-            employeeId,
-            jobType,
-            hours,
-            entry.followingSalesmanId || null,
-            entry.muatMeeBags || 0,
-            entry.muatBihunBags || 0,
-            entry.locationType || "Local",
-            entry.isDoubled || false,
-            entry.forceOTHours || 0,
-          ]);
+        const workLogResult = await (transactionClient || pool).query(workLogQuery, [
+          logDate,
+          shift,
+          dayType,
+          section,
+          contextData || {},
+          status,
+        ]);
 
-          const entryId = entryResult.rows[0].id;
+        const workLogId = workLogResult.rows[0].id;
 
-          // Insert activities for this employee entry
-          if (activities && activities.length > 0) {
-            // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
-            const overtimeThreshold = getOvertimeThreshold(logDate);
-            const forceOT = entry.forceOTHours || 0;
+        // Insert employee entries and activities for working employees
+        if (employeeEntries && employeeEntries.length > 0) {
+          for (const entry of employeeEntries) {
+            const { employeeId, jobType, hours, activities } = entry;
 
-            for (const activity of activities) {
-              if (activity.isSelected) {
-                let hoursApplied = null;
-                if (activity.rateUnit === "Hour") {
-                  if (activity.payType === "Overtime") {
-                    // BH_OT_STIM (JAGA STIM) uses ONLY the forced-OT column; all
-                    // other OT pay codes use ONLY natural OT (hours beyond the
-                    // day's threshold). Mirrors calculateActivityAmount.ts so
-                    // hours_applied matches calculated_amount.
-                    hoursApplied =
-                      activity.payCodeId === "BH_OT_STIM"
-                        ? forceOT
-                        : Math.max(0, hours - overtimeThreshold);
-                  } else {
-                    // Regular hours capped at OT threshold so OT hours
-                    // are not double-counted in base pay quantity.
-                    hoursApplied = Math.min(hours, overtimeThreshold);
-                  }
-                }
-
-                const activityQuery = `
-                INSERT INTO daily_work_log_activities (
-                  log_entry_id, pay_code_id, hours_applied,
-                  units_produced, rate_used, calculated_amount,
-                  is_manually_added, foc_units
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-              `;
-
-                await pool.query(activityQuery, [
-                  entryId,
-                  activity.payCodeId,
-                  hoursApplied,
-                  activity.unitsProduced
-                    ? parseFloat(activity.unitsProduced)
-                    : null,
-                  parseFloat(activity.rate),
-                  parseFloat(activity.calculatedAmount),
-                  false,
-                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
-                ]);
-              }
-            }
-          }
-        }
-      }
-
-      // Insert leave records if any
-      if (
-        leaveEntries &&
-        Array.isArray(leaveEntries) &&
-        leaveEntries.length > 0
-      ) {
-        for (const leave of leaveEntries) {
-          const { employeeId, leaveType, amount_paid, activities } = leave;
-
-          // Get employee's primary job for the leave entry
-          const employeeJobQuery = `
-            SELECT job FROM staffs WHERE id = $1
-          `;
-          const employeeJobResult = await pool.query(employeeJobQuery, [employeeId]);
-          const employeeJobs = employeeJobResult.rows[0]?.job || [];
-          const primaryJob = employeeJobs.length > 0 ? employeeJobs[0] : null;
-
-          if (!primaryJob) {
-            throw new Error(`Employee ${employeeId} has no job assigned`);
-          }
-
-          // Insert leave record
-          const leaveQuery = `
-            INSERT INTO leave_records (
-              employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
-            ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)
-          `;
-          await pool.query(leaveQuery, [
-            employeeId,
-            logDate,
-            leaveType,
-            workLogId,
-            1.0, // Assuming full day leave for now
-            amount_paid || 0,
-          ]);
-
-          // Create a leave entry in daily_work_log_entries for activities
-          const leaveEntryQuery = `
+            // Insert employee entry
+            const entryQuery = `
             INSERT INTO daily_work_log_entries (
-              work_log_id, employee_id, job_id, total_hours
-            ) VALUES ($1, $2, $3, $4)
+              work_log_id, employee_id, job_id, total_hours,
+              following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type, is_doubled,
+              force_ot_hours
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING id
           `;
-          const leaveEntryResult = await pool.query(leaveEntryQuery, [
-            workLogId,
-            employeeId,
-            primaryJob, // Use employee's primary job
-            8, // Standard 8 hours for leave
-          ]);
 
-          const leaveEntryId = leaveEntryResult.rows[0].id;
+            const entryResult = await (transactionClient || pool).query(entryQuery, [
+              workLogId,
+              employeeId,
+              jobType,
+              hours,
+              entry.followingSalesmanId || null,
+              entry.muatMeeBags || 0,
+              entry.muatBihunBags || 0,
+              entry.locationType || "Local",
+              entry.isDoubled || false,
+              entry.forceOTHours || 0,
+            ]);
 
-          // Insert leave activities
-          if (activities && activities.length > 0) {
-            for (const activity of activities) {
-              if (activity.isSelected) {
-                const activityQuery = `
+            const entryId = entryResult.rows[0].id;
+
+            // Insert activities for this employee entry
+            if (activities && activities.length > 0) {
+              // Get overtime threshold based on day (Saturday = 5 hours, others = 8 hours)
+              const overtimeThreshold = getOvertimeThreshold(logDate);
+              const forceOT = entry.forceOTHours || 0;
+
+              for (const activity of activities) {
+                if (activity.isSelected) {
+                  let hoursApplied = null;
+                  if (activity.rateUnit === "Hour") {
+                    if (activity.payType === "Overtime") {
+                      // BH_OT_STIM (JAGA STIM) uses ONLY the forced-OT column; all
+                      // other OT pay codes use ONLY natural OT (hours beyond the
+                      // day's threshold). Mirrors calculateActivityAmount.ts so
+                      // hours_applied matches calculated_amount.
+                      hoursApplied =
+                        activity.payCodeId === "BH_OT_STIM"
+                          ? forceOT
+                          : Math.max(0, hours - overtimeThreshold);
+                    } else {
+                      // Regular hours capped at OT threshold so OT hours
+                      // are not double-counted in base pay quantity.
+                      hoursApplied = Math.min(hours, overtimeThreshold);
+                    }
+                  }
+
+                  const activityQuery = `
                   INSERT INTO daily_work_log_activities (
                     log_entry_id, pay_code_id, hours_applied,
                     units_produced, rate_used, calculated_amount,
@@ -733,35 +717,136 @@ export default function (pool) {
                   ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 `;
 
-                await pool.query(activityQuery, [
-                  leaveEntryId,
-                  activity.payCodeId,
-                  activity.hoursApplied,
-                  activity.unitsProduced || null,
-                  parseFloat(activity.rate),
-                  parseFloat(activity.calculatedAmount),
-                  false,
-                  activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
-                ]);
+                  await (transactionClient || pool).query(activityQuery, [
+                    entryId,
+                    activity.payCodeId,
+                    hoursApplied,
+                    activity.unitsProduced
+                      ? parseFloat(activity.unitsProduced)
+                      : null,
+                    parseFloat(activity.rate),
+                    parseFloat(activity.calculatedAmount),
+                    false,
+                    activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
+                  ]);
+                }
               }
             }
           }
         }
+
+        // Insert leave records if any
+        if (
+          leaveEntries &&
+          Array.isArray(leaveEntries) &&
+          leaveEntries.length > 0
+        ) {
+          for (const leave of leaveEntries) {
+            const { employeeId, leaveType, amount_paid, activities } = leave;
+
+            // Get employee's primary job for the leave entry
+            const employeeJobQuery = `
+              SELECT job FROM staffs WHERE id = $1
+            `;
+            const employeeJobResult = await (transactionClient || pool).query(employeeJobQuery, [employeeId]);
+            const employeeJobs = employeeJobResult.rows[0]?.job || [];
+            const primaryJob = employeeJobs.length > 0 ? employeeJobs[0] : null;
+
+            if (!primaryJob) {
+              throw new Error(`Employee ${employeeId} has no job assigned`);
+            }
+
+            // Insert leave record
+            const leaveQuery = `
+              INSERT INTO leave_records (
+                employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
+              ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)
+            `;
+            await (transactionClient || pool).query(leaveQuery, [
+              employeeId,
+              logDate,
+              leaveType,
+              workLogId,
+              1.0, // Assuming full day leave for now
+              amount_paid || 0,
+            ]);
+
+            // Create a leave entry in daily_work_log_entries for activities
+            const leaveEntryQuery = `
+              INSERT INTO daily_work_log_entries (
+                work_log_id, employee_id, job_id, total_hours
+              ) VALUES ($1, $2, $3, $4)
+              RETURNING id
+            `;
+            const leaveEntryResult = await (transactionClient || pool).query(leaveEntryQuery, [
+              workLogId,
+              employeeId,
+              primaryJob, // Use employee's primary job
+              8, // Standard 8 hours for leave
+            ]);
+
+            const leaveEntryId = leaveEntryResult.rows[0].id;
+
+            // Insert leave activities
+            if (activities && activities.length > 0) {
+              for (const activity of activities) {
+                if (activity.isSelected) {
+                  const activityQuery = `
+                    INSERT INTO daily_work_log_activities (
+                      log_entry_id, pay_code_id, hours_applied,
+                      units_produced, rate_used, calculated_amount,
+                      is_manually_added, foc_units
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                  `;
+
+                  await (transactionClient || pool).query(activityQuery, [
+                    leaveEntryId,
+                    activity.payCodeId,
+                    activity.hoursApplied,
+                    activity.unitsProduced || null,
+                    parseFloat(activity.rate),
+                    parseFloat(activity.calculatedAmount),
+                    false,
+                    activity.unitsFOC ? parseFloat(activity.unitsFOC) : null,
+                  ]);
+                }
+              }
+            }
+          }
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.status(201).json({
+          message: `Work log submitted successfully`,
+          workLogId,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error creating daily work log:", error);
+        res.status(500).json({
+          message: "Error creating daily work log",
+          error: error.message,
+        });
       }
-
-      await pool.query("COMMIT");
-
-      res.status(201).json({
-        message: `Work log submitted successfully`,
-        workLogId,
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error creating daily work log:", error);
-      res.status(500).json({
-        message: "Error creating daily work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 

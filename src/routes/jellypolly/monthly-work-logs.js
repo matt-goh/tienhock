@@ -283,355 +283,148 @@ export default function (pool) {
 
   // Create a new monthly work log
   router.post("/", async (req, res) => {
-    const {
-      logMonth,
-      logYear,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries,
-      updatedLeaveEntries,
-    } = req.body;
-
-    if (!employeeEntries || employeeEntries.length === 0) {
-      return res.status(400).json({
-        message: "At least one employee entry is required",
-      });
-    }
-
-    const invalidHoursEntry = employeeEntries.find((entry) =>
-      getMonthlyEntryHoursError(entry)
-    );
-    if (invalidHoursEntry) {
-      return res.status(400).json({
-        message: getMonthlyEntryHoursError(invalidHoursEntry),
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const {
+        logMonth,
+        logYear,
+        section,
+        contextData,
+        status,
+        employeeEntries,
+        leaveEntries,
+        updatedLeaveEntries,
+      } = req.body;
 
-      const duplicateResult = await pool.query(
-        `SELECT id FROM jellypolly.monthly_work_logs
-         WHERE log_month = $1 AND log_year = $2 AND section = $3`,
-        [logMonth, logYear, section]
-      );
-
-      if (duplicateResult.rows.length > 0) {
-        await pool.query("ROLLBACK");
+      if (!employeeEntries || employeeEntries.length === 0) {
         return res.status(400).json({
-          message: `A monthly log for ${section} in ${logMonth}/${logYear} already exists`,
-          existingId: duplicateResult.rows[0].id,
+          message: "At least one employee entry is required",
         });
       }
 
-      const workLogResult = await pool.query(
-        `INSERT INTO jellypolly.monthly_work_logs (
-          log_month, log_year, section, context_data, status
-        ) VALUES ($1, $2, $3, $4, $5)
-        RETURNING id`,
-        [logMonth, logYear, section, contextData || {}, status || "Submitted"]
+      const invalidHoursEntry = employeeEntries.find((entry) =>
+        getMonthlyEntryHoursError(entry)
       );
+      if (invalidHoursEntry) {
+        return res.status(400).json({
+          message: getMonthlyEntryHoursError(invalidHoursEntry),
+        });
+      }
 
-      const workLogId = workLogResult.rows[0].id;
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      for (const entry of employeeEntries) {
-        const { employeeId, jobType, activities } = entry;
-        const {
-          totalHours,
-          overtimeHours,
-          ahadHours,
-          ahadOvertimeHours,
-          umumHours,
-          umumOvertimeHours,
-        } = getMonthlyEntryHours(entry);
-
-        const entryResult = await pool.query(
-          `INSERT INTO jellypolly.monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          RETURNING id`,
-          [
-            workLogId,
-            employeeId,
-            jobType,
-            totalHours,
-            overtimeHours || 0,
-            ahadHours || 0,
-            ahadOvertimeHours || 0,
-            umumHours || 0,
-            umumOvertimeHours || 0,
-          ]
+        const duplicateResult = await (transactionClient || pool).query(
+          `SELECT id FROM jellypolly.monthly_work_logs
+           WHERE log_month = $1 AND log_year = $2 AND section = $3`,
+          [logMonth, logYear, section]
         );
 
-        const entryId = entryResult.rows[0].id;
+        if (duplicateResult.rows.length > 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: `A monthly log for ${section} in ${logMonth}/${logYear} already exists`,
+            existingId: duplicateResult.rows[0].id,
+          });
+        }
 
-        if (activities && activities.length > 0) {
-          for (const activity of activities) {
-            if (activity.isSelected) {
-              await pool.query(
-                `INSERT INTO jellypolly.monthly_work_log_activities (
-                  monthly_entry_id, pay_code_id, description, hours_applied,
-                  units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [
-                  entryId,
-                  activity.payCodeId,
-                  activity.description || null,
-                  activity.hoursApplied || null,
-                  activity.unitsProduced || null,
-                  parseFloat(activity.rate),
-                  parseFloat(activity.calculatedAmount),
-                  activity.isManuallyAdded || false,
-                ]
-              );
+        const workLogResult = await (transactionClient || pool).query(
+          `INSERT INTO jellypolly.monthly_work_logs (
+            log_month, log_year, section, context_data, status
+          ) VALUES ($1, $2, $3, $4, $5)
+          RETURNING id`,
+          [logMonth, logYear, section, contextData || {}, status || "Submitted"]
+        );
+
+        const workLogId = workLogResult.rows[0].id;
+
+        for (const entry of employeeEntries) {
+          const { employeeId, jobType, activities } = entry;
+          const {
+            totalHours,
+            overtimeHours,
+            ahadHours,
+            ahadOvertimeHours,
+            umumHours,
+            umumOvertimeHours,
+          } = getMonthlyEntryHours(entry);
+
+          const entryResult = await (transactionClient || pool).query(
+            `INSERT INTO jellypolly.monthly_work_log_entries (
+              monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+              ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id`,
+            [
+              workLogId,
+              employeeId,
+              jobType,
+              totalHours,
+              overtimeHours || 0,
+              ahadHours || 0,
+              ahadOvertimeHours || 0,
+              umumHours || 0,
+              umumOvertimeHours || 0,
+            ]
+          );
+
+          const entryId = entryResult.rows[0].id;
+
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                await (transactionClient || pool).query(
+                  `INSERT INTO jellypolly.monthly_work_log_activities (
+                    monthly_entry_id, pay_code_id, description, hours_applied,
+                    units_produced, rate_used, calculated_amount, is_manually_added
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                  [
+                    entryId,
+                    activity.payCodeId,
+                    activity.description || null,
+                    activity.hoursApplied || null,
+                    activity.unitsProduced || null,
+                    parseFloat(activity.rate),
+                    parseFloat(activity.calculatedAmount),
+                    activity.isManuallyAdded || false,
+                  ]
+                );
+              }
             }
           }
         }
-      }
 
-      // Insert new leave records (shared public.leave_records, no work-log
-      // link — same as TH monthly leave)
-      if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
-        for (const leave of leaveEntries) {
-          const { employeeId, leaveDate, leaveType, amount_paid } = leave;
-          const leaveAmount = parseLeaveAmount(amount_paid);
-
-          if (leaveAmount === null) {
-            await pool.query("ROLLBACK");
-            return res.status(400).json({
-              message: "Leave amount must be a non-negative number",
-            });
-          }
-
-          const existingLeave = await pool.query(
-            `SELECT id FROM jellypolly.leave_records WHERE employee_id = $1 AND leave_date = $2`,
-            [employeeId, leaveDate]
-          );
-
-          if (existingLeave.rows.length === 0) {
-            await pool.query(
-              `INSERT INTO jellypolly.leave_records (
-                employee_id, leave_date, leave_type, days_taken, status, amount_paid
-              ) VALUES ($1, $2, $3, $4, 'approved', $5)`,
-              [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
-            );
-          }
-        }
-      }
-
-      // Update existing saved leave amounts if any
-      if (
-        updatedLeaveEntries &&
-        Array.isArray(updatedLeaveEntries) &&
-        updatedLeaveEntries.length > 0
-      ) {
-        for (const leave of updatedLeaveEntries) {
-          const { id: leaveId, amount_paid } = leave;
-          const leaveAmount = parseLeaveAmount(amount_paid);
-
-          if (!leaveId || leaveAmount === null) {
-            await pool.query("ROLLBACK");
-            return res.status(400).json({
-              message: "Leave amount must be a non-negative number",
-            });
-          }
-
-          await pool.query(
-            "UPDATE jellypolly.leave_records SET amount_paid = $1 WHERE id = $2",
-            [leaveAmount, leaveId]
-          );
-        }
-      }
-
-      await pool.query("COMMIT");
-
-      // Auto-reprocess the affected employees' JP payroll for this month
-      await reprocessJPEmployeesSafe(pool, {
-        year: parseInt(logYear),
-        month: parseInt(logMonth),
-        employeeIds: [
-          ...employeeEntries.map((e) => e.employeeId),
-          ...(leaveEntries || []).map((l) => l.employeeId),
-          ...(updatedLeaveEntries || [])
-            .map((l) => l.employeeId)
-            .filter(Boolean),
-        ],
-      });
-
-      res.status(201).json({
-        message: "Monthly work log created successfully",
-        workLogId,
-      });
-    } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error creating JP monthly work log:", error);
-      res.status(500).json({
-        message: "Error creating monthly work log",
-        error: error.message,
-      });
-    }
-  });
-
-  // Update existing monthly work log
-  router.put("/:id", async (req, res) => {
-    const { id } = req.params;
-    const {
-      logMonth,
-      logYear,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries,
-      updatedLeaveEntries,
-      deletedLeaveIds,
-    } = req.body;
-
-    if (!employeeEntries || employeeEntries.length === 0) {
-      return res.status(400).json({
-        message: "At least one employee entry is required",
-      });
-    }
-
-    const invalidHoursEntry = employeeEntries.find((entry) =>
-      getMonthlyEntryHoursError(entry)
-    );
-    if (invalidHoursEntry) {
-      return res.status(400).json({
-        message: getMonthlyEntryHoursError(invalidHoursEntry),
-      });
-    }
-
-    try {
-      await pool.query("BEGIN");
-
-      const checkResult = await pool.query(
-        "SELECT status FROM jellypolly.monthly_work_logs WHERE id = $1",
-        [id]
-      );
-
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Monthly work log not found" });
-      }
-
-      // Previously entered employees also need reprocessing if they are removed
-      const previousEntries = await pool.query(
-        "SELECT DISTINCT employee_id FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
-        [id]
-      );
-
-      await pool.query(
-        `UPDATE jellypolly.monthly_work_logs
-         SET log_month = $1, log_year = $2, section = $3,
-             context_data = $4, status = $5, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $6`,
-        [logMonth, logYear, section, contextData || {}, status, id]
-      );
-
-      await pool.query(
-        "DELETE FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
-        [id]
-      );
-
-      for (const entry of employeeEntries) {
-        const { employeeId, jobType, activities } = entry;
-        const {
-          totalHours,
-          overtimeHours,
-          ahadHours,
-          ahadOvertimeHours,
-          umumHours,
-          umumOvertimeHours,
-        } = getMonthlyEntryHours(entry);
-
-        const entryResult = await pool.query(
-          `INSERT INTO jellypolly.monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          RETURNING id`,
-          [
-            id,
-            employeeId,
-            jobType,
-            totalHours,
-            overtimeHours || 0,
-            ahadHours || 0,
-            ahadOvertimeHours || 0,
-            umumHours || 0,
-            umumOvertimeHours || 0,
-          ]
-        );
-
-        const entryId = entryResult.rows[0].id;
-
-        if (activities && activities.length > 0) {
-          for (const activity of activities) {
-            if (activity.isSelected) {
-              await pool.query(
-                `INSERT INTO jellypolly.monthly_work_log_activities (
-                  monthly_entry_id, pay_code_id, description, hours_applied,
-                  units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                [
-                  entryId,
-                  activity.payCodeId,
-                  activity.description || null,
-                  activity.hoursApplied || null,
-                  activity.unitsProduced || null,
-                  parseFloat(activity.rate),
-                  parseFloat(activity.calculatedAmount),
-                  activity.isManuallyAdded || false,
-                ]
-              );
-            }
-          }
-        }
-      }
-
-      // Delete specified leave records
-      const deletedLeaveEmployeeIds = [];
-      if (
-        deletedLeaveIds &&
-        Array.isArray(deletedLeaveIds) &&
-        deletedLeaveIds.length > 0
-      ) {
-        for (const leaveId of deletedLeaveIds) {
-          const deleted = await pool.query(
-            "DELETE FROM jellypolly.leave_records WHERE id = $1 RETURNING employee_id",
-            [leaveId]
-          );
-          if (deleted.rows[0]) {
-            deletedLeaveEmployeeIds.push(deleted.rows[0].employee_id);
-          }
-        }
-      }
-
-      // Insert new leave records (isNew only, same as TH)
-      if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
-        for (const leave of leaveEntries) {
-          if (leave.isNew) {
+        // Insert new leave records (shared public.leave_records, no work-log
+        // link — same as TH monthly leave)
+        if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+          for (const leave of leaveEntries) {
             const { employeeId, leaveDate, leaveType, amount_paid } = leave;
             const leaveAmount = parseLeaveAmount(amount_paid);
 
             if (leaveAmount === null) {
-              await pool.query("ROLLBACK");
+              if (transactionClient) {
+                await transactionClient.query("ROLLBACK");
+                transactionClient.release();
+                transactionClient = null;
+              }
               return res.status(400).json({
                 message: "Leave amount must be a non-negative number",
               });
             }
 
-            const existingLeave = await pool.query(
+            const existingLeave = await (transactionClient || pool).query(
               `SELECT id FROM jellypolly.leave_records WHERE employee_id = $1 AND leave_date = $2`,
               [employeeId, leaveDate]
             );
 
             if (existingLeave.rows.length === 0) {
-              await pool.query(
+              await (transactionClient || pool).query(
                 `INSERT INTO jellypolly.leave_records (
                   employee_id, leave_date, leave_type, days_taken, status, amount_paid
                 ) VALUES ($1, $2, $3, $4, 'approved', $5)`,
@@ -640,109 +433,413 @@ export default function (pool) {
             }
           }
         }
-      }
 
-      // Update existing saved leave amounts if any
-      if (
-        updatedLeaveEntries &&
-        Array.isArray(updatedLeaveEntries) &&
-        updatedLeaveEntries.length > 0
-      ) {
-        for (const leave of updatedLeaveEntries) {
-          const { id: leaveId, amount_paid } = leave;
-          const leaveAmount = parseLeaveAmount(amount_paid);
+        // Update existing saved leave amounts if any
+        if (
+          updatedLeaveEntries &&
+          Array.isArray(updatedLeaveEntries) &&
+          updatedLeaveEntries.length > 0
+        ) {
+          for (const leave of updatedLeaveEntries) {
+            const { id: leaveId, amount_paid } = leave;
+            const leaveAmount = parseLeaveAmount(amount_paid);
 
-          if (!leaveId || leaveAmount === null) {
-            await pool.query("ROLLBACK");
-            return res.status(400).json({
-              message: "Leave amount must be a non-negative number",
-            });
+            if (!leaveId || leaveAmount === null) {
+              if (transactionClient) {
+                await transactionClient.query("ROLLBACK");
+                transactionClient.release();
+                transactionClient = null;
+              }
+              return res.status(400).json({
+                message: "Leave amount must be a non-negative number",
+              });
+            }
+
+            await (transactionClient || pool).query(
+              "UPDATE jellypolly.leave_records SET amount_paid = $1 WHERE id = $2",
+              [leaveAmount, leaveId]
+            );
           }
-
-          await pool.query(
-            "UPDATE jellypolly.leave_records SET amount_paid = $1 WHERE id = $2",
-            [leaveAmount, leaveId]
-          );
         }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        // Auto-reprocess the affected employees' JP payroll for this month
+        await reprocessJPEmployeesSafe(pool, {
+          year: parseInt(logYear),
+          month: parseInt(logMonth),
+          employeeIds: [
+            ...employeeEntries.map((e) => e.employeeId),
+            ...(leaveEntries || []).map((l) => l.employeeId),
+            ...(updatedLeaveEntries || [])
+              .map((l) => l.employeeId)
+              .filter(Boolean),
+          ],
+        });
+
+        res.status(201).json({
+          message: "Monthly work log created successfully",
+          workLogId,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error creating JP monthly work log:", error);
+        res.status(500).json({
+          message: "Error creating monthly work log",
+          error: error.message,
+        });
+      }
+    } catch (error) {
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
+    }
+  });
+
+  // Update existing monthly work log
+  router.put("/:id", async (req, res) => {
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
+    try {
+      const { id } = req.params;
+      const {
+        logMonth,
+        logYear,
+        section,
+        contextData,
+        status,
+        employeeEntries,
+        leaveEntries,
+        updatedLeaveEntries,
+        deletedLeaveIds,
+      } = req.body;
+
+      if (!employeeEntries || employeeEntries.length === 0) {
+        return res.status(400).json({
+          message: "At least one employee entry is required",
+        });
       }
 
-      await pool.query("COMMIT");
+      const invalidHoursEntry = employeeEntries.find((entry) =>
+        getMonthlyEntryHoursError(entry)
+      );
+      if (invalidHoursEntry) {
+        return res.status(400).json({
+          message: getMonthlyEntryHoursError(invalidHoursEntry),
+        });
+      }
 
-      const affectedIds = [
-        ...new Set([
-          ...previousEntries.rows.map((r) => r.employee_id),
-          ...employeeEntries.map((e) => e.employeeId),
-          ...(leaveEntries || []).map((l) => l.employeeId).filter(Boolean),
-          ...(updatedLeaveEntries || [])
-            .map((l) => l.employeeId)
-            .filter(Boolean),
-          ...deletedLeaveEmployeeIds,
-        ]),
-      ];
-      await reprocessJPEmployeesSafe(pool, {
-        year: parseInt(logYear),
-        month: parseInt(logMonth),
-        employeeIds: affectedIds,
-      });
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      res.json({
-        message: "Monthly work log updated successfully",
-        workLogId: id,
-      });
+        const checkResult = await (transactionClient || pool).query(
+          "SELECT status FROM jellypolly.monthly_work_logs WHERE id = $1",
+          [id]
+        );
+
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Monthly work log not found" });
+        }
+
+        // Previously entered employees also need reprocessing if they are removed
+        const previousEntries = await (transactionClient || pool).query(
+          "SELECT DISTINCT employee_id FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
+          [id]
+        );
+
+        await (transactionClient || pool).query(
+          `UPDATE jellypolly.monthly_work_logs
+           SET log_month = $1, log_year = $2, section = $3,
+               context_data = $4, status = $5, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $6`,
+          [logMonth, logYear, section, contextData || {}, status, id]
+        );
+
+        await (transactionClient || pool).query(
+          "DELETE FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
+          [id]
+        );
+
+        for (const entry of employeeEntries) {
+          const { employeeId, jobType, activities } = entry;
+          const {
+            totalHours,
+            overtimeHours,
+            ahadHours,
+            ahadOvertimeHours,
+            umumHours,
+            umumOvertimeHours,
+          } = getMonthlyEntryHours(entry);
+
+          const entryResult = await (transactionClient || pool).query(
+            `INSERT INTO jellypolly.monthly_work_log_entries (
+              monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+              ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id`,
+            [
+              id,
+              employeeId,
+              jobType,
+              totalHours,
+              overtimeHours || 0,
+              ahadHours || 0,
+              ahadOvertimeHours || 0,
+              umumHours || 0,
+              umumOvertimeHours || 0,
+            ]
+          );
+
+          const entryId = entryResult.rows[0].id;
+
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                await (transactionClient || pool).query(
+                  `INSERT INTO jellypolly.monthly_work_log_activities (
+                    monthly_entry_id, pay_code_id, description, hours_applied,
+                    units_produced, rate_used, calculated_amount, is_manually_added
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                  [
+                    entryId,
+                    activity.payCodeId,
+                    activity.description || null,
+                    activity.hoursApplied || null,
+                    activity.unitsProduced || null,
+                    parseFloat(activity.rate),
+                    parseFloat(activity.calculatedAmount),
+                    activity.isManuallyAdded || false,
+                  ]
+                );
+              }
+            }
+          }
+        }
+
+        // Delete specified leave records
+        const deletedLeaveEmployeeIds = [];
+        if (
+          deletedLeaveIds &&
+          Array.isArray(deletedLeaveIds) &&
+          deletedLeaveIds.length > 0
+        ) {
+          for (const leaveId of deletedLeaveIds) {
+            const deleted = await (transactionClient || pool).query(
+              "DELETE FROM jellypolly.leave_records WHERE id = $1 RETURNING employee_id",
+              [leaveId]
+            );
+            if (deleted.rows[0]) {
+              deletedLeaveEmployeeIds.push(deleted.rows[0].employee_id);
+            }
+          }
+        }
+
+        // Insert new leave records (isNew only, same as TH)
+        if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+          for (const leave of leaveEntries) {
+            if (leave.isNew) {
+              const { employeeId, leaveDate, leaveType, amount_paid } = leave;
+              const leaveAmount = parseLeaveAmount(amount_paid);
+
+              if (leaveAmount === null) {
+                if (transactionClient) {
+                  await transactionClient.query("ROLLBACK");
+                  transactionClient.release();
+                  transactionClient = null;
+                }
+                return res.status(400).json({
+                  message: "Leave amount must be a non-negative number",
+                });
+              }
+
+              const existingLeave = await (transactionClient || pool).query(
+                `SELECT id FROM jellypolly.leave_records WHERE employee_id = $1 AND leave_date = $2`,
+                [employeeId, leaveDate]
+              );
+
+              if (existingLeave.rows.length === 0) {
+                await (transactionClient || pool).query(
+                  `INSERT INTO jellypolly.leave_records (
+                    employee_id, leave_date, leave_type, days_taken, status, amount_paid
+                  ) VALUES ($1, $2, $3, $4, 'approved', $5)`,
+                  [employeeId, leaveDate, leaveType, 1.0, leaveAmount]
+                );
+              }
+            }
+          }
+        }
+
+        // Update existing saved leave amounts if any
+        if (
+          updatedLeaveEntries &&
+          Array.isArray(updatedLeaveEntries) &&
+          updatedLeaveEntries.length > 0
+        ) {
+          for (const leave of updatedLeaveEntries) {
+            const { id: leaveId, amount_paid } = leave;
+            const leaveAmount = parseLeaveAmount(amount_paid);
+
+            if (!leaveId || leaveAmount === null) {
+              if (transactionClient) {
+                await transactionClient.query("ROLLBACK");
+                transactionClient.release();
+                transactionClient = null;
+              }
+              return res.status(400).json({
+                message: "Leave amount must be a non-negative number",
+              });
+            }
+
+            await (transactionClient || pool).query(
+              "UPDATE jellypolly.leave_records SET amount_paid = $1 WHERE id = $2",
+              [leaveAmount, leaveId]
+            );
+          }
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        const affectedIds = [
+          ...new Set([
+            ...previousEntries.rows.map((r) => r.employee_id),
+            ...employeeEntries.map((e) => e.employeeId),
+            ...(leaveEntries || []).map((l) => l.employeeId).filter(Boolean),
+            ...(updatedLeaveEntries || [])
+              .map((l) => l.employeeId)
+              .filter(Boolean),
+            ...deletedLeaveEmployeeIds,
+          ]),
+        ];
+        await reprocessJPEmployeesSafe(pool, {
+          year: parseInt(logYear),
+          month: parseInt(logMonth),
+          employeeIds: affectedIds,
+        });
+
+        res.json({
+          message: "Monthly work log updated successfully",
+          workLogId: id,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error updating JP monthly work log:", error);
+        res.status(500).json({
+          message: "Error updating monthly work log",
+          error: error.message,
+        });
+      }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error updating JP monthly work log:", error);
-      res.status(500).json({
-        message: "Error updating monthly work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Delete monthly work log
   router.delete("/:id", async (req, res) => {
-    const { id } = req.params;
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { id } = req.params;
 
-      const checkResult = await pool.query(
-        "SELECT log_month, log_year FROM jellypolly.monthly_work_logs WHERE id = $1",
-        [id]
-      );
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Monthly work log not found" });
+        const checkResult = await (transactionClient || pool).query(
+          "SELECT log_month, log_year FROM jellypolly.monthly_work_logs WHERE id = $1",
+          [id]
+        );
+
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Monthly work log not found" });
+        }
+
+        const { log_month, log_year } = checkResult.rows[0];
+
+        const affectedEntries = await (transactionClient || pool).query(
+          "SELECT DISTINCT employee_id FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
+          [id]
+        );
+
+        await (transactionClient || pool).query("DELETE FROM jellypolly.monthly_work_logs WHERE id = $1", [
+          id,
+        ]);
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        await reprocessJPEmployeesSafe(pool, {
+          year: log_year,
+          month: log_month,
+          employeeIds: affectedEntries.rows.map((r) => r.employee_id),
+        });
+
+        res.json({ message: "Monthly work log deleted successfully" });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error deleting JP monthly work log:", error);
+        res.status(500).json({
+          message: "Error deleting monthly work log",
+          error: error.message,
+        });
       }
-
-      const { log_month, log_year } = checkResult.rows[0];
-
-      const affectedEntries = await pool.query(
-        "SELECT DISTINCT employee_id FROM jellypolly.monthly_work_log_entries WHERE monthly_log_id = $1",
-        [id]
-      );
-
-      await pool.query("DELETE FROM jellypolly.monthly_work_logs WHERE id = $1", [
-        id,
-      ]);
-
-      await pool.query("COMMIT");
-
-      await reprocessJPEmployeesSafe(pool, {
-        year: log_year,
-        month: log_month,
-        employeeIds: affectedEntries.rows.map((r) => r.employee_id),
-      });
-
-      res.json({ message: "Monthly work log deleted successfully" });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error deleting JP monthly work log:", error);
-      res.status(500).json({
-        message: "Error deleting monthly work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 

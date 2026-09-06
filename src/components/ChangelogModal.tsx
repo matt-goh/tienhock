@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-05",
+    ms: "Hanya pentadbir yang dilantik boleh mengurus akses pejabat dan sandaran; pemulihan penuh sistem production dibuat oleh pentadbir pelayan. Sandaran automatik dibuat setiap hari, dengan amaran jika tiada sandaran terkini. Anda perlu log masuk semula selepas kemas kini ini menggunakan kata laluan sedia ada. Simpanan berkelompok untuk gaji dan katalog juga dilindungi supaya ralat tidak meninggalkan perubahan separuh siap.",
+    en: "Only designated administrators can manage office access and backups; full production recovery is handled by the server administrator. Automatic backups run daily, with a warning when no recent backup is available. Sign in again after this update using your existing password. Payroll and catalogue batch saves also protect against incomplete changes when an error occurs.",
+  },
+  {
+    date: "2026-09-05",
     ms: "Bil tunai tidak lagi muncul dalam senarai invois belum dibayar di halaman Bayaran Tien Hock. Hanya invois kredit yang masih berbaki boleh dipilih, dan pilihan Cek kekal tersedia apabila beberapa invois dipilih untuk bayaran cek yang sama.",
     en: "Cash bills no longer appear in the unpaid invoice list on Tien Hock Payments. Only credit invoices with an outstanding balance can be selected, and Cheque remains available when selecting multiple invoices for the same cheque payment.",
   },

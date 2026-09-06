@@ -381,221 +381,298 @@ export default function (pool) {
 
   // Create a new daily work log
   router.post("/", async (req, res) => {
-    const {
-      logDate,
-      shift,
-      dayType,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries,
-    } = req.body;
-
-    if (
-      (!employeeEntries || employeeEntries.length === 0) &&
-      (!leaveEntries || leaveEntries.length === 0)
-    ) {
-      return res.status(400).json({
-        message: "At least one employee entry or leave entry is required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const {
+        logDate,
+        shift,
+        dayType,
+        section,
+        contextData,
+        status,
+        employeeEntries,
+        leaveEntries,
+      } = req.body;
 
-      const workLogResult = await pool.query(
-        `INSERT INTO jellypolly.daily_work_logs (
-          log_date, shift, day_type, section, context_data, status
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING id`,
-        [logDate, shift, dayType, section, contextData || {}, status]
-      );
-
-      const workLogId = workLogResult.rows[0].id;
-
-      for (const entry of employeeEntries || []) {
-        await insertEntryWithActivities(workLogId, logDate, entry);
+      if (
+        (!employeeEntries || employeeEntries.length === 0) &&
+        (!leaveEntries || leaveEntries.length === 0)
+      ) {
+        return res.status(400).json({
+          message: "At least one employee entry or leave entry is required",
+        });
       }
 
-      for (const leave of leaveEntries || []) {
-        await insertLeaveEntry(workLogId, logDate, leave);
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
+
+        const workLogResult = await (transactionClient || pool).query(
+          `INSERT INTO jellypolly.daily_work_logs (
+            log_date, shift, day_type, section, context_data, status
+          ) VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id`,
+          [logDate, shift, dayType, section, contextData || {}, status]
+        );
+
+        const workLogId = workLogResult.rows[0].id;
+
+        for (const entry of employeeEntries || []) {
+          await insertEntryWithActivities(workLogId, logDate, entry);
+        }
+
+        for (const leave of leaveEntries || []) {
+          await insertLeaveEntry(workLogId, logDate, leave);
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        const { year, month } = yearMonthOf(logDate);
+        await reprocessJPEmployeesSafe(pool, {
+          year,
+          month,
+          employeeIds: [
+            ...(employeeEntries || []).map((e) => e.employeeId),
+            ...(leaveEntries || []).map((l) => l.employeeId),
+          ],
+        });
+
+        res.status(201).json({
+          message: "Work log submitted successfully",
+          workLogId,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error creating JP daily work log:", error);
+        res.status(500).json({
+          message: "Error creating daily work log",
+          error: error.message,
+        });
       }
-
-      await pool.query("COMMIT");
-
-      const { year, month } = yearMonthOf(logDate);
-      await reprocessJPEmployeesSafe(pool, {
-        year,
-        month,
-        employeeIds: [
-          ...(employeeEntries || []).map((e) => e.employeeId),
-          ...(leaveEntries || []).map((l) => l.employeeId),
-        ],
-      });
-
-      res.status(201).json({
-        message: "Work log submitted successfully",
-        workLogId,
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error creating JP daily work log:", error);
-      res.status(500).json({
-        message: "Error creating daily work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Update existing work log
   router.put("/:id", async (req, res) => {
-    const { id } = req.params;
-    const {
-      logDate,
-      shift,
-      dayType,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries,
-    } = req.body;
-
-    if (
-      (!employeeEntries || employeeEntries.length === 0) &&
-      (!leaveEntries || leaveEntries.length === 0)
-    ) {
-      return res.status(400).json({
-        message: "At least one employee entry or leave entry is required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { id } = req.params;
+      const {
+        logDate,
+        shift,
+        dayType,
+        section,
+        contextData,
+        status,
+        employeeEntries,
+        leaveEntries,
+      } = req.body;
 
-      const checkResult = await pool.query(
-        "SELECT status, log_date FROM jellypolly.daily_work_logs WHERE id = $1",
-        [id]
-      );
-
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Work log not found" });
+      if (
+        (!employeeEntries || employeeEntries.length === 0) &&
+        (!leaveEntries || leaveEntries.length === 0)
+      ) {
+        return res.status(400).json({
+          message: "At least one employee entry or leave entry is required",
+        });
       }
 
-      const previousEntries = await pool.query(
-        "SELECT DISTINCT employee_id FROM jellypolly.daily_work_log_entries WHERE work_log_id = $1",
-        [id]
-      );
-      const previousDate = checkResult.rows[0].log_date;
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      await pool.query(
-        `UPDATE jellypolly.daily_work_logs
-         SET log_date = $1, shift = $2, day_type = $3, section = $4,
-             context_data = $5, status = $6, updated_at = CURRENT_TIMESTAMP
-         WHERE id = $7`,
-        [logDate, shift, dayType, section, contextData || {}, status, id]
-      );
+        const checkResult = await (transactionClient || pool).query(
+          "SELECT status, log_date FROM jellypolly.daily_work_logs WHERE id = $1",
+          [id]
+        );
 
-      // Clear old leave records and work entries (mirrors TH)
-      await pool.query(
-        "DELETE FROM jellypolly.leave_records WHERE work_log_id = $1",
-        [id]
-      );
-      await pool.query(
-        "DELETE FROM jellypolly.daily_work_log_entries WHERE work_log_id = $1",
-        [id]
-      );
-
-      for (const entry of employeeEntries || []) {
-        await insertEntryWithActivities(id, logDate, entry);
-      }
-
-      for (const leave of leaveEntries || []) {
-        await insertLeaveEntry(id, logDate, leave);
-      }
-
-      await pool.query("COMMIT");
-
-      const affectedIds = [
-        ...new Set([
-          ...previousEntries.rows.map((r) => r.employee_id),
-          ...(employeeEntries || []).map((e) => e.employeeId),
-          ...(leaveEntries || []).map((l) => l.employeeId),
-        ]),
-      ];
-      const { year, month } = yearMonthOf(logDate);
-      await reprocessJPEmployeesSafe(pool, { year, month, employeeIds: affectedIds });
-      // If the log moved across months, reprocess the old month too
-      if (previousDate) {
-        const previous = yearMonthOf(previousDate);
-        if (previous.year !== year || previous.month !== month) {
-          await reprocessJPEmployeesSafe(pool, {
-            year: previous.year,
-            month: previous.month,
-            employeeIds: affectedIds,
-          });
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Work log not found" });
         }
-      }
 
-      res.json({
-        message: "Work log updated successfully",
-        workLogId: id,
-      });
+        const previousEntries = await (transactionClient || pool).query(
+          "SELECT DISTINCT employee_id FROM jellypolly.daily_work_log_entries WHERE work_log_id = $1",
+          [id]
+        );
+        const previousDate = checkResult.rows[0].log_date;
+
+        await (transactionClient || pool).query(
+          `UPDATE jellypolly.daily_work_logs
+           SET log_date = $1, shift = $2, day_type = $3, section = $4,
+               context_data = $5, status = $6, updated_at = CURRENT_TIMESTAMP
+           WHERE id = $7`,
+          [logDate, shift, dayType, section, contextData || {}, status, id]
+        );
+
+        // Clear old leave records and work entries (mirrors TH)
+        await (transactionClient || pool).query(
+          "DELETE FROM jellypolly.leave_records WHERE work_log_id = $1",
+          [id]
+        );
+        await (transactionClient || pool).query(
+          "DELETE FROM jellypolly.daily_work_log_entries WHERE work_log_id = $1",
+          [id]
+        );
+
+        for (const entry of employeeEntries || []) {
+          await insertEntryWithActivities(id, logDate, entry);
+        }
+
+        for (const leave of leaveEntries || []) {
+          await insertLeaveEntry(id, logDate, leave);
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        const affectedIds = [
+          ...new Set([
+            ...previousEntries.rows.map((r) => r.employee_id),
+            ...(employeeEntries || []).map((e) => e.employeeId),
+            ...(leaveEntries || []).map((l) => l.employeeId),
+          ]),
+        ];
+        const { year, month } = yearMonthOf(logDate);
+        await reprocessJPEmployeesSafe(pool, { year, month, employeeIds: affectedIds });
+        // If the log moved across months, reprocess the old month too
+        if (previousDate) {
+          const previous = yearMonthOf(previousDate);
+          if (previous.year !== year || previous.month !== month) {
+            await reprocessJPEmployeesSafe(pool, {
+              year: previous.year,
+              month: previous.month,
+              employeeIds: affectedIds,
+            });
+          }
+        }
+
+        res.json({
+          message: "Work log updated successfully",
+          workLogId: id,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error updating JP daily work log:", error);
+        res.status(500).json({
+          message: "Error updating daily work log",
+          error: error.message,
+        });
+      }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error updating JP daily work log:", error);
-      res.status(500).json({
-        message: "Error updating daily work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Delete work log
   router.delete("/:id", async (req, res) => {
-    const { id } = req.params;
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { id } = req.params;
 
-      const checkResult = await pool.query(
-        "SELECT status, log_date FROM jellypolly.daily_work_logs WHERE id = $1",
-        [id]
-      );
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Work log not found" });
+        const checkResult = await (transactionClient || pool).query(
+          "SELECT status, log_date FROM jellypolly.daily_work_logs WHERE id = $1",
+          [id]
+        );
+
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Work log not found" });
+        }
+
+        const logDate = checkResult.rows[0].log_date;
+        const affectedEntries = await (transactionClient || pool).query(
+          "SELECT DISTINCT employee_id FROM jellypolly.daily_work_log_entries WHERE work_log_id = $1",
+          [id]
+        );
+
+        // Cascade handles entries + activities
+        await (transactionClient || pool).query("DELETE FROM jellypolly.daily_work_logs WHERE id = $1", [id]);
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        const { year, month } = yearMonthOf(logDate);
+        await reprocessJPEmployeesSafe(pool, {
+          year,
+          month,
+          employeeIds: affectedEntries.rows.map((r) => r.employee_id),
+        });
+
+        res.json({ message: "Work log deleted successfully" });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error deleting JP work log:", error);
+        res.status(500).json({
+          message: "Error deleting work log",
+          error: error.message,
+        });
       }
-
-      const logDate = checkResult.rows[0].log_date;
-      const affectedEntries = await pool.query(
-        "SELECT DISTINCT employee_id FROM jellypolly.daily_work_log_entries WHERE work_log_id = $1",
-        [id]
-      );
-
-      // Cascade handles entries + activities
-      await pool.query("DELETE FROM jellypolly.daily_work_logs WHERE id = $1", [id]);
-
-      await pool.query("COMMIT");
-
-      const { year, month } = yearMonthOf(logDate);
-      await reprocessJPEmployeesSafe(pool, {
-        year,
-        month,
-        employeeIds: affectedEntries.rows.map((r) => r.employee_id),
-      });
-
-      res.json({ message: "Work log deleted successfully" });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error deleting JP work log:", error);
-      res.status(500).json({
-        message: "Error deleting work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
