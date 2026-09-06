@@ -90,6 +90,8 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
   const isBlockingOperation = restoring || uploading || downloading;
   const isBusy = loading || isBlockingOperation;
   const isSqlReplacementAvailable: boolean = NODE_ENV === "development";
+  const latestBackupTime: number = Math.max(0, ...backups.map((backup: Backup): number => new Date(backup.created).getTime()).filter(Number.isFinite));
+  const backupOverdue: boolean = !loading && Date.now() - latestBackupTime > 36 * 60 * 60 * 1000;
   const currentLocationPath = `${location.pathname}${location.search}${location.hash}`;
 
   // Reset backup name when modal closes
@@ -371,6 +373,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
       const response = await fetch(
         `${API_BASE_URL}/api/backup/download/${encodeURIComponent(filename)}`,
         {
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
             "x-session-id": sessionId,
@@ -646,6 +649,13 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
+                {!import.meta.env.DEV && <p className="mt-3 text-sm text-default-600 dark:text-gray-300">
+                  {t("Full database recovery is handled by the server administrator.")}
+                </p>}
+                {backupOverdue && <p role="status" className="mt-3 rounded bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                  {t("No backup from the last 36 hours is available. Please contact an administrator.")}
+                </p>}
+
                 {/* Error Message */}
                 {error && (
                   <div className="mt-4 p-4 bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 rounded-lg flex items-center">
@@ -834,6 +844,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                         </div>
                                       ) : (
                                         <>
+                                          {import.meta.env.DEV && (
                                           <Button
                                             onClick={() => {
                                               setSelectedBackup(
@@ -847,6 +858,7 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                           >
                                             {t("Restore")}
                                           </Button>
+                                          )}
                                           <Button
                                             onClick={() =>
                                               handleDownload(backup.filename)

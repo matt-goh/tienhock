@@ -157,477 +157,512 @@ export default function (pool) {
 
   // Add a pay code association to a job
   router.post("/", async (req, res) => {
-    const { job_id, pay_code_id, is_default = false } = req.body;
-
-    if (!job_id || !pay_code_id) {
-      return res
-        .status(400)
-        .json({ message: "job_id and pay_code_id are required" });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Begin transaction
-      await pool.query("BEGIN");
+      const { job_id, pay_code_id, is_default = false } = req.body;
 
-      // Check if the association already exists
-      const checkQuery =
-        "SELECT 1 FROM job_pay_codes WHERE job_id = $1 AND pay_code_id = $2";
-      const checkResult = await pool.query(checkQuery, [job_id, pay_code_id]);
-      if (checkResult.rows.length > 0) {
-        await pool.query("ROLLBACK");
-        return res.status(409).json({
-          message: "This pay code is already assigned to the job",
+      if (!job_id || !pay_code_id) {
+        return res
+          .status(400)
+          .json({ message: "job_id and pay_code_id are required" });
+      }
+
+      try {
+        // Begin transaction
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
+
+        // Check if the association already exists
+        const checkQuery =
+          "SELECT 1 FROM job_pay_codes WHERE job_id = $1 AND pay_code_id = $2";
+        const checkResult = await (transactionClient || pool).query(checkQuery, [job_id, pay_code_id]);
+        if (checkResult.rows.length > 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(409).json({
+            message: "This pay code is already assigned to the job",
+          });
+        }
+
+        // Insert with default NULL overrides
+        const insertQuery = `
+        INSERT INTO job_pay_codes (job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
+        VALUES ($1, $2, $3, NULL, NULL, NULL)
+        RETURNING *
+      `;
+        const result = await (transactionClient || pool).query(insertQuery, [
+          job_id,
+          pay_code_id,
+          is_default,
+        ]);
+
+        // Update the updated_at timestamp for all staff with this job
+        const updateStaffQuery = `
+        UPDATE staffs
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE job::jsonb ? $1
+      `;
+        await (transactionClient || pool).query(updateStaffQuery, [job_id]);
+
+        // Commit transaction
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.status(201).json({
+          message: "Pay code assigned to job successfully",
+          jobPayCode: result.rows[0],
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error assigning pay code to job:", error);
+        if (error.code === "23503") {
+          return res
+            .status(404)
+            .json({ message: "Invalid job_id or pay_code_id provided" });
+        }
+        res.status(500).json({
+          message: "Error assigning pay code to job",
+          error: error.message,
         });
       }
-
-      // Insert with default NULL overrides
-      const insertQuery = `
-      INSERT INTO job_pay_codes (job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
-      VALUES ($1, $2, $3, NULL, NULL, NULL)
-      RETURNING *
-    `;
-      const result = await pool.query(insertQuery, [
-        job_id,
-        pay_code_id,
-        is_default,
-      ]);
-
-      // Update the updated_at timestamp for all staff with this job
-      const updateStaffQuery = `
-      UPDATE staffs 
-      SET updated_at = CURRENT_TIMESTAMP 
-      WHERE job::jsonb ? $1
-    `;
-      await pool.query(updateStaffQuery, [job_id]);
-
-      // Commit transaction
-      await pool.query("COMMIT");
-
-      res.status(201).json({
-        message: "Pay code assigned to job successfully",
-        jobPayCode: result.rows[0],
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error assigning pay code to job:", error);
-      if (error.code === "23503") {
-        return res
-          .status(404)
-          .json({ message: "Invalid job_id or pay_code_id provided" });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
       }
-      res.status(500).json({
-        message: "Error assigning pay code to job",
-        error: error.message,
-      });
     }
   });
 
   // Batch insert multiple pay code associations to jobs
   router.post("/batch", async (req, res) => {
-    const { associations } = req.body;
-
-    if (
-      !associations ||
-      !Array.isArray(associations) ||
-      associations.length === 0
-    ) {
-      return res
-        .status(400)
-        .json({ message: "An array of associations is required" });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Validate all entries first
-      for (const entry of associations) {
-        const { job_id, pay_code_id } = entry;
-        if (!job_id || !pay_code_id) {
-          return res.status(400).json({
-            message: "All entries must have job_id and pay_code_id",
-            invalid_entry: entry,
-          });
-        }
+      const { associations } = req.body;
+
+      if (
+        !associations ||
+        !Array.isArray(associations) ||
+        associations.length === 0
+      ) {
+        return res
+          .status(400)
+          .json({ message: "An array of associations is required" });
       }
 
-      const results = [];
-      const errors = [];
-      let successCount = 0;
-      const affectedJobs = new Set(); // Track affected jobs for timestamp updates
+      try {
+        // Validate all entries first
+        for (const entry of associations) {
+          const { job_id, pay_code_id } = entry;
+          if (!job_id || !pay_code_id) {
+            return res.status(400).json({
+              message: "All entries must have job_id and pay_code_id",
+              invalid_entry: entry,
+            });
+          }
+        }
 
-      // Use a transaction for atomicity
-      await pool.query("BEGIN");
+        const results = [];
+        const errors = [];
+        let successCount = 0;
+        const affectedJobs = new Set(); // Track affected jobs for timestamp updates
 
-      for (const entry of associations) {
-        const { job_id, pay_code_id, is_default = false } = entry;
+        // Use a transaction for atomicity
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-        try {
-          // Check if the association already exists
-          const checkQuery =
-            "SELECT 1 FROM job_pay_codes WHERE job_id = $1 AND pay_code_id = $2";
-          const checkResult = await pool.query(checkQuery, [
-            job_id,
-            pay_code_id,
-          ]);
+        for (const entry of associations) {
+          const { job_id, pay_code_id, is_default = false } = entry;
 
-          if (checkResult.rows.length > 0) {
+          await transactionClient.query("SAVEPOINT security_batch_item");
+          try {
+            // Check if the association already exists
+            const checkQuery =
+              "SELECT 1 FROM job_pay_codes WHERE job_id = $1 AND pay_code_id = $2";
+            const checkResult = await (transactionClient || pool).query(checkQuery, [
+              job_id,
+              pay_code_id,
+            ]);
+
+            if (checkResult.rows.length > 0) {
+              errors.push({
+                job_id,
+                pay_code_id,
+                message: "Association already exists",
+              });
+              continue; // Skip this one and continue with the next
+            }
+
+            // Insert with default NULL overrides
+            const insertQuery = `
+            INSERT INTO job_pay_codes (job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
+            VALUES ($1, $2, $3, NULL, NULL, NULL)
+            RETURNING *
+          `;
+            const result = await (transactionClient || pool).query(insertQuery, [
+              job_id,
+              pay_code_id,
+              is_default,
+            ]);
+            results.push(result.rows[0]);
+            successCount++;
+
+            // Add to list of affected jobs
+            affectedJobs.add(job_id);
+          } catch (error) {
+            await transactionClient.query("ROLLBACK TO SAVEPOINT security_batch_item");
+            // Handle individual entry errors
             errors.push({
               job_id,
               pay_code_id,
-              message: "Association already exists",
+              message:
+                error.code === "23503"
+                  ? "Invalid job_id or pay_code_id"
+                  : error.message,
             });
-            continue; // Skip this one and continue with the next
+          } finally {
+            await transactionClient.query("RELEASE SAVEPOINT security_batch_item");
+          }
+        }
+
+        if (successCount > 0) {
+          // Update timestamps for all affected jobs' staff
+          for (const jobId of affectedJobs) {
+            // Update the updated_at timestamp for all staff with this job
+            const updateStaffQuery = `
+            UPDATE staffs
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE job::jsonb ? $1
+          `;
+            await (transactionClient || pool).query(updateStaffQuery, [jobId]);
           }
 
-          // Insert with default NULL overrides
-          const insertQuery = `
-          INSERT INTO job_pay_codes (job_id, pay_code_id, is_default, override_rate_biasa, override_rate_ahad, override_rate_umum)
-          VALUES ($1, $2, $3, NULL, NULL, NULL)
-          RETURNING *
-        `;
-          const result = await pool.query(insertQuery, [
-            job_id,
-            pay_code_id,
-            is_default,
-          ]);
-          results.push(result.rows[0]);
-          successCount++;
+          // Update pay code timestamps for all affected pay codes
+          const uniquePayCodeIds = [...new Set(associations.map(a => a.pay_code_id))];
+          if (uniquePayCodeIds.length > 0) {
+            const updatePayCodeQuery = `
+              UPDATE pay_codes
+              SET updated_at = CURRENT_TIMESTAMP
+              WHERE id = ANY($1)
+            `;
+            await (transactionClient || pool).query(updatePayCodeQuery, [uniquePayCodeIds]);
+          }
 
-          // Add to list of affected jobs
-          affectedJobs.add(job_id);
-        } catch (error) {
-          // Handle individual entry errors
-          errors.push({
-            job_id,
-            pay_code_id,
-            message:
-              error.code === "23503"
-                ? "Invalid job_id or pay_code_id"
-                : error.message,
+          if (transactionClient) {
+            await transactionClient.query("COMMIT");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(201).json({
+            message: `Successfully added ${successCount} of ${associations.length} associations`,
+            added: results,
+            errors: errors.length > 0 ? errors : undefined,
+          });
+        } else {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Failed to add any associations",
+            errors,
           });
         }
-      }
-
-      if (successCount > 0) {
-        // Update timestamps for all affected jobs' staff
-        for (const jobId of affectedJobs) {
-          // Update the updated_at timestamp for all staff with this job
-          const updateStaffQuery = `
-          UPDATE staffs 
-          SET updated_at = CURRENT_TIMESTAMP 
-          WHERE job::jsonb ? $1
-        `;
-          await pool.query(updateStaffQuery, [jobId]);
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
         }
-
-        // Update pay code timestamps for all affected pay codes
-        const uniquePayCodeIds = [...new Set(associations.map(a => a.pay_code_id))];
-        if (uniquePayCodeIds.length > 0) {
-          const updatePayCodeQuery = `
-            UPDATE pay_codes 
-            SET updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ANY($1)
-          `;
-          await pool.query(updatePayCodeQuery, [uniquePayCodeIds]);
-        }
-
-        await pool.query("COMMIT");
-        return res.status(201).json({
-          message: `Successfully added ${successCount} of ${associations.length} associations`,
-          added: results,
-          errors: errors.length > 0 ? errors : undefined,
-        });
-      } else {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Failed to add any associations",
-          errors,
+        console.error("Error in batch association:", error);
+        res.status(500).json({
+          message: "Error processing batch association",
+          error: error.message,
         });
       }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error in batch association:", error);
-      res.status(500).json({
-        message: "Error processing batch association",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Update override rates for a specific job-pay code association
   router.put("/:jobId/:payCodeId", async (req, res) => {
-    const { jobId, payCodeId } = req.params;
-    const {
-      override_rate_biasa,
-      override_rate_ahad,
-      override_rate_umum,
-      is_default,
-    } = req.body;
-
-    if (!jobId || !payCodeId) {
-      return res.status(400).json({
-        message: "Job ID and Pay Code ID are required in URL",
-      });
-    }
-
-    const fieldsToUpdate = [];
-    const values = [];
-    let valueIndex = 1;
-
-    // Helper functions - existing code remains unchanged
-    const addUpdateField = (fieldName, value) => {
-      if (value !== undefined) {
-        // Check if the key exists in the body
-        const parsedValue =
-          value === null || value === "" ? null : parseFloat(value);
-        if (parsedValue !== null && (isNaN(parsedValue) || parsedValue < 0)) {
-          throw new Error(
-            `Invalid value provided for ${fieldName}. Must be null or a non-negative number.`
-          );
-        }
-        fieldsToUpdate.push(`${fieldName} = $${valueIndex++}`);
-        values.push(parsedValue); // Add null or the parsed number to values array
-      }
-    };
-
-    // Helper to add boolean fields
-    const addBooleanField = (fieldName, value) => {
-      if (value !== undefined) {
-        fieldsToUpdate.push(`${fieldName} = $${valueIndex++}`);
-        values.push(!!value); // Convert to boolean
-      }
-    };
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Begin transaction
-      await pool.query("BEGIN");
+      const { jobId, payCodeId } = req.params;
+      const {
+        override_rate_biasa,
+        override_rate_ahad,
+        override_rate_umum,
+        is_default,
+      } = req.body;
 
-      // Validation logic (unchanged)
-      addUpdateField("override_rate_biasa", override_rate_biasa);
-      addUpdateField("override_rate_ahad", override_rate_ahad);
-      addUpdateField("override_rate_umum", override_rate_umum);
-      addBooleanField("is_default", is_default);
-
-      if (fieldsToUpdate.length === 0) {
-        await pool.query("ROLLBACK");
-        return res
-          .status(400)
-          .json({ message: "No update fields provided in the request body" });
+      if (!jobId || !payCodeId) {
+        return res.status(400).json({
+          message: "Job ID and Pay Code ID are required in URL",
+        });
       }
 
-      values.push(jobId);
-      values.push(payCodeId);
+      const fieldsToUpdate = [];
+      const values = [];
+      let valueIndex = 1;
 
-      const query = `
-      UPDATE job_pay_codes
-      SET ${fieldsToUpdate.join(", ")}
-      WHERE job_id = $${valueIndex++} AND pay_code_id = $${valueIndex++}
-      RETURNING *
-    `;
-
-      const result = await pool.query(query, values);
-
-      if (result.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res
-          .status(404)
-          .json({ message: "Job-PayCode association not found" });
-      }
-
-      // Update the updated_at timestamp for all staff with this job
-      const updateStaffQuery = `
-      UPDATE staffs 
-      SET updated_at = CURRENT_TIMESTAMP 
-      WHERE job::jsonb ? $1
-    `;
-      await pool.query(updateStaffQuery, [jobId]);
-
-      // Commit transaction
-      await pool.query("COMMIT");
-
-      // Format response data
-      const updatedRecord = {
-        ...result.rows[0],
-        override_rate_biasa:
-          result.rows[0].override_rate_biasa === null
-            ? null
-            : parseFloat(result.rows[0].override_rate_biasa),
-        override_rate_ahad:
-          result.rows[0].override_rate_ahad === null
-            ? null
-            : parseFloat(result.rows[0].override_rate_ahad),
-        override_rate_umum:
-          result.rows[0].override_rate_umum === null
-            ? null
-            : parseFloat(result.rows[0].override_rate_umum),
-        is_default: !!result.rows[0].is_default,
+      // Helper functions - existing code remains unchanged
+      const addUpdateField = (fieldName, value) => {
+        if (value !== undefined) {
+          // Check if the key exists in the body
+          const parsedValue =
+            value === null || value === "" ? null : parseFloat(value);
+          if (parsedValue !== null && (isNaN(parsedValue) || parsedValue < 0)) {
+            throw new Error(
+              `Invalid value provided for ${fieldName}. Must be null or a non-negative number.`
+            );
+          }
+          fieldsToUpdate.push(`${fieldName} = $${valueIndex++}`);
+          values.push(parsedValue); // Add null or the parsed number to values array
+        }
       };
 
-      res.json({
-        message: "Settings updated successfully",
-        updated: updatedRecord,
-      });
+      // Helper to add boolean fields
+      const addBooleanField = (fieldName, value) => {
+        if (value !== undefined) {
+          fieldsToUpdate.push(`${fieldName} = $${valueIndex++}`);
+          values.push(!!value); // Convert to boolean
+        }
+      };
+
+      try {
+        // Begin transaction
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
+
+        // Validation logic (unchanged)
+        addUpdateField("override_rate_biasa", override_rate_biasa);
+        addUpdateField("override_rate_ahad", override_rate_ahad);
+        addUpdateField("override_rate_umum", override_rate_umum);
+        addBooleanField("is_default", is_default);
+
+        if (fieldsToUpdate.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res
+            .status(400)
+            .json({ message: "No update fields provided in the request body" });
+        }
+
+        values.push(jobId);
+        values.push(payCodeId);
+
+        const query = `
+        UPDATE job_pay_codes
+        SET ${fieldsToUpdate.join(", ")}
+        WHERE job_id = $${valueIndex++} AND pay_code_id = $${valueIndex++}
+        RETURNING *
+      `;
+
+        const result = await (transactionClient || pool).query(query, values);
+
+        if (result.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res
+            .status(404)
+            .json({ message: "Job-PayCode association not found" });
+        }
+
+        // Update the updated_at timestamp for all staff with this job
+        const updateStaffQuery = `
+        UPDATE staffs
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE job::jsonb ? $1
+      `;
+        await (transactionClient || pool).query(updateStaffQuery, [jobId]);
+
+        // Commit transaction
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        // Format response data
+        const updatedRecord = {
+          ...result.rows[0],
+          override_rate_biasa:
+            result.rows[0].override_rate_biasa === null
+              ? null
+              : parseFloat(result.rows[0].override_rate_biasa),
+          override_rate_ahad:
+            result.rows[0].override_rate_ahad === null
+              ? null
+              : parseFloat(result.rows[0].override_rate_ahad),
+          override_rate_umum:
+            result.rows[0].override_rate_umum === null
+              ? null
+              : parseFloat(result.rows[0].override_rate_umum),
+          is_default: !!result.rows[0].is_default,
+        };
+
+        res.json({
+          message: "Settings updated successfully",
+          updated: updatedRecord,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error updating job-pay code settings:", error);
+        res.status(500).json({
+          message: "Error updating job-pay code settings",
+          error: error.message,
+        });
+      }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error updating job-pay code settings:", error);
-      res.status(500).json({
-        message: "Error updating job-pay code settings",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Remove a pay code association from a job
   router.delete("/:jobId/:payCodeId", async (req, res) => {
-    const { jobId, payCodeId } = req.params;
-
-    if (!jobId || !payCodeId) {
-      return res
-        .status(400)
-        .json({ message: "Job ID and Pay Code ID are required in URL" });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Begin transaction
-      await pool.query("BEGIN");
+      const { jobId, payCodeId } = req.params;
 
-      const query = `
-      DELETE FROM job_pay_codes
-      WHERE job_id = $1 AND pay_code_id = $2
-      RETURNING job_id, pay_code_id
-    `;
-
-      const result = await pool.query(query, [jobId, payCodeId]);
-
-      if (result.rows.length === 0) {
-        await pool.query("ROLLBACK");
+      if (!jobId || !payCodeId) {
         return res
-          .status(404)
-          .json({ message: "Job-PayCode association not found" });
+          .status(400)
+          .json({ message: "Job ID and Pay Code ID are required in URL" });
       }
 
-      // Update the updated_at timestamp for all staff with this job
-      const updateStaffQuery = `
-      UPDATE staffs 
-      SET updated_at = CURRENT_TIMESTAMP 
-      WHERE job::jsonb ? $1
-    `;
-      await pool.query(updateStaffQuery, [jobId]);
+      try {
+        // Begin transaction
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      // Commit transaction
-      await pool.query("COMMIT");
+        const query = `
+        DELETE FROM job_pay_codes
+        WHERE job_id = $1 AND pay_code_id = $2
+        RETURNING job_id, pay_code_id
+      `;
 
-      res.status(200).json({
-        message: "Pay code removed from job successfully",
-        removed: result.rows[0],
-      });
+        const result = await (transactionClient || pool).query(query, [jobId, payCodeId]);
+
+        if (result.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res
+            .status(404)
+            .json({ message: "Job-PayCode association not found" });
+        }
+
+        // Update the updated_at timestamp for all staff with this job
+        const updateStaffQuery = `
+        UPDATE staffs
+        SET updated_at = CURRENT_TIMESTAMP
+        WHERE job::jsonb ? $1
+      `;
+        await (transactionClient || pool).query(updateStaffQuery, [jobId]);
+
+        // Commit transaction
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.status(200).json({
+          message: "Pay code removed from job successfully",
+          removed: result.rows[0],
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error removing pay code from job:", error);
+        res.status(500).json({
+          message: "Error removing pay code from job",
+          error: error.message,
+        });
+      }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error removing pay code from job:", error);
-      res.status(500).json({
-        message: "Error removing pay code from job",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Batch update is_default for multiple job-pay code associations
   router.put("/batch-default", async (req, res) => {
-    const { items, is_default } = req.body;
-
-    if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "Items array is required and must not be empty" });
-    }
-
-    if (typeof is_default !== "boolean") {
-      return res.status(400).json({ message: "is_default must be a boolean value" });
-    }
-
-    // Validate all items have required fields
-    for (const item of items) {
-      if (!item.job_id || !item.pay_code_id) {
-        return res.status(400).json({
-          message: "All items must have job_id and pay_code_id",
-          invalid_item: item,
-        });
-      }
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { items, is_default } = req.body;
 
-      let updatedCount = 0;
-      const affectedJobIds = new Set();
-      const affectedPayCodeIds = new Set();
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ message: "Items array is required and must not be empty" });
+      }
 
-      // Update each item
+      if (typeof is_default !== "boolean") {
+        return res.status(400).json({ message: "is_default must be a boolean value" });
+      }
+
+      // Validate all items have required fields
       for (const item of items) {
-        const updateQuery = `
-          UPDATE job_pay_codes
-          SET is_default = $1
-          WHERE job_id = $2 AND pay_code_id = $3
-          RETURNING job_id, pay_code_id
-        `;
-        const result = await pool.query(updateQuery, [is_default, item.job_id, item.pay_code_id]);
-        if (result.rowCount > 0) {
-          updatedCount++;
-          affectedJobIds.add(item.job_id);
-          affectedPayCodeIds.add(item.pay_code_id);
-        }
-      }
-
-      // Update staff timestamps for all affected jobs
-      if (affectedJobIds.size > 0) {
-        const jobIdsArray = Array.from(affectedJobIds);
-        for (const jobId of jobIdsArray) {
-          const updateStaffQuery = `
-            UPDATE staffs
-            SET updated_at = CURRENT_TIMESTAMP
-            WHERE job::jsonb ? $1
-          `;
-          await pool.query(updateStaffQuery, [jobId]);
-        }
-      }
-
-      // Update pay codes' updated_at timestamps
-      if (affectedPayCodeIds.size > 0) {
-        const updatePayCodesQuery = `
-          UPDATE pay_codes
-          SET updated_at = CURRENT_TIMESTAMP
-          WHERE id = ANY($1::text[])
-        `;
-        await pool.query(updatePayCodesQuery, [Array.from(affectedPayCodeIds)]);
-      }
-
-      await pool.query("COMMIT");
-
-      res.json({
-        message: `Successfully updated ${updatedCount} pay code(s)`,
-        updated_count: updatedCount,
-      });
-    } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error in batch default update:", error);
-      res.status(500).json({
-        message: "Error processing batch default update",
-        error: error.message,
-      });
-    }
-  });
-
-  // Batch delete multiple pay code associations
-  router.post("/batch-delete", async (req, res) => {
-    const { items } = req.body;
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "An array of items to delete is required" });
-    }
-
-    try {
-      // Validate all entries first
-      for (const item of items) {
-        const { job_id, pay_code_id } = item;
-        if (!job_id || !pay_code_id) {
+        if (!item.job_id || !item.pay_code_id) {
           return res.status(400).json({
             message: "All items must have job_id and pay_code_id",
             invalid_item: item,
@@ -635,87 +670,222 @@ export default function (pool) {
         }
       }
 
-      await pool.query("BEGIN");
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      const results = [];
-      const errors = [];
-      let successCount = 0;
-      const affectedJobs = new Set(); // Track affected jobs for timestamp updates
+        let updatedCount = 0;
+        const affectedJobIds = new Set();
+        const affectedPayCodeIds = new Set();
 
-      for (const item of items) {
-        const { job_id, pay_code_id } = item;
-
-        try {
-          const query = `
-          DELETE FROM job_pay_codes
-          WHERE job_id = $1 AND pay_code_id = $2
-          RETURNING job_id, pay_code_id
-        `;
-          const result = await pool.query(query, [job_id, pay_code_id]);
-
-          if (result.rows.length > 0) {
-            results.push(result.rows[0]);
-            successCount++;
-            affectedJobs.add(job_id);
-          } else {
-            errors.push({
-              job_id,
-              pay_code_id,
-              message: "Association not found",
-            });
-          }
-        } catch (error) {
-          errors.push({
-            job_id,
-            pay_code_id,
-            message: error.message,
-          });
-        }
-      }
-
-      if (successCount > 0) {
-        // Update timestamps for all affected jobs' staff
-        for (const jobId of affectedJobs) {
-          // Update the updated_at timestamp for all staff with this job
-          const updateStaffQuery = `
-          UPDATE staffs 
-          SET updated_at = CURRENT_TIMESTAMP 
-          WHERE job::jsonb ? $1
-        `;
-          await pool.query(updateStaffQuery, [jobId]);
-        }
-
-        // Update pay code timestamps for all affected pay codes
-        const uniquePayCodeIds = [...new Set(items.map(i => i.pay_code_id))];
-        if (uniquePayCodeIds.length > 0) {
-          const updatePayCodeQuery = `
-            UPDATE pay_codes 
-            SET updated_at = CURRENT_TIMESTAMP 
-            WHERE id = ANY($1)
+        // Update each item
+        for (const item of items) {
+          const updateQuery = `
+            UPDATE job_pay_codes
+            SET is_default = $1
+            WHERE job_id = $2 AND pay_code_id = $3
+            RETURNING job_id, pay_code_id
           `;
-          await pool.query(updatePayCodeQuery, [uniquePayCodeIds]);
+          const result = await (transactionClient || pool).query(updateQuery, [is_default, item.job_id, item.pay_code_id]);
+          if (result.rowCount > 0) {
+            updatedCount++;
+            affectedJobIds.add(item.job_id);
+            affectedPayCodeIds.add(item.pay_code_id);
+          }
         }
 
-        await pool.query("COMMIT");
-        return res.status(200).json({
-          message: `Successfully removed ${successCount} of ${items.length} associations`,
-          removed: results,
-          errors: errors.length > 0 ? errors : undefined,
+        // Update staff timestamps for all affected jobs
+        if (affectedJobIds.size > 0) {
+          const jobIdsArray = Array.from(affectedJobIds);
+          for (const jobId of jobIdsArray) {
+            const updateStaffQuery = `
+              UPDATE staffs
+              SET updated_at = CURRENT_TIMESTAMP
+              WHERE job::jsonb ? $1
+            `;
+            await (transactionClient || pool).query(updateStaffQuery, [jobId]);
+          }
+        }
+
+        // Update pay codes' updated_at timestamps
+        if (affectedPayCodeIds.size > 0) {
+          const updatePayCodesQuery = `
+            UPDATE pay_codes
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = ANY($1::text[])
+          `;
+          await (transactionClient || pool).query(updatePayCodesQuery, [Array.from(affectedPayCodeIds)]);
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.json({
+          message: `Successfully updated ${updatedCount} pay code(s)`,
+          updated_count: updatedCount,
         });
-      } else {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Failed to remove any associations",
-          errors,
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error in batch default update:", error);
+        res.status(500).json({
+          message: "Error processing batch default update",
+          error: error.message,
         });
       }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error in batch deletion:", error);
-      res.status(500).json({
-        message: "Error processing batch deletion",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
+    }
+  });
+
+  // Batch delete multiple pay code associations
+  router.post("/batch-delete", async (req, res) => {
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
+    try {
+      const { items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "An array of items to delete is required" });
+      }
+
+      try {
+        // Validate all entries first
+        for (const item of items) {
+          const { job_id, pay_code_id } = item;
+          if (!job_id || !pay_code_id) {
+            return res.status(400).json({
+              message: "All items must have job_id and pay_code_id",
+              invalid_item: item,
+            });
+          }
+        }
+
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
+
+        const results = [];
+        const errors = [];
+        let successCount = 0;
+        const affectedJobs = new Set(); // Track affected jobs for timestamp updates
+
+        for (const item of items) {
+          const { job_id, pay_code_id } = item;
+
+          await transactionClient.query("SAVEPOINT security_batch_item");
+          try {
+            const query = `
+            DELETE FROM job_pay_codes
+            WHERE job_id = $1 AND pay_code_id = $2
+            RETURNING job_id, pay_code_id
+          `;
+            const result = await (transactionClient || pool).query(query, [job_id, pay_code_id]);
+
+            if (result.rows.length > 0) {
+              results.push(result.rows[0]);
+              successCount++;
+              affectedJobs.add(job_id);
+            } else {
+              errors.push({
+                job_id,
+                pay_code_id,
+                message: "Association not found",
+              });
+            }
+          } catch (error) {
+            await transactionClient.query("ROLLBACK TO SAVEPOINT security_batch_item");
+            errors.push({
+              job_id,
+              pay_code_id,
+              message: error.message,
+            });
+          } finally {
+            await transactionClient.query("RELEASE SAVEPOINT security_batch_item");
+          }
+        }
+
+        if (successCount > 0) {
+          // Update timestamps for all affected jobs' staff
+          for (const jobId of affectedJobs) {
+            // Update the updated_at timestamp for all staff with this job
+            const updateStaffQuery = `
+            UPDATE staffs
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE job::jsonb ? $1
+          `;
+            await (transactionClient || pool).query(updateStaffQuery, [jobId]);
+          }
+
+          // Update pay code timestamps for all affected pay codes
+          const uniquePayCodeIds = [...new Set(items.map(i => i.pay_code_id))];
+          if (uniquePayCodeIds.length > 0) {
+            const updatePayCodeQuery = `
+              UPDATE pay_codes
+              SET updated_at = CURRENT_TIMESTAMP
+              WHERE id = ANY($1)
+            `;
+            await (transactionClient || pool).query(updatePayCodeQuery, [uniquePayCodeIds]);
+          }
+
+          if (transactionClient) {
+            await transactionClient.query("COMMIT");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(200).json({
+            message: `Successfully removed ${successCount} of ${items.length} associations`,
+            removed: results,
+            errors: errors.length > 0 ? errors : undefined,
+          });
+        } else {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Failed to remove any associations",
+            errors,
+          });
+        }
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error in batch deletion:", error);
+        res.status(500).json({
+          message: "Error processing batch deletion",
+          error: error.message,
+        });
+      }
+    } catch (error) {
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 

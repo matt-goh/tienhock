@@ -71,76 +71,99 @@ export default function (pool) {
 
   // Batch import endpoint
   router.post("/batch", async (req, res) => {
-    const { holidays, overwrite = false } = req.body;
-
-    if (!holidays || !Array.isArray(holidays) || holidays.length === 0) {
-      return res
-        .status(400)
-        .json({ message: "No holidays provided for import" });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { holidays, overwrite = false } = req.body;
 
-      let insertedCount = 0;
-      let updatedCount = 0;
-      let skippedCount = 0;
-
-      for (const holiday of holidays) {
-        const { holiday_date, description, is_cuti_umum = true } = holiday;
-
-        // Check if holiday already exists
-        const checkQuery = `SELECT id FROM holiday_calendar WHERE holiday_date = $1`;
-        const checkResult = await pool.query(checkQuery, [holiday_date]);
-
-        if (checkResult.rows.length > 0) {
-          if (overwrite) {
-            // Update existing holiday
-            const updateQuery = `
-            UPDATE holiday_calendar
-            SET description = $1, is_cuti_umum = $2
-            WHERE holiday_date = $3
-          `;
-            await pool.query(updateQuery, [
-              description,
-              is_cuti_umum,
-              holiday_date,
-            ]);
-            updatedCount++;
-          } else {
-            // Skip duplicate
-            skippedCount++;
-          }
-        } else {
-          // Insert new holiday
-          const insertQuery = `
-          INSERT INTO holiday_calendar (holiday_date, description, is_active, is_cuti_umum)
-          VALUES ($1, $2, true, $3)
-        `;
-          await pool.query(insertQuery, [
-            holiday_date,
-            description,
-            is_cuti_umum,
-          ]);
-          insertedCount++;
-        }
+      if (!holidays || !Array.isArray(holidays) || holidays.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "No holidays provided for import" });
       }
 
-      await pool.query("COMMIT");
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      res.status(201).json({
-        message: "Holidays imported successfully",
-        inserted: insertedCount,
-        updated: updatedCount,
-        skipped: skippedCount,
-      });
+        let insertedCount = 0;
+        let updatedCount = 0;
+        let skippedCount = 0;
+
+        for (const holiday of holidays) {
+          const { holiday_date, description, is_cuti_umum = true } = holiday;
+
+          // Check if holiday already exists
+          const checkQuery = `SELECT id FROM holiday_calendar WHERE holiday_date = $1`;
+          const checkResult = await (transactionClient || pool).query(checkQuery, [holiday_date]);
+
+          if (checkResult.rows.length > 0) {
+            if (overwrite) {
+              // Update existing holiday
+              const updateQuery = `
+              UPDATE holiday_calendar
+              SET description = $1, is_cuti_umum = $2
+              WHERE holiday_date = $3
+            `;
+              await (transactionClient || pool).query(updateQuery, [
+                description,
+                is_cuti_umum,
+                holiday_date,
+              ]);
+              updatedCount++;
+            } else {
+              // Skip duplicate
+              skippedCount++;
+            }
+          } else {
+            // Insert new holiday
+            const insertQuery = `
+            INSERT INTO holiday_calendar (holiday_date, description, is_active, is_cuti_umum)
+            VALUES ($1, $2, true, $3)
+          `;
+            await (transactionClient || pool).query(insertQuery, [
+              holiday_date,
+              description,
+              is_cuti_umum,
+            ]);
+            insertedCount++;
+          }
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.status(201).json({
+          message: "Holidays imported successfully",
+          inserted: insertedCount,
+          updated: updatedCount,
+          skipped: skippedCount,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error importing holidays:", error);
+        res.status(500).json({
+          message: "Error importing holidays",
+          error: error.message,
+        });
+      }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error importing holidays:", error);
-      res.status(500).json({
-        message: "Error importing holidays",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
@@ -156,7 +179,7 @@ export default function (pool) {
     try {
       // Check if changing to a date that already exists
       const checkQuery = `
-        SELECT 1 FROM holiday_calendar 
+        SELECT 1 FROM holiday_calendar
         WHERE holiday_date = $1 AND id != $2
       `;
       const checkResult = await pool.query(checkQuery, [holiday_date, id]);

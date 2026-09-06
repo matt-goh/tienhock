@@ -1,0 +1,73 @@
+{
+  "date": "2026-09-05",
+  "assessment": "Source review plus targeted authentication HTTP regression tests with mocked database results; production unverified",
+  "sourceFilesParsed": 728,
+  "syntaxErrors": [],
+  "poolBeginSites": [],
+  "batchSavepointSites": 16,
+  "gitleaksDownloadChecksumMatchesUpstreamFile": true,
+  "i18nKeySymmetry": "passed",
+  "workflowYamlParsed": false,
+  "ciExecuted": false,
+  "applicationTestsRun": true,
+  "typeCheckRun": false,
+  "buildRun": false,
+  "lintRun": false,
+  "databaseChangesApplied": false,
+  "productionChanged": false,
+  "dockerAvailableAtFinalCheck": true,
+  "approvedAdministrators": [
+    "MILTI",
+    "TIMOTHY.G",
+    "HELEN",
+    "MATTHEW"
+  ],
+  "mobileCompatibilityException": true,
+  "sourceFileSelection": "Tracked and non-ignored untracked JS/TS sources, excluding declaration files",
+  "liveDatabaseApplicationTestsRun": false,
+  "sharedOfficePasswordsAccepted": true,
+  "personalPasswordMechanismRemoved": true,
+  "passwordMigrationRequired": false,
+  "authenticationRegression": {
+    "command": "node --test src/middleware/auth.test.js",
+    "productionCommandPowerShell": "$env:AUTH_TEST_ENV = 'production'; node --test src/middleware/auth.test.js",
+    "testsPerRun": 17,
+    "normalPassed": 17,
+    "productionSettingsPassed": 17,
+    "database": "mocked results only; no persistence or MyInvois calls",
+    "httpCoverage": [
+      "15 allowed mobile method/path/query combinations",
+      "mobile Origin/cookie independence",
+      "invalid queries and cross-company access denied",
+      "actual salesman-list handler response shape",
+      "cookie identity cannot be selected by the client",
+      "existing shared-password login without a password migration",
+      "administrator-only shared-credential provisioning"
+    ]
+  },
+  "mobileBaselineComparison": {
+    "commit": "3c08e5b2c226bb55e2f8c4509cee0ae5f78c37ac",
+    "allowlistAndCredentialValidationUnchanged": true,
+    "salesInvoiceEInvoiceAndCatalogueHandlersUnchanged": true,
+    "installedPhoneOrProductionTested": false,
+    "deploymentRequirement": "Keep MOBILE_API_KEY_SHA256 at the current installed-client key digest"
+  },
+  "developmentAdministratorReadOnlyCheck": {
+    "activeOfficeIdsPresent": [
+      "HELEN",
+      "MATTHEW",
+      "MILTI",
+      "TIMOTHY.G"
+    ],
+    "idsMissing": [],
+    "runtimeRolePresent": false,
+    "discardedPasswordColumnPresent": false,
+    "productionChecked": false,
+    "ownerCorrectedId": {
+      "from": "TIMOTHY",
+      "to": "TIMOTHY.G"
+    }
+  },
+  "subsequentDeploymentPreparation": "DEPLOYMENT_READINESS_EVIDENCE_2026-09-06.json",
+  "scopeNote": "The flags above describe the 5 September code-review pass. The linked 6 September evidence records later production role changes, a GitHub secret and restored-database testing."
+}

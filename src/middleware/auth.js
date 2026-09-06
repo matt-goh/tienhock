@@ -1,3 +1,4 @@
+import { readSessionCookie, requireBrowserOrigin } from "./security.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { NODE_ENV } from "../configs/config.js";
 
@@ -273,13 +274,13 @@ export const authMiddleware = (pool) => async (req, res, next) => {
     return next();
   }
 
-  const sessionId = sessionHeader.value;
+  requireBrowserOrigin(req, res, () => {});
+  if (res.headersSent) return;
+  const sessionId = readSessionCookie(req);
   if (!sessionId || !SESSION_ID_PATTERN.test(sessionId)) {
     return res.status(401).json({ message: "Valid session ID required" });
   }
 
-  const isSessionInitialization =
-    req.method === "POST" && requestPath === "/api/sessions/initialize";
 
   try {
     try {
@@ -305,9 +306,10 @@ export const authMiddleware = (pool) => async (req, res, next) => {
       WHERE s.session_id = $1
         AND s.staff_id IS NOT NULL
         AND s.status = 'active'
-        AND s.last_active > NOW() - INTERVAL '7 days'
+        AND s.last_active > NOW() - INTERVAL '8 hours'
+        AND s.created_at > NOW() - INTERVAL '12 hours'
         AND st.job ? 'OFFICE'
-        AND (st.date_resigned IS NULL OR st.date_resigned > CURRENT_DATE)
+        AND (st.date_resigned IS NULL OR st.date_resigned > (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kuala_Lumpur')::date)
     `;
 
     const sessionResult = await pool.query(sessionQuery, [sessionId]);
@@ -331,17 +333,6 @@ export const authMiddleware = (pool) => async (req, res, next) => {
     }
 
     const session = sessionResult.rows[0];
-
-    // A restored browser session may refresh itself, but it cannot use the
-    // initialization endpoint to switch the session to another staff member.
-    if (
-      isSessionInitialization &&
-      (req.body?.sessionId !== sessionId ||
-        typeof req.body?.staffId !== "string" ||
-        req.body.staffId !== String(session.staff_id))
-    ) {
-      return res.status(403).json({ message: "Session identity mismatch" });
-    }
 
     req.session = {
       ...session,

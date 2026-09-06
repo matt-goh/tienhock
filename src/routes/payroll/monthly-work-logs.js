@@ -304,379 +304,173 @@ export default function (pool) {
 
   // Create a new monthly work log
   router.post("/", async (req, res) => {
-    const {
-      logMonth,
-      logYear,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries,
-      updatedLeaveEntries,
-    } = req.body;
-
-    if (!employeeEntries || employeeEntries.length === 0) {
-      return res.status(400).json({
-        message: "At least one employee entry is required",
-      });
-    }
-
-    const invalidHoursEntry = employeeEntries.find((entry) =>
-      getMonthlyEntryHoursError(entry)
-    );
-    if (invalidHoursEntry) {
-      return res.status(400).json({
-        message: getMonthlyEntryHoursError(invalidHoursEntry),
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
-
-      // Check for duplicate (same month/year/section)
-      const duplicateCheck = `
-        SELECT id FROM monthly_work_logs
-        WHERE log_month = $1 AND log_year = $2 AND section = $3
-      `;
-      const duplicateResult = await pool.query(duplicateCheck, [
+      const {
         logMonth,
         logYear,
         section,
-      ]);
-
-      if (duplicateResult.rows.length > 0) {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: `A monthly log for ${section} in ${logMonth}/${logYear} already exists`,
-          existingId: duplicateResult.rows[0].id,
-        });
-      }
-
-      // Insert main monthly work log
-      const workLogQuery = `
-        INSERT INTO monthly_work_logs (
-          log_month, log_year, section, context_data, status
-        ) VALUES ($1, $2, $3, $4, $5)
-        RETURNING id
-      `;
-
-      const workLogResult = await pool.query(workLogQuery, [
-        logMonth,
-        logYear,
-        section,
-        contextData || {},
-        status || "Submitted",
-      ]);
-
-      const workLogId = workLogResult.rows[0].id;
-
-      // Insert employee entries and activities
-      for (const entry of employeeEntries) {
-        const { employeeId, jobType, activities } = entry;
-        const {
-          totalHours,
-          overtimeHours,
-          ahadHours,
-          ahadOvertimeHours,
-          umumHours,
-          umumOvertimeHours,
-        } =
-          getMonthlyEntryHours(entry);
-
-        // Insert employee entry
-        const entryQuery = `
-          INSERT INTO monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-          RETURNING id
-        `;
-
-        const entryResult = await pool.query(entryQuery, [
-          workLogId,
-          employeeId,
-          jobType,
-          totalHours,
-          overtimeHours || 0,
-          ahadHours || 0,
-          ahadOvertimeHours || 0,
-          umumHours || 0,
-          umumOvertimeHours || 0,
-        ]);
-
-        const entryId = entryResult.rows[0].id;
-
-        // Insert activities for this employee entry
-        if (activities && activities.length > 0) {
-          for (const activity of activities) {
-            if (activity.isSelected) {
-              const activityQuery = `
-                INSERT INTO monthly_work_log_activities (
-                  monthly_entry_id, pay_code_id, description, hours_applied,
-                  units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-              `;
-
-              await pool.query(activityQuery, [
-                entryId,
-                activity.payCodeId,
-                activity.description || null,
-                activity.hoursApplied || null,
-                activity.unitsProduced || null,
-                parseFloat(activity.rate),
-                parseFloat(activity.calculatedAmount),
-                activity.isManuallyAdded || false,
-              ]);
-            }
-          }
-        }
-      }
-
-      // Insert leave records if any
-      if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
-        for (const leave of leaveEntries) {
-          const { employeeId, leaveDate, leaveType, amount_paid, activities } = leave;
-          const leaveAmount = parseLeaveAmount(amount_paid);
-
-          if (leaveAmount === null) {
-            await pool.query("ROLLBACK");
-            return res.status(400).json({
-              message: "Leave amount must be a non-negative number",
-            });
-          }
-
-          // Check if leave record already exists for this date/employee
-          const existingLeave = await pool.query(
-            `SELECT id FROM leave_records WHERE employee_id = $1 AND leave_date = $2`,
-            [employeeId, leaveDate]
-          );
-
-          if (existingLeave.rows.length === 0) {
-            // Insert new leave record (not linked to monthly_log, but to individual date)
-            const leaveQuery = `
-              INSERT INTO leave_records (
-                employee_id, leave_date, leave_type, days_taken, status, amount_paid
-              ) VALUES ($1, $2, $3, $4, 'approved', $5)
-            `;
-            await pool.query(leaveQuery, [
-              employeeId,
-              leaveDate,
-              leaveType,
-              1.0,
-              leaveAmount,
-            ]);
-          }
-        }
-      }
-
-      // Update existing saved leave amounts if any
-      if (
-        updatedLeaveEntries &&
-        Array.isArray(updatedLeaveEntries) &&
-        updatedLeaveEntries.length > 0
-      ) {
-        for (const leave of updatedLeaveEntries) {
-          const { id: leaveId, amount_paid } = leave;
-          const leaveAmount = parseLeaveAmount(amount_paid);
-
-          if (!leaveId || leaveAmount === null) {
-            await pool.query("ROLLBACK");
-            return res.status(400).json({
-              message: "Leave amount must be a non-negative number",
-            });
-          }
-
-          await pool.query(
-            "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
-            [leaveAmount, leaveId]
-          );
-        }
-      }
-
-      await pool.query("COMMIT");
-
-      res.status(201).json({
-        message: "Monthly work log created successfully",
-        workLogId,
-      });
-    } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error creating monthly work log:", error);
-      res.status(500).json({
-        message: "Error creating monthly work log",
-        error: error.message,
-      });
-    }
-  });
-
-  // Update existing monthly work log
-  router.put("/:id", async (req, res) => {
-    const { id } = req.params;
-    const {
-      logMonth,
-      logYear,
-      section,
-      contextData,
-      status,
-      employeeEntries,
-      leaveEntries,
-      updatedLeaveEntries,
-      deletedLeaveIds,
-    } = req.body;
-
-    if (!employeeEntries || employeeEntries.length === 0) {
-      return res.status(400).json({
-        message: "At least one employee entry is required",
-      });
-    }
-
-    const invalidHoursEntry = employeeEntries.find((entry) =>
-      getMonthlyEntryHoursError(entry)
-    );
-    if (invalidHoursEntry) {
-      return res.status(400).json({
-        message: getMonthlyEntryHoursError(invalidHoursEntry),
-      });
-    }
-
-    try {
-      await pool.query("BEGIN");
-
-      // Check if the work log exists and is not processed
-      const checkQuery = `
-        SELECT status FROM monthly_work_logs WHERE id = $1
-      `;
-      const checkResult = await pool.query(checkQuery, [id]);
-
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Monthly work log not found" });
-      }
-
-      if (checkResult.rows[0].status === "Processed") {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot edit processed monthly work log",
-        });
-      }
-
-      // Update main monthly work log
-      const updateQuery = `
-        UPDATE monthly_work_logs
-        SET log_month = $1, log_year = $2, section = $3,
-            context_data = $4, status = $5, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $6
-      `;
-
-      await pool.query(updateQuery, [
-        logMonth,
-        logYear,
-        section,
-        contextData || {},
+        contextData,
         status,
-        id,
-      ]);
+        employeeEntries,
+        leaveEntries,
+        updatedLeaveEntries,
+      } = req.body;
 
-      // Delete old entries (cascade will handle activities)
-      await pool.query(
-        "DELETE FROM monthly_work_log_entries WHERE monthly_log_id = $1",
-        [id]
+      if (!employeeEntries || employeeEntries.length === 0) {
+        return res.status(400).json({
+          message: "At least one employee entry is required",
+        });
+      }
+
+      const invalidHoursEntry = employeeEntries.find((entry) =>
+        getMonthlyEntryHoursError(entry)
       );
+      if (invalidHoursEntry) {
+        return res.status(400).json({
+          message: getMonthlyEntryHoursError(invalidHoursEntry),
+        });
+      }
 
-      // Insert updated employee entries and activities
-      for (const entry of employeeEntries) {
-        const { employeeId, jobType, activities } = entry;
-        const {
-          totalHours,
-          overtimeHours,
-          ahadHours,
-          ahadOvertimeHours,
-          umumHours,
-          umumOvertimeHours,
-        } =
-          getMonthlyEntryHours(entry);
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-        const entryQuery = `
-          INSERT INTO monthly_work_log_entries (
-            monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
-            ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        // Check for duplicate (same month/year/section)
+        const duplicateCheck = `
+          SELECT id FROM monthly_work_logs
+          WHERE log_month = $1 AND log_year = $2 AND section = $3
+        `;
+        const duplicateResult = await (transactionClient || pool).query(duplicateCheck, [
+          logMonth,
+          logYear,
+          section,
+        ]);
+
+        if (duplicateResult.rows.length > 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: `A monthly log for ${section} in ${logMonth}/${logYear} already exists`,
+            existingId: duplicateResult.rows[0].id,
+          });
+        }
+
+        // Insert main monthly work log
+        const workLogQuery = `
+          INSERT INTO monthly_work_logs (
+            log_month, log_year, section, context_data, status
+          ) VALUES ($1, $2, $3, $4, $5)
           RETURNING id
         `;
 
-        const entryResult = await pool.query(entryQuery, [
-          id,
-          employeeId,
-          jobType,
-          totalHours,
-          overtimeHours || 0,
-          ahadHours || 0,
-          ahadOvertimeHours || 0,
-          umumHours || 0,
-          umumOvertimeHours || 0,
+        const workLogResult = await (transactionClient || pool).query(workLogQuery, [
+          logMonth,
+          logYear,
+          section,
+          contextData || {},
+          status || "Submitted",
         ]);
 
-        const entryId = entryResult.rows[0].id;
+        const workLogId = workLogResult.rows[0].id;
 
-        if (activities && activities.length > 0) {
-          for (const activity of activities) {
-            if (activity.isSelected) {
-              const activityQuery = `
-                INSERT INTO monthly_work_log_activities (
-                  monthly_entry_id, pay_code_id, description, hours_applied,
-                  units_produced, rate_used, calculated_amount, is_manually_added
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-              `;
+        // Insert employee entries and activities
+        for (const entry of employeeEntries) {
+          const { employeeId, jobType, activities } = entry;
+          const {
+            totalHours,
+            overtimeHours,
+            ahadHours,
+            ahadOvertimeHours,
+            umumHours,
+            umumOvertimeHours,
+          } =
+            getMonthlyEntryHours(entry);
 
-              await pool.query(activityQuery, [
-                entryId,
-                activity.payCodeId,
-                activity.description || null,
-                activity.hoursApplied || null,
-                activity.unitsProduced || null,
-                parseFloat(activity.rate),
-                parseFloat(activity.calculatedAmount),
-                activity.isManuallyAdded || false,
-              ]);
+          // Insert employee entry
+          const entryQuery = `
+            INSERT INTO monthly_work_log_entries (
+              monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+              ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id
+          `;
+
+          const entryResult = await (transactionClient || pool).query(entryQuery, [
+            workLogId,
+            employeeId,
+            jobType,
+            totalHours,
+            overtimeHours || 0,
+            ahadHours || 0,
+            ahadOvertimeHours || 0,
+            umumHours || 0,
+            umumOvertimeHours || 0,
+          ]);
+
+          const entryId = entryResult.rows[0].id;
+
+          // Insert activities for this employee entry
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                const activityQuery = `
+                  INSERT INTO monthly_work_log_activities (
+                    monthly_entry_id, pay_code_id, description, hours_applied,
+                    units_produced, rate_used, calculated_amount, is_manually_added
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `;
+
+                await (transactionClient || pool).query(activityQuery, [
+                  entryId,
+                  activity.payCodeId,
+                  activity.description || null,
+                  activity.hoursApplied || null,
+                  activity.unitsProduced || null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  activity.isManuallyAdded || false,
+                ]);
+              }
             }
           }
         }
-      }
 
-      // Delete specified leave records
-      if (deletedLeaveIds && Array.isArray(deletedLeaveIds) && deletedLeaveIds.length > 0) {
-        for (const leaveId of deletedLeaveIds) {
-          await pool.query("DELETE FROM leave_records WHERE id = $1", [leaveId]);
-        }
-      }
-
-      // Handle leave entries - only insert new ones
-      if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
-        for (const leave of leaveEntries) {
-          if (leave.isNew) {
-            const { employeeId, leaveDate, leaveType, amount_paid } = leave;
+        // Insert leave records if any
+        if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+          for (const leave of leaveEntries) {
+            const { employeeId, leaveDate, leaveType, amount_paid, activities } = leave;
             const leaveAmount = parseLeaveAmount(amount_paid);
 
             if (leaveAmount === null) {
-              await pool.query("ROLLBACK");
+              if (transactionClient) {
+                await transactionClient.query("ROLLBACK");
+                transactionClient.release();
+                transactionClient = null;
+              }
               return res.status(400).json({
                 message: "Leave amount must be a non-negative number",
               });
             }
 
-            // Check if leave record already exists
-            const existingLeave = await pool.query(
+            // Check if leave record already exists for this date/employee
+            const existingLeave = await (transactionClient || pool).query(
               `SELECT id FROM leave_records WHERE employee_id = $1 AND leave_date = $2`,
               [employeeId, leaveDate]
             );
 
             if (existingLeave.rows.length === 0) {
+              // Insert new leave record (not linked to monthly_log, but to individual date)
               const leaveQuery = `
                 INSERT INTO leave_records (
                   employee_id, leave_date, leave_type, days_taken, status, amount_paid
                 ) VALUES ($1, $2, $3, $4, 'approved', $5)
               `;
-              await pool.query(leaveQuery, [
+              await (transactionClient || pool).query(leaveQuery, [
                 employeeId,
                 leaveDate,
                 leaveType,
@@ -686,86 +480,397 @@ export default function (pool) {
             }
           }
         }
-      }
 
-      // Update existing saved leave amounts if any
-      if (
-        updatedLeaveEntries &&
-        Array.isArray(updatedLeaveEntries) &&
-        updatedLeaveEntries.length > 0
-      ) {
-        for (const leave of updatedLeaveEntries) {
-          const { id: leaveId, amount_paid } = leave;
-          const leaveAmount = parseLeaveAmount(amount_paid);
+        // Update existing saved leave amounts if any
+        if (
+          updatedLeaveEntries &&
+          Array.isArray(updatedLeaveEntries) &&
+          updatedLeaveEntries.length > 0
+        ) {
+          for (const leave of updatedLeaveEntries) {
+            const { id: leaveId, amount_paid } = leave;
+            const leaveAmount = parseLeaveAmount(amount_paid);
 
-          if (!leaveId || leaveAmount === null) {
-            await pool.query("ROLLBACK");
-            return res.status(400).json({
-              message: "Leave amount must be a non-negative number",
-            });
+            if (!leaveId || leaveAmount === null) {
+              if (transactionClient) {
+                await transactionClient.query("ROLLBACK");
+                transactionClient.release();
+                transactionClient = null;
+              }
+              return res.status(400).json({
+                message: "Leave amount must be a non-negative number",
+              });
+            }
+
+            await (transactionClient || pool).query(
+              "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
+              [leaveAmount, leaveId]
+            );
           }
-
-          await pool.query(
-            "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
-            [leaveAmount, leaveId]
-          );
         }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.status(201).json({
+          message: "Monthly work log created successfully",
+          workLogId,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error creating monthly work log:", error);
+        res.status(500).json({
+          message: "Error creating monthly work log",
+          error: error.message,
+        });
+      }
+    } catch (error) {
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
+    }
+  });
+
+  // Update existing monthly work log
+  router.put("/:id", async (req, res) => {
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
+    try {
+      const { id } = req.params;
+      const {
+        logMonth,
+        logYear,
+        section,
+        contextData,
+        status,
+        employeeEntries,
+        leaveEntries,
+        updatedLeaveEntries,
+        deletedLeaveIds,
+      } = req.body;
+
+      if (!employeeEntries || employeeEntries.length === 0) {
+        return res.status(400).json({
+          message: "At least one employee entry is required",
+        });
       }
 
-      await pool.query("COMMIT");
+      const invalidHoursEntry = employeeEntries.find((entry) =>
+        getMonthlyEntryHoursError(entry)
+      );
+      if (invalidHoursEntry) {
+        return res.status(400).json({
+          message: getMonthlyEntryHoursError(invalidHoursEntry),
+        });
+      }
 
-      res.json({
-        message: "Monthly work log updated successfully",
-        workLogId: id,
-      });
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
+
+        // Check if the work log exists and is not processed
+        const checkQuery = `
+          SELECT status FROM monthly_work_logs WHERE id = $1
+        `;
+        const checkResult = await (transactionClient || pool).query(checkQuery, [id]);
+
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Monthly work log not found" });
+        }
+
+        if (checkResult.rows[0].status === "Processed") {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Cannot edit processed monthly work log",
+          });
+        }
+
+        // Update main monthly work log
+        const updateQuery = `
+          UPDATE monthly_work_logs
+          SET log_month = $1, log_year = $2, section = $3,
+              context_data = $4, status = $5, updated_at = CURRENT_TIMESTAMP
+          WHERE id = $6
+        `;
+
+        await (transactionClient || pool).query(updateQuery, [
+          logMonth,
+          logYear,
+          section,
+          contextData || {},
+          status,
+          id,
+        ]);
+
+        // Delete old entries (cascade will handle activities)
+        await (transactionClient || pool).query(
+          "DELETE FROM monthly_work_log_entries WHERE monthly_log_id = $1",
+          [id]
+        );
+
+        // Insert updated employee entries and activities
+        for (const entry of employeeEntries) {
+          const { employeeId, jobType, activities } = entry;
+          const {
+            totalHours,
+            overtimeHours,
+            ahadHours,
+            ahadOvertimeHours,
+            umumHours,
+            umumOvertimeHours,
+          } =
+            getMonthlyEntryHours(entry);
+
+          const entryQuery = `
+            INSERT INTO monthly_work_log_entries (
+              monthly_log_id, employee_id, job_id, total_hours, overtime_hours,
+              ahad_hours, ahad_overtime_hours, umum_hours, umum_overtime_hours
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id
+          `;
+
+          const entryResult = await (transactionClient || pool).query(entryQuery, [
+            id,
+            employeeId,
+            jobType,
+            totalHours,
+            overtimeHours || 0,
+            ahadHours || 0,
+            ahadOvertimeHours || 0,
+            umumHours || 0,
+            umumOvertimeHours || 0,
+          ]);
+
+          const entryId = entryResult.rows[0].id;
+
+          if (activities && activities.length > 0) {
+            for (const activity of activities) {
+              if (activity.isSelected) {
+                const activityQuery = `
+                  INSERT INTO monthly_work_log_activities (
+                    monthly_entry_id, pay_code_id, description, hours_applied,
+                    units_produced, rate_used, calculated_amount, is_manually_added
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                `;
+
+                await (transactionClient || pool).query(activityQuery, [
+                  entryId,
+                  activity.payCodeId,
+                  activity.description || null,
+                  activity.hoursApplied || null,
+                  activity.unitsProduced || null,
+                  parseFloat(activity.rate),
+                  parseFloat(activity.calculatedAmount),
+                  activity.isManuallyAdded || false,
+                ]);
+              }
+            }
+          }
+        }
+
+        // Delete specified leave records
+        if (deletedLeaveIds && Array.isArray(deletedLeaveIds) && deletedLeaveIds.length > 0) {
+          for (const leaveId of deletedLeaveIds) {
+            await (transactionClient || pool).query("DELETE FROM leave_records WHERE id = $1", [leaveId]);
+          }
+        }
+
+        // Handle leave entries - only insert new ones
+        if (leaveEntries && Array.isArray(leaveEntries) && leaveEntries.length > 0) {
+          for (const leave of leaveEntries) {
+            if (leave.isNew) {
+              const { employeeId, leaveDate, leaveType, amount_paid } = leave;
+              const leaveAmount = parseLeaveAmount(amount_paid);
+
+              if (leaveAmount === null) {
+                if (transactionClient) {
+                  await transactionClient.query("ROLLBACK");
+                  transactionClient.release();
+                  transactionClient = null;
+                }
+                return res.status(400).json({
+                  message: "Leave amount must be a non-negative number",
+                });
+              }
+
+              // Check if leave record already exists
+              const existingLeave = await (transactionClient || pool).query(
+                `SELECT id FROM leave_records WHERE employee_id = $1 AND leave_date = $2`,
+                [employeeId, leaveDate]
+              );
+
+              if (existingLeave.rows.length === 0) {
+                const leaveQuery = `
+                  INSERT INTO leave_records (
+                    employee_id, leave_date, leave_type, days_taken, status, amount_paid
+                  ) VALUES ($1, $2, $3, $4, 'approved', $5)
+                `;
+                await (transactionClient || pool).query(leaveQuery, [
+                  employeeId,
+                  leaveDate,
+                  leaveType,
+                  1.0,
+                  leaveAmount,
+                ]);
+              }
+            }
+          }
+        }
+
+        // Update existing saved leave amounts if any
+        if (
+          updatedLeaveEntries &&
+          Array.isArray(updatedLeaveEntries) &&
+          updatedLeaveEntries.length > 0
+        ) {
+          for (const leave of updatedLeaveEntries) {
+            const { id: leaveId, amount_paid } = leave;
+            const leaveAmount = parseLeaveAmount(amount_paid);
+
+            if (!leaveId || leaveAmount === null) {
+              if (transactionClient) {
+                await transactionClient.query("ROLLBACK");
+                transactionClient.release();
+                transactionClient = null;
+              }
+              return res.status(400).json({
+                message: "Leave amount must be a non-negative number",
+              });
+            }
+
+            await (transactionClient || pool).query(
+              "UPDATE leave_records SET amount_paid = $1 WHERE id = $2",
+              [leaveAmount, leaveId]
+            );
+          }
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.json({
+          message: "Monthly work log updated successfully",
+          workLogId: id,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error updating monthly work log:", error);
+        res.status(500).json({
+          message: "Error updating monthly work log",
+          error: error.message,
+        });
+      }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error updating monthly work log:", error);
-      res.status(500).json({
-        message: "Error updating monthly work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // Delete monthly work log (only if not processed)
   router.delete("/:id", async (req, res) => {
-    const { id } = req.params;
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { id } = req.params;
 
-      // Check if the work log is processed
-      const checkQuery = `
-        SELECT status FROM monthly_work_logs WHERE id = $1
-      `;
-      const checkResult = await pool.query(checkQuery, [id]);
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      if (checkResult.rows.length === 0) {
-        await pool.query("ROLLBACK");
-        return res.status(404).json({ message: "Monthly work log not found" });
-      }
+        // Check if the work log is processed
+        const checkQuery = `
+          SELECT status FROM monthly_work_logs WHERE id = $1
+        `;
+        const checkResult = await (transactionClient || pool).query(checkQuery, [id]);
 
-      if (checkResult.rows[0].status === "Processed") {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Cannot delete processed monthly work log",
+        if (checkResult.rows.length === 0) {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(404).json({ message: "Monthly work log not found" });
+        }
+
+        if (checkResult.rows[0].status === "Processed") {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Cannot delete processed monthly work log",
+          });
+        }
+
+        // Delete the monthly work log (cascade will handle entries and activities)
+        await (transactionClient || pool).query("DELETE FROM monthly_work_logs WHERE id = $1", [id]);
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        res.json({ message: "Monthly work log deleted successfully" });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error deleting monthly work log:", error);
+        res.status(500).json({
+          message: "Error deleting monthly work log",
+          error: error.message,
         });
       }
-
-      // Delete the monthly work log (cascade will handle entries and activities)
-      await pool.query("DELETE FROM monthly_work_logs WHERE id = $1", [id]);
-
-      await pool.query("COMMIT");
-
-      res.json({ message: "Monthly work log deleted successfully" });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error deleting monthly work log:", error);
-      res.status(500).json({
-        message: "Error deleting monthly work log",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 

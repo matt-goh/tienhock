@@ -184,29 +184,52 @@ export default function (pool) {
 
   // Delete job and its details
   router.delete("/:id", async (req, res) => {
-    const { id } = req.params;
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
+      const { id } = req.params;
 
-      // Delete the job
-      const deleteJobQuery = "DELETE FROM jobs WHERE id = $1";
-      await pool.query(deleteJobQuery, [id]);
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      await pool.query("COMMIT");
+        // Delete the job
+        const deleteJobQuery = "DELETE FROM jobs WHERE id = $1";
+        await (transactionClient || pool).query(deleteJobQuery, [id]);
 
-      // Invalidate cache
-      cache.invalidate(CACHE_KEYS.JOBS);
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
 
-      res
-        .status(200)
-        .json({ message: "Job deleted successfully" });
+        // Invalidate cache
+        cache.invalidate(CACHE_KEYS.JOBS);
+
+        res
+          .status(200)
+          .json({ message: "Job deleted successfully" });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error deleting job:", error);
+        res
+          .status(500)
+          .json({ message: "Error deleting job", error: error.message });
+      }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error deleting job:", error);
-      res
-        .status(500)
-        .json({ message: "Error deleting job", error: error.message });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
@@ -265,7 +288,7 @@ export default function (pool) {
 
     try {
       const query = `
-      SELECT COUNT(*) 
+      SELECT COUNT(*)
       FROM job_pay_codes
       WHERE job_id = $1
     `;

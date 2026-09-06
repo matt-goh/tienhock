@@ -1,3 +1,4 @@
+import toast from "react-hot-toast";
 // src/components/Navbar/NavbarUserMenu.tsx
 import { Switch } from "@headlessui/react";
 import {
@@ -68,6 +69,7 @@ export default function NavbarUserMenu() {
       await logout();
     } catch (error) {
       console.error("Logout failed:", error);
+      toast.error(t("Logout failed. Please try again."));
     }
   };
 
@@ -197,6 +199,7 @@ export default function NavbarUserMenu() {
               </button>
 
               {/* Backup Option */}
+              {user?.isSecurityAdmin && (
               <button
                 className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-default-700 dark:text-gray-200 hover:bg-default-100 dark:hover:bg-gray-700 active:bg-default-200 dark:active:bg-gray-600 transition-colors duration-200"
                 onClick={handleBackupClick}
@@ -208,6 +211,7 @@ export default function NavbarUserMenu() {
                 {t("Backup")}
               </button>
 
+              )}
               {/* Logout Option */}
               <button
                 className="h-9 group flex w-full items-center rounded-md px-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 active:bg-red-100 dark:active:bg-red-900/50 transition-colors duration-200"

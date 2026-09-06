@@ -252,7 +252,7 @@ const Login: React.FC = () => {
 
       navigate(targetPath);
     } catch (error: any) {
-      toast.error(error.message);
+      toast.error(t(error.message));
     } finally {
       setIsLoading(false);
     }

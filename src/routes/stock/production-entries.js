@@ -20,6 +20,12 @@ let workerOrderTableReady = false;
 const ensureWorkerOrderTable = async (pool) => {
   if (workerOrderTableReady) return;
 
+  if (process.env.NODE_ENV === "production") {
+    // Production migrations own schema changes; the app role only reads/writes rows.
+    await pool.query('SELECT scope, worker_id, sort_order FROM production_worker_orders LIMIT 0');
+    workerOrderTableReady = true;
+    return;
+  }
   await pool.query(`
     CREATE TABLE IF NOT EXISTS production_worker_orders (
       scope text NOT NULL CHECK (scope IN ('BH_PACKING', 'MEE_PACKING')),

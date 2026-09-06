@@ -1,3 +1,4 @@
+import { assertProductionDatabaseRole } from "./src/routes/utils/database-security.js";
 // server.js
 import "dotenv/config";
 import setupRoutes from "./src/routes/index.js";
@@ -16,7 +17,8 @@ import { clearInvalidEInvoicesForNonEligibleCustomers } from "./src/routes/sales
 
 const { json } = pkgBodyParser;
 const app = express();
-const port = 5000;
+app.set("trust proxy", "loopback");
+const port = Number(process.env.PORT || 5000);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const databasePassword = process.env.DB_PASSWORD;
@@ -33,6 +35,8 @@ export const pool = createDatabasePool({
   password: databasePassword,
   port: process.env.DB_PORT || 5434,
 });
+
+if (process.env.NODE_ENV === "production") await assertProductionDatabaseRole(pool);
 
 // Middleware to handle database maintenance mode
 app.use(async (req, res, next) => {
@@ -60,7 +64,7 @@ const corsConfig =
     ? { origin: false } // In production, Nginx handles CORS
     : {
         // In development, Express handles CORS
-        origin: ["http://localhost:3000", "http://localhost:5000"], // Allow frontend and potentially backend itself
+        origin: ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:5000"], // Allow frontend and potentially backend itself
         methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE", "PATCH"],
         allowedHeaders: [
           "Content-Type",
@@ -144,17 +148,17 @@ cron.schedule(
   }
 );
 
-// --- Weekly automatic backup ---
+// --- Daily automatic backup ---
 cron.schedule(
-  "0 3 * * 0", // Run every Sunday at 3:00 AM UTC (11:00 AM Malaysia time)
+  "0 19 * * *", // Daily fresh backup at 03:00 Malaysia time (19:00 UTC)
   async () => {
-    console.log(`[${new Date().toISOString()}] Starting weekly automatic backup...`);
+    console.log(`[${new Date().toISOString()}] Starting daily automatic backup...`);
     try {
       await createAutoBackup();
-      console.log(`[${new Date().toISOString()}] Weekly automatic backup completed`);
+      console.log(`[${new Date().toISOString()}] Daily automatic backup completed`);
     } catch (error) {
       console.error(
-        `[${new Date().toISOString()}] Error in weekly backup job:`,
+        `[${new Date().toISOString()}] Error in daily backup job:`,
         error
       );
     }
@@ -209,7 +213,7 @@ app.get("*", (req, res) => {
 });
 
 // Start server
-const server = app.listen(port, "0.0.0.0");
+const server = app.listen(port, process.env.HOST || "127.0.0.1");
 
 // Enhanced graceful shutdown
 const shutdownGracefully = async (signal) => {

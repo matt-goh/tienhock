@@ -1,3 +1,4 @@
+import { insertPayrollItems } from "./payroll-item-insert.js";
 // src/routes/payroll/monthly-payrolls.js
 import { Router } from "express";
 import {
@@ -1515,6 +1516,7 @@ export default function (pool) {
       const INCOME_TAX_THRESHOLD = 3000;
 
       for (const [employeeName, employeeJobCombos] of employeesByName) {
+        await client.query("SAVEPOINT security_batch_item");
         try {
           const primaryEmployee = employeeJobCombos[0];
           // Sibling ids that are actually part of this payroll row (the ids with
@@ -1984,23 +1986,7 @@ export default function (pool) {
             (item) => !item.is_manual,
           );
           if (nonManualItems.length > 0) {
-            const itemValues = nonManualItems
-              .map(
-                (item) =>
-                  `(${employeePayrollId}, '${item.pay_code_id}', '${(item.description || "").replace(/'/g, "''")}',
-                ${item.rate}, '${item.rate_unit}', ${item.quantity}, ${item.amount}, false,
-                ${item.job_type ? `'${item.job_type}'` : "NULL"},
-                ${item.source_employee_id ? `'${item.source_employee_id}'` : "NULL"},
-                ${item.source_date ? `'${item.source_date}'` : "NULL"},
-                ${item.work_log_id || "NULL"},
-                ${item.work_log_type ? `'${item.work_log_type}'` : "NULL"},
-                ${item.foc_units || "NULL"})`,
-              )
-              .join(", ");
-            await client.query(`
-              INSERT INTO payroll_items (employee_payroll_id, pay_code_id, description, rate, rate_unit, quantity, amount, is_manual, job_type, source_employee_id, source_date, work_log_id, work_log_type, foc_units)
-              VALUES ${itemValues}
-            `);
+            await insertPayrollItems(client, employeePayrollId, nonManualItems, true);
           }
 
           // Insert deductions
@@ -2028,6 +2014,7 @@ export default function (pool) {
             netPay: Math.round(netPay * 100) / 100,
           });
         } catch (error) {
+          await client.query("ROLLBACK TO SAVEPOINT security_batch_item");
           console.error(
             "Error processing employee:",
             employeeJobCombos[0].employeeId,
@@ -2041,6 +2028,8 @@ export default function (pool) {
           if (error.code) {
             throw error;
           }
+        } finally {
+          await client.query("RELEASE SAVEPOINT security_batch_item");
         }
       }
 

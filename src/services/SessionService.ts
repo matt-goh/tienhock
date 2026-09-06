@@ -6,6 +6,7 @@ export interface AuthenticatedUser {
   name: string;
   ic_no: string;
   job: string[];
+  isSecurityAdmin?: boolean;
 }
 
 export interface StoredSession {
@@ -39,7 +40,12 @@ class SessionService {
 
   constructor() {
     this.currentSessionId =
-      this.getStoredSessionId() || this.generateSessionId();
+      "cookie-session";
+    try {
+      localStorage.removeItem(this.SESSION_ID_KEY);
+      const cached: StoredSession | null = this.getStoredSession();
+      if (cached && cached.sessionId !== "cookie-session") this.clearSession();
+    } catch { /* Login remains available when browser storage is disabled. */ }
     this.startStateCheck();
     this.setupActivityBasedChecks();
   }
@@ -51,10 +57,6 @@ class SessionService {
       console.error("Failed to get stored session ID:", error);
       return null;
     }
-  }
-
-  private generateSessionId(): string {
-    return `sess_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   }
 
   private createSessionError(
@@ -168,10 +170,11 @@ class SessionService {
   }
 
   async checkState(): Promise<SessionState> {
+    if (!this.getStoredSession()?.user) return { staff: null, hasActiveProfile: false };
     try {
       // Use the state endpoint to check session without creating/updating it
       const response = await api.get(
-        `/api/sessions/state/${this.currentSessionId}`
+        "/api/sessions/state"
       );
 
       // Update the last check time
@@ -209,7 +212,6 @@ class SessionService {
       const data = await api.post("/api/auth/login", {
         ic_no,
         password,
-        sessionId: this.currentSessionId,
       });
 
       const session: AuthenticatedSession = {
@@ -221,6 +223,7 @@ class SessionService {
       this.currentSessionId = data.sessionId;
       localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
       this.saveSession(session);
+      this.startStateCheck();
 
       // Update the last check time after login
       this.lastCheckTime = Date.now();
@@ -278,41 +281,21 @@ class SessionService {
   }
 
   async logout(): Promise<void> {
-    try {
-      await this.endSession();
-    } catch (error) {
-      console.warn("Error during logout:", error);
-    } finally {
-      this.clearSession();
-      // Generate new session ID for anonymous tracking
-      this.currentSessionId = this.generateSessionId();
-      localStorage.setItem(this.SESSION_ID_KEY, this.currentSessionId);
-    }
+    await this.endSession();
   }
 
   async endSession(): Promise<void> {
-    try {
-      await api.delete(`/api/sessions/${this.currentSessionId}`);
-      this.clearSession();
-      if (this.stateCheckInterval) {
-        clearInterval(this.stateCheckInterval);
-      }
-    } catch (error) {
-      console.warn(
-        "Failed to end session on server, clearing local session anyway:",
-        error
-      );
-      // Don't throw error here - just clear local session
-      this.clearSession();
-      if (this.stateCheckInterval) {
-        clearInterval(this.stateCheckInterval);
-      }
-    }
+    // Keep the UI signed in if revocation fails, so logout can be retried.
+    await api.post("/api/auth/logout", {});
+    this.clearSession();
+    this.currentSessionId = "cookie-session";
+    if (this.stateCheckInterval) clearInterval(this.stateCheckInterval);
   }
 
   private clearSession(): void {
     try {
       localStorage.removeItem(this.SESSION_KEY);
+      localStorage.removeItem(this.SESSION_ID_KEY);
     } catch (error) {
       console.error("Error clearing session:", error);
     }

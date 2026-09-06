@@ -1,5 +1,7 @@
 # Hetzner production server bootstrap
 
+The database role and GitHub Actions secret `ERP_DB_PASSWORD` were prepared and tested on 6 September; see the [deployment readiness record](../../docs/security/DEPLOYMENT_READINESS_2026-09-06.md). The pending workflow maps that secret to the application environment variable `DB_PASSWORD`. Application deployment remains pending. Existing shared OFFICE passwords remain by owner decision; no password migration or reset is required. Follow [the remediation runbook](../../docs/security/SECURITY_REMEDIATION_2026-09-05.md#deployment-cutover), including the four administrator accounts and server-only production restoration.
+
 Production uses system Nginx and PM2. The Cloudflare Tunnel sends
 `api.tienhock.com` to `http://localhost:80`; system Nginx then proxies to the
 PM2-managed Node server at `127.0.0.1:5000`.

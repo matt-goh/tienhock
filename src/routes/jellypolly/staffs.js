@@ -15,13 +15,6 @@ export default function (pool) {
     return result.rows.length > 0;
   }
 
-  // Helper function to check if staff has OFFICE job and set password
-  function shouldSetPassword(job) {
-    if (!job) return false;
-    const jobArray = Array.isArray(job) ? job : JSON.parse(job);
-    return jobArray.includes("OFFICE");
-  }
-
   function getStaffIdValidationError(id, fieldName = "Staff ID") {
     if (!id || typeof id !== "string") {
       return `${fieldName} is required`;
@@ -34,8 +27,6 @@ export default function (pool) {
     return null;
   }
 
-  // Default password hash for OFFICE staff
-  const DEFAULT_PASSWORD_HASH = "$2a$10$LCpAl1V5h9xwjFrRtlIiD.jg.ZgCba4n7tUHFFxqNZTHjXh.9IQYy";
 
   // Get staff members
   router.get("/", async (req, res) => {
@@ -185,9 +176,8 @@ export default function (pool) {
           .json({ message: "A staff member with this ID already exists" });
       }
 
-      // Check if staff has OFFICE job and set password accordingly
-      const hasOfficeJob = shouldSetPassword(job);
-      const password = hasOfficeJob ? DEFAULT_PASSWORD_HASH : null;
+      // Login credentials are assigned through the protected account reset flow.
+      const password = null;
 
       // Check if there are existing staff with the same name and get their head_staff_id
       let headStaffId = null;
@@ -259,7 +249,7 @@ export default function (pool) {
 
       res.status(201).json({
         message: "Staff member created successfully",
-        staff: result.rows[0],
+        staff: { ...result.rows[0], password: undefined },
       });
     } catch (error) {
       console.error("Error creating staff member:", error);
@@ -723,9 +713,7 @@ export default function (pool) {
           updateId = newId;
         }
 
-        // Check if staff has OFFICE job and set password accordingly
-        const hasOfficeJob = shouldSetPassword(job);
-        const password = hasOfficeJob ? DEFAULT_PASSWORD_HASH : null;
+        // JP staff records do not manage the shared ERP login in public.staffs.
 
         const query = `
           UPDATE jellypolly.staffs
@@ -734,9 +722,9 @@ export default function (pool) {
               ic_no = $12, bank_account_number = $13, epf_no = $14, income_tax_no = $15, 
               socso_no = $16, document = $17, payment_type = $18, payment_preference = $19, 
               race = $20, agama = $21, date_resigned = $22, marital_status = $23, 
-              spouse_employment_status = $24, number_of_children = $25, department = $26, kwsp_number = $27, password = $28,
-              epf_age_override = $29, epf_nationality_override = $30, socso_age_override = $31, sip_age_override = $32
-          WHERE id = $33
+              spouse_employment_status = $24, number_of_children = $25, department = $26, kwsp_number = $27,
+              epf_age_override = $28, epf_nationality_override = $29, socso_age_override = $30, sip_age_override = $31
+          WHERE id = $32
           RETURNING *
         `;
 
@@ -768,7 +756,6 @@ export default function (pool) {
           numberOfChildren || 0,
           department || null,
           kwspNumber || null,
-          password,
           epfAgeOverride || null,
           epfNationalityOverride || null,
           socsoAgeOverride || null,
@@ -789,7 +776,7 @@ export default function (pool) {
 
         res.json({
           message: "Staff member updated successfully",
-          staff: result.rows[0],
+          staff: { ...result.rows[0], password: undefined },
         });
       } catch (error) {
         await client.query("ROLLBACK");
@@ -840,7 +827,7 @@ export default function (pool) {
 
         res.json({
           message: "Staff member deleted successfully",
-          staff: result.rows[0],
+          staff: { ...result.rows[0], password: undefined },
         });
       } catch (error) {
         await client.query("ROLLBACK");

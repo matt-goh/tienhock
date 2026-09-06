@@ -1,0 +1,1962 @@
+{
+  "date": "2026-09-04",
+  "baselineCommit": "671511a0443c14174edccbc2b31ef1a2284843cc",
+  "assessmentType": "Repository-wide automated inventory and targeted manual security review; no exploitation or full conformance verification",
+  "runtime": {
+    "localNode": "v22.8.0",
+    "localNpm": "10.8.2",
+    "gitleaks": "8.30.1",
+    "developmentPostgres": "16.15"
+  },
+  "coverage": {
+    "trackedFiles": 871,
+    "sourceFilesParsed": 729,
+    "routerDeclarations": 883,
+    "routerFiles": 124,
+    "appRegistrationCalls": 142,
+    "databaseQueryCalls": 3786,
+    "sqlLikeInterpolatedTemplates": 290,
+    "unaffiliatedPoolBeginSites": 54,
+    "snapshotFiles": 874,
+    "gitReachableCommits": 3328,
+    "gitleaksReportedCommitsScanned": 2976
+  },
+  "npmAudit": {
+    "all": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 5,
+        "moderate": 29,
+        "high": 17,
+        "critical": 3,
+        "total": 54
+      },
+      "dependencies": {
+        "prod": 492,
+        "dev": 335,
+        "optional": 67,
+        "peer": 0,
+        "peerOptional": 0,
+        "total": 827
+      }
+    },
+    "production": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 24,
+        "high": 7,
+        "critical": 1,
+        "total": 32
+      },
+      "dependencies": {
+        "prod": 492,
+        "dev": 335,
+        "optional": 67,
+        "peer": 0,
+        "peerOptional": 0,
+        "total": 827
+      }
+    },
+    "packages": [
+      {
+        "name": "@aws-sdk/client-s3",
+        "severity": "moderate",
+        "direct": true,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.962.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core",
+          "@aws-sdk/credential-provider-node",
+          "@aws-sdk/middleware-flexible-checksums",
+          "@aws-sdk/middleware-sdk-s3",
+          "@aws-sdk/middleware-user-agent",
+          "@aws-sdk/signature-v4-multi-region",
+          "@aws-sdk/util-user-agent-node"
+        ]
+      },
+      {
+        "name": "@aws-sdk/client-sso",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.958.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core",
+          "@aws-sdk/middleware-user-agent",
+          "@aws-sdk/util-user-agent-node"
+        ]
+      },
+      {
+        "name": "@aws-sdk/core",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/xml-builder"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-env",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-http",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-ini",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.962.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core",
+          "@aws-sdk/credential-provider-env",
+          "@aws-sdk/credential-provider-http",
+          "@aws-sdk/credential-provider-login",
+          "@aws-sdk/credential-provider-process",
+          "@aws-sdk/credential-provider-sso",
+          "@aws-sdk/credential-provider-web-identity",
+          "@aws-sdk/nested-clients"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-login",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.962.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core",
+          "@aws-sdk/nested-clients"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-node",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.962.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/credential-provider-env",
+          "@aws-sdk/credential-provider-http",
+          "@aws-sdk/credential-provider-ini",
+          "@aws-sdk/credential-provider-process",
+          "@aws-sdk/credential-provider-sso",
+          "@aws-sdk/credential-provider-web-identity"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-process",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-sso",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.958.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/client-sso",
+          "@aws-sdk/core",
+          "@aws-sdk/token-providers"
+        ]
+      },
+      {
+        "name": "@aws-sdk/credential-provider-web-identity",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.958.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core",
+          "@aws-sdk/nested-clients"
+        ]
+      },
+      {
+        "name": "@aws-sdk/middleware-flexible-checksums",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core"
+        ]
+      },
+      {
+        "name": "@aws-sdk/middleware-sdk-s3",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core"
+        ]
+      },
+      {
+        "name": "@aws-sdk/middleware-user-agent",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core"
+        ]
+      },
+      {
+        "name": "@aws-sdk/nested-clients",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.958.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core",
+          "@aws-sdk/middleware-user-agent",
+          "@aws-sdk/util-user-agent-node"
+        ]
+      },
+      {
+        "name": "@aws-sdk/signature-v4-multi-region",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/middleware-sdk-s3"
+        ]
+      },
+      {
+        "name": "@aws-sdk/token-providers",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.958.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/core",
+          "@aws-sdk/nested-clients"
+        ]
+      },
+      {
+        "name": "@aws-sdk/util-user-agent-node",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@aws-sdk/middleware-user-agent"
+        ]
+      },
+      {
+        "name": "@aws-sdk/xml-builder",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.957.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "fast-xml-parser"
+        ]
+      },
+      {
+        "name": "@babel/core",
+        "severity": "low",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "7.28.5"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "@babel/core: Arbitrary File Read via sourceMappingURL Comment",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-4x5r-pxfx-6jf8",
+            "affectedRange": "<=7.29.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "@remix-run/router",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "1.21.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "React Router vulnerable to XSS via Open Redirects",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-2w69-qvjg-hvjx",
+            "affectedRange": "<=1.23.1"
+          },
+          {
+            "title": "React Router's same-origin redirect with path starting // causes open redirect via protocol-relative URL reinterpretation",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-2j2x-hqr9-3h42",
+            "affectedRange": ">=1.3.0 <1.23.3"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "ajv",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "8.12.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "ajv has ReDoS when using `$data` option",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-2g4f-4pwh-qvx6",
+            "affectedRange": ">=7.0.0-alpha.0 <8.18.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "axios",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "1.7.9"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "axios Requests Vulnerable To Possible SSRF and Credential Leakage via Absolute URL",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-jr5f-v2jv-69x6",
+            "affectedRange": ">=1.0.0 <1.8.2"
+          },
+          {
+            "title": "Axios is vulnerable to DoS attack through lack of data size check",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-4hjh-wcwx-xvwj",
+            "affectedRange": ">=1.0.0 <1.12.0"
+          },
+          {
+            "title": "Axios has a NO_PROXY Hostname Normalization Bypass that Leads to SSRF",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-3p68-rc4w-qgx5",
+            "affectedRange": ">=1.0.0 <1.15.0"
+          },
+          {
+            "title": "Axios: Authentication Bypass via Prototype Pollution Gadget in `validateStatus` Merge Strategy",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-w9j2-pvgh-6h63",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: Incomplete Fix for CVE-2025-62718 ? NO_PROXY Protection Bypassed via RFC 1122 Loopback Subnet (127.0.0.0/8) in Axios 1.15.0",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-pmwg-cvhr-8vh7",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: Invisible JSON Response Tampering via Prototype Pollution Gadget in `parseReviver`",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-3w6x-2g7m-8v23",
+            "affectedRange": ">=1.0.0 <1.15.2"
+          },
+          {
+            "title": "Axios: Null Byte Injection via Reverse-Encoding in AxiosURLSearchParams",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-xhjh-pmcv-23jw",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: CRLF Injection in multipart/form-data body via unsanitized blob.type in formDataToStream",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-445q-vr5w-6q77",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: no_proxy bypass via IP alias allows SSRF",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-m7pr-hjqh-92cm",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios' HTTP adapter-streamed uploads bypass maxBodyLength when maxRedirects: 0",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-5c9x-8gcm-mpgx",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: HTTP adapter streamed responses bypass maxContentLength",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-vf2m-468p-8v99",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: Prototype Pollution Gadgets - Response Tampering, Data Exfiltration, and Request Hijacking",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-pf86-5x62-jrwf",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: Header Injection via Prototype Pollution",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-6chq-wfr3-2hj9",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: XSRF Token Cross-Origin Leakage via Prototype Pollution Gadget in `withXSRFToken` Boolean Coercion",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-xx6v-rp6x-q39c",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios is Vulnerable to Denial of Service via __proto__ Key in mergeConfig",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-43fc-jf86-j433",
+            "affectedRange": ">=1.0.0 <=1.13.4"
+          },
+          {
+            "title": "Axios has prototype pollution read-side gadgets in HTTP adapter that allow credential injection and request hijacking",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-q8qp-cvcw-x6jj",
+            "affectedRange": ">=1.0.0 <1.15.2"
+          },
+          {
+            "title": "Axios has Unrestricted Cloud Metadata Exfiltration via Header Injection Chain",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-fvcv-3m26-pcqx",
+            "affectedRange": ">=1.0.0 <1.15.0"
+          },
+          {
+            "title": "Axios: unbounded recursion in toFormData causes DoS via deeply nested request data",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-62hf-57xw-28j9",
+            "affectedRange": ">=1.0.0 <1.15.1"
+          },
+          {
+            "title": "Axios: Regular Expression Denial of Service (ReDoS) via Cookie Name Injection",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-hfxv-24rg-xrqf",
+            "affectedRange": ">=1.0.0 <1.16.0"
+          },
+          {
+            "title": "Allocation of Resources Without Limits or Throttling in Axios",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-777c-7fjr-54vf",
+            "affectedRange": ">=1.7.0 <1.16.0"
+          },
+          {
+            "title": "Axios: Proxy-Authorization Credential Leak to Origin Server Across HTTP-to-HTTPS Redirect in Axios Node.js HTTP Adapter",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-p92q-9vqr-4j8v",
+            "affectedRange": ">=1.0.0 <1.16.0"
+          },
+          {
+            "title": "Axios: Proxy-Authorization header leaks to redirect target when proxy is re-evaluated to direct connection",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-j5f8-grm9-p9fc",
+            "affectedRange": ">=1.0.0 <1.16.0"
+          },
+          {
+            "title": "axios Vulnerable to Credential Theft and Response Hijacking via Prototype Pollution Gadget in Config Merge",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-3g43-6gmg-66jw",
+            "affectedRange": ">=1.0.0 <1.15.2"
+          },
+          {
+            "title": "axios Vulnerable to Full Man-in-the-Middle via Prototype Pollution Gadget in `config.proxy`",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-35jp-ww65-95wh",
+            "affectedRange": ">=1.0.0 <1.16.0"
+          },
+          {
+            "title": "axios has DoS & Header Injection via Prototype Pollution Read-Side Gadgets in axios merge functions",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-898c-q2cr-xwhg",
+            "affectedRange": ">=1.0.0 <1.16.0"
+          },
+          {
+            "title": "Axios: Prototype pollution gadgets can alter axios request construction",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-mmx7-hfxf-jppx",
+            "affectedRange": ">=1.0.0 <1.18.0"
+          },
+          {
+            "title": "Axios: Deep formToJSON Key Recursion Can Cause Denial of Service",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-pmv8-rq9r-6j72",
+            "affectedRange": ">=1.0.0 <1.18.0"
+          },
+          {
+            "title": "Axios: Nested axios option objects can consume polluted prototype values",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-7q8q-rj6j-mhjq",
+            "affectedRange": ">=1.0.0 <1.18.0"
+          },
+          {
+            "title": "Axios: Fetch adapter `ReadableStream` uploads bypass `maxBodyLength`",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-jqh4-m9w3-8hp9",
+            "affectedRange": ">=1.7.0 <1.18.0"
+          },
+          {
+            "title": "Axios: Excessive recursion in formDataToJSON can cause denial of service",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-42h9-826w-cgv3",
+            "affectedRange": ">=1.0.0 <1.18.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "body-parser",
+        "severity": "moderate",
+        "direct": true,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "1.20.3"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "body-parser vulnerable to denial of service when invalid limit value silently disables size enforcement",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-v422-hmwv-36x6",
+            "affectedRange": "<1.20.6"
+          }
+        ],
+        "viaPackages": [
+          "qs"
+        ]
+      },
+      {
+        "name": "browserslist",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "4.24.3"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "Browserslist: Unbounded memory growth (no cache eviction) via distinct query results, leading to eventual OOM",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-c83g-rgw3-j3cx",
+            "affectedRange": "<=4.28.6"
+          },
+          {
+            "title": "Browserslist: Uncaught crash / prototype write via untrusted browserslist-stats.json custom stats (normalizeStats)",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-73wf-gq98-2v4g",
+            "affectedRange": "<=4.28.6"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "compression",
+        "severity": "low",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "1.7.4"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "on-headers"
+        ]
+      },
+      {
+        "name": "diff",
+        "severity": "low",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "4.0.2"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "jsdiff has a Denial of Service vulnerability in parsePatch and applyPatch",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-73rr-hh4g-fpgx",
+            "affectedRange": ">=4.0.0 <4.0.4"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "esbuild",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "0.21.5"
+        ],
+        "fixAvailable": {
+          "name": "vite",
+          "version": "6.4.3",
+          "isSemVerMajor": true
+        },
+        "advisories": [
+          {
+            "title": "esbuild enables any website to send any requests to the development server and read the response",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-67mh-4wv8-2f99",
+            "affectedRange": "<=0.24.2"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "exceljs",
+        "severity": "moderate",
+        "direct": true,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "4.4.0"
+        ],
+        "fixAvailable": {
+          "name": "exceljs",
+          "version": "3.4.0",
+          "isSemVerMajor": true
+        },
+        "advisories": [],
+        "viaPackages": [
+          "uuid"
+        ]
+      },
+      {
+        "name": "express",
+        "severity": "high",
+        "direct": true,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "4.21.2"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "body-parser",
+          "path-to-regexp",
+          "qs"
+        ]
+      },
+      {
+        "name": "fast-xml-parser",
+        "severity": "critical",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "5.2.5"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "fast-xml-parser has RangeError DoS Numeric Entities Bug",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-37qj-frw5-hhjh",
+            "affectedRange": ">=5.0.9 <=5.3.3"
+          },
+          {
+            "title": "fast-xml-parser has an entity encoding bypass via regex injection in DOCTYPE entity names",
+            "severity": "critical",
+            "url": "https://github.com/advisories/GHSA-m7jm-9gc2-mpf2",
+            "affectedRange": ">=5.0.0 <5.3.5"
+          },
+          {
+            "title": "fast-xml-parser affected by DoS through entity expansion in DOCTYPE (no expansion limit)",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-jmr7-xgp7-cmfj",
+            "affectedRange": ">=5.0.0 <5.3.6"
+          },
+          {
+            "title": "fast-xml-parser has stack overflow in XMLBuilder with preserveOrder",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-fj3w-jwp8-x2g3",
+            "affectedRange": ">=5.0.0 <5.3.8"
+          },
+          {
+            "title": "fast-xml-parser affected by numeric entity expansion bypassing all entity expansion limits (incomplete fix for CVE-2026-26278)",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-8gc5-j5rx-235r",
+            "affectedRange": ">=5.0.0 <5.5.6"
+          },
+          {
+            "title": "Entity Expansion Limits Bypassed When Set to Zero Due to JavaScript Falsy Evaluation in fast-xml-parser",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-jp2q-39xq-3w4g",
+            "affectedRange": ">=5.0.0 <5.5.7"
+          },
+          {
+            "title": "fast-xml-parser XMLBuilder: XML Comment and CDATA Injection via Unescaped Delimiters",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-gh4j-gqv2-49f6",
+            "affectedRange": "<5.7.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "follow-redirects",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "1.15.9"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "follow-redirects leaks Custom Authentication Headers to Cross-Domain Redirect Targets",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-r4q5-vmmm-2653",
+            "affectedRange": "<=1.15.11"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "form-data",
+        "severity": "critical",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "4.0.1"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "form-data uses unsafe random function in form-data for choosing boundary",
+            "severity": "critical",
+            "url": "https://github.com/advisories/GHSA-fjxv-7rqg-78g4",
+            "affectedRange": ">=4.0.0 <4.0.4"
+          },
+          {
+            "title": "form-data: CRLF injection in form-data via unescaped multipart field names and filenames",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-hmw2-7cc7-3qxx",
+            "affectedRange": ">=4.0.0 <4.0.6"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "glob",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "7.2.3",
+          "10.4.5"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "glob CLI: Command injection via -c/--cmd executes matches with shell:true",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-5j98-mcp5-4vw2",
+            "affectedRange": ">=10.2.0 <10.5.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "joi",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "17.13.3"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "joi has an uncaught RangeError on deeply nested input through recursive `link()` schemas",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-q7cg-457f-vx79",
+            "affectedRange": "<17.13.4"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "lodash",
+        "severity": "high",
+        "direct": true,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "4.17.21"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "lodash vulnerable to Code Injection via `_.template` imports key names",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-r5fr-rjxr-66jc",
+            "affectedRange": ">=4.0.0 <=4.17.23"
+          },
+          {
+            "title": "lodash vulnerable to Prototype Pollution via array path bypass in `_.unset` and `_.omit`",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-f23m-r3pf-42rh",
+            "affectedRange": "<=4.17.23"
+          },
+          {
+            "title": "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-xxjr-mmjv-4gpg",
+            "affectedRange": ">=4.0.0 <=4.17.22"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "minimatch",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.1.2",
+          "5.1.9",
+          "9.0.9"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "minimatch has a ReDoS via repeated wildcards with non-matching literal in pattern",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-3ppc-4f35-3m26",
+            "affectedRange": "<3.1.3"
+          },
+          {
+            "title": "minimatch has ReDoS: matchOne() combinatorial backtracking via multiple non-adjacent GLOBSTAR segments",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-7r86-cg39-jmmj",
+            "affectedRange": "<3.1.3"
+          },
+          {
+            "title": "minimatch ReDoS: nested *() extglobs generate catastrophically backtracking regular expressions",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-23c5-xmqv-rm74",
+            "affectedRange": "<3.1.4"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "nanoid",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "3.3.8"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "nanoid: non-secure generators can loop indefinitely with negative size",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-28wg-ghj8-5hjv",
+            "affectedRange": "<3.3.16"
+          },
+          {
+            "title": "nanoid: custom generators can loop indefinitely when size is zero",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-2v37-7h3g-55p8",
+            "affectedRange": "<3.3.18"
+          },
+          {
+            "title": "nanoid: Integer Overflow or Wraparound",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-xwg4-73v4-xw9w",
+            "affectedRange": "<3.3.12"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "node-cron",
+        "severity": "moderate",
+        "direct": true,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "3.0.3"
+        ],
+        "fixAvailable": {
+          "name": "node-cron",
+          "version": "4.6.0",
+          "isSemVerMajor": true
+        },
+        "advisories": [],
+        "viaPackages": [
+          "uuid"
+        ]
+      },
+      {
+        "name": "on-headers",
+        "severity": "low",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "1.0.2"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "on-headers is vulnerable to http response header manipulation",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-76c9-3jph-rj3q",
+            "affectedRange": "<1.1.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "path-to-regexp",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "0.1.12",
+          "3.3.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "path-to-regexp vulnerable to Regular Expression Denial of Service via multiple route parameters",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-37ch-88jc-xwx2",
+            "affectedRange": "<0.1.13"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "picomatch",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "2.3.1"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "Picomatch: Method Injection in POSIX Character Classes causes incorrect Glob Matching",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-3v7f-55p6-f55p",
+            "affectedRange": "<2.3.2"
+          },
+          {
+            "title": "Picomatch has a ReDoS vulnerability via extglob quantifiers",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-c2c7-rcm5-vvqj",
+            "affectedRange": "<2.3.2"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "postcss",
+        "severity": "high",
+        "direct": true,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "8.4.49"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "PostCSS has XSS via Unescaped </style> in its CSS Stringify Output",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-qx2v-qp2m-jg93",
+            "affectedRange": "<8.5.10"
+          },
+          {
+            "title": "PostCSS: Arbitrary file read and information disclosure via attacker-controlled sourceMappingURL in CSS comments",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-6g55-p6wh-862q",
+            "affectedRange": "<=8.5.11"
+          },
+          {
+            "title": "PostCSS: incomplete fix of GHSA-6g55-p6wh-862q ? attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-fxqj-rqcc-2cmp",
+            "affectedRange": "<=8.5.22"
+          },
+          {
+            "title": "PostCSS: Path Traversal in Previous Source Map Auto-Loading (sourceMappingURL) leads to Arbitrary .map File Disclosure",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-r28c-9q8g-f849",
+            "affectedRange": "<=8.5.17"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "postcss-selector-parser",
+        "severity": "low",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "6.1.2"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "postcss-selector-parser allows denial of service through uncontrolled AST recursion",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-w9m9-85wc-3x92",
+            "affectedRange": ">=6.1.0 <6.1.3"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "qs",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "6.13.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "qs's arrayLimit bypass in comma parsing allows denial of service",
+            "severity": "low",
+            "url": "https://github.com/advisories/GHSA-w7fw-mjwx-w883",
+            "affectedRange": ">=6.7.0 <=6.14.1"
+          },
+          {
+            "title": "qs's arrayLimit bypass in its bracket notation allows DoS via memory exhaustion",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-6rw7-vpxm-498p",
+            "affectedRange": "<6.14.1"
+          },
+          {
+            "title": "qs has a remotely triggerable DoS: qs.stringify crashes with TypeError on null/undefined entries in comma-format arrays when encodeValuesOnly is set",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-q8mj-m7cp-5q26",
+            "affectedRange": ">=6.11.1 <=6.15.1"
+          },
+          {
+            "title": "qs: Denial of Service via Attacker Controlled isBuffer",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-4mjr-xmp4-gh2g",
+            "affectedRange": ">=2.2.5 <6.16.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "react-router",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "6.28.1"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "React Router has unexpected external redirect via untrusted paths",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-9jcx-v3wj-wh4m",
+            "affectedRange": ">=6.0.0 <6.30.2"
+          },
+          {
+            "title": "React Router: Open redirect via backslash in <Link> and useNavigate (CVE-2025-68470 bypass)",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-wrjc-x8rr-h8h6",
+            "affectedRange": ">=6.0.0 <7.18.0"
+          },
+          {
+            "title": "React Router: Arbitrary Constructor Injection via deserializeErrors() in React Router SSR Hydration",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-337j-9hxr-rhxg",
+            "affectedRange": ">=6.4.0 <7.18.0"
+          },
+          {
+            "title": "React Router's same-origin redirect with path starting // causes open redirect via protocol-relative URL reinterpretation",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-2j2x-hqr9-3h42",
+            "affectedRange": ">=6.7.0 <6.30.4"
+          }
+        ],
+        "viaPackages": [
+          "@remix-run/router"
+        ]
+      },
+      {
+        "name": "react-router-dom",
+        "severity": "high",
+        "direct": true,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "6.28.1"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "@remix-run/router",
+          "react-router"
+        ]
+      },
+      {
+        "name": "rollup",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "4.54.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "Rollup 4 has Arbitrary File Write via Path Traversal",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-mw96-cpmx-2vgc",
+            "affectedRange": ">=4.0.0 <4.59.0"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "serve",
+        "severity": "high",
+        "direct": true,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "14.2.4"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "ajv",
+          "compression",
+          "serve-handler"
+        ]
+      },
+      {
+        "name": "serve-handler",
+        "severity": "high",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "6.1.6"
+        ],
+        "fixAvailable": true,
+        "advisories": [],
+        "viaPackages": [
+          "minimatch"
+        ]
+      },
+      {
+        "name": "shell-quote",
+        "severity": "critical",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "1.8.2"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "shell-quote quote() does not escape newlines in object .op values",
+            "severity": "critical",
+            "url": "https://github.com/advisories/GHSA-w7jw-789q-3m8p",
+            "affectedRange": ">=1.1.0 <=1.8.3"
+          },
+          {
+            "title": "shell-quote: Quadratic-complexity Denial of Service in `parse()` (CWE-407)",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-395f-4hp3-45gv",
+            "affectedRange": "<=1.8.4"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "uuid",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": true,
+        "lockedVersions": [
+          "8.3.2"
+        ],
+        "fixAvailable": {
+          "name": "node-cron",
+          "version": "4.6.0",
+          "isSemVerMajor": true
+        },
+        "advisories": [
+          {
+            "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+            "affectedRange": "<11.1.1"
+          }
+        ],
+        "viaPackages": []
+      },
+      {
+        "name": "vite",
+        "severity": "high",
+        "direct": true,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "5.4.21"
+        ],
+        "fixAvailable": {
+          "name": "vite",
+          "version": "6.4.3",
+          "isSemVerMajor": true
+        },
+        "advisories": [
+          {
+            "title": "Vite Vulnerable to Path Traversal in Optimized Deps `.map` Handling",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-4w7w-66w2-5vf9",
+            "affectedRange": "<=6.4.1"
+          },
+          {
+            "title": "launch-editor: NTLMv2 hash disclosure via UNC path handling on Windows",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-v6wh-96g9-6wx3",
+            "affectedRange": "<=6.4.2"
+          },
+          {
+            "title": "vite: `server.fs.deny` bypass on Windows alternate paths",
+            "severity": "high",
+            "url": "https://github.com/advisories/GHSA-fx2h-pf6j-xcff",
+            "affectedRange": "<=6.4.2"
+          }
+        ],
+        "viaPackages": [
+          "esbuild"
+        ]
+      },
+      {
+        "name": "yaml",
+        "severity": "moderate",
+        "direct": false,
+        "inProductionAudit": false,
+        "lockedVersions": [
+          "2.7.0"
+        ],
+        "fixAvailable": true,
+        "advisories": [
+          {
+            "title": "yaml is vulnerable to Stack Overflow via deeply nested YAML collections",
+            "severity": "moderate",
+            "url": "https://github.com/advisories/GHSA-48c2-rrv3-qjmp",
+            "affectedRange": ">=2.0.0 <2.8.3"
+          }
+        ],
+        "viaPackages": []
+      }
+    ]
+  },
+  "gitleaks": {
+    "currentCandidates": [
+      {
+        "rule": "generic-api-key",
+        "file": ".env",
+        "line": 2,
+        "triage": "mobile SHA-256 digest, not raw secret"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "prod/docker-compose.yml",
+        "line": 7,
+        "triage": "literal credential in ignored alternate Compose configuration; validity unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "prod/docker-compose.yml",
+        "line": 40,
+        "triage": "literal credential in ignored alternate Compose configuration; validity unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "prod/docker-compose.yml",
+        "line": 42,
+        "triage": "literal credential in ignored alternate Compose configuration; validity unverified"
+      }
+    ],
+    "historyCandidates": [
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 91,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 98,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 105,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 112,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 126,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 133,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 140,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 179,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 186,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 193,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 200,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 214,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 221,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 228,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 273,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 1098,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 1179,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "dev/import/closing-stock-report/current-june-report.json",
+        "line": 1259,
+        "commit": "c5a04afadb325328d48c26f43ad137cfe630d1a6",
+        "triage": "non-secret report lineKey"
+      },
+      {
+        "rule": "curl-auth-header",
+        "file": "docs/PINJAM_REPORT_PARITY_HANDOVER.md",
+        "line": 192,
+        "commit": "3b86d3821986ba1cf5f647a0ad5830cdb646f4d6",
+        "triage": "REMOVED_SECRET example"
+      },
+      {
+        "rule": "curl-auth-header",
+        "file": "docs/PINJAM_REPORT_PARITY_HANDOVER.md",
+        "line": 194,
+        "commit": "3b86d3821986ba1cf5f647a0ad5830cdb646f4d6",
+        "triage": "REMOVED_SECRET example"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": ".github/workflows/deploy.yml",
+        "line": 39,
+        "commit": "7e878bf39518cd0fe9321e2b3235fc0ca9105f4c",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": ".github/workflows/deploy.yml",
+        "line": 41,
+        "commit": "7e878bf39518cd0fe9321e2b3235fc0ca9105f4c",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "docs/HETZNER_MIGRATION_PLAN.md",
+        "line": 285,
+        "commit": "e5cee42a8084a54eee330edbc34062e8f4324c31",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "docs/HETZNER_MIGRATION_PLAN.md",
+        "line": 287,
+        "commit": "e5cee42a8084a54eee330edbc34062e8f4324c31",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "src/routes/index.js",
+        "line": 36,
+        "commit": "491c8e33ba2e44b1ac4ec48eca68852c24906a20",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "prod/docker-compose.yml",
+        "line": 7,
+        "commit": "870a3889d23fcab433745a903c5d70192911bd8b",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "prod/docker-compose.yml",
+        "line": 23,
+        "commit": "20c56b62fb733f57a8702c766d5956e6b40c0f27",
+        "triage": "placeholder"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "server.js",
+        "line": 24,
+        "commit": "97cb2cd81d9344c19faaf642ab5365e9535fe71d",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      },
+      {
+        "rule": "generic-api-key",
+        "file": "src/configs/production.js",
+        "line": 19,
+        "commit": "9ede45b7e50531dda1936b38944c385e5410e0c7",
+        "triage": "historical literal credential candidate; validity and rotation unverified"
+      }
+    ],
+    "note": "Only metadata retained. Raw credentials and matching source snippets intentionally omitted. Counts represent occurrences, not unique valid credentials."
+  },
+  "passiveLiveHeadRequests": [
+    {
+      "url": "https://tienhock.com/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "server": "cloudflare",
+        "strict-transport-security": null,
+        "content-security-policy": null,
+        "x-frame-options": null,
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": null,
+        "cache-control": "public, max-age=0, must-revalidate",
+        "cf-cache-status": "DYNAMIC",
+        "access-control-allow-origin": "*",
+        "x-powered-by": null
+      }
+    },
+    {
+      "url": "https://greentarget.tienhock.com/",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "server": "cloudflare",
+        "strict-transport-security": null,
+        "content-security-policy": null,
+        "x-frame-options": null,
+        "x-content-type-options": "nosniff",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": null,
+        "cache-control": "public, max-age=0, must-revalidate",
+        "cf-cache-status": "DYNAMIC",
+        "access-control-allow-origin": "*",
+        "x-powered-by": null
+      }
+    },
+    {
+      "url": "https://api.tienhock.com/api/staffs",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "server": "cloudflare",
+        "strict-transport-security": null,
+        "content-security-policy": null,
+        "x-frame-options": null,
+        "x-content-type-options": null,
+        "referrer-policy": null,
+        "permissions-policy": null,
+        "cache-control": null,
+        "cf-cache-status": "DYNAMIC",
+        "access-control-allow-origin": null,
+        "x-powered-by": "Express"
+      }
+    },
+    {
+      "url": "https://api.tienhock.com/api/backup/list",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "server": "cloudflare",
+        "strict-transport-security": null,
+        "content-security-policy": null,
+        "x-frame-options": null,
+        "x-content-type-options": null,
+        "referrer-policy": null,
+        "permissions-policy": null,
+        "cache-control": null,
+        "cf-cache-status": "DYNAMIC",
+        "access-control-allow-origin": null,
+        "x-powered-by": "Express"
+      }
+    },
+    {
+      "url": "https://api.tienhock.com/greentarget/api/customers",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "server": "cloudflare",
+        "strict-transport-security": null,
+        "content-security-policy": null,
+        "x-frame-options": null,
+        "x-content-type-options": null,
+        "referrer-policy": null,
+        "permissions-policy": null,
+        "cache-control": null,
+        "cf-cache-status": "DYNAMIC",
+        "access-control-allow-origin": null,
+        "x-powered-by": "Express"
+      }
+    },
+    {
+      "url": "https://api.tienhock.com/jellypolly/api/invoices",
+      "status": 401,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "server": "cloudflare",
+        "strict-transport-security": null,
+        "content-security-policy": null,
+        "x-frame-options": null,
+        "x-content-type-options": null,
+        "referrer-policy": null,
+        "permissions-policy": null,
+        "cache-control": null,
+        "cf-cache-status": "DYNAMIC",
+        "access-control-allow-origin": null,
+        "x-powered-by": "Express"
+      }
+    }
+  ],
+  "developmentReadOnlyObservations": {
+    "role": "postgres",
+    "superuser": true,
+    "createRole": true,
+    "createDatabase": true,
+    "bypassRowSecurity": true,
+    "activeOfficeAccounts": 12,
+    "accountsWithPassword": 12,
+    "distinctPasswordHashes": 1,
+    "schemas": [
+      {
+        "name": "public",
+        "tables": 100,
+        "rowSecurityTables": 0
+      },
+      {
+        "name": "greentarget",
+        "tables": 49,
+        "rowSecurityTables": 0
+      },
+      {
+        "name": "jellypolly",
+        "tables": 36,
+        "rowSecurityTables": 0
+      }
+    ],
+    "note": "Development only. Absence of RLS is not independently classified as a vulnerability for this intentionally shared application."
+  },
+  "poolBeginSites": [
+    {
+      "file": "src/routes/auth/auth.js",
+      "line": 46
+    },
+    {
+      "file": "src/routes/catalogue/employee-pay-codes.js",
+      "line": 188
+    },
+    {
+      "file": "src/routes/catalogue/employee-pay-codes.js",
+      "line": 305
+    },
+    {
+      "file": "src/routes/catalogue/employee-pay-codes.js",
+      "line": 401
+    },
+    {
+      "file": "src/routes/catalogue/employee-pay-codes.js",
+      "line": 527
+    },
+    {
+      "file": "src/routes/catalogue/employee-pay-codes.js",
+      "line": 600
+    },
+    {
+      "file": "src/routes/catalogue/employee-pay-codes.js",
+      "line": 678
+    },
+    {
+      "file": "src/routes/catalogue/job-location-mappings.js",
+      "line": 150
+    },
+    {
+      "file": "src/routes/catalogue/job-location-mappings.js",
+      "line": 228
+    },
+    {
+      "file": "src/routes/catalogue/job-location-mappings.js",
+      "line": 327
+    },
+    {
+      "file": "src/routes/catalogue/job-location-mappings.js",
+      "line": 389
+    },
+    {
+      "file": "src/routes/catalogue/job-pay-codes.js",
+      "line": 170
+    },
+    {
+      "file": "src/routes/catalogue/job-pay-codes.js",
+      "line": 257
+    },
+    {
+      "file": "src/routes/catalogue/job-pay-codes.js",
+      "line": 401
+    },
+    {
+      "file": "src/routes/catalogue/job-pay-codes.js",
+      "line": 490
+    },
+    {
+      "file": "src/routes/catalogue/job-pay-codes.js",
+      "line": 555
+    },
+    {
+      "file": "src/routes/catalogue/job-pay-codes.js",
+      "line": 638
+    },
+    {
+      "file": "src/routes/catalogue/jobs.js",
+      "line": 190
+    },
+    {
+      "file": "src/routes/catalogue/product-pay-codes.js",
+      "line": 185
+    },
+    {
+      "file": "src/routes/catalogue/product-pay-codes.js",
+      "line": 282
+    },
+    {
+      "file": "src/routes/jellypolly/daily-work-logs.js",
+      "line": 405
+    },
+    {
+      "file": "src/routes/jellypolly/daily-work-logs.js",
+      "line": 475
+    },
+    {
+      "file": "src/routes/jellypolly/daily-work-logs.js",
+      "line": 561
+    },
+    {
+      "file": "src/routes/jellypolly/employee-pay-codes.js",
+      "line": 188
+    },
+    {
+      "file": "src/routes/jellypolly/employee-pay-codes.js",
+      "line": 305
+    },
+    {
+      "file": "src/routes/jellypolly/employee-pay-codes.js",
+      "line": 401
+    },
+    {
+      "file": "src/routes/jellypolly/employee-pay-codes.js",
+      "line": 527
+    },
+    {
+      "file": "src/routes/jellypolly/employee-pay-codes.js",
+      "line": 600
+    },
+    {
+      "file": "src/routes/jellypolly/employee-pay-codes.js",
+      "line": 678
+    },
+    {
+      "file": "src/routes/jellypolly/job-location-mappings.js",
+      "line": 154
+    },
+    {
+      "file": "src/routes/jellypolly/job-location-mappings.js",
+      "line": 235
+    },
+    {
+      "file": "src/routes/jellypolly/job-location-mappings.js",
+      "line": 334
+    },
+    {
+      "file": "src/routes/jellypolly/job-location-mappings.js",
+      "line": 396
+    },
+    {
+      "file": "src/routes/jellypolly/job-pay-codes.js",
+      "line": 170
+    },
+    {
+      "file": "src/routes/jellypolly/job-pay-codes.js",
+      "line": 257
+    },
+    {
+      "file": "src/routes/jellypolly/job-pay-codes.js",
+      "line": 401
+    },
+    {
+      "file": "src/routes/jellypolly/job-pay-codes.js",
+      "line": 490
+    },
+    {
+      "file": "src/routes/jellypolly/job-pay-codes.js",
+      "line": 555
+    },
+    {
+      "file": "src/routes/jellypolly/job-pay-codes.js",
+      "line": 638
+    },
+    {
+      "file": "src/routes/jellypolly/jobs.js",
+      "line": 193
+    },
+    {
+      "file": "src/routes/jellypolly/monthly-work-logs.js",
+      "line": 313
+    },
+    {
+      "file": "src/routes/jellypolly/monthly-work-logs.js",
+      "line": 509
+    },
+    {
+      "file": "src/routes/jellypolly/monthly-work-logs.js",
+      "line": 707
+    },
+    {
+      "file": "src/routes/jellypolly/product-pay-codes.js",
+      "line": 185
+    },
+    {
+      "file": "src/routes/jellypolly/product-pay-codes.js",
+      "line": 282
+    },
+    {
+      "file": "src/routes/payroll/daily-work-logs.js",
+      "line": 261
+    },
+    {
+      "file": "src/routes/payroll/daily-work-logs.js",
+      "line": 491
+    },
+    {
+      "file": "src/routes/payroll/daily-work-logs.js",
+      "line": 569
+    },
+    {
+      "file": "src/routes/payroll/employee-payrolls.js",
+      "line": 184
+    },
+    {
+      "file": "src/routes/payroll/employee-payrolls.js",
+      "line": 2183
+    },
+    {
+      "file": "src/routes/payroll/holidays.js",
+      "line": 83
+    },
+    {
+      "file": "src/routes/payroll/monthly-work-logs.js",
+      "line": 334
+    },
+    {
+      "file": "src/routes/payroll/monthly-work-logs.js",
+      "line": 543
+    },
+    {
+      "file": "src/routes/payroll/monthly-work-logs.js",
+      "line": 736
+    }
+  ],
+  "limitations": [
+    "No live authenticated requests or credential-validity checks",
+    "No exploit, load, brute-force, application test suite, build, lint, or type-check execution",
+    "No production database or SSH access",
+    "No live IAM/S3 retention/Cloudflare account/firewall/branch-protection inspection",
+    "No restore exercise; backups and supporting-document recovery unverified",
+    "No guarantee all vulnerabilities found or every standards requirement satisfied"
+  ]
+}

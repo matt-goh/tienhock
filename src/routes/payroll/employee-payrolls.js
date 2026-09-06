@@ -1,3 +1,4 @@
+import { insertPayrollItems } from "./payroll-item-insert.js";
 // src/routes/payroll/employee-payrolls.js
 import { Router } from "express";
 import {
@@ -181,496 +182,516 @@ const saveDeductions = async (pool, employeePayrollId, deductions) => {
  * @param {number} employeePayrollId - The ID of the employee payroll to recalculate.
  */
 const recalculateAndUpdatePayroll = async (pool, employeePayrollId) => {
-  await pool.query("BEGIN");
+  /** @type {import("pg").PoolClient | null} */
+  let transactionClient = null;
   try {
-    // 1. FETCH ALL NECESSARY DATA
-    // Get employee_id from the payroll
-    const payrollDetails = await pool.query(
-      "SELECT employee_id FROM employee_payrolls WHERE id = $1",
-      [employeePayrollId],
-    );
-    if (payrollDetails.rows.length === 0)
-      throw new Error("Employee payroll not found");
-    const { employee_id } = payrollDetails.rows[0];
-
-    // Get employee's info (birthdate, nationality, marital status, spouse employment status, number of children)
-    const employeeInfoRes = await pool.query(
-      "SELECT birthdate, nationality, marital_status, spouse_employment_status, number_of_children, epf_age_override, epf_nationality_override, socso_age_override, sip_age_override FROM staffs WHERE id = $1",
-      [employee_id],
-    );
-    if (employeeInfoRes.rows.length === 0)
-      throw new Error(`Employee ${employee_id} not found`);
-    const employeeInfo = employeeInfoRes.rows[0];
-
-    // Get all current payroll items
-    const itemsRes = await pool.query(
-      `
-      SELECT pi.*, pc.pay_type
-      FROM payroll_items pi
-      LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
-      WHERE pi.employee_payroll_id = $1
-    `,
-      [employeePayrollId],
-    );
-    const payrollItems = itemsRes.rows.map((item) => ({
-      ...item,
-      rate: parseFloat(item.rate),
-      quantity: parseFloat(item.quantity),
-      foc_units: parseFloat(item.foc_units || 0),
-      amount: parseFloat(item.amount),
-    }));
-
-    // Get employee payroll details to fetch year and month for leave records
-    const payrollInfoRes = await pool.query(
-      `
-      SELECT ep.employee_id, ep.job_type, ep.employee_job_mapping, s.name as employee_name, mp.year, mp.month
-      FROM employee_payrolls ep
-      JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
-      JOIN staffs s ON s.id = ep.employee_id
-      WHERE ep.id = $1
-    `,
-      [employeePayrollId],
-    );
-
-    if (payrollInfoRes.rows.length === 0) {
-      throw new Error("Employee payroll not found");
-    }
-
-    const { year, month, employee_name, job_type, employee_job_mapping } =
-      payrollInfoRes.rows[0];
-    // Sibling ids that make up this payroll row. Commission/Others are scoped to
-    // these (the ids with work in the row) rather than all same-name siblings, so
-    // a same-name id with no work this month does not leak its records onto this
-    // row. Fall back to the row owner if the mapping is missing.
-    const groupEmployeeIds = employee_job_mapping
-      ? Object.keys(employee_job_mapping)
-      : [employee_id];
-    const scopedGroupEmployeeIds =
-      groupEmployeeIds.length > 0 ? groupEmployeeIds : [employee_id];
-
-    // Get leave records for this employee for the specific month/year
-    const leaveRecordsRes = await pool.query(
-      `
-      SELECT
-        to_char(leave_date, 'YYYY-MM-DD') as date,
-        employee_id,
-        leave_type,
-        days_taken,
-        amount_paid
-      FROM leave_records
-      WHERE employee_id IN (
-        SELECT id FROM staffs WHERE name = $1
-      )
-        AND EXTRACT(YEAR FROM leave_date) = $2
-        AND EXTRACT(MONTH FROM leave_date) = $3
-        AND status = 'approved'
-        AND company <> 'JP'
-      ORDER BY leave_date ASC
-    `,
-      [employee_name, year, month],
-    );
-
-    const leaveRecords = leaveRecordsRes.rows.map((record) => ({
-      ...record,
-      days_taken: parseFloat(record.days_taken),
-      amount_paid: parseFloat(record.amount_paid || 0),
-    }));
-
-    // Exclude daily work items dated on a leave day — they pay nothing as work
-    // (the day is paid via leave) and would otherwise inflate gross, mirroring
-    // the payslip display. Used for gross + EPF base below.
-    const leaveDateSet = buildLeaveDateSet(leaveRecords);
-    const workItems = removeLeaveDayWorkItems(payrollItems, leaveDateSet);
-
-    // Get commission records for this employee for the specific month/year
-    const commissionRecordsRes = await pool.query(
-      `
-      SELECT amount, description, is_advance
-      FROM commission_records
-      WHERE employee_id = ANY($1)
-        AND DATE(commission_date) >= $2
-        AND DATE(commission_date) <= $3
-      ORDER BY commission_date DESC
-    `,
-      [
-        scopedGroupEmployeeIds,
-        `${year}-${month.toString().padStart(2, "0")}-01`,
-        `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
-      ],
-    );
-
-    const commissionRecords = commissionRecordsRes.rows.map((record) => ({
-      ...record,
-      amount: parseFloat(record.amount || 0),
-    }));
-
-    // Get others (Kerja Luar OT) records for this employee for the specific month/year
-    const othersRecordsRes = await pool.query(
-      `
-      SELECT orec.amount, orec.description, pc.pay_type
-      FROM others_records orec
-      LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
-      WHERE orec.employee_id = ANY($1)
-        AND DATE(orec.record_date) >= $2
-        AND DATE(orec.record_date) <= $3
-      ORDER BY orec.record_date DESC
-    `,
-      [
-        scopedGroupEmployeeIds,
-        `${year}-${month.toString().padStart(2, "0")}-01`,
-        `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
-      ],
-    );
-
-    const othersRecords = othersRecordsRes.rows.map((record) => ({
-      ...record,
-      amount: parseFloat(record.amount || 0),
-    }));
-    // Overtime "Others" count towards gross but are excluded from the EPF base.
-    const othersOvertimeGrossPay = othersRecords.reduce(
-      (sum, record) =>
-        (record.pay_type || "").toLowerCase() === "overtime"
-          ? sum + record.amount
-          : sum,
-      0,
-    );
-
-    // Get all active contribution rates
-    const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
-      await Promise.all([
-        pool.query("SELECT * FROM epf_rates WHERE is_active = true"),
-        pool.query(
-          "SELECT * FROM socso_rates WHERE is_active = true ORDER BY wage_from",
-        ),
-        pool.query(
-          "SELECT * FROM sip_rates WHERE is_active = true ORDER BY wage_from",
-        ),
-        pool.query(
-          "SELECT * FROM income_tax_rates WHERE is_active = true ORDER BY wage_from",
-        ), // Add this
-      ]);
-    const epfRates = epfRatesRes.rows;
-    const socsoRates = socsoRatesRes.rows;
-    const sipRates = sipRatesRes.rows;
-    const incomeTaxRates = incomeTaxRatesRes.rows;
-
-    // 2. PERFORM CALCULATIONS (Server-side implementation of client logic)
-
-    // --- Calculation Helpers ---
-    const findEPFRate = (rates, type, wage) => {
-      const applicable = rates.filter((r) => r.employee_type === type);
-      if (!applicable.length) return null;
-      if (type.startsWith("local_")) {
-        const over = applicable.find((r) => r.wage_threshold === null);
-        const under = applicable.find((r) => r.wage_threshold !== null);
-        return under && wage <= parseFloat(under.wage_threshold)
-          ? under
-          : over || null;
-      }
-      return applicable[0];
-    };
-
-    const findRateByWage = (rates, wage) =>
-      rates.find(
-        (r) => wage >= parseFloat(r.wage_from) && wage <= parseFloat(r.wage_to),
-      ) || null;
-
-    const findIncomeTaxRateByWage = (rates, wage) => {
-      const lookupWage = Math.ceil(wage);
-      return (
-        rates.find(
-          (r) =>
-            lookupWage >= parseFloat(r.wage_from) &&
-            lookupWage <= parseFloat(r.wage_to),
-        ) || null
+    transactionClient = await pool.connect();
+    await transactionClient.query("BEGIN");
+    try {
+      // 1. FETCH ALL NECESSARY DATA
+      // Get employee_id from the payroll
+      const payrollDetails = await (transactionClient || pool).query(
+        "SELECT employee_id FROM employee_payrolls WHERE id = $1",
+        [employeePayrollId],
       );
-    };
+      if (payrollDetails.rows.length === 0)
+        throw new Error("Employee payroll not found");
+      const { employee_id } = payrollDetails.rows[0];
 
-    const getEPFWageCeiling = (wageAmount) => {
-      if (wageAmount <= 10) return 0;
-      if (wageAmount <= 20) return 20;
-      if (wageAmount <= 5000) return Math.ceil(wageAmount / 20) * 20;
-      return 5000 + Math.ceil((wageAmount - 5000) / 100) * 100;
-    };
+      // Get employee's info (birthdate, nationality, marital status, spouse employment status, number of children)
+      const employeeInfoRes = await (transactionClient || pool).query(
+        "SELECT birthdate, nationality, marital_status, spouse_employment_status, number_of_children, epf_age_override, epf_nationality_override, socso_age_override, sip_age_override FROM staffs WHERE id = $1",
+        [employee_id],
+      );
+      if (employeeInfoRes.rows.length === 0)
+        throw new Error(`Employee ${employee_id} not found`);
+      const employeeInfo = employeeInfoRes.rows[0];
 
-    // --- Main Calculation Logic ---
-    const workGrossPayCents = calculateConsolidatedPayrollItemsCents(workItems);
-    const workGrossPay = workGrossPayCents / 100;
-    const leaveGrossPayCents = leaveRecords.reduce(
-      (sum, record) => sum + Math.round(record.amount_paid * 100),
-      0,
-    );
-    const leaveGrossPay = leaveGrossPayCents / 100;
-    const commissionGrossPayCents = commissionRecords.reduce(
-      (sum, record) => sum + Math.round(record.amount * 100),
-      0,
-    );
-    const commissionGrossPay = commissionGrossPayCents / 100;
-    const commissionAdvanceCents = commissionRecords.reduce(
-      (sum, record) =>
-        record.is_advance === false
-          ? sum
-          : sum + Math.round(record.amount * 100),
-      0,
-    );
-    const commissionAdvancePay = commissionAdvanceCents / 100;
-    const othersGrossPayCents = othersRecords.reduce(
-      (sum, record) => sum + Math.round(record.amount * 100),
-      0,
-    );
-    const othersGrossPay = othersGrossPayCents / 100;
-    const grossPay =
-      Math.round(
-        (workGrossPay + leaveGrossPay + commissionGrossPay + othersGrossPay) *
-          100,
-      ) / 100;
+      // Get all current payroll items
+      const itemsRes = await (transactionClient || pool).query(
+        `
+        SELECT pi.*, pc.pay_type
+        FROM payroll_items pi
+        LEFT JOIN pay_codes pc ON pi.pay_code_id = pc.id
+        WHERE pi.employee_payroll_id = $1
+      `,
+        [employeePayrollId],
+      );
+      const payrollItems = itemsRes.rows.map((item) => ({
+        ...item,
+        rate: parseFloat(item.rate),
+        quantity: parseFloat(item.quantity),
+        foc_units: parseFloat(item.foc_units || 0),
+        amount: parseFloat(item.amount),
+      }));
 
-    const groupedItems = workItems.reduce(
-      (acc, item) => {
-        const type = item.pay_type || "Tambahan"; // Default to Tambahan
-        if (!acc[type]) acc[type] = [];
-        acc[type].push(item);
-        return acc;
-      },
-      { Base: [], Tambahan: [], Overtime: [] },
-    );
+      // Get employee payroll details to fetch year and month for leave records
+      const payrollInfoRes = await (transactionClient || pool).query(
+        `
+        SELECT ep.employee_id, ep.job_type, ep.employee_job_mapping, s.name as employee_name, mp.year, mp.month
+        FROM employee_payrolls ep
+        JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
+        JOIN staffs s ON s.id = ep.employee_id
+        WHERE ep.id = $1
+      `,
+        [employeePayrollId],
+      );
 
-    // Calculate EPF gross pay using CONSOLIDATED approach. Excludes all overtime:
-    // Overtime work items aren't in Base/Tambahan, and overtime "Others" are
-    // removed via othersOvertimeGrossPay (OT is not part of the EPF wage base).
-    const epfGrossPayCents =
-      calculateConsolidatedPayrollItemsCents(groupedItems.Base || []) +
-      calculateConsolidatedPayrollItemsCents(groupedItems.Tambahan || []) +
-      Math.round(leaveGrossPay * 100) +
-      Math.round(commissionGrossPay * 100) +
-      Math.round((othersGrossPay - othersOvertimeGrossPay) * 100);
-    const epfGrossPay = epfGrossPayCents / 100;
+      if (payrollInfoRes.rows.length === 0) {
+        throw new Error("Employee payroll not found");
+      }
 
-    const age = Math.floor(
-      (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
-        (365.25 * 24 * 60 * 60 * 1000),
-    );
-    // SIP/EIS age-18 check uses the age during the payroll month, not today.
-    const sipAge = ageAtPayrollMonth(employeeInfo.birthdate, year, month);
-    const contributionCtx = resolveContributionContext(
-      employeeInfo,
-      age,
-      sipAge,
-    );
+      const { year, month, employee_name, job_type, employee_job_mapping } =
+        payrollInfoRes.rows[0];
+      // Sibling ids that make up this payroll row. Commission/Others are scoped to
+      // these (the ids with work in the row) rather than all same-name siblings, so
+      // a same-name id with no work this month does not leak its records onto this
+      // row. Fall back to the row owner if the mapping is missing.
+      const groupEmployeeIds = employee_job_mapping
+        ? Object.keys(employee_job_mapping)
+        : [employee_id];
+      const scopedGroupEmployeeIds =
+        groupEmployeeIds.length > 0 ? groupEmployeeIds : [employee_id];
 
-    const deductions = [];
+      // Get leave records for this employee for the specific month/year
+      const leaveRecordsRes = await (transactionClient || pool).query(
+        `
+        SELECT
+          to_char(leave_date, 'YYYY-MM-DD') as date,
+          employee_id,
+          leave_type,
+          days_taken,
+          amount_paid
+        FROM leave_records
+        WHERE employee_id IN (
+          SELECT id FROM staffs WHERE name = $1
+        )
+          AND EXTRACT(YEAR FROM leave_date) = $2
+          AND EXTRACT(MONTH FROM leave_date) = $3
+          AND status = 'approved'
+          AND company <> 'JP'
+        ORDER BY leave_date ASC
+      `,
+        [employee_name, year, month],
+      );
 
-    // Calculate EPF
-    const epfRate = contributionCtx.epf.eligible
-      ? findEPFRate(epfRates, contributionCtx.epf.employeeType, epfGrossPay)
-      : null;
-    if (epfRate) {
-      const wageCeiling = getEPFWageCeiling(epfGrossPay);
-      if (wageCeiling > 0) {
-        const employeeContribution = Math.ceil(
-          (wageCeiling * parseFloat(epfRate.employee_rate_percentage)) / 100,
+      const leaveRecords = leaveRecordsRes.rows.map((record) => ({
+        ...record,
+        days_taken: parseFloat(record.days_taken),
+        amount_paid: parseFloat(record.amount_paid || 0),
+      }));
+
+      // Exclude daily work items dated on a leave day — they pay nothing as work
+      // (the day is paid via leave) and would otherwise inflate gross, mirroring
+      // the payslip display. Used for gross + EPF base below.
+      const leaveDateSet = buildLeaveDateSet(leaveRecords);
+      const workItems = removeLeaveDayWorkItems(payrollItems, leaveDateSet);
+
+      // Get commission records for this employee for the specific month/year
+      const commissionRecordsRes = await (transactionClient || pool).query(
+        `
+        SELECT amount, description, is_advance
+        FROM commission_records
+        WHERE employee_id = ANY($1)
+          AND DATE(commission_date) >= $2
+          AND DATE(commission_date) <= $3
+        ORDER BY commission_date DESC
+      `,
+        [
+          scopedGroupEmployeeIds,
+          `${year}-${month.toString().padStart(2, "0")}-01`,
+          `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
+        ],
+      );
+
+      const commissionRecords = commissionRecordsRes.rows.map((record) => ({
+        ...record,
+        amount: parseFloat(record.amount || 0),
+      }));
+
+      // Get others (Kerja Luar OT) records for this employee for the specific month/year
+      const othersRecordsRes = await (transactionClient || pool).query(
+        `
+        SELECT orec.amount, orec.description, pc.pay_type
+        FROM others_records orec
+        LEFT JOIN pay_codes pc ON orec.pay_code_id = pc.id
+        WHERE orec.employee_id = ANY($1)
+          AND DATE(orec.record_date) >= $2
+          AND DATE(orec.record_date) <= $3
+        ORDER BY orec.record_date DESC
+      `,
+        [
+          scopedGroupEmployeeIds,
+          `${year}-${month.toString().padStart(2, "0")}-01`,
+          `${year}-${month.toString().padStart(2, "0")}-${new Date(year, month, 0).getDate().toString().padStart(2, "0")}`,
+        ],
+      );
+
+      const othersRecords = othersRecordsRes.rows.map((record) => ({
+        ...record,
+        amount: parseFloat(record.amount || 0),
+      }));
+      // Overtime "Others" count towards gross but are excluded from the EPF base.
+      const othersOvertimeGrossPay = othersRecords.reduce(
+        (sum, record) =>
+          (record.pay_type || "").toLowerCase() === "overtime"
+            ? sum + record.amount
+            : sum,
+        0,
+      );
+
+      // Get all active contribution rates
+      const [epfRatesRes, socsoRatesRes, sipRatesRes, incomeTaxRatesRes] =
+        await Promise.all([
+          (transactionClient || pool).query("SELECT * FROM epf_rates WHERE is_active = true"),
+          (transactionClient || pool).query(
+            "SELECT * FROM socso_rates WHERE is_active = true ORDER BY wage_from",
+          ),
+          (transactionClient || pool).query(
+            "SELECT * FROM sip_rates WHERE is_active = true ORDER BY wage_from",
+          ),
+          (transactionClient || pool).query(
+            "SELECT * FROM income_tax_rates WHERE is_active = true ORDER BY wage_from",
+          ), // Add this
+        ]);
+      const epfRates = epfRatesRes.rows;
+      const socsoRates = socsoRatesRes.rows;
+      const sipRates = sipRatesRes.rows;
+      const incomeTaxRates = incomeTaxRatesRes.rows;
+
+      // 2. PERFORM CALCULATIONS (Server-side implementation of client logic)
+
+      // --- Calculation Helpers ---
+      const findEPFRate = (rates, type, wage) => {
+        const applicable = rates.filter((r) => r.employee_type === type);
+        if (!applicable.length) return null;
+        if (type.startsWith("local_")) {
+          const over = applicable.find((r) => r.wage_threshold === null);
+          const under = applicable.find((r) => r.wage_threshold !== null);
+          return under && wage <= parseFloat(under.wage_threshold)
+            ? under
+            : over || null;
+        }
+        return applicable[0];
+      };
+
+      const findRateByWage = (rates, wage) =>
+        rates.find(
+          (r) => wage >= parseFloat(r.wage_from) && wage <= parseFloat(r.wage_to),
+        ) || null;
+
+      const findIncomeTaxRateByWage = (rates, wage) => {
+        const lookupWage = Math.ceil(wage);
+        return (
+          rates.find(
+            (r) =>
+              lookupWage >= parseFloat(r.wage_from) &&
+              lookupWage <= parseFloat(r.wage_to),
+          ) || null
         );
-        const employerContribution =
-          epfRate.employer_rate_percentage !== null
-            ? Math.ceil(
-                (wageCeiling * parseFloat(epfRate.employer_rate_percentage)) /
-                  100,
-              )
-            : parseFloat(epfRate.employer_fixed_amount);
+      };
 
-        deductions.push({
-          deduction_type: "epf",
-          employee_amount: employeeContribution || 0,
-          employer_amount: employerContribution || 0,
-          wage_amount: epfGrossPay,
-          rate_info: {
-            rate_id: epfRate.id,
-            employee_rate: `${epfRate.employee_rate_percentage}%`,
-            employer_rate: epfRate.employer_rate_percentage
-              ? `${epfRate.employer_rate_percentage}%`
-              : `RM${epfRate.employer_fixed_amount}`,
-            age_group: contributionCtx.epf.employeeType,
-            wage_ceiling_used: wageCeiling,
-          },
-        });
-      }
-    }
+      const getEPFWageCeiling = (wageAmount) => {
+        if (wageAmount <= 10) return 0;
+        if (wageAmount <= 20) return 20;
+        if (wageAmount <= 5000) return Math.ceil(wageAmount / 20) * 20;
+        return 5000 + Math.ceil((wageAmount - 5000) / 100) * 100;
+      };
 
-    // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
-    // No wage means no contribution: skip when grossPay is 0 so the lowest
-    // bracket (wage_from = 0) does not charge the minimum on a zero-wage month.
-    const socsoRate = contributionCtx.socso.eligible && grossPay > 0
-      ? findRateByWage(socsoRates, grossPay)
-      : null;
-    if (socsoRate) {
-      const isOver60 = contributionCtx.socso.isOver60;
-      const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
-      const skbbk =
-        shouldApplySKBBK
-          ? Math.round(parseFloat(socsoRate.employee_rate_skbbk || 0) * 100) /
-            100
-          : 0;
-      const keilatan = isOver60
-        ? 0
-        : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) / 100;
-      const employee_amount = Math.round((keilatan + skbbk) * 100) / 100;
-      const employer_amount = isOver60
-        ? Math.round(parseFloat(socsoRate.employer_rate_over_60 || 0) * 100) /
-          100
-        : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) / 100;
+      // --- Main Calculation Logic ---
+      const workGrossPayCents = calculateConsolidatedPayrollItemsCents(workItems);
+      const workGrossPay = workGrossPayCents / 100;
+      const leaveGrossPayCents = leaveRecords.reduce(
+        (sum, record) => sum + Math.round(record.amount_paid * 100),
+        0,
+      );
+      const leaveGrossPay = leaveGrossPayCents / 100;
+      const commissionGrossPayCents = commissionRecords.reduce(
+        (sum, record) => sum + Math.round(record.amount * 100),
+        0,
+      );
+      const commissionGrossPay = commissionGrossPayCents / 100;
+      const commissionAdvanceCents = commissionRecords.reduce(
+        (sum, record) =>
+          record.is_advance === false
+            ? sum
+            : sum + Math.round(record.amount * 100),
+        0,
+      );
+      const commissionAdvancePay = commissionAdvanceCents / 100;
+      const othersGrossPayCents = othersRecords.reduce(
+        (sum, record) => sum + Math.round(record.amount * 100),
+        0,
+      );
+      const othersGrossPay = othersGrossPayCents / 100;
+      const grossPay =
+        Math.round(
+          (workGrossPay + leaveGrossPay + commissionGrossPay + othersGrossPay) *
+            100,
+        ) / 100;
 
-      deductions.push({
-        deduction_type: "socso",
-        employee_amount,
-        employer_amount,
-        wage_amount: grossPay,
-        rate_info: {
-          rate_id: socsoRate.id,
-          employee_rate: `RM${employee_amount.toFixed(2)}`,
-          employer_rate: `RM${employer_amount.toFixed(2)}`,
-          age_group: isOver60 ? "60_and_above" : "under_60",
-          keilatan_amount: keilatan,
-          skbbk_amount: skbbk,
+      const groupedItems = workItems.reduce(
+        (acc, item) => {
+          const type = item.pay_type || "Tambahan"; // Default to Tambahan
+          if (!acc[type]) acc[type] = [];
+          acc[type].push(item);
+          return acc;
         },
-      });
-    }
+        { Base: [], Tambahan: [], Overtime: [] },
+      );
 
-    // Calculate SIP (only for Malaysian citizens under 60).
-    // No wage means no contribution: skip when grossPay is 0.
-    if (
-      grossPay > 0 &&
-      contributionCtx.sip.eligible &&
-      contributionCtx.sip.under60 &&
-      contributionCtx.isMalaysian
-    ) {
-      const sipRate = findRateByWage(sipRates, grossPay);
-      if (sipRate) {
-        deductions.push({
-          deduction_type: "sip",
-          employee_amount: parseFloat(sipRate.employee_rate) || 0,
-          employer_amount: parseFloat(sipRate.employer_rate) || 0,
-          wage_amount: grossPay,
-          rate_info: {
-            rate_id: sipRate.id,
-            employee_rate: `RM${sipRate.employee_rate}`,
-            employer_rate: `RM${sipRate.employer_rate}`,
-            age_group: "under_60",
-          },
-        });
-      }
-    }
+      // Calculate EPF gross pay using CONSOLIDATED approach. Excludes all overtime:
+      // Overtime work items aren't in Base/Tambahan, and overtime "Others" are
+      // removed via othersOvertimeGrossPay (OT is not part of the EPF wage base).
+      const epfGrossPayCents =
+        calculateConsolidatedPayrollItemsCents(groupedItems.Base || []) +
+        calculateConsolidatedPayrollItemsCents(groupedItems.Tambahan || []) +
+        Math.round(leaveGrossPay * 100) +
+        Math.round(commissionGrossPay * 100) +
+        Math.round((othersGrossPay - othersOvertimeGrossPay) * 100);
+      const epfGrossPay = epfGrossPayCents / 100;
 
-    // Calculate Income Tax
-    const incomeTaxRate = findIncomeTaxRateByWage(incomeTaxRates, grossPay);
+      const age = Math.floor(
+        (Date.now() - new Date(employeeInfo.birthdate).getTime()) /
+          (365.25 * 24 * 60 * 60 * 1000),
+      );
+      // SIP/EIS age-18 check uses the age during the payroll month, not today.
+      const sipAge = ageAtPayrollMonth(employeeInfo.birthdate, year, month);
+      const contributionCtx = resolveContributionContext(
+        employeeInfo,
+        age,
+        sipAge,
+      );
 
-    if (incomeTaxRate) {
-      const maritalStatus = employeeInfo.maritalStatus || "Single";
-      const spouseEmploymentStatus =
-        employeeInfo.spouseEmploymentStatus || null;
-      const numberOfChildren = employeeInfo.numberOfChildren || 0;
+      const deductions = [];
 
-      // Determine applicable rate
-      let applicableRate = parseFloat(incomeTaxRate.base_rate);
+      // Calculate EPF
+      const epfRate = contributionCtx.epf.eligible
+        ? findEPFRate(epfRates, contributionCtx.epf.employeeType, epfGrossPay)
+        : null;
+      if (epfRate) {
+        const wageCeiling = getEPFWageCeiling(epfGrossPay);
+        if (wageCeiling > 0) {
+          const employeeContribution = Math.ceil(
+            (wageCeiling * parseFloat(epfRate.employee_rate_percentage)) / 100,
+          );
+          const employerContribution =
+            epfRate.employer_rate_percentage !== null
+              ? Math.ceil(
+                  (wageCeiling * parseFloat(epfRate.employer_rate_percentage)) /
+                    100,
+                )
+              : parseFloat(epfRate.employer_fixed_amount);
 
-      // Single employees use base rate
-      if (maritalStatus === "Single") {
-        applicableRate = parseFloat(incomeTaxRate.base_rate);
-      } else if (maritalStatus === "Married") {
-        // Married employees use K rates based on number of children and spouse status
-        const childrenKey = Math.min(numberOfChildren, 10);
-
-        if (spouseEmploymentStatus === "Unemployed") {
-          const unemployedKey = `unemployed_spouse_k${childrenKey}`;
-          applicableRate =
-            parseFloat(incomeTaxRate[unemployedKey]) || applicableRate;
-        } else if (spouseEmploymentStatus === "Employed") {
-          const employedKey = `employed_spouse_k${childrenKey}`;
-          applicableRate =
-            parseFloat(incomeTaxRate[employedKey]) || applicableRate;
-        }
-        // If spouse employment status is not specified for married employees,
-        // fallback to base rate (though this should ideally not happen)
-      }
-
-      // Build tax category string
-      let taxCategory = maritalStatus;
-      if (maritalStatus === "Married") {
-        const childrenCount = Math.min(numberOfChildren, 10);
-        taxCategory += `-K${childrenCount}`;
-        if (spouseEmploymentStatus) {
-          taxCategory += `-${spouseEmploymentStatus}`;
+          deductions.push({
+            deduction_type: "epf",
+            employee_amount: employeeContribution || 0,
+            employer_amount: employerContribution || 0,
+            wage_amount: epfGrossPay,
+            rate_info: {
+              rate_id: epfRate.id,
+              employee_rate: `${epfRate.employee_rate_percentage}%`,
+              employer_rate: epfRate.employer_rate_percentage
+                ? `${epfRate.employer_rate_percentage}%`
+                : `RM${epfRate.employer_fixed_amount}`,
+              age_group: contributionCtx.epf.employeeType,
+              wage_ceiling_used: wageCeiling,
+            },
+          });
         }
       }
 
-      if (applicableRate > 0) {
+      // Calculate SOCSO. SKBBK applies from June 2026 payrolls onward.
+      // No wage means no contribution: skip when grossPay is 0 so the lowest
+      // bracket (wage_from = 0) does not charge the minimum on a zero-wage month.
+      const socsoRate = contributionCtx.socso.eligible && grossPay > 0
+        ? findRateByWage(socsoRates, grossPay)
+        : null;
+      if (socsoRate) {
+        const isOver60 = contributionCtx.socso.isOver60;
+        const shouldApplySKBBK = isSOCSOSKBBKEffective(year, month);
+        const skbbk =
+          shouldApplySKBBK
+            ? Math.round(parseFloat(socsoRate.employee_rate_skbbk || 0) * 100) /
+              100
+            : 0;
+        const keilatan = isOver60
+          ? 0
+          : Math.round(parseFloat(socsoRate.employee_rate || 0) * 100) / 100;
+        const employee_amount = Math.round((keilatan + skbbk) * 100) / 100;
+        const employer_amount = isOver60
+          ? Math.round(parseFloat(socsoRate.employer_rate_over_60 || 0) * 100) /
+            100
+          : Math.round(parseFloat(socsoRate.employer_rate || 0) * 100) / 100;
+
         deductions.push({
-          deduction_type: "income_tax",
-          employee_amount: applicableRate,
-          employer_amount: 0,
+          deduction_type: "socso",
+          employee_amount,
+          employer_amount,
           wage_amount: grossPay,
           rate_info: {
-            rate_id: incomeTaxRate.id,
-            employee_rate: `RM${applicableRate}`,
-            employer_rate: "RM0.00",
-            tax_category: taxCategory,
+            rate_id: socsoRate.id,
+            employee_rate: `RM${employee_amount.toFixed(2)}`,
+            employer_rate: `RM${employer_amount.toFixed(2)}`,
+            age_group: isOver60 ? "60_and_above" : "under_60",
+            keilatan_amount: keilatan,
+            skbbk_amount: skbbk,
           },
         });
       }
+
+      // Calculate SIP (only for Malaysian citizens under 60).
+      // No wage means no contribution: skip when grossPay is 0.
+      if (
+        grossPay > 0 &&
+        contributionCtx.sip.eligible &&
+        contributionCtx.sip.under60 &&
+        contributionCtx.isMalaysian
+      ) {
+        const sipRate = findRateByWage(sipRates, grossPay);
+        if (sipRate) {
+          deductions.push({
+            deduction_type: "sip",
+            employee_amount: parseFloat(sipRate.employee_rate) || 0,
+            employer_amount: parseFloat(sipRate.employer_rate) || 0,
+            wage_amount: grossPay,
+            rate_info: {
+              rate_id: sipRate.id,
+              employee_rate: `RM${sipRate.employee_rate}`,
+              employer_rate: `RM${sipRate.employer_rate}`,
+              age_group: "under_60",
+            },
+          });
+        }
+      }
+
+      // Calculate Income Tax
+      const incomeTaxRate = findIncomeTaxRateByWage(incomeTaxRates, grossPay);
+
+      if (incomeTaxRate) {
+        const maritalStatus = employeeInfo.maritalStatus || "Single";
+        const spouseEmploymentStatus =
+          employeeInfo.spouseEmploymentStatus || null;
+        const numberOfChildren = employeeInfo.numberOfChildren || 0;
+
+        // Determine applicable rate
+        let applicableRate = parseFloat(incomeTaxRate.base_rate);
+
+        // Single employees use base rate
+        if (maritalStatus === "Single") {
+          applicableRate = parseFloat(incomeTaxRate.base_rate);
+        } else if (maritalStatus === "Married") {
+          // Married employees use K rates based on number of children and spouse status
+          const childrenKey = Math.min(numberOfChildren, 10);
+
+          if (spouseEmploymentStatus === "Unemployed") {
+            const unemployedKey = `unemployed_spouse_k${childrenKey}`;
+            applicableRate =
+              parseFloat(incomeTaxRate[unemployedKey]) || applicableRate;
+          } else if (spouseEmploymentStatus === "Employed") {
+            const employedKey = `employed_spouse_k${childrenKey}`;
+            applicableRate =
+              parseFloat(incomeTaxRate[employedKey]) || applicableRate;
+          }
+          // If spouse employment status is not specified for married employees,
+          // fallback to base rate (though this should ideally not happen)
+        }
+
+        // Build tax category string
+        let taxCategory = maritalStatus;
+        if (maritalStatus === "Married") {
+          const childrenCount = Math.min(numberOfChildren, 10);
+          taxCategory += `-K${childrenCount}`;
+          if (spouseEmploymentStatus) {
+            taxCategory += `-${spouseEmploymentStatus}`;
+          }
+        }
+
+        if (applicableRate > 0) {
+          deductions.push({
+            deduction_type: "income_tax",
+            employee_amount: applicableRate,
+            employer_amount: 0,
+            wage_amount: grossPay,
+            rate_info: {
+              rate_id: incomeTaxRate.id,
+              employee_rate: `RM${applicableRate}`,
+              employer_rate: "RM0.00",
+              tax_category: taxCategory,
+            },
+          });
+        }
+      }
+
+      // 3. UPDATE DATABASE
+      const totalEmployeeDeductions = deductions.reduce(
+        (sum, d) => sum + d.employee_amount,
+        0,
+      );
+      // Only advance commission/bonus records are deducted as advance payments.
+      // Others (Kerja Luar OT) is treated as a regular earning — included in gross/EPF only, NOT deducted from net.
+      const totalCommissionDeductions = commissionAdvancePay;
+      const netPay =
+        grossPay - totalEmployeeDeductions - totalCommissionDeductions;
+
+      // Get mid-month payroll for rounding calculation. Grouped payrolls (job_type
+      // has a comma) sum every sibling id's advance by name so the final rounding
+      // subtracts all advances paid to the person; single-job payrolls use just
+      // this employee's advance — matching payroll processing and the read endpoints.
+      const isGroupedRecalc = (job_type || "").includes(", ");
+      const midMonthRes = await (transactionClient || pool).query(
+        isGroupedRecalc
+          ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+             WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
+               AND year = $2 AND month = $3`
+          : `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+             WHERE employee_id = $1 AND year = $2 AND month = $3`,
+        [isGroupedRecalc ? employee_name : employee_id, year, month],
+      );
+      const midMonthAmount = parseFloat(midMonthRes.rows[0]?.amount || 0);
+
+      // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
+      const jumlah = netPay - midMonthAmount;
+      const setelahDigenapkan = Math.ceil(jumlah);
+      const digenapkan = setelahDigenapkan - jumlah;
+
+      // Update gross pay, net pay, and rounding columns
+      await (transactionClient || pool).query(
+        `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
+        [
+          grossPay.toFixed(2),
+          netPay.toFixed(2),
+          digenapkan.toFixed(2),
+          setelahDigenapkan.toFixed(2),
+          employeePayrollId,
+        ],
+      );
+
+      // Save the newly calculated deductions
+      await saveDeductions((transactionClient || pool), employeePayrollId, deductions);
+
+      if (transactionClient) {
+        await transactionClient.query("COMMIT");
+        transactionClient.release();
+        transactionClient = null;
+      }
+    } catch (error) {
+      if (transactionClient) {
+        await transactionClient.query("ROLLBACK");
+        transactionClient.release();
+        transactionClient = null;
+      }
+      // Re-throw the error to be caught by the route handler's catch block
+      console.error("Error during payroll recalculation:", error);
+      throw error;
     }
-
-    // 3. UPDATE DATABASE
-    const totalEmployeeDeductions = deductions.reduce(
-      (sum, d) => sum + d.employee_amount,
-      0,
-    );
-    // Only advance commission/bonus records are deducted as advance payments.
-    // Others (Kerja Luar OT) is treated as a regular earning — included in gross/EPF only, NOT deducted from net.
-    const totalCommissionDeductions = commissionAdvancePay;
-    const netPay =
-      grossPay - totalEmployeeDeductions - totalCommissionDeductions;
-
-    // Get mid-month payroll for rounding calculation. Grouped payrolls (job_type
-    // has a comma) sum every sibling id's advance by name so the final rounding
-    // subtracts all advances paid to the person; single-job payrolls use just
-    // this employee's advance — matching payroll processing and the read endpoints.
-    const isGroupedRecalc = (job_type || "").includes(", ");
-    const midMonthRes = await pool.query(
-      isGroupedRecalc
-        ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
-           WHERE employee_id IN (SELECT id FROM staffs WHERE name = $1)
-             AND year = $2 AND month = $3`
-        : `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
-           WHERE employee_id = $1 AND year = $2 AND month = $3`,
-      [isGroupedRecalc ? employee_name : employee_id, year, month],
-    );
-    const midMonthAmount = parseFloat(midMonthRes.rows[0]?.amount || 0);
-
-    // Calculate rounding (digenapkan) - round UP to nearest whole ringgit
-    const jumlah = netPay - midMonthAmount;
-    const setelahDigenapkan = Math.ceil(jumlah);
-    const digenapkan = setelahDigenapkan - jumlah;
-
-    // Update gross pay, net pay, and rounding columns
-    await pool.query(
-      `UPDATE employee_payrolls SET gross_pay = $1, net_pay = $2, digenapkan = $3, setelah_digenapkan = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
-      [
-        grossPay.toFixed(2),
-        netPay.toFixed(2),
-        digenapkan.toFixed(2),
-        setelahDigenapkan.toFixed(2),
-        employeePayrollId,
-      ],
-    );
-
-    // Save the newly calculated deductions
-    await saveDeductions(pool, employeePayrollId, deductions);
-
-    await pool.query("COMMIT");
-  } catch (error) {
-    await pool.query("ROLLBACK");
-    // Re-throw the error to be caught by the route handler's catch block
-    console.error("Error during payroll recalculation:", error);
-    throw error;
+  } finally {
+    if (transactionClient) {
+      // Roll back early returns and never put an open transaction back in the pool.
+      try { await transactionClient.query("ROLLBACK"); }
+      catch { transactionClient.release(true); transactionClient = null; }
+      transactionClient?.release();
+    }
   }
 };
 
@@ -802,7 +823,7 @@ export default function (pool) {
 
       // Get all deductions for these payrolls in a single query
       const deductionsQuery = `
-      SELECT pd.employee_payroll_id, pd.deduction_type, pd.employee_amount, 
+      SELECT pd.employee_payroll_id, pd.deduction_type, pd.employee_amount,
              pd.employer_amount, pd.wage_amount, pd.rate_info
       FROM payroll_deductions pd
       WHERE pd.employee_payroll_id = ANY($1)
@@ -932,7 +953,7 @@ export default function (pool) {
       // Get all commission records for these payrolls in a single query
       // Handle grouped payrolls by getting commissions for all employees with the same name
       const commissionsQuery = `
-      SELECT 
+      SELECT
         ep.id as employee_payroll_id,
         cr.*,
         s.name as employee_name
@@ -940,7 +961,7 @@ export default function (pool) {
       JOIN monthly_payrolls mp ON ep.monthly_payroll_id = mp.id
       JOIN staffs emp_staff ON ep.employee_id = emp_staff.id
       JOIN commission_records cr ON (
-        CASE 
+        CASE
           WHEN ep.job_type LIKE '%,%' THEN cr.employee_id IN (
             SELECT s2.id FROM staffs s2 WHERE s2.name = emp_staff.name
           )
@@ -1965,6 +1986,7 @@ export default function (pool) {
           deductions = [],
         } = payroll;
 
+        await client.query("SAVEPOINT security_batch_item");
         try {
           // Fetch mid_month_payroll amount for digenapkan calculation. Grouped
           // payrolls (job_type has a comma) sum every sibling id's advance by
@@ -1991,7 +2013,7 @@ export default function (pool) {
 
           // Check if employee payroll exists
           const checkQuery = `
-            SELECT id FROM employee_payrolls 
+            SELECT id FROM employee_payrolls
             WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3
           `;
           const checkResult = await client.query(checkQuery, [
@@ -2056,31 +2078,7 @@ export default function (pool) {
 
           // Insert new payroll items
           if (items.length > 0) {
-            const itemValues = items
-              .map((item) => {
-                return `(
-                ${employeePayrollId},
-                '${item.pay_code_id}',
-                '${item.description.replace(/'/g, "''")}',
-                ${item.rate},
-                '${item.rate_unit}',
-                ${item.quantity},
-                ${item.amount},
-                ${item.is_manual || false}
-              )`;
-              })
-              .join(", ");
-
-            const itemsQuery = `
-              INSERT INTO payroll_items (
-                employee_payroll_id, pay_code_id, description, 
-                rate, rate_unit, quantity, amount, is_manual
-              )
-              VALUES ${itemValues}
-              RETURNING id
-            `;
-
-            await client.query(itemsQuery);
+            await insertPayrollItems(client, employeePayrollId, items);
           }
 
           // Save deductions if provided
@@ -2095,6 +2093,7 @@ export default function (pool) {
             status: "success",
           });
         } catch (error) {
+          await client.query("ROLLBACK TO SAVEPOINT security_batch_item");
           console.error(`Error processing employee ${employee_id}:`, error);
           errors.push({
             employee_id,
@@ -2102,6 +2101,8 @@ export default function (pool) {
             error: error.message,
             status: "error",
           });
+        } finally {
+          await client.query("RELEASE SAVEPOINT security_batch_item");
         }
       }
 
@@ -2160,172 +2161,171 @@ export default function (pool) {
 
   // Create or update an employee payroll
   router.post("/", async (req, res) => {
-    const {
-      monthly_payroll_id,
-      employee_id,
-      job_type,
-      section,
-      gross_pay,
-      net_pay,
-      items = [],
-      deductions = [],
-    } = req.body;
-
-    // Validate required fields
-    if (!monthly_payroll_id || !employee_id || !job_type || !section) {
-      return res.status(400).json({
-        message:
-          "monthly_payroll_id, employee_id, job_type, and section are required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      await pool.query("BEGIN");
-
-      // Fetch year and month from monthly_payroll for digenapkan calculation
-      const monthlyPayrollResult = await pool.query(
-        `SELECT year, month FROM monthly_payrolls WHERE id = $1`,
-        [monthly_payroll_id],
-      );
-      const { year: payrollYear, month: payrollMonth } =
-        monthlyPayrollResult.rows[0] || {};
-
-      // Fetch mid_month_payroll amount for digenapkan calculation. Grouped
-      // payrolls (job_type has a comma) sum every sibling id's advance by name.
-      const isGroupedSave = (job_type || "").includes(", ");
-      const midMonthResult = await pool.query(
-        isGroupedSave
-          ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
-             WHERE employee_id IN (
-               SELECT id FROM staffs WHERE name = (SELECT name FROM staffs WHERE id = $1)
-             ) AND year = $2 AND month = $3`
-          : `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
-             WHERE employee_id = $1 AND year = $2 AND month = $3`,
-        [employee_id, payrollYear, payrollMonth],
-      );
-      const midMonthAmount = parseFloat(midMonthResult.rows[0]?.amount || 0);
-
-      // Calculate digenapkan (round UP to nearest whole ringgit)
-      const jumlah = (net_pay || 0) - midMonthAmount;
-      const setelahDigenapkan = Math.ceil(jumlah);
-      const digenapkan = setelahDigenapkan - jumlah;
-
-      // Check if employee payroll exists
-      const checkQuery = `
-        SELECT id FROM employee_payrolls
-        WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3
-      `;
-      const checkResult = await pool.query(checkQuery, [
+      const {
         monthly_payroll_id,
         employee_id,
         job_type,
-      ]);
+        section,
+        gross_pay,
+        net_pay,
+        items = [],
+        deductions = [],
+      } = req.body;
 
-      let employeePayrollId;
+      // Validate required fields
+      if (!monthly_payroll_id || !employee_id || !job_type || !section) {
+        return res.status(400).json({
+          message:
+            "monthly_payroll_id, employee_id, job_type, and section are required",
+        });
+      }
 
-      if (checkResult.rows.length > 0) {
-        // Update existing employee payroll
-        employeePayrollId = checkResult.rows[0].id;
+      try {
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-        const updateQuery = `
-          UPDATE employee_payrolls
-          SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4,
-              digenapkan = $5, setelah_digenapkan = $6, updated_at = CURRENT_TIMESTAMP
-          WHERE id = $7
-          RETURNING *
-        `;
-
-        await pool.query(updateQuery, [
-          job_type,
-          section,
-          gross_pay || 0,
-          net_pay || 0,
-          digenapkan.toFixed(2),
-          setelahDigenapkan.toFixed(2),
-          employeePayrollId,
-        ]);
-
-        // Delete existing non-manual items to replace with new ones (preserve manually added items)
-        await pool.query(
-          "DELETE FROM payroll_items WHERE employee_payroll_id = $1 AND is_manual = false",
-          [employeePayrollId],
+        // Fetch year and month from monthly_payroll for digenapkan calculation
+        const monthlyPayrollResult = await (transactionClient || pool).query(
+          `SELECT year, month FROM monthly_payrolls WHERE id = $1`,
+          [monthly_payroll_id],
         );
-      } else {
-        // Create a new employee payroll
-        const insertQuery = `
-          INSERT INTO employee_payrolls (
-            monthly_payroll_id, employee_id, job_type, section,
-            gross_pay, net_pay, digenapkan, setelah_digenapkan
-          )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-          RETURNING id
-        `;
+        const { year: payrollYear, month: payrollMonth } =
+          monthlyPayrollResult.rows[0] || {};
 
-        const insertResult = await pool.query(insertQuery, [
+        // Fetch mid_month_payroll amount for digenapkan calculation. Grouped
+        // payrolls (job_type has a comma) sum every sibling id's advance by name.
+        const isGroupedSave = (job_type || "").includes(", ");
+        const midMonthResult = await (transactionClient || pool).query(
+          isGroupedSave
+            ? `SELECT COALESCE(SUM(amount), 0) as amount FROM mid_month_payrolls
+               WHERE employee_id IN (
+                 SELECT id FROM staffs WHERE name = (SELECT name FROM staffs WHERE id = $1)
+               ) AND year = $2 AND month = $3`
+            : `SELECT COALESCE(amount, 0) as amount FROM mid_month_payrolls
+               WHERE employee_id = $1 AND year = $2 AND month = $3`,
+          [employee_id, payrollYear, payrollMonth],
+        );
+        const midMonthAmount = parseFloat(midMonthResult.rows[0]?.amount || 0);
+
+        // Calculate digenapkan (round UP to nearest whole ringgit)
+        const jumlah = (net_pay || 0) - midMonthAmount;
+        const setelahDigenapkan = Math.ceil(jumlah);
+        const digenapkan = setelahDigenapkan - jumlah;
+
+        // Check if employee payroll exists
+        const checkQuery = `
+          SELECT id FROM employee_payrolls
+          WHERE monthly_payroll_id = $1 AND employee_id = $2 AND job_type = $3
+        `;
+        const checkResult = await (transactionClient || pool).query(checkQuery, [
           monthly_payroll_id,
           employee_id,
           job_type,
-          section,
-          gross_pay || 0,
-          net_pay || 0,
-          digenapkan.toFixed(2),
-          setelahDigenapkan.toFixed(2),
         ]);
 
-        employeePayrollId = insertResult.rows[0].id;
+        let employeePayrollId;
+
+        if (checkResult.rows.length > 0) {
+          // Update existing employee payroll
+          employeePayrollId = checkResult.rows[0].id;
+
+          const updateQuery = `
+            UPDATE employee_payrolls
+            SET job_type = $1, section = $2, gross_pay = $3, net_pay = $4,
+                digenapkan = $5, setelah_digenapkan = $6, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $7
+            RETURNING *
+          `;
+
+          await (transactionClient || pool).query(updateQuery, [
+            job_type,
+            section,
+            gross_pay || 0,
+            net_pay || 0,
+            digenapkan.toFixed(2),
+            setelahDigenapkan.toFixed(2),
+            employeePayrollId,
+          ]);
+
+          // Delete existing non-manual items to replace with new ones (preserve manually added items)
+          await (transactionClient || pool).query(
+            "DELETE FROM payroll_items WHERE employee_payroll_id = $1 AND is_manual = false",
+            [employeePayrollId],
+          );
+        } else {
+          // Create a new employee payroll
+          const insertQuery = `
+            INSERT INTO employee_payrolls (
+              monthly_payroll_id, employee_id, job_type, section,
+              gross_pay, net_pay, digenapkan, setelah_digenapkan
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING id
+          `;
+
+          const insertResult = await (transactionClient || pool).query(insertQuery, [
+            monthly_payroll_id,
+            employee_id,
+            job_type,
+            section,
+            gross_pay || 0,
+            net_pay || 0,
+            digenapkan.toFixed(2),
+            setelahDigenapkan.toFixed(2),
+          ]);
+
+          employeePayrollId = insertResult.rows[0].id;
+        }
+
+        // Insert new payroll items
+        if (items.length > 0) {
+          await insertPayrollItems((transactionClient || pool), employeePayrollId, items);
+        }
+
+        // Save deductions if provided
+        if (deductions && deductions.length > 0) {
+          await saveDeductions((transactionClient || pool), employeePayrollId, deductions);
+        }
+
+        if (transactionClient) {
+          await transactionClient.query("COMMIT");
+          transactionClient.release();
+          transactionClient = null;
+        }
+
+        // Recalculate the payroll to ensure leave records are included in totals
+        // This is done after commit to avoid nested transactions
+        await recalculateAndUpdatePayroll(pool, employeePayrollId);
+
+        res.status(201).json({
+          message: "Employee payroll created/updated successfully",
+          employee_payroll_id: employeePayrollId,
+        });
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
+        }
+        console.error("Error creating/updating employee payroll:", error);
+        res.status(500).json({
+          message: "Error creating/updating employee payroll",
+          error: error.message,
+        });
       }
-
-      // Insert new payroll items
-      if (items.length > 0) {
-        const itemValues = items
-          .map((item) => {
-            return `(
-            ${employeePayrollId},
-            '${item.pay_code_id}',
-            '${item.description.replace(/'/g, "''")}',
-            ${item.rate},
-            '${item.rate_unit}',
-            ${item.quantity},
-            ${item.amount},
-            ${item.is_manual || false}
-          )`;
-          })
-          .join(", ");
-
-        const itemsQuery = `
-          INSERT INTO payroll_items (
-            employee_payroll_id, pay_code_id, description, 
-            rate, rate_unit, quantity, amount, is_manual
-          )
-          VALUES ${itemValues}
-          RETURNING id
-        `;
-
-        await pool.query(itemsQuery);
-      }
-
-      // Save deductions if provided
-      if (deductions && deductions.length > 0) {
-        await saveDeductions(pool, employeePayrollId, deductions);
-      }
-
-      await pool.query("COMMIT");
-
-      // Recalculate the payroll to ensure leave records are included in totals
-      // This is done after commit to avoid nested transactions
-      await recalculateAndUpdatePayroll(pool, employeePayrollId);
-
-      res.status(201).json({
-        message: "Employee payroll created/updated successfully",
-        employee_payroll_id: employeePayrollId,
-      });
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error creating/updating employee payroll:", error);
-      res.status(500).json({
-        message: "Error creating/updating employee payroll",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 

@@ -127,226 +127,288 @@ export default function (pool) {
 
   // POST /batch - Add multiple product-paycode associations
   router.post("/batch", async (req, res) => {
-    const { associations } = req.body;
-
-    if (!associations || !Array.isArray(associations) || associations.length === 0) {
-      return res.status(400).json({
-        message: "An array of associations is required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Validate all entries first
-      for (const entry of associations) {
-        const { product_id, pay_code_id } = entry;
-        if (!product_id || !pay_code_id) {
-          return res.status(400).json({
-            message: "All entries must have product_id and pay_code_id",
-            invalid_entry: entry,
-          });
-        }
+      const { associations } = req.body;
+
+      if (!associations || !Array.isArray(associations) || associations.length === 0) {
+        return res.status(400).json({
+          message: "An array of associations is required",
+        });
       }
 
-      // Validate unit compatibility for the complete batch before inserting
-      // anything. RAMEN production is packet-based; PKT codes are reserved for
-      // RAMEN so a direct API request cannot bypass the UI filter.
-      for (const entry of associations) {
-        const { product_id, pay_code_id } = entry;
-        const compatibilityResult = await pool.query(
-          `
-            SELECT p.type, pc.rate_unit
-            FROM products p
-            CROSS JOIN pay_codes pc
-            WHERE p.id = $1 AND pc.id = $2
-          `,
-          [product_id, pay_code_id]
-        );
-
-        if (compatibilityResult.rows.length === 0) {
-          return res.status(400).json({
-            message: "Invalid product_id or pay_code_id",
-            invalid_entry: entry,
-          });
+      try {
+        // Validate all entries first
+        for (const entry of associations) {
+          const { product_id, pay_code_id } = entry;
+          if (!product_id || !pay_code_id) {
+            return res.status(400).json({
+              message: "All entries must have product_id and pay_code_id",
+              invalid_entry: entry,
+            });
+          }
         }
 
-        const { type, rate_unit } = compatibilityResult.rows[0];
-        if ((type === "RAMEN") !== (rate_unit === "PKT")) {
-          return res.status(400).json({
-            message: "Product and pay code units are incompatible",
-            invalid_entry: entry,
-          });
+        // Validate unit compatibility for the complete batch before inserting
+        // anything. RAMEN production is packet-based; PKT codes are reserved for
+        // RAMEN so a direct API request cannot bypass the UI filter.
+        for (const entry of associations) {
+          const { product_id, pay_code_id } = entry;
+          const compatibilityResult = await (transactionClient || pool).query(
+            `
+              SELECT p.type, pc.rate_unit
+              FROM products p
+              CROSS JOIN pay_codes pc
+              WHERE p.id = $1 AND pc.id = $2
+            `,
+            [product_id, pay_code_id]
+          );
+
+          if (compatibilityResult.rows.length === 0) {
+            return res.status(400).json({
+              message: "Invalid product_id or pay_code_id",
+              invalid_entry: entry,
+            });
+          }
+
+          const { type, rate_unit } = compatibilityResult.rows[0];
+          if ((type === "RAMEN") !== (rate_unit === "PKT")) {
+            return res.status(400).json({
+              message: "Product and pay code units are incompatible",
+              invalid_entry: entry,
+            });
+          }
         }
-      }
 
-      const results = [];
-      const errors = [];
-      let successCount = 0;
+        const results = [];
+        const errors = [];
+        let successCount = 0;
 
-      await pool.query("BEGIN");
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      for (const entry of associations) {
-        const { product_id, pay_code_id } = entry;
+        for (const entry of associations) {
+          const { product_id, pay_code_id } = entry;
 
-        try {
-          // Check if the association already exists
-          const checkQuery =
-            "SELECT 1 FROM product_pay_codes WHERE product_id = $1 AND pay_code_id = $2";
-          const checkResult = await pool.query(checkQuery, [product_id, pay_code_id]);
+          await transactionClient.query("SAVEPOINT security_batch_item");
+          try {
+            // Check if the association already exists
+            const checkQuery =
+              "SELECT 1 FROM product_pay_codes WHERE product_id = $1 AND pay_code_id = $2";
+            const checkResult = await (transactionClient || pool).query(checkQuery, [product_id, pay_code_id]);
 
-          if (checkResult.rows.length > 0) {
+            if (checkResult.rows.length > 0) {
+              errors.push({
+                product_id,
+                pay_code_id,
+                message: "Association already exists",
+              });
+              continue;
+            }
+
+            // Insert the association
+            const insertQuery = `
+              INSERT INTO product_pay_codes (product_id, pay_code_id)
+              VALUES ($1, $2)
+              RETURNING *
+            `;
+            const result = await (transactionClient || pool).query(insertQuery, [product_id, pay_code_id]);
+            results.push(result.rows[0]);
+            successCount++;
+          } catch (error) {
+            await transactionClient.query("ROLLBACK TO SAVEPOINT security_batch_item");
             errors.push({
               product_id,
               pay_code_id,
-              message: "Association already exists",
+              message: error.code === "23503"
+                ? "Invalid product_id or pay_code_id"
+                : error.message,
             });
-            continue;
+          } finally {
+            await transactionClient.query("RELEASE SAVEPOINT security_batch_item");
+          }
+        }
+
+        if (successCount > 0) {
+          // Update pay code timestamps for affected pay codes
+          const uniquePayCodeIds = [...new Set(associations.map((a) => a.pay_code_id))];
+          if (uniquePayCodeIds.length > 0) {
+            const updatePayCodeQuery = `
+              UPDATE pay_codes
+              SET updated_at = CURRENT_TIMESTAMP
+              WHERE id = ANY($1)
+            `;
+            await (transactionClient || pool).query(updatePayCodeQuery, [uniquePayCodeIds]);
           }
 
-          // Insert the association
-          const insertQuery = `
-            INSERT INTO product_pay_codes (product_id, pay_code_id)
-            VALUES ($1, $2)
-            RETURNING *
-          `;
-          const result = await pool.query(insertQuery, [product_id, pay_code_id]);
-          results.push(result.rows[0]);
-          successCount++;
-        } catch (error) {
-          errors.push({
-            product_id,
-            pay_code_id,
-            message: error.code === "23503"
-              ? "Invalid product_id or pay_code_id"
-              : error.message,
+          if (transactionClient) {
+            await transactionClient.query("COMMIT");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(201).json({
+            message: `Successfully added ${successCount} of ${associations.length} associations`,
+            added: results,
+            errors: errors.length > 0 ? errors : undefined,
+          });
+        } else {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Failed to add any associations",
+            errors,
           });
         }
-      }
-
-      if (successCount > 0) {
-        // Update pay code timestamps for affected pay codes
-        const uniquePayCodeIds = [...new Set(associations.map((a) => a.pay_code_id))];
-        if (uniquePayCodeIds.length > 0) {
-          const updatePayCodeQuery = `
-            UPDATE pay_codes
-            SET updated_at = CURRENT_TIMESTAMP
-            WHERE id = ANY($1)
-          `;
-          await pool.query(updatePayCodeQuery, [uniquePayCodeIds]);
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
         }
-
-        await pool.query("COMMIT");
-        return res.status(201).json({
-          message: `Successfully added ${successCount} of ${associations.length} associations`,
-          added: results,
-          errors: errors.length > 0 ? errors : undefined,
-        });
-      } else {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Failed to add any associations",
-          errors,
+        console.error("Error in batch association:", error);
+        res.status(500).json({
+          message: "Error processing batch association",
+          error: error.message,
         });
       }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error in batch association:", error);
-      res.status(500).json({
-        message: "Error processing batch association",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 
   // POST /batch-delete - Remove multiple product-paycode associations
   router.post("/batch-delete", async (req, res) => {
-    const { items } = req.body;
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        message: "An array of items to delete is required",
-      });
-    }
-
+    /** @type {import("pg").PoolClient | null} */
+    let transactionClient = null;
     try {
-      // Validate all entries first
-      for (const item of items) {
-        const { product_id, pay_code_id } = item;
-        if (!product_id || !pay_code_id) {
-          return res.status(400).json({
-            message: "All items must have product_id and pay_code_id",
-            invalid_item: item,
-          });
-        }
+      const { items } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({
+          message: "An array of items to delete is required",
+        });
       }
 
-      await pool.query("BEGIN");
+      try {
+        // Validate all entries first
+        for (const item of items) {
+          const { product_id, pay_code_id } = item;
+          if (!product_id || !pay_code_id) {
+            return res.status(400).json({
+              message: "All items must have product_id and pay_code_id",
+              invalid_item: item,
+            });
+          }
+        }
 
-      const results = [];
-      const errors = [];
-      let successCount = 0;
+        transactionClient = await pool.connect();
+        await transactionClient.query("BEGIN");
 
-      for (const item of items) {
-        const { product_id, pay_code_id } = item;
+        const results = [];
+        const errors = [];
+        let successCount = 0;
 
-        try {
-          const query = `
-            DELETE FROM product_pay_codes
-            WHERE product_id = $1 AND pay_code_id = $2
-            RETURNING product_id, pay_code_id
-          `;
-          const result = await pool.query(query, [product_id, pay_code_id]);
+        for (const item of items) {
+          const { product_id, pay_code_id } = item;
 
-          if (result.rows.length > 0) {
-            results.push(result.rows[0]);
-            successCount++;
-          } else {
+          await transactionClient.query("SAVEPOINT security_batch_item");
+          try {
+            const query = `
+              DELETE FROM product_pay_codes
+              WHERE product_id = $1 AND pay_code_id = $2
+              RETURNING product_id, pay_code_id
+            `;
+            const result = await (transactionClient || pool).query(query, [product_id, pay_code_id]);
+
+            if (result.rows.length > 0) {
+              results.push(result.rows[0]);
+              successCount++;
+            } else {
+              errors.push({
+                product_id,
+                pay_code_id,
+                message: "Association not found",
+              });
+            }
+          } catch (error) {
+            await transactionClient.query("ROLLBACK TO SAVEPOINT security_batch_item");
             errors.push({
               product_id,
               pay_code_id,
-              message: "Association not found",
+              message: error.message,
             });
+          } finally {
+            await transactionClient.query("RELEASE SAVEPOINT security_batch_item");
           }
-        } catch (error) {
-          errors.push({
-            product_id,
-            pay_code_id,
-            message: error.message,
+        }
+
+        if (successCount > 0) {
+          // Update pay code timestamps for affected pay codes
+          const uniquePayCodeIds = [...new Set(items.map((i) => i.pay_code_id))];
+          if (uniquePayCodeIds.length > 0) {
+            const updatePayCodeQuery = `
+              UPDATE pay_codes
+              SET updated_at = CURRENT_TIMESTAMP
+              WHERE id = ANY($1)
+            `;
+            await (transactionClient || pool).query(updatePayCodeQuery, [uniquePayCodeIds]);
+          }
+
+          if (transactionClient) {
+            await transactionClient.query("COMMIT");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.json({
+            message: `Successfully deleted ${successCount} of ${items.length} associations`,
+            deleted: results,
+            errors: errors.length > 0 ? errors : undefined,
+          });
+        } else {
+          if (transactionClient) {
+            await transactionClient.query("ROLLBACK");
+            transactionClient.release();
+            transactionClient = null;
+          }
+          return res.status(400).json({
+            message: "Failed to delete any associations",
+            errors,
           });
         }
-      }
-
-      if (successCount > 0) {
-        // Update pay code timestamps for affected pay codes
-        const uniquePayCodeIds = [...new Set(items.map((i) => i.pay_code_id))];
-        if (uniquePayCodeIds.length > 0) {
-          const updatePayCodeQuery = `
-            UPDATE pay_codes
-            SET updated_at = CURRENT_TIMESTAMP
-            WHERE id = ANY($1)
-          `;
-          await pool.query(updatePayCodeQuery, [uniquePayCodeIds]);
+      } catch (error) {
+        if (transactionClient) {
+          await transactionClient.query("ROLLBACK");
+          transactionClient.release();
+          transactionClient = null;
         }
-
-        await pool.query("COMMIT");
-        return res.json({
-          message: `Successfully deleted ${successCount} of ${items.length} associations`,
-          deleted: results,
-          errors: errors.length > 0 ? errors : undefined,
-        });
-      } else {
-        await pool.query("ROLLBACK");
-        return res.status(400).json({
-          message: "Failed to delete any associations",
-          errors,
+        console.error("Error in batch delete:", error);
+        res.status(500).json({
+          message: "Error processing batch delete",
+          error: error.message,
         });
       }
     } catch (error) {
-      await pool.query("ROLLBACK");
-      console.error("Error in batch delete:", error);
-      res.status(500).json({
-        message: "Error processing batch delete",
-        error: error.message,
-      });
+      console.error("Database transaction failed:", error.code || error.name);
+      if (!res.headersSent) return res.status(503).json({ message: "Database operation failed. Please retry." });
+    } finally {
+      if (transactionClient) {
+        // Roll back early returns and never put an open transaction back in the pool.
+        try { await transactionClient.query("ROLLBACK"); }
+        catch { transactionClient.release(true); transactionClient = null; }
+        transactionClient?.release();
+      }
     }
   });
 

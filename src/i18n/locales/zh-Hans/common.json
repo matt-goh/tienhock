@@ -1,4 +1,6 @@
 {
+  "Full database recovery is handled by the server administrator.": "完整数据库恢复由服务器管理员处理。",
+  "No backup from the last 36 hours is available. Please contact an administrator.": "没有最近36小时内的备份。请联系管理员。",
   "save": "保存",
   "cancel": "取消",
   "delete": "删除",

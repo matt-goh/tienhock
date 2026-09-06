@@ -28,6 +28,7 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include",
         cache: "no-store",
         headers: {
           "Content-Type": "application/json",
@@ -46,6 +47,7 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -64,6 +66,7 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include",
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -82,6 +85,7 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include",
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -100,6 +104,7 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include",
         method: "POST",
         headers: {
           "Content-Type": contentType || file.type || "application/octet-stream",
@@ -134,6 +139,7 @@ export const api = {
     const sessionId = sessionService.getSessionId();
     try {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include",
         cache: "no-store",
         headers: {
           "x-session-id": sessionId,
@@ -172,6 +178,7 @@ export const api = {
           : { [IRREGULAR_PLURALS[routeName] || `${routeName}`]: payload };
 
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        credentials: "include",
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

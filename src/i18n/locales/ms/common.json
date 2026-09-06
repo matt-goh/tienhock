@@ -1,4 +1,6 @@
 {
+  "Full database recovery is handled by the server administrator.": "Pemulihan penuh pangkalan data dikendalikan oleh pentadbir pelayan.",
+  "No backup from the last 36 hours is available. Please contact an administrator.": "Tiada sandaran dalam tempoh 36 jam terakhir. Sila hubungi pentadbir.",
   "save": "Simpan",
   "cancel": "Batal",
   "delete": "Padam",
