@@ -1,4 +1,13 @@
-# Deployment preparation — 6 September 2026
+# Deployment preparation, rollout and verification ? 6?7 September 2026
+
+The workflow import fix (`00636fdd`) and Nginx CORS fix (`1af030ca`) are committed.
+The publication warnings in the earlier checkpoint notes below are historical.
+The Restore helper is installed and tested; its accompanying app changes still
+need publication. The reported HR save failure is resolved on the live server.
+
+Later verification: [Restore feature](#restore-feature-verification) ?
+[HR Mee/Bihun saves](#hr-save-verification). For ongoing installation and operation,
+use the [server runbook](../../prod/server/README.md).
 
 **Production rollout completed on 7 September 2026, around 00:49 Malaysia time (6 September UTC).** The security backend now runs with `tienhock_app`; both frontend domains serve the cookie-session release. The preparation record below is historical; the rollout results supersede its pending-deployment statements.
 
@@ -75,3 +84,150 @@ The test process was stopped. No frontend build, type check or lint was run, in 
 No further account-name or password-policy decisions are needed for this preparation. Shared OFFICE passwords and the legacy mobile key remain the owner's accepted exceptions. This preparation does not certify the entire project or close those risks.
 
 Machine-readable results: [deployment readiness evidence](DEPLOYMENT_READINESS_EVIDENCE_2026-09-06.json). GitHub secret handling follows its [Actions secrets API](https://docs.github.com/en/rest/actions/secrets#create-or-update-a-repository-secret); PostgreSQL credentials were set through its [password administration mechanism](https://www.postgresql.org/docs/16/auth-password.html).
+
+## Restore feature verification
+
+Verified on 7 September 2026 (Malaysia time).
+
+The owner requested that the existing production Restore button be reinstated.
+The earlier production restriction is superseded by this change. MILTI,
+TIMOTHY.G, HELEN and MATTHEW retain their existing shared-password accounts and
+can restore a backup selected from the list after the existing confirmation.
+Plaintext SQL upload/replacement remains the existing development-only feature.
+
+The frontend button is no longer hidden in production. The backend no longer
+rejects production restoration outright. It checks and calls the root-owned
+`restore-tienhock-backup` helper with a validated filename. Normal API requests
+still use `tienhock_app`. The helper executes the restore as the separate
+`tienhock_restore` local-peer OS/database identity, with no superuser, role
+creation, database creation, membership or server-program-execution privileges.
+No new password or deployment secret is needed.
+
+Before restoring, the helper saves a private recovery dump outside the app's
+writable directories. It transfers only application-schema object ownership to
+the restore role; the database stays postgres-owned. The selected restore,
+session deletion and runtime access grants execute in one transaction. A failed
+restore rolls back those changes; successful restoration signs everyone out.
+The root-owned helper and its sudoers entry must be installed separately from
+the app checkout. Installation, recovery-copy retention and limitations are in
+[the server runbook](../../prod/server/README.md#production-restore-button-setup).
+
+### Verification
+
+Used PostgreSQL 16 on Hetzner and the isolated database
+`tienhock_restore_verify_20260907`, initially loaded from the independently
+verified production dump. Production business data was not restored or edited.
+
+- A selected backup restored the expected test-marker value.
+- Old sessions contained in that backup were removed.
+- Runtime table grants returned, while runtime schema creation stayed denied.
+- The real application's restricted credentials connected to the restored copy;
+  its startup privilege check and every table's four DML grants passed.
+- An injected error after restoration and grant/session work rolled back the
+  changed rows and session deletion together.
+- Traversal, symlink and option-like filenames were rejected.
+- The restore identity was denied attempts to become a superuser or execute a
+  PostgreSQL server-side program.
+- The existing 17 authentication/mobile tests passed; translation key symmetry
+  passed. Backend and helper syntax checks passed. No frontend build, type check
+  or lint was run.
+
+The temporary database and its test snapshots were removed after verification.
+The server helper and restricted sudo rule are installed, and the application's
+OS account passed the installed helper's readiness check. Production business
+rows and employee passwords were not changed. The server helper is provisioned
+separately; publish the accompanying frontend
+and backend changes through the usual master-to-production deployment to make
+the button available. This feature reinstatement does not execute a production
+restore. Shared credentials still permit account impersonation, and a compromised
+application process can invoke its delegated restore operation. The helper
+limits that operation's scope; it does not make authorized restoration harmless.
+
+The source backup and pre-restore recovery dump are retained. An operator must
+monitor recovery-directory disk usage and remove obsolete copies after verifying
+the result. These server copies do not replace ongoing independently protected
+backups. PostgreSQL archives contain executable definitions, so only this
+company's trusted complete backups belong in this workflow. See PostgreSQL's
+[restore documentation](https://www.postgresql.org/docs/16/app-pgrestore.html)
+and [psql transaction options](https://www.postgresql.org/docs/16/app-psql.html).
+
+Machine-readable verification: `subsequentRestoreFeatureVerification` in the [deployment evidence](DEPLOYMENT_READINESS_EVIDENCE_2026-09-06.json).
+
+## HR save verification
+
+Verified on 7 September 2026 (Malaysia time).
+
+**The reported HTML/JSON failure is resolved on the current live server.** No
+additional production code change or deployment was needed for this incident.
+All times below are Malaysia time.
+
+### Confirmed incident
+
+Nginx recorded 25 failed requests to `/api/daily-work-logs` between **6 September
+18:06:51 and 19:04:09**: 14 POSTs and 11 PUTs, all HTTP 500. Every matching error
+reported `open() /var/lib/nginx/body/[temporary-file] failed (13: Permission denied)`.
+The PUT failures targeted work log 847. These requests failed in Nginx before
+reaching the payroll handler; the frontend then attempted to parse Nginx's HTML
+error page as JSON, producing the reported `Unexpected token '<'` message.
+
+Mee and Bihun use the same save API as Boiler, but contain more employee/activity
+data. Nginx writes request bodies that exceed its memory buffer to temporary
+files, explaining why the smaller Boiler saves could work while larger entries
+failed. See the [Nginx request-body buffer documentation](https://nginx.org/en/docs/http/ngx_http_core_module.html#client_body_buffer_size).
+The saved fixtures used below were approximately 29 KB for Mee, 23 KB for Bihun
+and 3 KB for Boiler; they are representative records, not captures of HR's
+failed submissions.
+
+The current Nginx worker runs as `www-data`; `/var/lib/nginx/body` is owned by
+`www-data:root`, mode `0700`, and a write-access check under that worker identity
+passed. The directory metadata changed at **7 September 00:35:57**, during the
+earlier deployment. The exact action that originally caused the permission
+mismatch cannot be established from the retained evidence. It was a server
+temporary-file permission failure; these logs do not implicate the payroll
+transaction changes or restricted database role.
+
+### Verification
+
+Production revision: `e7b65b3eb87773387886049e5ab00db8a3db7230`.
+
+- Public HTTPS POST and PUT probes to the affected API, with bodies of 1,039,
+  65,551 and 524,303 bytes, all reached authentication and returned valid JSON
+  HTTP 401 with the correct `https://tienhock.com` CORS origin. These probes
+  deliberately carried no credentials and could not save business data.
+- A separate database copy, `tienhock_hr_verify_20260907`, was tested using the
+  deployed payroll router, production authentication middleware, a temporary
+  session for an ordinary OFFICE account, and the actual restricted
+  `tienhock_app` connection. Copied sessions were cleared before testing; the
+  production database-role guard passed. The test server listened only on a
+  temporary loopback port.
+- Existing submitted records supplied the fixture data. Both create (HTTP 201)
+  and update (HTTP 200) passed for each section. Database reads verified the
+  persisted entry/activity counts and total calculated amounts against each
+  submitted payload:
+
+| Section | Employee/job entries | Activities | Create | Update |
+| --- | ---: | ---: | --- | --- |
+| Mee | 11 | 134 | Passed | Passed |
+| Bihun | 12 | 102 | Passed | Passed |
+| Boiler | 2 | 14 | Passed | Passed |
+
+All six saves finished in under 150 ms in this isolated check. No production
+payroll records were changed. The test database and temporary server harness
+were removed. The current Nginx error log contained no matching daily-work-log
+permission failures after verification.
+
+Machine-readable results: `subsequentHrSaveVerification` in the [deployment evidence](DEPLOYMENT_READINESS_EVIDENCE_2026-09-06.json).
+
+### HR follow-up and limits
+
+HR can refresh the app, sign in again if requested, check which entries already
+exist, and retry the missing Mee/Bihun saves. There were also successful saves
+during the incident window, so check the list before re-entering records.
+The 25 requests rejected by Nginx did not reach the database.
+
+This verifies the reported server failure and representative saves using the
+current database permissions. It does not replay HR's unsaved browser state or
+certify every payroll workflow, calculation, leave combination or concurrent
+save. No frontend build, type check or lint command was run. No application code
+was changed for this verification; the previously pending restore-feature work
+remains separate.

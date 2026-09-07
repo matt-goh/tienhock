@@ -1,5 +1,9 @@
 # Security remediation — 5 September 2026
 
+**Later owner correction:** The production Restore button is being reinstated
+through a dedicated server helper; see [7 September restore reinstatement](DEPLOYMENT_READINESS_2026-09-06.md#restore-feature-verification).
+That record supersedes this report's server-only restoration restriction.
+
 This records the repository changes for the first ten findings in the [original review](SECURITY_REVIEW_2026-09-04.md). It is **not a compliance certificate**. The [deployment readiness and rollout record](DEPLOYMENT_READINESS_2026-09-06.md) documents the later production role setup, recovery rehearsal and completed application rollout on 7 September Malaysia time. Its rollout section supersedes the historical cutover checklist below.
 
 **The application is now running with the restricted database role.** The server intentionally refuses privileged production database connections. Per the owner's updated decision, existing shared OFFICE passwords remain: there is no password-reset migration or personal-password setup step. Employees must sign in again because browser sessions now use server-issued cookies. The rollout record lists outstanding manual checks and the workflow correction still awaiting publication.

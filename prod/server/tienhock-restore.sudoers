@@ -1,0 +1,2 @@
+# The root-owned helper accepts one validated backup filename or --check.
+tienhock ALL=(root) NOPASSWD: /usr/local/sbin/restore-tienhock-backup *

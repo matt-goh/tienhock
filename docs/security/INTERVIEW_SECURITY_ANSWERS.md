@@ -4,7 +4,9 @@ Updated for the [5 September remediation](SECURITY_REMEDIATION_2026-09-05.md) an
 
 **“Can somebody just sabotage all the data anytime they want?”**
 
-“The APIs require authentication, backup administration is restricted, and the app cannot drop or recreate the database. Authorized users can still damage business records, especially with shared credentials. We have tested an independent recovery copy, but stronger ongoing backup protection is still being set up.”
+“The APIs require authentication, and ordinary database access is restricted. Restoring a backup is reserved for four administrator accounts. Authorized users can still damage business records, especially with shared credentials, so we also need recovery copies. We have tested an independent copy, but ongoing protected retention still needs work.”
+
+The [restore reinstatement](DEPLOYMENT_READINESS_2026-09-06.md#restore-feature-verification) restores the administrator workflow through a dedicated server helper; publish its frontend/backend changes before describing that button as available in production.
 
 **“What did you actually improve?”**
 

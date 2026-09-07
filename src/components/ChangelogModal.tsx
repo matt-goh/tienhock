@@ -26,6 +26,11 @@ const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   },
   {
     date: "2026-09-07",
+    ms: "Pentadbir yang dilantik boleh memulihkan sandaran daripada aplikasi semula. Salinan pemulihan disimpan sebelum pemulihan bermula, dan semua pengguna perlu log masuk semula selepas pemulihan berjaya.",
+    en: "Designated administrators can restore backups from the app again. A recovery copy is saved before restoration starts, and everyone must sign in again after a successful restore.",
+  },
+  {
+    date: "2026-09-07",
     ms: "Masalah yang menghalang pentadbir daripada memuatkan senarai sandaran selepas kemas kini keselamatan telah dibetulkan.",
     en: "Fixed an issue preventing administrators from loading the backup list after the security update.",
   },

@@ -953,10 +953,16 @@ export default function backupRouter(pool) {
       pool.pool.maintenanceMode = true;
 
       restoreState.phase = 'DATABASE_RESTORE';
-      await runPostgresTool('pg_restore', ['-h', dbHost, '-p', String(dbPort), '-U', DB_USER, '-d', DB_NAME,
-        '--clean', '--if-exists', '--single-transaction', '--exit-on-error', '--no-owner', '--no-privileges', backupPath]);
-      // Never revive browser sessions embedded in an old database dump.
-      await pool.query('DELETE FROM active_sessions');
+      if (env === 'production') {
+        // The root-owned helper restores as a separate, non-superuser owner.
+        // It clears sessions and reapplies runtime grants in the same transaction.
+        await backupCommand('sudo', ['-n', '/usr/local/sbin/restore-tienhock-backup', path.basename(backupPath)]);
+      } else {
+        await runPostgresTool('pg_restore', ['-h', dbHost, '-p', String(dbPort), '-U', DB_USER, '-d', DB_NAME,
+          '--clean', '--if-exists', '--single-transaction', '--exit-on-error', '--no-owner', '--no-privileges', backupPath]);
+        // Never revive browser sessions embedded in an old database dump.
+        await pool.query('DELETE FROM active_sessions');
+      }
 
       // Complete restore
       pool.pool.maintenanceMode = false;
@@ -1403,14 +1409,23 @@ export default function backupRouter(pool) {
       return res.status(400).json({ message: 'Invalid backup filename' });
     }
 
-    // The runtime database role has no DDL/ownership privileges in production.
-    // Restores there are performed using the documented server maintenance procedure.
-    if (env === 'production') return res.status(403).json({ message: 'Production restoration requires server maintenance access' });
     if (restoreState.status === 'RESTORING' || creatingBackup) {
       return res.status(503).json({
         error: 'Service unavailable',
         message: 'A restore operation is already in progress'
       });
+    }
+
+    if (env === 'production') {
+      try {
+        await backupCommand('sudo', ['-n', '/usr/local/sbin/restore-tienhock-backup', '--check']);
+      } catch {
+        return res.status(503).json({ message: 'The server restore helper is not ready. Please contact the server administrator.' });
+      }
+      // Recheck after the asynchronous preflight so concurrent requests cannot overlap.
+      if (restoreState.status === 'RESTORING' || creatingBackup) {
+        return res.status(409).json({ message: 'A backup operation is already in progress' });
+      }
     }
 
     restoreState = {
@@ -1422,6 +1437,7 @@ export default function backupRouter(pool) {
     pool.pool.maintenanceMode = true;
 
     try {
+      logSecurityAction(req, 'backup_restore_started', filename);
       res.json({
         message: 'Restore initiated',
         status: 'RESTORING'

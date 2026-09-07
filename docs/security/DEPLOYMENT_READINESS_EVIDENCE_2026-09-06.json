@@ -232,5 +232,180 @@
     "untrustedOriginReceivesNoAllowOrigin": true,
     "businessRecordsChanged": false,
     "configurationCorrectionPublished": false
+  },
+  "subsequentRestoreFeatureVerification": {
+    "successfulRestore": true,
+    "oldSessionsCleared": true,
+    "runtimeGrantsRestored": true,
+    "runtimeSchemaCreateDenied": true,
+    "restoreOwnsApplicationObjects": true,
+    "failedRestoreRollsBackDataAndSessions": true,
+    "unsafePathsRejected": true,
+    "restoreCannotEscalateOrExecuteServerPrograms": true,
+    "database": "tienhock_restore_verify_20260907",
+    "testDatabaseRemoved": true,
+    "testRecoveryCopiesRemoved": 2,
+    "serverHelperInstalled": true,
+    "sudoHelperCheckPassed": true,
+    "actualRuntimeCredentialsPassed": true,
+    "startupRoleCheckPassed": true,
+    "allTableDmlGrantsPassed": true,
+    "liveBusinessDataRestored": false,
+    "applicationChangesPublished": false,
+    "helperSha256": "abe90dbd9fd2bf1fec10eafea4f3d3ddddee3de35f5135eb782ac01e369f6124",
+    "testedHelperSha256BeforeTypeAnnotations": "ed98de6088b49acb9d4bfabf163df571e301199804c6a9aa2411edf1456d16fd",
+    "executableAstUnchangedByFinalTypeAnnotations": true
+  },
+  "subsequentHrSaveVerification": {
+    "database": "tienhock_hr_verify_20260907",
+    "runtime_role": "tienhock_app",
+    "runtime_role_guard": "passed",
+    "ordinary_office_session": true,
+    "production_auth_middleware": true,
+    "production_payroll_rows_changed": false,
+    "tests": [
+      {
+        "section": "MEE",
+        "method": "POST",
+        "status": 201,
+        "entries": 11,
+        "activities": 134,
+        "request_bytes": 29097,
+        "persisted_counts_and_amounts_match": true,
+        "milliseconds": 128
+      },
+      {
+        "section": "MEE",
+        "method": "PUT",
+        "status": 200,
+        "entries": 11,
+        "activities": 134,
+        "request_bytes": 29097,
+        "persisted_counts_and_amounts_match": true,
+        "milliseconds": 92
+      },
+      {
+        "section": "BIHUN",
+        "method": "POST",
+        "status": 201,
+        "entries": 12,
+        "activities": 102,
+        "request_bytes": 22644,
+        "persisted_counts_and_amounts_match": true,
+        "milliseconds": 52
+      },
+      {
+        "section": "BIHUN",
+        "method": "PUT",
+        "status": 200,
+        "entries": 12,
+        "activities": 102,
+        "request_bytes": 22644,
+        "persisted_counts_and_amounts_match": true,
+        "milliseconds": 53
+      },
+      {
+        "section": "BOILER",
+        "method": "POST",
+        "status": 201,
+        "entries": 2,
+        "activities": 14,
+        "request_bytes": 3337,
+        "persisted_counts_and_amounts_match": true,
+        "milliseconds": 9
+      },
+      {
+        "section": "BOILER",
+        "method": "PUT",
+        "status": 200,
+        "entries": 2,
+        "activities": 14,
+        "request_bytes": 3337,
+        "persisted_counts_and_amounts_match": true,
+        "milliseconds": 16
+      }
+    ],
+    "browser_interaction_tested": false,
+    "verified_at_malaysia": "2026-09-07T02:05:15.961064+08:00",
+    "production_revision": "e7b65b3eb87773387886049e5ab00db8a3db7230",
+    "route_sha256": "0ea95351b8ada67c2ef08744bed35ee51df497e1b8e82b37671a7635fd8d40f1",
+    "incident": {
+      "first_failure_malaysia": "2026-09-06 18:06:51",
+      "last_failure_malaysia": "2026-09-06 19:04:09",
+      "failed_requests": 25,
+      "post_failures": 14,
+      "put_failures": 11,
+      "http_status": 500,
+      "worker_pid": 2745796,
+      "error": "open() /var/lib/nginx/body/[temporary-file] failed (13: Permission denied)",
+      "original_permission_change_cause": "not established from retained evidence"
+    },
+    "public_ingress_probes": [
+      {
+        "method": "POST",
+        "path": "/api/daily-work-logs",
+        "body_bytes": 1039,
+        "http_status": 401,
+        "json": true,
+        "cors_origin": "https://tienhock.com",
+        "credentials_sent": false
+      },
+      {
+        "method": "POST",
+        "path": "/api/daily-work-logs",
+        "body_bytes": 65551,
+        "http_status": 401,
+        "json": true,
+        "cors_origin": "https://tienhock.com",
+        "credentials_sent": false
+      },
+      {
+        "method": "POST",
+        "path": "/api/daily-work-logs",
+        "body_bytes": 524303,
+        "http_status": 401,
+        "json": true,
+        "cors_origin": "https://tienhock.com",
+        "credentials_sent": false
+      },
+      {
+        "method": "PUT",
+        "path": "/api/daily-work-logs/847",
+        "body_bytes": 1039,
+        "http_status": 401,
+        "json": true,
+        "cors_origin": "https://tienhock.com",
+        "credentials_sent": false
+      },
+      {
+        "method": "PUT",
+        "path": "/api/daily-work-logs/847",
+        "body_bytes": 65551,
+        "http_status": 401,
+        "json": true,
+        "cors_origin": "https://tienhock.com",
+        "credentials_sent": false
+      },
+      {
+        "method": "PUT",
+        "path": "/api/daily-work-logs/847",
+        "body_bytes": 524303,
+        "http_status": 401,
+        "json": true,
+        "cors_origin": "https://tienhock.com",
+        "credentials_sent": false
+      }
+    ],
+    "body_directory": {
+      "path": "/var/lib/nginx/body",
+      "owner": "www-data:root",
+      "mode": "0700",
+      "metadata_changed_at_malaysia": "2026-09-07 00:35:57",
+      "worker_write_access": true
+    },
+    "current_body_permission_errors": 0,
+    "test_database_removed": true,
+    "temporary_server_harness_removed": true,
+    "production_code_or_configuration_changed_this_verification": false
   }
 }
