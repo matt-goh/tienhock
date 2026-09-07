@@ -253,11 +253,28 @@ export default function (pool) {
     }
   });
 
-  // Shared insert of one employee entry + activities
-  const insertEntryWithActivities = async (workLogId, logDate, entry) => {
+  // Keep employee entries and activities on the work log's transaction connection.
+  /**
+   * @param {import("pg").PoolClient} client
+   * @param {number | string} workLogId
+   * @param {string} logDate
+   * @param {object} entry
+   * @param {string} entry.employeeId
+   * @param {string} entry.jobType
+   * @param {number} entry.hours
+   * @param {import("../../components/Payroll/ManageActivitiesModal").ActivityItem[]} [entry.activities]
+   * @param {string} [entry.followingSalesmanId]
+   * @param {number} [entry.muatMeeBags]
+   * @param {number} [entry.muatBihunBags]
+   * @param {string} [entry.locationType]
+   * @param {boolean} [entry.isDoubled]
+   * @param {number} [entry.forceOTHours]
+   * @returns {Promise<void>}
+   */
+  const insertEntryWithActivities = async (client, workLogId, logDate, entry) => {
     const { employeeId, jobType, hours, activities } = entry;
 
-    const entryResult = await pool.query(
+    const entryResult = await client.query(
       `INSERT INTO jellypolly.daily_work_log_entries (
         work_log_id, employee_id, job_id, total_hours,
         following_salesman_id, muat_mee_bags, muat_bihun_bags, location_type,
@@ -297,7 +314,7 @@ export default function (pool) {
             }
           }
 
-          await pool.query(
+          await client.query(
             `INSERT INTO jellypolly.daily_work_log_activities (
               log_entry_id, pay_code_id, hours_applied,
               units_produced, rate_used, calculated_amount,
@@ -324,11 +341,22 @@ export default function (pool) {
   // work-log entry holding the leave activities. The activities are stored for
   // display; the processor pays leave via amount_paid and excludes leave-day
   // work items from gross, mirroring TH.
-  const insertLeaveEntry = async (workLogId, logDate, leave) => {
+  /**
+   * @param {import("pg").PoolClient} client
+   * @param {number | string} workLogId
+   * @param {string} logDate
+   * @param {object} leave
+   * @param {string} leave.employeeId
+   * @param {string} leave.leaveType
+   * @param {number} [leave.amount_paid]
+   * @param {import("../../components/Payroll/ManageActivitiesModal").ActivityItem[]} [leave.activities]
+   * @returns {Promise<void>}
+   */
+  const insertLeaveEntry = async (client, workLogId, logDate, leave) => {
     const { employeeId, leaveType, amount_paid, activities } = leave;
 
     // Resolve the employee's JP job id from staffs.job
-    const staffResult = await pool.query(
+    const staffResult = await client.query(
       "SELECT job FROM jellypolly.staffs WHERE id = $1",
       [employeeId]
     );
@@ -338,14 +366,14 @@ export default function (pool) {
       throw new Error(`Employee ${employeeId} has no JP job assignment`);
     }
 
-    await pool.query(
+    await client.query(
       `INSERT INTO jellypolly.leave_records (
         employee_id, leave_date, leave_type, work_log_id, days_taken, status, amount_paid
       ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)`,
       [employeeId, logDate, leaveType, workLogId, 1.0, amount_paid || 0]
     );
 
-    const leaveEntryResult = await pool.query(
+    const leaveEntryResult = await client.query(
       `INSERT INTO jellypolly.daily_work_log_entries (
         work_log_id, employee_id, job_id, total_hours
       ) VALUES ($1, $2, $3, $4)
@@ -357,7 +385,7 @@ export default function (pool) {
     if (activities && activities.length > 0) {
       for (const activity of activities) {
         if (activity.isSelected) {
-          await pool.query(
+          await client.query(
             `INSERT INTO jellypolly.daily_work_log_activities (
               log_entry_id, pay_code_id, hours_applied,
               units_produced, rate_used, calculated_amount,
@@ -419,11 +447,11 @@ export default function (pool) {
         const workLogId = workLogResult.rows[0].id;
 
         for (const entry of employeeEntries || []) {
-          await insertEntryWithActivities(workLogId, logDate, entry);
+          await insertEntryWithActivities(transactionClient, workLogId, logDate, entry);
         }
 
         for (const leave of leaveEntries || []) {
-          await insertLeaveEntry(workLogId, logDate, leave);
+          await insertLeaveEntry(transactionClient, workLogId, logDate, leave);
         }
 
         if (transactionClient) {
@@ -540,11 +568,11 @@ export default function (pool) {
         );
 
         for (const entry of employeeEntries || []) {
-          await insertEntryWithActivities(id, logDate, entry);
+          await insertEntryWithActivities(transactionClient, id, logDate, entry);
         }
 
         for (const leave of leaveEntries || []) {
-          await insertLeaveEntry(id, logDate, leave);
+          await insertLeaveEntry(transactionClient, id, logDate, leave);
         }
 
         if (transactionClient) {

@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-07",
+    ms: "Masalah yang menghalang penyimpanan dan pengemaskinian rekod kerja harian Jelly Polly, termasuk kemasukan mesin dan cuti, telah dibetulkan. Jika simpanan gagal, rekod asal kekal tanpa perubahan separuh siap.",
+    en: "Fixed Jelly Polly daily work entries failing to save or update, including machine entries and leave. If a save fails, the original records are preserved without incomplete changes.",
+  },
+  {
+    date: "2026-09-07",
     ms: "Laporan Gaji Jelly Polly kini menggabungkan bayaran pendahuluan separuh bulan bagi semua kod pekerja yang dipautkan kepada orang yang sama, supaya potongan gaji, jumlah bayaran bank dan fail eksport bank adalah betul.",
     en: "Jelly Polly Salary Reports now include mid-month advances from all linked codes for the same employee, so salary deductions, bank payment totals and bank export files are correct.",
   },
