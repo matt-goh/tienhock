@@ -7,6 +7,10 @@
 /out
 /logs
 
+# generated TypeScript and Vite caches
+*.tsbuildinfo
+/vite.config.*.timestamp-*.mjs
+
 # misc
 .env
 .env.*

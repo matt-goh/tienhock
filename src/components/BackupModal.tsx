@@ -649,9 +649,6 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
 
-                {!import.meta.env.DEV && <p className="mt-3 text-sm text-default-600 dark:text-gray-300">
-                  {t("Full database recovery is handled by the server administrator.")}
-                </p>}
                 {backupOverdue && <p role="status" className="mt-3 rounded bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
                   {t("No backup from the last 36 hours is available. Please contact an administrator.")}
                 </p>}
@@ -844,7 +841,6 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                         </div>
                                       ) : (
                                         <>
-                                          {import.meta.env.DEV && (
                                           <Button
                                             onClick={() => {
                                               setSelectedBackup(
@@ -858,7 +854,6 @@ const BackupModal: React.FC<BackupModalProps> = ({ isOpen, onClose }) => {
                                           >
                                             {t("Restore")}
                                           </Button>
-                                          )}
                                           <Button
                                             onClick={() =>
                                               handleDownload(backup.filename)

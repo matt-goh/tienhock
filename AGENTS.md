@@ -73,9 +73,11 @@ reconciliation workflow, start with `docs/Account/AUDIT_2026_READ_FIRST.md`.
 - PostgreSQL with connection pooling
 - Maintenance mode support for database operations
 - Environment variables for database configuration
-- Production runtime role `tienhock_app` was provisioned and validated on 2026-09-06 with DML access in public/greentarget/jellypolly and no owner/superuser powers. GitHub Actions secret `ERP_DB_PASSWORD` supplies the application environment variable `DB_PASSWORD`; the live application switched to this role on 2026-09-07 Malaysia time. See `docs/security/DEPLOYMENT_READINESS_2026-09-06.md` for rollout verification and the workflow import correction awaiting publication.
+- Production runtime role `tienhock_app` was provisioned and validated on 2026-09-06 with DML access in public/greentarget/jellypolly and no owner/superuser powers. GitHub Actions secret `ERP_DB_PASSWORD` supplies the application environment variable `DB_PASSWORD`; the live application switched to this role on 2026-09-07 Malaysia time. See `docs/security/DEPLOYMENT_READINESS_2026-09-06.md` for rollout verification and deployment recovery details.
 
 #### Database Schema (90 tables)
+
+- **Production backup restoration (2026-09-07):** The four security administrators can restore a listed backup through the app. The root-owned `restore-tienhock-backup` helper uses the separate local-peer role/OS account `tienhock_restore` (no superuser, database creation, role creation or memberships). At restore time, only objects in public/greentarget/jellypolly transfer to that role; database ownership stays with postgres. A private pre-restore dump is retained, and restoration, session invalidation and `tienhock_app` grants run in one transaction. Ordinary requests keep the restricted runtime role. See `prod/server/README.md`; no personal-password mechanism is introduced.
 
 **Accounting & Finance:**
 
