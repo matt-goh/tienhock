@@ -299,10 +299,24 @@ export default function (pool) {
       if (!dedsByEp[d.employee_payroll_id]) dedsByEp[d.employee_payroll_id] = [];
       dedsByEp[d.employee_payroll_id].push(d);
     });
+    // Match the payroll processor: advances on any sub-ID belong to its HEAD.
+    /** @type {Record<string, number>} */
     const midByEmpMonth = {};
-    mid.rows.forEach((m) => {
-      midByEmpMonth[`${m.employee_id}_${m.month}`] = Number(m.amount);
-    });
+    mid.rows.forEach(
+      /**
+       * @param {{ employee_id: string, month: number, amount: string | number }} m
+       * @returns {void}
+       */
+      (m) => {
+        /** @type {string} */
+        const canonicalId = staffById[m.employee_id]?.head_staff_id || m.employee_id;
+        /** @type {string} */
+        const key = `${canonicalId}_${m.month}`;
+        midByEmpMonth[key] = round2(
+          (midByEmpMonth[key] || 0) + (Number(m.amount) || 0)
+        );
+      }
+    );
     const leaveTotalByEmpMonth = {};
     const leaveDatesByEmpMonth = {};
     leave.rows.forEach((l) => {
