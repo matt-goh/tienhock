@@ -1843,6 +1843,8 @@ export async function getReceiptGroup(client, receiptId) {
 
   return {
     display_reference: anchor.display_reference,
+    receipt_ids: receiptIds,
+    notes: receiptResult.rows.map((receipt) => receipt.notes).filter(Boolean),
     payment_method: anchor.payment_method,
     debit_account: anchor.debit_account,
     received_date: anchor.received_date,

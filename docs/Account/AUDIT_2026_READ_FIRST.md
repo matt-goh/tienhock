@@ -195,6 +195,15 @@ Minimum controls:
 Historical imported baseline: 3,863 posted `IMP` journals / 10,068 lines and 642 January anchors.
 Organic June–December activity sits beside it; these counts do not prove later completeness.
 
+**8 Sep 2026 auditor-opening follow-up:** the user's fresh production copy now has 641 January
+anchors after auditor keying. The supplied auditor list confirms JP January debit RM9,659.45;
+its stale June checkpoint was corrected in dev from RM594.10 to RM9,546.10, balancing January–August
+TBs. **Production applied by the user on 2026-09-08 at 12:30:59 KL**; supplied output confirms
+all eight TB differences are zero and the transaction committed. Preserve the original imports and old scan
+baseline separately from these revised openings. A distinct RM31,495.55 Balance Sheet difference
+traces to ARI's credit opening on expense Note 5 and still needs auditor clarification. Start with
+[the correction evidence and runbook](JP_OPENING_CORRECTION_2026-09-08.md) before reusing an old gate.
+
 ### Monthly comparison
 
 Run every not-yet-signed month **sequentially** from the last reconciled month through December. If

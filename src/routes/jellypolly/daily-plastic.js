@@ -283,7 +283,8 @@ export default function (pool) {
         .json({ message: "At least one pay-code line is required" });
     }
 
-    const client = await pool.connect();
+    /** @type {import("pg").PoolClient | null} */
+    let client = await pool.connect();
     try {
       await client.query("BEGIN");
 
@@ -357,6 +358,9 @@ export default function (pool) {
       }
 
       await client.query("COMMIT");
+      // Payroll processing checks out its own connection after the save.
+      client.release();
+      client = null;
 
       const { year, month } = yearMonthOf(date);
       await reprocessJPEmployeesSafe(pool, {
@@ -371,14 +375,14 @@ export default function (pool) {
         entryId,
       });
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (client) await client.query("ROLLBACK");
       console.error("Error saving JP daily plastic:", error);
       res.status(500).json({
         message: "Error saving daily plastic",
         error: error.message,
       });
     } finally {
-      client.release();
+      client?.release();
     }
   });
 
@@ -390,7 +394,8 @@ export default function (pool) {
       });
     }
 
-    const client = await pool.connect();
+    /** @type {import("pg").PoolClient | null} */
+    let client = await pool.connect();
     try {
       await client.query("BEGIN");
       const deletedCount = await deleteEmployeePlasticEntries(
@@ -399,6 +404,8 @@ export default function (pool) {
         employee_id
       );
       await client.query("COMMIT");
+      client.release();
+      client = null;
 
       if (deletedCount === 0) {
         return res.status(404).json({ message: "No daily plastic log found" });
@@ -413,14 +420,14 @@ export default function (pool) {
 
       res.json({ message: "Daily plastic cleared" });
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (client) await client.query("ROLLBACK");
       console.error("Error clearing JP daily plastic:", error);
       res.status(500).json({
         message: "Error clearing daily plastic",
         error: error.message,
       });
     } finally {
-      client.release();
+      client?.release();
     }
   });
 
@@ -493,7 +500,8 @@ export default function (pool) {
         .json({ message: "A valid date (YYYY-MM-DD) is required" });
     }
 
-    const client = await pool.connect();
+    /** @type {import("pg").PoolClient | null} */
+    let client = await pool.connect();
     try {
       await client.query("BEGIN");
 
@@ -592,6 +600,8 @@ export default function (pool) {
       }
 
       await client.query("COMMIT");
+      client.release();
+      client = null;
 
       if (affectedEmployeeIds.size > 0) {
         const { year, month } = yearMonthOf(date);
@@ -604,14 +614,14 @@ export default function (pool) {
 
       res.json({ message: "Plastic leave saved" });
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (client) await client.query("ROLLBACK");
       console.error("Error saving JP daily plastic leave:", error);
       res.status(500).json({
         message: "Error saving leave records",
         error: error.message,
       });
     } finally {
-      client.release();
+      client?.release();
     }
   });
 

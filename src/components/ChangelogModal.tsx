@@ -20,6 +20,21 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-08",
+    ms: "Bayaran online atau pindahan bank yang sudah selesai kini boleh dibetulkan kepada cek belum jelas melalui butiran kumpulan bayaran. Semak tarikh, invois dan sebab pembetulan sebelum menyimpan. Bayaran asal dikekalkan sebagai rekod dibatalkan, dan baki invois dipulihkan sehingga cek dijelaskan.",
+    en: "Settled online or bank-transfer payments can now be corrected to pending cheques from payment group details. Review the date, invoices and correction reason before saving. The original payment remains as a cancelled record, and invoice balances are restored until the cheque clears.",
+  },
+  {
+    date: "2026-09-08",
+    ms: "Baki awal Jun 2026 bagi akaun JP (Jelly Polly) dalam Tien Hock telah diselaraskan dengan baki Januari daripada auditor, membetulkan perbezaan RM8,952 dalam Trial Balance dan Penyata Akaun JP.",
+    en: "Aligned the June 2026 opening balance for JP (Jelly Polly) in Tien Hock with the auditor's January figures, correcting the RM8,952 difference in the Trial Balance and JP customer statements.",
+  },
+  {
+    date: "2026-09-07",
+    ms: "Penyimpanan pengeluaran dan cuti Jelly Polly, kadar gaji pekerja Green Target, kategori kerja serta penjanaan baucar gaji Tien Hock kini lebih lancar ketika ramai pengguna bekerja serentak. Masalah yang boleh memaparkan ralat selepas simpanan berjaya atau menghalang pengiraan semula gaji Jelly Polly telah dibetulkan.",
+    en: "Improved saving for Jelly Polly production and leave, Green Target employee pay rates, job categories and Tien Hock salary vouchers when many users work at once. Fixed issues that could show an error after a successful save or prevent Jelly Polly payroll recalculation.",
+  },
+  {
     date: "2026-09-07",
     ms: "Masalah yang menghalang penyimpanan dan pengemaskinian rekod kerja harian Jelly Polly, termasuk kemasukan mesin dan cuti, telah dibetulkan. Jika simpanan gagal, rekod asal kekal tanpa perubahan separuh siap.",
     en: "Fixed Jelly Polly daily work entries failing to save or update, including machine entries and leave. If a save fails, the original records are preserved without incomplete changes.",

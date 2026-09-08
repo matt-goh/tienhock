@@ -15,9 +15,50 @@ import {
   amendPendingReceiptGroup,
 } from "../accounting/receipt-service.js";
 import { applyOverpayment } from "../accounting/overpayment-apply.js";
+import { previewReceiptCorrection, correctReceiptToCheque } from "../accounting/receipt-correction.js";
 
 export default function (pool) {
   const router = Router();
+
+  // Preview and correction share a stable snapshot; correction additionally
+  // locks every member and uses serializable isolation for concurrent changes.
+  router.get("/:id/correction-preview", async (req, res) => {
+    const receiptId = Number(req.params.id);
+    if (!Number.isSafeInteger(receiptId) || receiptId <= 0) return res.status(400).json({ message: "Invalid payment group" });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
+      const { receipts, allocation_rows, ...preview } = await previewReceiptCorrection(client, receiptId);
+      await client.query("COMMIT");
+      res.json(preview);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      res.status(error.status || 400).json({ message: error.message || "Could not review this payment." });
+    } finally {
+      client.release();
+    }
+  });
+
+  router.post("/:id/correct-to-cheque", async (req, res) => {
+    const receiptId = Number(req.params.id);
+    if (!Number.isSafeInteger(receiptId) || receiptId <= 0) return res.status(400).json({ message: "Invalid payment group" });
+    if (!req.user?.id) return res.status(403).json({ message: "A signed-in staff session is required to correct payments." });
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
+      const result = await correctReceiptToCheque(client, receiptId, req.body || {}, req.user.id);
+      await client.query("COMMIT");
+      res.json(result);
+    } catch (error) {
+      await client.query("ROLLBACK");
+      const concurrent = ["40001", "40P01"].includes(error.code);
+      res.status(concurrent ? 409 : error.status || 400).json({
+        message: concurrent ? "Another user changed related records. Nothing was changed by this correction. Close this dialog and review the payment again." : error.message || "Could not correct this payment.",
+      });
+    } finally {
+      client.release();
+    }
+  });
 
   // --- POST /api/receipts — create one atomic receipt ---
   // Accepts an optional flat `overpayment_allocations` array
