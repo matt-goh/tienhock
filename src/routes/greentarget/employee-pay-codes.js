@@ -19,16 +19,26 @@ export default function (pool) {
     return parsed;
   };
 
-  const employeeExists = async (employeeId) => {
-    const result = await pool.query(
+  /**
+   * @param {string} employeeId
+   * @param {Pick<import("pg").PoolClient, "query">} [db]
+   * @returns {Promise<boolean>}
+   */
+  const employeeExists = async (employeeId, db = pool) => {
+    const result = await db.query(
       "SELECT 1 FROM public.staffs WHERE id = $1",
       [employeeId]
     );
     return result.rows.length > 0;
   };
 
-  const payCodeExists = async (payCodeId) => {
-    const result = await pool.query(
+  /**
+   * @param {string} payCodeId
+   * @param {Pick<import("pg").PoolClient, "query">} [db]
+   * @returns {Promise<boolean>}
+   */
+  const payCodeExists = async (payCodeId, db = pool) => {
+    const result = await db.query(
       "SELECT 1 FROM public.pay_codes WHERE id = $1",
       [payCodeId]
     );
@@ -137,7 +147,7 @@ export default function (pool) {
 
     const client = await pool.connect();
     try {
-      if (!(await employeeExists(employeeId))) {
+      if (!(await employeeExists(employeeId, client))) {
         return res
           .status(400)
           .json({ message: `Employee '${employeeId}' not found` });
@@ -153,7 +163,7 @@ export default function (pool) {
             invalid_entry: entry,
           });
         }
-        if (!(await payCodeExists(pay_code_id))) {
+        if (!(await payCodeExists(pay_code_id, client))) {
           return res.status(400).json({
             message: `Pay code '${pay_code_id}' not found`,
             invalid_entry: entry,
@@ -200,12 +210,12 @@ export default function (pool) {
         );
       }
 
-      await client.query("COMMIT");
-
-      const result = await pool.query(
+      const result = await client.query(
         `${mappingSelect} WHERE epc.employee_id = $1 ORDER BY epc.pay_code_id`,
         [employeeId]
       );
+      await client.query("COMMIT");
+
       res.json({ mappings: result.rows.map(toMapping) });
     } catch (error) {
       await client.query("ROLLBACK");

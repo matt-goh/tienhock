@@ -5,9 +5,14 @@ export default function(pool) {
   const router = Router();
 
   // Helper function to verify section exists
-  async function verifySectionExists(section) {
+  /**
+   * @param {string} section
+   * @param {Pick<import('pg').PoolClient, 'query'>} [db]
+   * @returns {Promise<boolean>}
+   */
+  async function verifySectionExists(section, db = pool) {
     const query = 'SELECT name FROM sections WHERE name = $1';
-    const result = await pool.query(query, [section]);
+    const result = await db.query(query, [section]);
     return result.rows.length > 0;
   }
 
@@ -117,7 +122,7 @@ router.delete('/', async (req, res) => {
           
           // Verify section exists if provided
           if (section) {
-            const sectionExists = await verifySectionExists(section);
+            const sectionExists = await verifySectionExists(section, client);
             if (!sectionExists) {
               throw new Error(`Invalid section: ${section}`);
             }

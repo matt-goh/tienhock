@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-07",
+    ms: "Penyimpanan pengeluaran dan cuti Jelly Polly, kadar gaji pekerja Green Target, kategori kerja serta penjanaan baucar gaji Tien Hock kini lebih lancar ketika ramai pengguna bekerja serentak. Masalah yang boleh memaparkan ralat selepas simpanan berjaya atau menghalang pengiraan semula gaji Jelly Polly telah dibetulkan.",
+    en: "Improved saving for Jelly Polly production and leave, Green Target employee pay rates, job categories and Tien Hock salary vouchers when many users work at once. Fixed issues that could show an error after a successful save or prevent Jelly Polly payroll recalculation.",
+  },
+  {
+    date: "2026-09-07",
     ms: "Masalah yang menghalang penyimpanan dan pengemaskinian rekod kerja harian Jelly Polly, termasuk kemasukan mesin dan cuti, telah dibetulkan. Jika simpanan gagal, rekod asal kekal tanpa perubahan separuh siap.",
     en: "Fixed Jelly Polly daily work entries failing to save or update, including machine entries and leave. If a save fails, the original records are preserved without incomplete changes.",
   },

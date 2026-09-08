@@ -233,7 +233,8 @@ export default function (pool) {
       });
     }
 
-    const client = await pool.connect();
+    /** @type {import("pg").PoolClient | null} */
+    let client = await pool.connect();
     try {
       await client.query("BEGIN");
 
@@ -346,6 +347,9 @@ export default function (pool) {
       }
 
       await client.query("COMMIT");
+      // Release before the payroll processor requests its own connection.
+      client.release();
+      client = null;
 
       if (affectedEmployeeIds.size > 0) {
         const { year, month } = yearMonthOf(date);
@@ -361,14 +365,14 @@ export default function (pool) {
         entries: savedEntries,
       });
     } catch (error) {
-      await client.query("ROLLBACK");
+      if (client) await client.query("ROLLBACK");
       console.error("Error saving packing cuti entries:", error);
       res.status(error.status || 500).json({
         message: error.message || "Error saving packing cuti entries",
         error: error.message,
       });
     } finally {
-      client.release();
+      client?.release();
     }
   });
 

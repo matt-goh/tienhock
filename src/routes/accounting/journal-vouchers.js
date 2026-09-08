@@ -1906,9 +1906,9 @@ export default function (pool) {
         } else {
           // Build the exact posting lines with the shared builder (same output the
           // preview shows) from the monthly Salary Report. Guard before inserting.
-          const salaryReport = await computeMonthlySalaryReport(pool, yearInt, monthInt);
-          const jellyByLoc = await computeJellyByLocation(pool, yearInt, monthInt, salaryReport);
-          const ramenByLoc = await computeRamenByLocation(pool, yearInt, monthInt, salaryReport);
+          const salaryReport = await computeMonthlySalaryReport(client, yearInt, monthInt);
+          const jellyByLoc = await computeJellyByLocation(client, yearInt, monthInt, salaryReport);
+          const ramenByLoc = await computeRamenByLocation(client, yearInt, monthInt, salaryReport);
           const jvsl = buildJvslFromSalaryReport(
             salaryReport,
             mappingsByLocation,

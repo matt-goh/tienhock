@@ -633,7 +633,8 @@ export default function (pool) {
         });
       }
 
-      const client = await pool.connect();
+      /** @type {import("pg").PoolClient | null} */
+      let client = await pool.connect();
 
       try {
         await client.query("BEGIN");
@@ -757,14 +758,16 @@ export default function (pool) {
           totalBags += Number(bags_packed);
         }
 
-        await client.query("COMMIT");
-
         // JP products feed the Jelly Polly payroll (bags × product pay code);
-        // reprocess the affected workers' JP payroll for that month
-        const productTypeResult = await pool.query(
+        // read the product on this connection, then release before processing.
+        const productTypeResult = await client.query(
           "SELECT type FROM products WHERE id = $1",
           [product_id]
         );
+        await client.query("COMMIT");
+        client.release();
+        client = null;
+
         if (productTypeResult.rows[0]?.type === "JP") {
           const [yearStr, monthStr] = String(date).split("-");
           const workerIds = entries
@@ -788,10 +791,10 @@ export default function (pool) {
           entry_count: savedEntries.length,
         });
       } catch (error) {
-        await client.query("ROLLBACK");
+        if (client) await client.query("ROLLBACK");
         throw error;
       } finally {
-        client.release();
+        client?.release();
       }
     } catch (error) {
       console.error("Error batch saving production entries:", error);
