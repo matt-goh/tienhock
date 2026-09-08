@@ -1,5 +1,15 @@
 # Migrations Applied & Removed — Ledger
 
+## Applied dev + production: 8 Sep 2026 - JP June opening correction
+
+| File | What it does | Status |
+|------|--------------|--------|
+| `2026-09-08_jp_june_opening_correction.sql` | Carries auditor-confirmed JP January debit RM9,659.45 plus Jan-May movement -RM113.35 into the existing 1 June checkpoint: debit RM594.10 → RM9,546.10, with an explanatory audit note. Updates one opening row; preserves all other openings, journals, import staging and other company schemas. Guards the reviewed before-state and verifies January-August TB balance plus May-to-June checkpoint continuity before commit; reruns make no changes. | dev applied 2026-09-08 11:58:36 KL (rollback rehearsal, actual report checks and idempotence verified); prod applied by the user 2026-09-08 12:30:59 KL (tienhock_prod output: eight zero TB differences, final COMMIT) |
+
+Evidence, backup and production commands: [JP opening correction](Account/JP_OPENING_CORRECTION_2026-09-08.md).
+The SQL is retained as the reviewed implementation pending normal migration cleanup. The connected Balance Sheet
+check identified a separate RM31,495.55 ARI opening/note issue, documented there and not changed.
+
 ## Live migration 3 Sep 2026 - Danish primary salary location / August JVSL
 
 `dev/migrations/2026-09-03_restore_danish_primary_salary_location.sql` is applied to dev and

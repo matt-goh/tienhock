@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-08",
+    ms: "Baki awal Jun 2026 bagi akaun JP (Jelly Polly) dalam Tien Hock telah diselaraskan dengan baki Januari daripada auditor, membetulkan perbezaan RM8,952 dalam Trial Balance dan Penyata Akaun JP.",
+    en: "Aligned the June 2026 opening balance for JP (Jelly Polly) in Tien Hock with the auditor's January figures, correcting the RM8,952 difference in the Trial Balance and JP customer statements.",
+  },
+  {
     date: "2026-09-07",
     ms: "Penyimpanan pengeluaran dan cuti Jelly Polly, kadar gaji pekerja Green Target, kategori kerja serta penjanaan baucar gaji Tien Hock kini lebih lancar ketika ramai pengguna bekerja serentak. Masalah yang boleh memaparkan ralat selepas simpanan berjaya atau menghalang pengiraan semula gaji Jelly Polly telah dibetulkan.",
     en: "Improved saving for Jelly Polly production and leave, Green Target employee pay rates, job categories and Tien Hock salary vouchers when many users work at once. Fixed issues that could show an error after a successful save or prevent Jelly Polly payroll recalculation.",
