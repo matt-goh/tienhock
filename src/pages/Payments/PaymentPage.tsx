@@ -347,6 +347,7 @@ const PaymentPage: React.FC = () => {
               <TimeNavigator
                 range={filters.dateRange}
                 onChange={handleTimeNavigatorChange}
+                allowFuture
                 className="max-w-full"
               />
             </div>

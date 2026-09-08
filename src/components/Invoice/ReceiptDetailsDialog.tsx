@@ -27,6 +27,7 @@ import Button from "../Button";
 import ConfirmationDialog from "../ConfirmationDialog";
 import PillSelect, { type PillSelectOption } from "../PillSelect";
 import TimeNavigator, { type TimeRange } from "../TimeNavigator";
+import CorrectPaymentDialog from "./CorrectPaymentDialog";
 
 type PaymentGroupStatus = "pending" | "posted" | "mixed" | "cancelled";
 type ReceiptAllocationType = "invoice" | "excess" | "account";
@@ -92,6 +93,7 @@ interface PaymentGroupDetails {
   cancellation_reasons: string[];
   origin: "erp" | "import_opening";
   allocations: ReceiptAllocation[];
+  notes?: string[];
 }
 
 interface ReceiptCancelResponse {
@@ -271,6 +273,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
   const [isSavingAmendment, setIsSavingAmendment] =
     useState<boolean>(false);
   const [amendmentError, setAmendmentError] = useState<string | null>(null);
+  const [isCorrectionOpen, setIsCorrectionOpen] = useState<boolean>(false);
 
   const invoiceAllocations: ReceiptAllocation[] = useMemo(
     (): ReceiptAllocation[] =>
@@ -417,6 +420,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       setAmendmentAmounts({});
       setIsSavingAmendment(false);
       setAmendmentError(null);
+      setIsCorrectionOpen(false);
     }
   }, [isOpen]);
 
@@ -434,6 +438,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
     setAmendmentAmounts({});
     setIsSavingAmendment(false);
     setAmendmentError(null);
+    setIsCorrectionOpen(false);
   }, [receiptId]);
 
   const handleClose = (): void => {
@@ -442,6 +447,7 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
       !isConfirming &&
       !isSavingReference &&
       !isSavingDate &&
+      !isCorrectionOpen &&
       !isSavingAmendment
     ) {
       setIsCancelConfirmationOpen(false);
@@ -1269,6 +1275,15 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                           </div>
                         </dl>
 
+                        {paymentGroup.notes && paymentGroup.notes.length > 0 && (
+                          <div className="rounded-lg bg-default-50 p-3 text-sm dark:bg-gray-900/50">
+                            <p className="font-medium">{t("Payment notes")}</p>
+                            {paymentGroup.notes.map((note: string, index: number): React.ReactNode => (
+                              <p key={index} className="mt-1 whitespace-pre-wrap break-words">{note}</p>
+                            ))}
+                          </div>
+                        )}
+
                         <div>
                           <div className="mb-2 flex items-center justify-between gap-3">
                             <h4 className="text-sm font-semibold text-default-800 dark:text-gray-100">
@@ -1365,6 +1380,21 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
                       >
                         {t("close", { ns: "common" })}
                       </Button>
+                      {paymentGroup?.origin === "erp" && paymentGroup.status === "posted" &&
+                        ["online", "bank_transfer"].includes(paymentGroup.payment_method) && (
+                        <Button
+                          type="button"
+                          color="sky"
+                          variant="outline"
+                          size="sm"
+                          icon={IconPencil}
+                          onClick={(): void => setIsCorrectionOpen(true)}
+                          disabled={isLoading || isCancelling || isConfirming || isSavingReference || isSavingDate || isSavingAmendment}
+                          className="flex-1 sm:flex-none"
+                        >
+                          {t("Correct to pending cheque")}
+                        </Button>
+                      )}
                       {canAmendGroup && (
                         <Button
                           type="button"
@@ -1461,6 +1491,17 @@ const ReceiptDetailsDialog: React.FC<ReceiptDetailsDialogProps> = ({
         variant="success"
         allowContentOverflow
       />
+
+      {isCorrectionOpen && receiptId !== null && (
+        <CorrectPaymentDialog
+          receiptId={receiptId}
+          onClose={(): void => setIsCorrectionOpen(false)}
+          onCorrected={async (): Promise<void> => {
+            onClose();
+            await onAmended();
+          }}
+        />
+      )}
 
       <ConfirmationDialog
         isOpen={isDateDialogOpen}

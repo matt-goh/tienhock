@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-08",
+    ms: "Bayaran online atau pindahan bank yang sudah selesai kini boleh dibetulkan kepada cek belum jelas melalui butiran kumpulan bayaran. Semak tarikh, invois dan sebab pembetulan sebelum menyimpan. Bayaran asal dikekalkan sebagai rekod dibatalkan, dan baki invois dipulihkan sehingga cek dijelaskan.",
+    en: "Settled online or bank-transfer payments can now be corrected to pending cheques from payment group details. Review the date, invoices and correction reason before saving. The original payment remains as a cancelled record, and invoice balances are restored until the cheque clears.",
+  },
+  {
+    date: "2026-09-08",
     ms: "Baki awal Jun 2026 bagi akaun JP (Jelly Polly) dalam Tien Hock telah diselaraskan dengan baki Januari daripada auditor, membetulkan perbezaan RM8,952 dalam Trial Balance dan Penyata Akaun JP.",
     en: "Aligned the June 2026 opening balance for JP (Jelly Polly) in Tien Hock with the auditor's January figures, correcting the RM8,952 difference in the Trial Balance and JP customer statements.",
   },
