@@ -1,5 +1,298 @@
 # Migrations Applied & Removed — Ledger
 
+## Applied dev + production: 9 Sep 2026 - confirmed monthly closing stock
+
+| File | What it does | Status |
+|------|--------------|--------|
+| `2026-09-09_confirmed_closing_stock_jan_aug.sql` | Inserts missing user-confirmed January-August 2026 values in `public.closing_stock_values`. Preserves matching rows/metadata and rejects conflicting amounts. Guards the reviewed context and verifies eight TB/BS/profit/CoGM controls before commit. No schema, opening, journal or allowance changes. | **Dev applied 2026-09-09 11:32:52 KL** after the user refreshed dev from production: 21 inserts, May's three rows unchanged, final COMMIT. Rollback rehearsal, conflict rejection, actual-handler comparison, unchanged protected-table fingerprints and zero-insert rerun passed. **Production applied by the user 2026-09-09 12:02:07 KL**: supplied tienhock_prod output confirms 21 inserts, 24 matching values, eight zero TB/BS differences and final COMMIT. File retained. |
+
+Source, backup hashes, report results and shell-paste steps:
+[closing-stock correction](Account/CLOSING_STOCK_CORRECTION_2026-09-09.md).
+Migration SHA-256: `4e60ab1a9a55511cf8121895012c6f090b065c04d9f5966f516006f471eab6f1`.
+January CoGM is now RM537,223.39 in dev and in the supplied production SQL results. The separate January expense difference,
+Trial Balance comparison and report layouts remain open; this is not a full audit sign-off.
+
+Production output retained privately as `out/audit-2026-stock-correction/production-applied.txt`,
+SHA-256 `4295eb43152f2242ceb6b0e58ca23f37dbacef00454afc4e7bfec6b94c9a2b90`.
+All 24 values and eight displayed report rows were compared with the fixture/dev proof;
+they match. This verifies the supplied terminal output, not an independent production
+endpoint query. Refreshed app-report confirmation has not yet been supplied.
+
+**Production backup created by the user, 2026-09-09 11:59:00 KL:**
+`/home/tienhock/closing-stock-20260909-20260909-115857/closing-stock-before.dump`,
+SHA-256 `e553422ad1908895769439a00001c20a1fb58d984769710d7bf84a0f7bbc1ba0`.
+Supplied archive listing includes table data, sequence/value, constraints and ACLs.
+Production SQL has committed and its checks passed. This is a temporary rollback
+backup: the user wants cleanup after the refreshed January/May report checks pass,
+without retaining it indefinitely. A conditional cleanup command was prepared for
+those two files and the empty directory; it has not been run by the assistant.
+Refreshed report confirmation and backup deletion are not yet reported. See the
+runbook's temporary-retention section.
+
+## Applied dev + production, removed: 8 Sep 2026 - ARI receivables classification
+
+| File | What it does | Status |
+|------|--------------|--------|
+| `2026-09-08_ari_receivables_classification.sql` | Moves ARI from parent AE / inherited expense Note 5 to a root GL allowance account with explicit Trade Receivables Note 22. Appends an audit note and updates account metadata; preserves ARI credit opening RM31,495.55, CL_AFI and all other amounts. Guards the reviewed state and verifies January-August TB/BS balance, unchanged profit, all openings and all other accounts before commit. Reruns make no changes. | dev applied 2026-09-08 13:03:55 KL; rollback rehearsal, changed-opening rejection, actual report/ledger checks and idempotence passed. **Production applied by the user 2026-09-08 13:21:16 KL** (tienhock_prod output: eight zero BS/TB differences, unchanged allowance amounts, final COMMIT). SQL file removed at the user's request after confirmation. |
+
+Evidence, backup and production shell-paste instructions: [ARI review and correction](Account/ARI_BALANCE_SHEET_REVIEW_2026-09-08.md).
+Production output supplied by the user identifies `tienhock_prod`, verification time
+**2026-09-08 13:21:16 KL**, ARI moved to root GL / Note 22, both allowance amounts unchanged,
+all eight January-August BS and TB differences zero, and final `COMMIT`. The production
+backup path/hash was not supplied. Production was not independently queried here.
+The migration was still uncommitted when removed, so its exact SQL is preserved below rather than
+relying on git history. SHA-256: `efdfec41610057bc9de2669949614b7efeaf242d3de09f9daab8ef073991a2e3`.
+**Later evidence, 9 Sep KL:** the user says CL_AFI belongs under receivables and ARI
+under expenses. Keep CL_AFI unchanged. ARI's intended treatment is reopened; the
+successful execution recorded above has not been reversed. See the
+[core report review](Account/CORE_REPORT_REVIEW_2026-09-09.md) before using this
+historical classification as a template for further accounting changes.
+
+**Further 9 Sep KL reply:** the auditor sheet is for year ended 31 December 2025,
+opening balances at 1 January 2026; both ARI 31,495.55 and CL_AFI 25,696.82 are
+confirmed credits. These facts resolve the period/sign questions, not the original
+adjusting journal or the user's expense-label interpretation. The applied mapping
+and amounts remain unchanged. The subsequent monthly-stock correction is recorded
+separately above; it does not change either allowance.
+
+<details>
+<summary>Exact ARI SQL archived before removal on 8 September 2026</summary>
+
+```sql
+-- Tien Hock: classify the auditor's ARI allowance against Trade Receivables.
+-- Evidence: docs/Account/ARI_BALANCE_SHEET_REVIEW_2026-09-08.md.
+-- Back up public.account_codes before running. User executes production SQL.
+-- psql -X -v ON_ERROR_STOP=1 -d <tienhock|tienhock_prod> -f <this file>
+-- Changes one account's classification/audit metadata, no amounts or journals.
+-- Successful reruns verify the corrected state without writing.
+\set ON_ERROR_STOP on
+
+BEGIN;
+SET LOCAL search_path = public, pg_temp;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '60s';
+
+DO $guard$
+BEGIN
+  IF current_database() NOT IN ('tienhock', 'tienhock_prod') THEN
+    RAISE EXCEPTION 'Unexpected database: %', current_database();
+  END IF;
+END
+$guard$;
+
+LOCK TABLE public.financial_statement_notes, public.account_opening_balances,
+  public.journal_entries, public.journal_entry_lines, public.closing_stock_values IN SHARE MODE;
+LOCK TABLE public.account_codes IN SHARE ROW EXCLUSIVE MODE;
+
+CREATE TEMP TABLE ari_codes_before ON COMMIT DROP AS SELECT * FROM public.account_codes;
+CREATE TEMP TABLE ari_openings_before ON COMMIT DROP AS SELECT * FROM public.account_opening_balances;
+
+-- Same note inheritance, latest anchors, fiscal opening stock, signed notes,
+-- TD folding and exact-month stock injection as financial-reports.js.
+CREATE TEMP VIEW ari_report_controls AS
+WITH RECURSIVE months AS (
+  SELECT (make_date(2026, month_no, 1) + INTERVAL '1 month' - INTERVAL '1 day')::date AS month_end
+  FROM generate_series(1, 8) month_no
+), note_walk AS (
+  SELECT code AS origin, parent_code, fs_note, 0 AS depth FROM public.account_codes
+  UNION ALL
+  SELECT w.origin, p.parent_code, p.fs_note, w.depth + 1
+  FROM note_walk w JOIN public.account_codes p ON p.code = w.parent_code
+  WHERE w.fs_note IS NULL
+), effective AS (
+  SELECT DISTINCT ON (origin) origin AS code, fs_note
+  FROM note_walk WHERE fs_note IS NOT NULL ORDER BY origin, depth
+), periods AS (
+  SELECT m.month_end, ac.code, ac.ledger_type, a.amount,
+         COALESCE(a.as_of_date, DATE '2026-01-01') AS movement_start
+  FROM months m CROSS JOIN public.account_codes ac
+  LEFT JOIN LATERAL (
+    SELECT amount, as_of_date FROM public.account_opening_balances
+    WHERE account_code = ac.code AND as_of_date <= m.month_end
+    ORDER BY as_of_date DESC LIMIT 1
+  ) a ON true
+  WHERE ac.is_active = true
+), movement AS (
+  SELECT p.month_end, p.code, SUM(jel.debit_amount - jel.credit_amount) AS net
+  FROM periods p JOIN public.journal_entry_lines jel ON jel.account_code = p.code
+  JOIN public.journal_entries je ON je.id = jel.journal_entry_id
+  WHERE je.status = 'posted' AND je.entry_date >= p.movement_start AND je.entry_date <= p.month_end
+  GROUP BY p.month_end, p.code
+), balances AS (
+  SELECT p.month_end, p.code, p.ledger_type, COALESCE(p.amount, 0) + COALESCE(m.net, 0) AS net
+  FROM periods p LEFT JOIN movement m ON m.month_end = p.month_end AND m.code = p.code
+), folded AS (
+  SELECT month_end, CASE WHEN ledger_type = 'TD' THEN 'DEBTOR' ELSE code END AS code, SUM(net) AS net
+  FROM balances GROUP BY month_end, CASE WHEN ledger_type = 'TD' THEN 'DEBTOR' ELSE code END
+), tb AS (
+  SELECT month_end, SUM(GREATEST(net, 0)) AS debit, SUM(GREATEST(-net, 0)) AS credit
+  FROM folded GROUP BY month_end
+), statement_balances AS (
+  SELECT b.month_end, e.fs_note, SUM(b.net) AS net
+  FROM balances b JOIN effective e ON e.code = b.code GROUP BY b.month_end, e.fs_note
+), fiscal_stock AS (
+  SELECT e.fs_note, SUM(a.amount) AS net
+  FROM public.account_opening_balances a JOIN effective e ON e.code = a.account_code
+  WHERE a.as_of_date = DATE '2026-01-01' AND e.fs_note IN ('3-1', '3-3', '3-7')
+  GROUP BY e.fs_note
+), pnl_activity AS (
+  SELECT m.month_end, e.fs_note, SUM(jel.debit_amount - jel.credit_amount) AS net
+  FROM months m JOIN public.journal_entries je
+    ON je.status = 'posted' AND je.entry_date >= DATE '2026-01-01' AND je.entry_date <= m.month_end
+  JOIN public.journal_entry_lines jel ON jel.journal_entry_id = je.id
+  JOIN effective e ON e.code = jel.account_code
+  GROUP BY m.month_end, e.fs_note
+  UNION ALL
+  SELECT m.month_end, s.fs_note, s.net FROM months m CROSS JOIN fiscal_stock s
+), pnl AS (
+  SELECT month_end, fs_note, SUM(net) AS net FROM pnl_activity GROUP BY month_end, fs_note
+), closing_stock AS (
+  SELECT m.month_end, csv.fs_note, csv.amount
+  FROM months m JOIN public.closing_stock_values csv
+    ON csv.year = 2026 AND csv.month = EXTRACT(MONTH FROM m.month_end)
+  JOIN public.financial_statement_notes fsn ON fsn.code = csv.fs_note
+), profit AS (
+  SELECT m.month_end, COALESCE(SUM(
+    CASE WHEN n.category = 'revenue' THEN
+      CASE WHEN n.normal_balance = 'debit' THEN COALESCE(p.net, 0) ELSE -COALESCE(p.net, 0) END
+    WHEN n.category IN ('expense', 'cogs') THEN
+      -CASE WHEN n.normal_balance = 'debit' THEN COALESCE(p.net, 0) ELSE -COALESCE(p.net, 0) END
+    ELSE 0 END
+  ), 0) + COALESCE((SELECT SUM(amount) FROM closing_stock WHERE month_end = m.month_end), 0) AS amount
+  FROM months m CROSS JOIN public.financial_statement_notes n
+  LEFT JOIN pnl p ON p.month_end = m.month_end AND p.fs_note = n.code
+  WHERE n.is_active = true AND n.report_section IN ('income_statement', 'cogm')
+  GROUP BY m.month_end
+), bs_notes AS (
+  SELECT m.month_end, n.category,
+    CASE WHEN n.normal_balance = 'credit' THEN -COALESCE(s.net, 0) ELSE COALESCE(s.net, 0) END
+      + COALESCE(c.amount, 0) AS amount
+  FROM months m CROSS JOIN public.financial_statement_notes n
+  LEFT JOIN statement_balances s ON s.month_end = m.month_end AND s.fs_note = n.code
+  LEFT JOIN closing_stock c ON c.month_end = m.month_end AND c.fs_note = n.code
+  WHERE n.is_active = true AND n.report_section = 'balance_sheet'
+), bs AS (
+  SELECT month_end, COALESCE(SUM(amount) FILTER (WHERE category = 'asset'), 0) AS assets,
+    COALESCE(SUM(amount) FILTER (WHERE category IN ('liability', 'equity')), 0) AS liabilities_equity
+  FROM bs_notes GROUP BY month_end
+)
+SELECT t.month_end, t.debit AS tb_debit, t.credit AS tb_credit, t.debit - t.credit AS tb_difference,
+  b.assets, b.liabilities_equity + p.amount AS liabilities_equity, p.amount AS current_year_profit,
+  b.assets - b.liabilities_equity - p.amount AS bs_difference
+FROM tb t JOIN bs b USING (month_end) JOIN profit p USING (month_end);
+
+CREATE TEMP TABLE ari_reports_before ON COMMIT DROP AS SELECT * FROM ari_report_controls;
+
+DO $correction$
+DECLARE
+  v_account public.account_codes%ROWTYPE;
+  v_already_corrected boolean;
+  v_changed integer;
+BEGIN
+  SELECT * INTO STRICT v_account FROM public.account_codes WHERE code = 'ARI';
+  IF btrim(v_account.description) IS DISTINCT FROM 'ALLOWANCE FOR IMPAIRMENT'
+     OR v_account.ledger_type IS DISTINCT FROM 'GL'
+     OR v_account.is_active IS DISTINCT FROM true OR v_account.is_system IS DISTINCT FROM false THEN
+    RAISE EXCEPTION 'ARI identity or account type changed; review rather than overwrite';
+  END IF;
+  v_already_corrected := v_account.parent_code IS NULL AND v_account.level IS NOT DISTINCT FROM 1
+    AND v_account.fs_note IS NOT DISTINCT FROM '22';
+  IF NOT v_already_corrected AND NOT (
+    v_account.parent_code IS NOT DISTINCT FROM 'AE' AND v_account.level IS NOT DISTINCT FROM 2 AND v_account.fs_note IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Unexpected ARI classification: parent %, level %, note %',
+      v_account.parent_code, v_account.level, v_account.fs_note;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM public.financial_statement_notes
+    WHERE code = '22' AND category = 'asset' AND report_section = 'balance_sheet'
+      AND normal_balance = 'debit' AND is_active = true
+  ) OR NOT EXISTS (
+    SELECT 1 FROM public.account_codes a JOIN public.financial_statement_notes n ON n.code = a.fs_note
+    WHERE a.code = 'AE' AND a.fs_note = '5' AND n.category = 'expense' AND n.report_section = 'income_statement'
+  ) THEN
+    RAISE EXCEPTION 'Reviewed expense/receivables note definitions changed';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.account_codes WHERE parent_code = 'ARI')
+     OR EXISTS (SELECT 1 FROM public.journal_entry_lines WHERE account_code = 'ARI') THEN
+    RAISE EXCEPTION 'ARI has children or journal lines requiring separate review';
+  END IF;
+  IF (SELECT COUNT(*) FROM public.account_opening_balances WHERE account_code = 'ARI') <> 1
+     OR NOT EXISTS (
+       SELECT 1 FROM public.account_opening_balances
+       WHERE account_code = 'ARI' AND as_of_date = DATE '2026-01-01' AND amount = -31495.55
+     ) THEN
+    RAISE EXCEPTION 'Auditor-reviewed ARI opening changed; no amount will be overwritten';
+  END IF;
+  IF (SELECT COUNT(*) FROM ari_reports_before) <> 8 OR EXISTS (
+    SELECT 1 FROM ari_reports_before WHERE tb_difference <> 0
+      OR bs_difference <> CASE WHEN v_already_corrected THEN 0 ELSE 31495.55 END
+  ) THEN
+    RAISE EXCEPTION 'January-August reports differ from the reviewed ARI before-state';
+  END IF;
+
+  IF NOT v_already_corrected THEN
+    UPDATE public.account_codes
+    SET parent_code = NULL, level = 1, fs_note = '22',
+      notes = concat_ws(E'\n', NULLIF(notes, ''),
+        'Audit classification correction 2026-09-08: auditor ARI schedule identifies allowance against receivables, credit 31,495.55. Explicit Note 22 replaces inherited expense Note 5; removed from AE parent. Opening amount unchanged. CL_AFI remains separate pending confirmation. See docs/Account/ARI_BALANCE_SHEET_REVIEW_2026-09-08.md.'),
+      updated_by = 'migration', updated_at = CURRENT_TIMESTAMP
+    WHERE code = 'ARI';
+    GET DIAGNOSTICS v_changed = ROW_COUNT;
+    IF v_changed <> 1 THEN RAISE EXCEPTION 'Expected one ARI account update; got %', v_changed; END IF;
+    RAISE NOTICE 'ARI moved from AE / expense Note 5 to root GL / Trade Receivables Note 22';
+  ELSE
+    RAISE NOTICE 'ARI already has the corrected classification; no row changed';
+  END IF;
+
+  IF (SELECT COUNT(*) FROM ari_report_controls) <> 8 OR EXISTS (
+    SELECT 1 FROM ari_report_controls a JOIN ari_reports_before b USING (month_end)
+    WHERE a.tb_difference <> 0 OR a.bs_difference <> 0
+      OR a.tb_debit <> b.tb_debit OR a.tb_credit <> b.tb_credit
+      OR a.current_year_profit <> b.current_year_profit OR a.liabilities_equity <> b.liabilities_equity
+      OR b.assets - a.assets <> CASE WHEN v_already_corrected THEN 0 ELSE 31495.55 END
+  ) THEN
+    RAISE EXCEPTION 'Post-correction TB / BS / profit verification failed';
+  END IF;
+  IF EXISTS (SELECT * FROM public.account_opening_balances EXCEPT SELECT * FROM ari_openings_before)
+     OR EXISTS (SELECT * FROM ari_openings_before EXCEPT SELECT * FROM public.account_opening_balances)
+     OR EXISTS (SELECT * FROM public.account_codes WHERE code <> 'ARI'
+                EXCEPT SELECT * FROM ari_codes_before WHERE code <> 'ARI')
+     OR EXISTS (SELECT * FROM ari_codes_before WHERE code <> 'ARI'
+                EXCEPT SELECT * FROM public.account_codes WHERE code <> 'ARI') THEN
+    RAISE EXCEPTION 'An opening balance or another account changed';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.account_codes a JOIN ari_codes_before b USING (code)
+    WHERE a.code = 'ARI' AND
+      (to_jsonb(a) - ARRAY['parent_code','level','fs_note','notes','updated_by','updated_at'])
+        IS DISTINCT FROM
+      (to_jsonb(b) - ARRAY['parent_code','level','fs_note','notes','updated_by','updated_at'])
+  ) THEN
+    RAISE EXCEPTION 'An unrelated ARI field changed';
+  END IF;
+END
+$correction$;
+
+SELECT current_database() AS database,
+  to_char(now() AT TIME ZONE 'Asia/Kuala_Lumpur', 'YYYY-MM-DD HH24:MI:SS') AS verified_kl;
+SELECT a.code, b.parent_code AS before_parent, a.parent_code AS after_parent,
+  b.fs_note AS before_direct_note, a.fs_note AS after_direct_note, a.level,
+  to_char(ob.as_of_date, 'YYYY-MM-DD') AS as_of_date, ob.amount AS unchanged_opening
+FROM public.account_codes a JOIN ari_codes_before b USING (id)
+JOIN public.account_opening_balances ob ON ob.account_code = a.code
+WHERE a.code IN ('ARI', 'CL_AFI') ORDER BY a.code, ob.as_of_date;
+SELECT to_char(a.month_end, 'YYYY-MM-DD') AS month_end, b.bs_difference AS before_bs_difference,
+  a.bs_difference AS after_bs_difference, a.tb_difference, a.current_year_profit,
+  a.assets, a.liabilities_equity
+FROM ari_report_controls a JOIN ari_reports_before b USING (month_end) ORDER BY a.month_end;
+
+DROP VIEW ari_report_controls;
+COMMIT;
+```
+
+</details>
+
 ## Applied dev + production: 8 Sep 2026 - JP June opening correction
 
 | File | What it does | Status |
@@ -8,7 +301,8 @@
 
 Evidence, backup and production commands: [JP opening correction](Account/JP_OPENING_CORRECTION_2026-09-08.md).
 The SQL is retained as the reviewed implementation pending normal migration cleanup. The connected Balance Sheet
-check identified a separate RM31,495.55 ARI opening/note issue, documented there and not changed.
+check identified a separate RM31,495.55 ARI opening/note issue, subsequently corrected in dev by
+the separately recorded classification migration above; the user has also confirmed ARI production application.
 
 ## Live migration 3 Sep 2026 - Danish primary salary location / August JVSL
 

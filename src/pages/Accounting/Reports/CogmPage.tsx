@@ -7,42 +7,16 @@ import LoadingSpinner from "../../../components/LoadingSpinner";
 import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateCogmPDF } from "../../../utils/accounting/CogmPDF";
+import {
+  type CogmData,
+  type CogmLayoutRow,
+  formatCogmAmount,
+  getCogmLayoutRows,
+} from "../../../utils/accounting/cogmLayout";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
-
-interface LineItem {
-  note: string;
-  name: string;
-  amount: number;
-}
-
-interface CogmData {
-  period: {
-    year: number;
-    month: number;
-    start_date: string;
-    end_date: string;
-  };
-  raw_materials: {
-    items: LineItem[];
-    total: number;
-  };
-  packing_materials: {
-    items: LineItem[];
-    total: number;
-  };
-  labor_costs: {
-    items: LineItem[];
-    total: number;
-  };
-  other_costs: {
-    items: LineItem[];
-    total: number;
-  };
-  total_cogm: number;
-}
 
 const CogmPage: React.FC = () => {
   const { t } = useTranslation("accounting");
@@ -95,13 +69,6 @@ const CogmPage: React.FC = () => {
     } finally {
       setExporting(false);
     }
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("en-MY", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(amount));
   };
 
   if (loading && !data) {
@@ -176,144 +143,60 @@ const CogmPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Raw Materials Section */}
-            {data.raw_materials.items.length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  {t("Raw Materials")}
-                </h3>
-                <div className="space-y-1 pl-4">
-                  {data.raw_materials.items.map((item) => (
-                    <div key={item.note} className="flex justify-between text-sm">
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {t("{{name}} (Note {{note}})", {
-                          name: item.name,
-                          note: item.note,
-                        })}
-                      </span>
-                      <span className="text-gray-900 dark:text-white">
-                        {formatCurrency(item.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">
-                    {t("Total Raw Materials")}
-                  </span>
-                  <span className="text-gray-900 dark:text-white">
-                    {formatCurrency(data.raw_materials.total)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Packing Materials Section */}
-            {data.packing_materials.items.length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  {t("Packing Materials")}
-                </h3>
-                <div className="space-y-1 pl-4">
-                  {data.packing_materials.items.map((item) => (
-                    <div key={item.note} className="flex justify-between text-sm">
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {t("{{name}} (Note {{note}})", {
-                          name: item.name,
-                          note: item.note,
-                        })}
-                      </span>
-                      <span className="text-gray-900 dark:text-white">
-                        {formatCurrency(item.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">
-                    {t("Total Packing Materials")}
-                  </span>
-                  <span className="text-gray-900 dark:text-white">
-                    {formatCurrency(data.packing_materials.total)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Labor Costs Section */}
-            {data.labor_costs.items.length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  {t("Direct Labor")}
-                </h3>
-                <div className="space-y-1 pl-4">
-                  {data.labor_costs.items.map((item) => (
-                    <div key={item.note} className="flex justify-between text-sm">
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {t("{{name}} (Note {{note}})", {
-                          name: item.name,
-                          note: item.note,
-                        })}
-                      </span>
-                      <span className="text-gray-900 dark:text-white">
-                        {formatCurrency(item.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">
-                    {t("Total Direct Labor")}
-                  </span>
-                  <span className="text-gray-900 dark:text-white">
-                    {formatCurrency(data.labor_costs.total)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Other Costs Section */}
-            {data.other_costs.items.length > 0 && (
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                  {t("Other Manufacturing Costs")}
-                </h3>
-                <div className="space-y-1 pl-4">
-                  {data.other_costs.items.map((item) => (
-                    <div key={item.note} className="flex justify-between text-sm">
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {t("{{name}} (Note {{note}})", {
-                          name: item.name,
-                          note: item.note,
-                        })}
-                      </span>
-                      <span className="text-gray-900 dark:text-white">
-                        {formatCurrency(item.amount)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                  <span className="text-gray-800 dark:text-gray-200">
-                    {t("Total Other Costs")}
-                  </span>
-                  <span className="text-gray-900 dark:text-white">
-                    {formatCurrency(data.other_costs.total)}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Total COGM */}
-            <div className="flex justify-between text-lg font-bold py-4 border-y-2 border-gray-400 dark:border-gray-500 bg-amber-50 dark:bg-amber-900/30 -mx-6 px-6">
-              <span className="text-gray-900 dark:text-white">
-                {t("COST OF GOODS MANUFACTURED")}
-              </span>
-              <span className="text-amber-700 dark:text-amber-400">
-                RM {formatCurrency(data.total_cogm)}
-              </span>
-            </div>
+          <div className="overflow-x-auto p-4 sm:p-6">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-gray-400 dark:border-gray-500 text-gray-600 dark:text-gray-400 uppercase">
+                  <th scope="col" className="pb-2 text-left font-medium">{t("Particular")}</th>
+                  <th scope="col" className="w-20 px-3 pb-2 text-center font-medium">{t("Note")}</th>
+                  <th scope="col" className="w-40 pb-2 text-right font-medium">{t("Amount (RM)")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {getCogmLayoutRows(data).map((row: CogmLayoutRow): React.ReactNode => {
+                  if (row.kind === "heading") {
+                    return (
+                      <tr key={row.key}>
+                        <th colSpan={3} scope="row" className="pt-6 pb-3 text-left font-bold text-gray-900 dark:text-white uppercase">
+                          {t(row.label)}
+                        </th>
+                      </tr>
+                    );
+                  }
+                  if (row.kind === "subtotal") {
+                    return (
+                      <tr key={row.key}>
+                        <td colSpan={2} />
+                        <td className="border-t border-gray-400 dark:border-gray-500 py-2 text-right font-semibold tabular-nums text-gray-900 dark:text-white">
+                          {formatCogmAmount(row.amount)}
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return (
+                    <tr key={row.key}>
+                      <td className={`${row.spaceBefore ? "pt-8" : "pt-1"} pb-1 text-gray-700 dark:text-gray-300`}>
+                        {row.translateLabel ? t(row.label) : row.label}
+                      </td>
+                      <td className={`${row.spaceBefore ? "pt-8" : "pt-1"} px-3 pb-1 text-center text-gray-600 dark:text-gray-400`}>
+                        {row.note}
+                      </td>
+                      <td className={`${row.spaceBefore ? "pt-8" : "pt-1"} pb-1 text-right tabular-nums text-gray-900 dark:text-white`}>
+                        {formatCogmAmount(row.amount)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="font-bold text-gray-900 dark:text-white">
+                  <th colSpan={2} scope="row" className="pt-3 pr-4 text-left">{t("COST OF GOODS MANUFACTURED")}</th>
+                  <td className="border-t border-b-4 border-double border-gray-600 dark:border-gray-300 py-3 text-right tabular-nums">
+                    {formatCogmAmount(data.total_cogm)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
 
           {/* Footer */}

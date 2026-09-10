@@ -11,22 +11,21 @@ import {
 import TienHockLogo from "../tienhock.png";
 import { TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfBlob } from "../pdfPrintFallback";
+import { formatCogmAmount, getCogmLayoutRows } from "./cogmLayout";
+import type { CogmData, CogmLayoutRow } from "./cogmLayout";
 
 const colors = {
   textPrimary: "#0f172a",
   textSecondary: "#475569",
   textMuted: "#64748b",
-  borderDark: "#334155",
-  border: "#cbd5e1",
-  amber: "#92400e",
+  border: "#64748b",
 };
 
 const styles = StyleSheet.create({
   page: {
     paddingTop: 20,
-    paddingBottom: 30,
-    paddingLeft: 40,
-    paddingRight: 40,
+    paddingBottom: 40,
+    paddingHorizontal: 40,
     fontFamily: "Helvetica",
     fontSize: 9,
     color: colors.textPrimary,
@@ -43,151 +42,67 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 7,
+    marginBottom: 12,
     gap: 12,
   },
-  logo: {
-    width: 50,
-    height: 50,
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
-  companyName: {
-    fontSize: 14,
-    fontFamily: "Helvetica-Bold",
-    color: colors.textPrimary,
-  },
+  logo: { width: 50, height: 50 },
+  headerTextContainer: { flex: 1 },
+  companyName: { fontSize: 14, fontFamily: "Helvetica-Bold" },
   reportTitle: {
     fontSize: 12,
     fontFamily: "Helvetica-Bold",
     marginTop: 6,
     color: colors.textSecondary,
   },
-  periodText: {
-    fontSize: 9,
-    color: colors.textMuted,
-    marginTop: 3,
-  },
-  section: {
-    marginBottom: 12,
+  periodText: { fontSize: 9, color: colors.textMuted, marginTop: 3 },
+  columnHeader: {
+    flexDirection: "row",
+    paddingBottom: 6,
+    borderBottomWidth: 0.75,
+    borderBottomColor: colors.border,
+    color: colors.textSecondary,
   },
   sectionTitle: {
-    fontSize: 9,
     fontFamily: "Helvetica-Bold",
-    color: colors.textPrimary,
-    marginBottom: 4,
+    marginTop: 18,
+    marginBottom: 8,
     textTransform: "uppercase",
   },
-  lineItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 2,
-    paddingLeft: 15,
-  },
-  lineItemLabel: {
-    flex: 1,
-    fontSize: 9,
-    color: colors.textSecondary,
-  },
-  lineItemAmount: {
-    width: 100,
+  lineItem: { flexDirection: "row", paddingVertical: 3 },
+  spacedItem: { marginTop: 22 },
+  lineItemLabel: { flex: 1, paddingRight: 8 },
+  note: { width: 50, textAlign: "center" },
+  amount: { width: 110, textAlign: "right", fontFamily: "Courier" },
+  subtotal: { flexDirection: "row", marginTop: 3, marginBottom: 6 },
+  subtotalSpacer: { flex: 1 },
+  subtotalAmount: {
+    width: 110,
     textAlign: "right",
-    fontSize: 9,
-    fontFamily: "Courier",
-  },
-  subtotal: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 4,
-    marginTop: 4,
-    paddingLeft: 15,
-    borderTopWidth: 0.5,
+    fontFamily: "Courier-Bold",
+    paddingTop: 5,
+    borderTopWidth: 0.75,
     borderTopColor: colors.border,
   },
-  subtotalLabel: {
-    flex: 1,
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    color: colors.textSecondary,
-  },
-  subtotalAmount: {
-    width: 100,
-    textAlign: "right",
-    fontSize: 9,
-    fontFamily: "Courier-Bold",
-  },
-  finalTotal: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-    marginTop: 10,
-    borderTopWidth: 2,
-    borderBottomWidth: 2,
-    borderColor: colors.textPrimary,
-    backgroundColor: "#fef3c7",
-  },
-  finalTotalLabel: {
-    flex: 1,
-    fontSize: 11,
-    fontFamily: "Helvetica-Bold",
-    color: colors.textPrimary,
-    paddingLeft: 4,
+  finalTotal: { flexDirection: "row", marginTop: 4 },
+  finalTotalLabel: { flex: 1, fontFamily: "Helvetica-Bold", paddingTop: 8 },
+  finalAmountBox: {
+    width: 110,
+    paddingBottom: 2,
+    borderBottomWidth: 0.75,
+    borderBottomColor: colors.textPrimary,
   },
   finalTotalAmount: {
-    width: 140,
     textAlign: "right",
-    fontSize: 11,
+    fontSize: 10,
     fontFamily: "Courier-Bold",
-    color: colors.amber,
-    paddingRight: 4,
+    paddingTop: 7,
+    paddingBottom: 5,
+    borderTopWidth: 0.75,
+    borderBottomWidth: 0.75,
+    borderColor: colors.textPrimary,
   },
-  generatedAt: {
-    marginTop: 9,
-    fontSize: 7,
-    color: colors.textMuted,
-    textAlign: "right",
-  },
+  generatedAt: { marginTop: 12, fontSize: 7, color: colors.textMuted, textAlign: "right" },
 });
-
-interface LineItem {
-  note: string;
-  name: string;
-  amount: number;
-}
-
-interface CogmData {
-  period: {
-    year: number;
-    month: number;
-    start_date: string;
-    end_date: string;
-  };
-  raw_materials: {
-    items: LineItem[];
-    total: number;
-  };
-  packing_materials: {
-    items: LineItem[];
-    total: number;
-  };
-  labor_costs: {
-    items: LineItem[];
-    total: number;
-  };
-  other_costs: {
-    items: LineItem[];
-    total: number;
-  };
-  total_cogm: number;
-}
-
-const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat("en-MY", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Math.abs(amount));
-};
 
 interface CogmPDFDocumentProps {
   data: CogmData;
@@ -211,104 +126,38 @@ const CogmPDFDocument: React.FC<CogmPDFDocumentProps> = ({ data }) => {
           </View>
         </View>
 
-        {/* Raw Materials Section */}
-        {data.raw_materials.items.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Raw Materials</Text>
-            {data.raw_materials.items.map((item) => (
-              <View key={item.note} style={styles.lineItem}>
-                <Text style={styles.lineItemLabel}>
-                  {item.name} (Note {item.note})
-                </Text>
-                <Text style={styles.lineItemAmount}>
-                  {formatCurrency(item.amount)}
-                </Text>
-              </View>
-            ))}
-            <View style={styles.subtotal}>
-              <Text style={styles.subtotalLabel}>Total Raw Materials</Text>
-              <Text style={styles.subtotalAmount}>
-                {formatCurrency(data.raw_materials.total)}
-              </Text>
-            </View>
-          </View>
-        )}
+        <View style={styles.columnHeader}>
+          <Text style={styles.lineItemLabel}>PARTICULAR</Text>
+          <Text style={styles.note}>NOTE</Text>
+          <Text style={styles.amount}>RM</Text>
+        </View>
 
-        {/* Packing Materials Section */}
-        {data.packing_materials.items.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Packing Materials</Text>
-            {data.packing_materials.items.map((item) => (
-              <View key={item.note} style={styles.lineItem}>
-                <Text style={styles.lineItemLabel}>
-                  {item.name} (Note {item.note})
-                </Text>
-                <Text style={styles.lineItemAmount}>
-                  {formatCurrency(item.amount)}
-                </Text>
+        {getCogmLayoutRows(data).map((row: CogmLayoutRow): React.ReactNode => {
+          if (row.kind === "heading") {
+            return <Text key={row.key} style={styles.sectionTitle} minPresenceAhead={40}>{row.label}</Text>;
+          }
+          if (row.kind === "subtotal") {
+            return (
+              <View key={row.key} style={styles.subtotal} wrap={false}>
+                <View style={styles.subtotalSpacer} />
+                <Text style={styles.subtotalAmount}>{formatCogmAmount(row.amount)}</Text>
               </View>
-            ))}
-            <View style={styles.subtotal}>
-              <Text style={styles.subtotalLabel}>Total Packing Materials</Text>
-              <Text style={styles.subtotalAmount}>
-                {formatCurrency(data.packing_materials.total)}
-              </Text>
+            );
+          }
+          return (
+            <View key={row.key} style={row.spaceBefore ? [styles.lineItem, styles.spacedItem] : styles.lineItem} wrap={false}>
+              <Text style={styles.lineItemLabel}>{row.label}</Text>
+              <Text style={styles.note}>{row.note}</Text>
+              <Text style={styles.amount}>{formatCogmAmount(row.amount)}</Text>
             </View>
-          </View>
-        )}
+          );
+        })}
 
-        {/* Labor Costs Section */}
-        {data.labor_costs.items.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Direct Labor</Text>
-            {data.labor_costs.items.map((item) => (
-              <View key={item.note} style={styles.lineItem}>
-                <Text style={styles.lineItemLabel}>
-                  {item.name} (Note {item.note})
-                </Text>
-                <Text style={styles.lineItemAmount}>
-                  {formatCurrency(item.amount)}
-                </Text>
-              </View>
-            ))}
-            <View style={styles.subtotal}>
-              <Text style={styles.subtotalLabel}>Total Direct Labor</Text>
-              <Text style={styles.subtotalAmount}>
-                {formatCurrency(data.labor_costs.total)}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Other Costs Section */}
-        {data.other_costs.items.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Other Manufacturing Costs</Text>
-            {data.other_costs.items.map((item) => (
-              <View key={item.note} style={styles.lineItem}>
-                <Text style={styles.lineItemLabel}>
-                  {item.name} (Note {item.note})
-                </Text>
-                <Text style={styles.lineItemAmount}>
-                  {formatCurrency(item.amount)}
-                </Text>
-              </View>
-            ))}
-            <View style={styles.subtotal}>
-              <Text style={styles.subtotalLabel}>Total Other Costs</Text>
-              <Text style={styles.subtotalAmount}>
-                {formatCurrency(data.other_costs.total)}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Total COGM */}
-        <View style={styles.finalTotal}>
+        <View style={styles.finalTotal} wrap={false}>
           <Text style={styles.finalTotalLabel}>COST OF GOODS MANUFACTURED</Text>
-          <Text style={styles.finalTotalAmount}>
-            RM {formatCurrency(data.total_cogm)}
-          </Text>
+          <View style={styles.finalAmountBox}>
+            <Text style={styles.finalTotalAmount}>{formatCogmAmount(data.total_cogm)}</Text>
+          </View>
         </View>
 
         {/* Generated At */}

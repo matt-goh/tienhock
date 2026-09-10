@@ -20,9 +20,24 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-10",
+    ms: "Laporan CoGM Tien Hock dan PDF kini mengikut susunan laporan lama, dengan lajur nota berasingan, subtotal dan baris potongan stok akhir yang jelas. Kos pengangkutan ditunjukkan bersama bahan mentah, diikuti bahan pembungkusan dan gaji pekerja kilang. Jumlah CoGM kekal sama.",
+    en: "Tien Hock's CoGM report and PDF now follow the legacy report order, with a separate note column, subtotals and clear closing-stock deductions. Freight appears with raw materials, followed by packing materials and factory wages. CoGM totals are unchanged.",
+  },
+  {
+    date: "2026-09-09",
+    ms: "Laporan CoGM, Penyata Pendapatan dan Balance Sheet Tien Hock kini mengambil kira baki stok akhir yang disahkan bagi Januari hingga Ogos 2026. Jumlah CoGM Januari ialah RM537,223.39. Baki stok Mei dan jumlah Trial Balance kekal sama.",
+    en: "Tien Hock CoGM, Income Statement and Balance Sheet reports now include the confirmed closing stock for January through August 2026. January CoGM is RM537,223.39. May's stock values and Trial Balance totals are unchanged.",
+  },
+  {
     date: "2026-09-08",
     ms: "Bayaran online atau pindahan bank yang sudah selesai kini boleh dibetulkan kepada cek belum jelas melalui butiran kumpulan bayaran. Semak tarikh, invois dan sebab pembetulan sebelum menyimpan. Bayaran asal dikekalkan sebagai rekod dibatalkan, dan baki invois dipulihkan sehingga cek dijelaskan.",
     en: "Settled online or bank-transfer payments can now be corrected to pending cheques from payment group details. Review the date, invoices and correction reason before saving. The original payment remains as a cancelled record, and invoice balances are restored until the cheque clears.",
+  },
+  {
+    date: "2026-09-08",
+    ms: "Baki ARI kini ditunjukkan sebagai potongan pada baki pelanggan dalam Balance Sheet Tien Hock, membetulkan perbezaan RM31,495.55 bagi Januari hingga Ogos 2026. Amaun baki awal dan untung kekal sama.",
+    en: "ARI now appears as a deduction from receivables in the Tien Hock Balance Sheet, correcting the RM31,495.55 difference for January through August 2026. Opening amounts and profit are unchanged.",
   },
   {
     date: "2026-09-08",
