@@ -184,6 +184,15 @@ January opening on a non-Balance-Sheet note outside the recognised opening-stock
 The TB includes this credit, while the Balance Sheet's profit calculation does not
 consume non-stock P&L opening balances.
 
-This explains the separate report difference; it does not establish the auditor's
-intended account classification or treatment. Obtain the auditor's ARI schedule/note
-placement before proposing that separate correction. No ARI amount or mapping was changed.
+The subsequently supplied auditor photograph identifies ARI as **Allowance of Impairment
+on Receivables**, with a handwritten total of **31,495.55**. A read-only preview placing
+ARI in Note 22 balances January-August Balance Sheets while preserving TB totals and
+profit. The separate ARI classification correction was subsequently applied to dev on
+**2026-09-08 at 13:03:55 KL**; production applied at **2026-09-08 13:21:16 KL**, confirmed
+by the supplied output showing eight zero BS/TB differences and final `COMMIT`. No ARI amount was
+changed. The user subsequently stated that CL_AFI belongs under receivables and ARI
+under expenses. Keep CL_AFI unchanged; ARI's intended treatment is reopened pending
+its adjustment year/sign/entry. The applied ARI mapping has not been reversed. See the
+[core report review](CORE_REPORT_REVIEW_2026-09-09.md) and
+[ARI execution record](ARI_BALANCE_SHEET_REVIEW_2026-09-08.md). The independently
+auditor-supported JP correction remains applied.

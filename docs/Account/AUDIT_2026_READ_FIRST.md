@@ -75,8 +75,8 @@ names/hashes, not the file contents.
 
 | Evidence to preserve | Expected/private location or current gap |
 |---|---|
-| TH Jan–May exports | `dev/import/legacy-jan-may/data/` — absent here |
-| TH Jan–May report scans | `dev/import/legacy-report-fixtures/data/` — absent here |
+| TH Jan–May exports | Two `EXCEL_TH*.xlsx` workbooks recovered at repository root on 9 Sep KL; original hash-pinned CSVs still absent. See the [conversion handover](CORE_FIXTURE_CONVERSION_HANDOVER_2026-09-09.md) |
+| TH Jan–May report scans | Five root `Trial_Balance_*_2026.pdf` files recovered and matched to historical hashes on 9 Sep KL; private CSV fixtures and the other May report scans remain absent |
 | TH June TB/account ledgers | original PDFs such as `JUNE_TIENHOCK_TRIAL_BALANCE.pdf` and `JUNE_MRM&MGT.pdf` are absent; only transcriptions remain |
 | TH closing-stock scan | `dev/import/closing-stock-report/ClosingStockReport.pdf` — absent here |
 | GT Jan–Jun workbooks | `dev/import/greentarget-legacy/data/` — absent here |
@@ -201,8 +201,68 @@ its stale June checkpoint was corrected in dev from RM594.10 to RM9,546.10, bala
 TBs. **Production applied by the user on 2026-09-08 at 12:30:59 KL**; supplied output confirms
 all eight TB differences are zero and the transaction committed. Preserve the original imports and old scan
 baseline separately from these revised openings. A distinct RM31,495.55 Balance Sheet difference
-traces to ARI's credit opening on expense Note 5 and still needs auditor clarification. Start with
-[the correction evidence and runbook](JP_OPENING_CORRECTION_2026-09-08.md) before reusing an old gate.
+traces to ARI's credit opening on expense Note 5. The subsequently supplied auditor schedule
+identifies it as an allowance against receivables. ARI's root GL / Note 22 classification correction
+was applied in dev at **2026-09-08 13:03:55 KL**; actual January-August Balance Sheets and TBs
+balance, with all opening amounts and profit unchanged. **ARI production applied at
+2026-09-08 13:21:16 KL**; the supplied `tienhock_prod` output confirms eight zero BS/TB
+differences, unchanged allowance amounts and final `COMMIT`. Its SQL file was removed after
+confirmation, with exact contents archived in the migration log. **Reopened 9 Sep KL:**
+the user says CL_AFI belongs under receivables and ARI under expenses. Keep CL_AFI
+unchanged; the applied ARI mapping is now under review, not reversed. Newly supplied
+January reports prove missing closing stock of RM697,899.52 in CoGM and RM829,605.22
+across BS/IS, plus a separate RM31,853.85 expense difference. The handwritten TB
+comparisons need current account-level exports. Start with the
+[core report review](CORE_REPORT_REVIEW_2026-09-09.md), then the
+[ARI review](ARI_BALANCE_SHEET_REVIEW_2026-09-08.md) and
+[JP correction evidence and runbook](JP_OPENING_CORRECTION_2026-09-08.md) before reusing an old gate.
+
+**9 Sep KL source recovery:** the two root XLSX files contain readable historical
+ledgers; the five root TB PDFs exactly match the older January-May scans, whose
+totals differ from the latest handwritten comparison. January page 20 was visually
+confirmed at RM13,982,350.19, versus the new comparison's RM14,056,981.54. Do not OCR
+all 100 pages or treat the recovered files as updated auditor data. The user has
+already asked about ARI's year/sign/entry and the missing monthly stock values.
+Use the [Terra conversion handover](CORE_FIXTURE_CONVERSION_HANDOVER_2026-09-09.md)
+for source hashes, Excel date/column traps and the smaller request for current
+January TB data. No new accounting correction was applied during source inspection.
+
+**Latest 9 Sep KL replies supersede the evidence requests above:** both ARI
+RM31,495.55 and CL_AFI RM25,696.82 are confirmed **credits** on the auditor's
+1 January 2026 opening schedule, year ended 31 December 2025. The full January-August
+stock table is supplied; all 24 figures are transcribed and actual-handler previews
+passed at **11:13:51 KL**. May's three stored rows match; 21 rows remain to be saved.
+Do not re-ask for stock totals or allowance year/sign, or implement the earlier
+diagnostic that counted ARI's opening credit in 2026 profit. No DB write occurred.
+The user explicitly says no Excel export is available: **use root
+`Trial_Balance_Jan_2026.pdf`** for January, keeping its older balances separate from
+revised auditor openings. The old January Excel request is withdrawn. Continue via
+the updated core review and Terra handover; the whole reconciliation is not yet closed.
+
+**Stock implementation, 9 Sep KL:** after the user refreshed dev from production,
+the guarded stock migration was **applied to dev at 11:32:52 KL**: 21 inserts,
+May's three rows/metadata preserved, all eight TB/BS balances zero, and January
+CoGM RM537,223.39. Rollback rehearsal, conflict rejection, actual-handler/SQL
+comparison and zero-insert rerun passed; accounts, openings, journals, staging and
+notes have unchanged fingerprints. **Production applied by the user at 12:02:07 KL**;
+supplied output confirms 21 inserts, 24 matching amounts, eight zero TB/BS differences
+and COMMIT. Temporary production backup cleanup awaits the refreshed January/May
+app-report check. See [stock correction and runbook](CLOSING_STOCK_CORRECTION_2026-09-09.md).
+Stock conversion is complete. No further allowance change was made.
+
+**Latest follow-up, 10 Sep KL:** the January direct-scan fixture is complete: 885
+rows over 20 pages, debit/credit RM13,982,350.19. Its comparison to the refreshed
+dev report has 30 account differences, all exactly explained by revised January
+openings, with no remaining imported-movement or account-balance residual. This
+does not reconcile the newer handwritten RM14,056,981.54 state; that separate
+RM6,143.55 January difference still awaits confirmation of the current legacy total.
+See `out/audit-2026-january-reconciliation/JANUARY_RECONCILIATION.md`; do not repeat
+the PDF conversion or request Excel. The user confirmed all January-August CoGM
+amounts and completed the temporary stock-backup cleanup. The requested CoGM
+screen/PDF layout is now implemented locally, with January/August PDF previews and
+eight unchanged-total checks in `out/audit-2026-cogm-format/`. The API/YTD basis is
+unchanged. Income Statement/Balance Sheet layouts and the allowance/expense
+reconciliation remain separate pending work. See the updated core review above.
 
 ### Monthly comparison
 
