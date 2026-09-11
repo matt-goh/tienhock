@@ -254,8 +254,12 @@ Stock conversion is complete. No further allowance change was made.
 rows over 20 pages, debit/credit RM13,982,350.19. Its comparison to the refreshed
 dev report has 30 account differences, all exactly explained by revised January
 openings, with no remaining imported-movement or account-balance residual. This
-does not reconcile the newer handwritten RM14,056,981.54 state; that separate
-RM6,143.55 January difference still awaits confirmation of the current legacy total.
+does not reconcile the newer handwritten RM14,056,981.54 state. **The user explicitly
+confirms that all blue handwritten amounts are the required target totals. The TB
+issue remains OPEN**, including the RM6,143.55 January difference. Do not ask for
+confirmation of these totals again. The missing evidence is the account breakdown
+behind the blue January total, supplied as PDF/photos; the older PDF has a different
+total. Identify the differing accounts before preparing any accounting correction.
 See `out/audit-2026-january-reconciliation/JANUARY_RECONCILIATION.md`; do not repeat
 the PDF conversion or request Excel. The user confirmed all January-August CoGM
 amounts and completed the temporary stock-backup cleanup. The requested CoGM
