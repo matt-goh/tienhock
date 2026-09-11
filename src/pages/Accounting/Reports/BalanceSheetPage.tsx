@@ -4,6 +4,8 @@ import { IconPrinter, IconRefresh, IconCheck, IconX } from "@tabler/icons-react"
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import CoreStatementTable from "../../../components/Accounting/CoreStatementTable";
+import { type BalanceSheetData, getBalanceSheetLayoutRows } from "../../../utils/accounting/coreStatementLayout";
 import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateBalanceSheetPDF } from "../../../utils/accounting/BalanceSheetPDF";
@@ -19,17 +21,6 @@ import type { TFunction } from "i18next";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
 
-interface LineItem {
-  note: string | null;
-  name: string;
-  amount: number;
-}
-
-const formatLineItemLabel = (item: LineItem, t: TFunction): string =>
-  item.note
-    ? t("{{name}} (Note {{note}})", { name: item.name, note: item.note })
-    : item.name;
-
 const formatGTLineItemLabel = (item: GTStatementItem, t: TFunction): string => {
   if (item.note)
     return t("{{name}} (Note {{note}})", { name: item.name, note: item.note });
@@ -40,46 +31,6 @@ const formatGTLineItemLabel = (item: GTStatementItem, t: TFunction): string => {
     });
   return item.name;
 };
-
-interface BalanceSheetData {
-  period: {
-    year: number;
-    month: number;
-    start_date: string;
-    as_of_date: string;
-  };
-  assets: {
-    current: {
-      items: LineItem[];
-      total: number;
-    };
-    non_current: {
-      items: LineItem[];
-      total: number;
-    };
-    total: number;
-  };
-  liabilities: {
-    current: {
-      items: LineItem[];
-      total: number;
-    };
-    non_current: {
-      items: LineItem[];
-      total: number;
-    };
-    total: number;
-  };
-  equity: {
-    items: LineItem[];
-    total: number;
-  };
-  totals: {
-    total_assets: number;
-    total_liabilities_equity: number;
-    is_balanced: boolean;
-  };
-}
 
 interface BalanceSheetPageProps {
   company?: "tienhock" | "greentarget";
@@ -372,7 +323,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
           {/* Title Header */}
           <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center">
-              {t("STATEMENT OF FINANCIAL POSITION")}
+              {t("BALANCE SHEET")}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
               {t("For the period {{start}} to {{end}}", {
@@ -382,201 +333,7 @@ const BalanceSheetPage: React.FC<BalanceSheetPageProps> = ({
             </p>
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* ASSETS */}
-            <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wide border-b-2 border-gray-300 dark:border-gray-600 pb-2">
-                {t("ASSETS")}
-              </h3>
-
-              {/* Non-Current Assets */}
-              {data.assets.non_current.items.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {t("Non-Current Assets")}
-                  </h4>
-                  <div className="space-y-1 pl-4">
-                    {data.assets.non_current.items.map((item) => (
-                      <div
-                        key={`${item.note ?? "no-note"}-${item.name}`}
-                        className="flex justify-between text-sm"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item, t)}
-                        </span>
-                        <span className="text-gray-900 dark:text-white">
-                          {formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">
-                      {t("Total Non-Current Assets")}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(data.assets.non_current.total)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Current Assets */}
-              {data.assets.current.items.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {t("Current Assets")}
-                  </h4>
-                  <div className="space-y-1 pl-4">
-                    {data.assets.current.items.map((item) => (
-                      <div
-                        key={`${item.note ?? "no-note"}-${item.name}`}
-                        className="flex justify-between text-sm"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item, t)}
-                        </span>
-                        <span className="text-gray-900 dark:text-white">
-                          {formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">
-                      {t("Total Current Assets")}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(data.assets.current.total)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Total Assets */}
-              <div className="flex justify-between text-base font-bold mt-4 pt-3 border-t-2 border-gray-300 dark:border-gray-600">
-                <span className="text-gray-900 dark:text-white">
-                  {t("TOTAL ASSETS")}
-                </span>
-                <span className="text-gray-900 dark:text-white">
-                  RM {formatCurrency(data.assets.total)}
-                </span>
-              </div>
-            </div>
-
-            {/* LIABILITIES & EQUITY */}
-            <div>
-              <h3 className="text-base font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wide border-b-2 border-gray-300 dark:border-gray-600 pb-2">
-                {t("LIABILITIES & EQUITY")}
-              </h3>
-
-              {/* Non-Current Liabilities */}
-              {data.liabilities.non_current.items.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {t("Non-Current Liabilities")}
-                  </h4>
-                  <div className="space-y-1 pl-4">
-                    {data.liabilities.non_current.items.map((item) => (
-                      <div
-                        key={`${item.note ?? "no-note"}-${item.name}`}
-                        className="flex justify-between text-sm"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item, t)}
-                        </span>
-                        <span className="text-gray-900 dark:text-white">
-                          {formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">
-                      {t("Total Non-Current Liabilities")}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(data.liabilities.non_current.total)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Current Liabilities */}
-              {data.liabilities.current.items.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {t("Current Liabilities")}
-                  </h4>
-                  <div className="space-y-1 pl-4">
-                    {data.liabilities.current.items.map((item) => (
-                      <div
-                        key={`${item.note ?? "no-note"}-${item.name}`}
-                        className="flex justify-between text-sm"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item, t)}
-                        </span>
-                        <span className="text-gray-900 dark:text-white">
-                          {formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">
-                      {t("Total Current Liabilities")}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(data.liabilities.current.total)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Equity */}
-              {data.equity.items.length > 0 && (
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {t("Equity")}
-                  </h4>
-                  <div className="space-y-1 pl-4">
-                    {data.equity.items.map((item) => (
-                      <div
-                        key={`${item.note ?? "no-note"}-${item.name}`}
-                        className="flex justify-between text-sm"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {formatLineItemLabel(item, t)}
-                        </span>
-                        <span className="text-gray-900 dark:text-white">
-                          {formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 pl-4">
-                    <span className="text-gray-800 dark:text-gray-200">
-                      {t("Total Equity")}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(data.equity.total)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Total Liabilities & Equity */}
-              <div className="flex justify-between text-base font-bold mt-4 pt-3 border-t-2 border-gray-300 dark:border-gray-600">
-                <span className="text-gray-900 dark:text-white">
-                  {t("TOTAL LIABILITIES & EQUITY")}
-                </span>
-                <span className="text-gray-900 dark:text-white">
-                  RM {formatCurrency(data.totals.total_liabilities_equity)}
-                </span>
-              </div>
-            </div>
-          </div>
+          <CoreStatementTable rows={getBalanceSheetLayoutRows(data)} />
 
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">

@@ -255,6 +255,13 @@ layouts are separate company implementations and should retain their current beh
 
 ## 5. Trial Balance: balanced internally, different from the comparison totals
 
+**Latest user direction: the BLUE figures below are the required target totals.
+TB reconciliation remains OPEN.** Internal balance and the completed historical
+January PDF bridge do not close this issue. The amounts themselves are confirmed;
+do not repeat the request for confirmation or a photo of only the grand totals.
+The missing evidence is January's account breakdown behind RM14,056,981.54. Request
+that report as PDF/photos first, without requesting Excel or all eight months.
+
 The actual January-August ERP handlers still return equal debits and credits.
 Changing ARI's statement note or adding closing-stock report values does not change
 those TB totals. The handwritten comparison transcribes as follows:
@@ -278,9 +285,9 @@ the two root XLSX files contain earlier ledger balances. These are not updated T
 See the [conversion handover](CORE_FIXTURE_CONVERSION_HANDOVER_2026-09-09.md). The archived
 June transcription likewise must not substitute for the current legacy export.
 **Latest user direction:** no Excel export is available; use root
-`Trial_Balance_Jan_2026.pdf`. Do not request an Excel export again or wait for another
-file. Transcribe that PDF and bridge its historical account balances to the revised
-auditor openings and known later entries separately. Its RM13,982,350.19 total is
+`Trial_Balance_Jan_2026.pdf`. Its conversion and historical opening bridge are now
+complete: all 30 account differences are explained by revised January openings.
+Do not request an Excel export or repeat that completed conversion. Its RM13,982,350.19 total is
 not evidence of the handwritten RM14,056,981.54 state. Full January-August agreement
 is not established by those old files; compare consecutive months by account using the
 [monthly tie-out workflow](../../dev/import/legacy-tieout/README.md).
@@ -302,10 +309,10 @@ Do not accept old named residuals as the explanation for a new export.
    revised openings and current ERP results; investigate the remaining 31,853.85
    expense difference and the independent 358.30 accrual clue without a balancing plug.
 
-No new question is being sent now. The earlier January Excel request is withdrawn
-following the user's explicit direction. Later July/August movement isolation remains
-limited by the absence of corresponding source account rows; continue the January
-comparison first rather than repeatedly asking for broad document packs.
+The earlier January Excel request remains withdrawn. Following confirmation of the
+blue targets, the next evidence request is specifically the January account balances
+that total RM14,056,981.54. Later July/August movement isolation also lacks the relevant
+source account rows; start with January rather than requesting broad document packs.
 
 ## Verification artifacts
 

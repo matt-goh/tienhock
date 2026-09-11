@@ -4,6 +4,8 @@ import { IconPrinter, IconRefresh } from "@tabler/icons-react";
 import MonthNavigator from "../../../components/MonthNavigator";
 import Button from "../../../components/Button";
 import LoadingSpinner from "../../../components/LoadingSpinner";
+import CoreStatementTable from "../../../components/Accounting/CoreStatementTable";
+import { type IncomeStatementData, getIncomeStatementLayoutRows } from "../../../utils/accounting/coreStatementLayout";
 import ReportSourceGuide from "../../../components/Accounting/ReportSourceGuide";
 import { api } from "../../../routes/utils/api";
 import { generateIncomeStatementPDF } from "../../../utils/accounting/IncomeStatementPDF";
@@ -18,35 +20,6 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { useScrollRestoration } from "../../../hooks/useScrollRestoration";
 import { usePersistedMonth } from "../../../hooks/usePersistedFilters";
-
-interface LineItem {
-  note: string;
-  name: string;
-  amount: number;
-}
-
-interface IncomeStatementData {
-  period: {
-    year: number;
-    month: number;
-    start_date: string;
-    end_date: string;
-  };
-  revenue: {
-    items: LineItem[];
-    total: number;
-  };
-  cost_of_goods_sold: {
-    items: LineItem[];
-    total: number;
-  };
-  gross_profit: number;
-  expenses: {
-    items: LineItem[];
-    total: number;
-  };
-  net_profit: number;
-}
 
 interface IncomeStatementPageProps {
   company?: "tienhock" | "greentarget";
@@ -182,13 +155,6 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
     } finally {
       setExporting(false);
     }
-  };
-
-  const formatCurrency = (amount: number): string => {
-    return new Intl.NumberFormat("en-MY", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(Math.abs(amount));
   };
 
   const formatGTCurrency = (amount: number): string => {
@@ -327,7 +293,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
           {/* Title Header */}
           <div className="bg-gray-50 dark:bg-gray-900 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white text-center">
-              {t("INCOME STATEMENT")}
+              {t("DETAILED INCOME STATEMENT")}
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 text-center mt-1">
               {t("For the period {{start}} to {{end}}", {
@@ -337,145 +303,7 @@ const IncomeStatementPage: React.FC<IncomeStatementPageProps> = ({
             </p>
           </div>
 
-          <div className="p-6 space-y-6">
-            {/* Revenue Section */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                {t("Revenue")}
-              </h3>
-              <div className="space-y-1">
-                {data.revenue.items.map((item) => (
-                  <div key={item.note} className="flex justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">
-                      {t("{{name}} (Note {{note}})", {
-                        name: item.name,
-                        note: item.note,
-                      })}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(item.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-900 dark:text-white">
-                  {t("Total Revenue")}
-                </span>
-                <span className="text-gray-900 dark:text-white">
-                  {formatCurrency(data.revenue.total)}
-                </span>
-              </div>
-            </div>
-
-            {/* COGS Section */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                {t("Less: Cost of Goods Sold")}
-              </h3>
-              <div className="space-y-1 pl-4">
-                {data.cost_of_goods_sold.items.map((item) => (
-                  <div key={item.note} className="flex justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">
-                      {t("{{name}} (Note {{note}})", {
-                        name: item.name,
-                        note: item.note,
-                      })}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(item.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-900 dark:text-white">
-                  {t("Total Cost of Goods Sold")}
-                </span>
-                <span className="text-gray-900 dark:text-white">
-                  ({formatCurrency(data.cost_of_goods_sold.total)})
-                </span>
-              </div>
-            </div>
-
-            {/* Gross Profit */}
-            <div className="flex justify-between items-center text-base font-bold py-3 border-y-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 -mx-6 px-6">
-              <div>
-                <span className="text-gray-900 dark:text-white">
-                  {t("GROSS PROFIT")}
-                </span>
-                {data.revenue.total > 0 && (
-                  <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                    {t("({{percent}}% margin)", {
-                      percent: (
-                        (data.gross_profit / data.revenue.total) *
-                        100
-                      ).toFixed(1),
-                    })}
-                  </span>
-                )}
-              </div>
-              <span className={`${data.gross_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                {data.gross_profit >= 0 ? "" : "("}
-                {formatCurrency(data.gross_profit)}
-                {data.gross_profit >= 0 ? "" : ")"}
-              </span>
-            </div>
-
-            {/* Expenses Section */}
-            <div>
-              <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2 uppercase tracking-wide">
-                {t("Less: Operating Expenses")}
-              </h3>
-              <div className="space-y-1 pl-4">
-                {data.expenses.items.map((item) => (
-                  <div key={item.note} className="flex justify-between text-sm">
-                    <span className="text-gray-700 dark:text-gray-300">
-                      {t("{{name}} (Note {{note}})", {
-                        name: item.name,
-                        note: item.note,
-                      })}
-                    </span>
-                    <span className="text-gray-900 dark:text-white">
-                      {formatCurrency(item.amount)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                <span className="text-gray-900 dark:text-white">
-                  {t("Total Operating Expenses")}
-                </span>
-                <span className="text-gray-900 dark:text-white">
-                  ({formatCurrency(data.expenses.total)})
-                </span>
-              </div>
-            </div>
-
-            {/* Net Profit */}
-            <div className="flex justify-between items-center text-lg font-bold py-4 border-y-2 border-gray-400 dark:border-gray-500 bg-blue-50 dark:bg-blue-900/30 -mx-6 px-6">
-              <div>
-                <span className="text-gray-900 dark:text-white">
-                  {t("NET PROFIT / (LOSS)")}
-                </span>
-                {data.revenue.total > 0 && (
-                  <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                    {t("({{percent}}% margin)", {
-                      percent: (
-                        (data.net_profit / data.revenue.total) *
-                        100
-                      ).toFixed(1),
-                    })}
-                  </span>
-                )}
-              </div>
-              <span className={`${data.net_profit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                {data.net_profit >= 0 ? "" : "("}
-                RM {formatCurrency(data.net_profit)}
-                {data.net_profit >= 0 ? "" : ")"}
-              </span>
-            </div>
-          </div>
+          <CoreStatementTable rows={getIncomeStatementLayoutRows(data)} />
 
           {/* Footer */}
           <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">

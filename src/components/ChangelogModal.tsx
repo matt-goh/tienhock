@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-10",
+    ms: "Balance Sheet dan Penyata Pendapatan Terperinci Tien Hock kini mengikut susunan laporan lama pada skrin dan PDF, dengan lajur nota berasingan dan subtotal. Balance Sheet menunjukkan bahagian Dibiayai Oleh, manakala Penyata Pendapatan mengasingkan CoGM, pendapatan lain, kos kewangan dan cukai. Jumlah akhir kekal sama.",
+    en: "Tien Hock's Balance Sheet and Detail Income Statement now follow the legacy report order on screen and in PDFs, with separate note columns and subtotals. The Balance Sheet shows the Financed By section, while the Income Statement separates CoGM, other income, finance costs and tax. Final totals are unchanged.",
+  },
+  {
+    date: "2026-09-10",
     ms: "Laporan CoGM Tien Hock dan PDF kini mengikut susunan laporan lama, dengan lajur nota berasingan, subtotal dan baris potongan stok akhir yang jelas. Kos pengangkutan ditunjukkan bersama bahan mentah, diikuti bahan pembungkusan dan gaji pekerja kilang. Jumlah CoGM kekal sama.",
     en: "Tien Hock's CoGM report and PDF now follow the legacy report order, with a separate note column, subtotals and clear closing-stock deductions. Freight appears with raw materials, followed by packing materials and factory wages. CoGM totals are unchanged.",
   },
