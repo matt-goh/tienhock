@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-12",
+    ms: "Pintasan 'This year' kini merangkumi 1 Januari hingga 31 Disember, supaya bayaran termasuk cek bertarikh kemudian dalam tahun yang sama turut dipaparkan.",
+    en: "The 'This year' shortcut now covers 1 January through 31 December, so payments including cheques dated later in the same year are included.",
+  },
+  {
     date: "2026-09-10",
     ms: "Balance Sheet dan Penyata Pendapatan Terperinci Tien Hock kini mengikut susunan laporan lama pada skrin dan PDF, dengan lajur nota berasingan dan subtotal. Balance Sheet menunjukkan bahagian Dibiayai Oleh, manakala Penyata Pendapatan mengasingkan CoGM, pendapatan lain, kos kewangan dan cukai. Jumlah akhir kekal sama.",
     en: "Tien Hock's Balance Sheet and Detail Income Statement now follow the legacy report order on screen and in PDFs, with separate note columns and subtotals. The Balance Sheet shows the Financed By section, while the Income Statement separates CoGM, other income, finance costs and tax. Final totals are unchanged.",
