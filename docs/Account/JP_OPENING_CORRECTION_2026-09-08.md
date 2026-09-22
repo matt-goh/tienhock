@@ -1,5 +1,8 @@
 # JP opening correction - 8 September 2026
 
+> **Latest status,19 September2026:** User confirmed the January JP707.45 / CR_JP8,952 debit split was intentional. Only JP's June opening has now been corrected to594.10 in dev; production pending. All12 monthly TB/BS checks balance and JP statement/ledger/ageing agree. January-June match the confirmed red totals. Earlier dev four-account application was overwritten by the production refresh; its old SSH script remains on hold. July/August flour questions remain. See [JP split correction](JP_SPLIT_CORRECTION_2026-09-19.md) for the separate new JP-only production paste and verification. Older statuses below are historical.
+
+
 **Status:** applied to development on 2026-09-08 at 11:58:36 Asia/Kuala_Lumpur;
 an immediate rerun made no changes. **Production applied by the user on 2026-09-08
 at 12:30:59 Asia/Kuala_Lumpur**, confirmed by the supplied `tienhock_prod` terminal output.

@@ -20,6 +20,31 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-22",
+    ms: "Nota kredit, debit dan bayaran balik Jelly Polly kini tidak lagi masuk ke dalam akaun Tien Hock. Catatan RM258.13 yang tersalah masuk telah dibetulkan; nota kredit serta baki invois dan pelanggan Jelly Polly dikekalkan. Untung Tien Hock mulai Ogos meningkat RM258.13, manakala CoGM kekal sama.",
+    en: "Jelly Polly credit, debit and refund notes no longer enter Tien Hock's accounts. Corrected the misplaced RM258.13 entry while preserving the Jelly Polly credit note and invoice/customer balances. Tien Hock profit from August increases by RM258.13; CoGM is unchanged.",
+  },
+  {
+    date: "2026-09-22",
+    ms: "Pembetulan baki JP dan empat akaun Januari Tien Hock telah disemak semula dengan rekod terkini. Trial Balance Januari ialah RM14,056,981.54 pada kedua-dua belah, dan CoGM Januari hingga Ogos sepadan dengan jadual yang dikemas kini pada 19 September. Perbezaan laporan yang lain masih dalam semakan.",
+    en: "Rechecked the JP balance and four January Tien Hock account corrections against the latest records. January Trial Balance totals are RM14,056,981.54 on each side, and January-August CoGM matches the schedule updated on 19 September. Other report differences remain under review.",
+  },
+  {
+    date: "2026-09-19",
+    ms: "Baki awal Jun bagi akaun JP dalam Tien Hock diselaraskan dengan pecahan baki Januari antara JP dan CR_JP yang disahkan. Amaun RM8,952 tidak lagi dikira dua kali mulai Jun; Trial Balance dan Balance Sheet kembali seimbang, dan Penyata Akaun JP sepadan dengan baki invois belum dibayar. Baki Januari dan untung kekal sama.",
+    en: "Aligned the June opening for the JP account in Tien Hock with the confirmed January split between JP and CR_JP. RM8,952 is no longer counted twice from June; the Trial Balance and Balance Sheet balance again, and JP statements agree with outstanding invoices. January balances and profit are unchanged.",
+  },
+  {
+    date: "2026-09-13",
+    ms: "Empat amaun Trial Balance Januari 2026 Tien Hock dibetulkan mengikut semakan pengguna: AC_TM, ACD_PCB, ACW_PCB dan MBTEL. Jumlah debit dan kredit Januari kini RM14,056,981.54. Belanja telefon berkurang RM358.30; pembetulan PCB yang sudah dibuat pada Ogos diambil kira supaya tidak dikira dua kali.",
+    en: "Corrected four Tien Hock January 2026 Trial Balance amounts from the user's review: AC_TM, ACD_PCB, ACW_PCB and MBTEL. January debit and credit totals are now RM14,056,981.54. Telephone expenses decrease by RM358.30; the PCB correction already made in August is accounted for so it is not counted twice.",
+  },
+  {
+    date: "2026-09-12",
+    ms: "Pintasan 'This year' kini merangkumi 1 Januari hingga 31 Disember, supaya bayaran termasuk cek bertarikh kemudian dalam tahun yang sama turut dipaparkan.",
+    en: "The 'This year' shortcut now covers 1 January through 31 December, so payments including cheques dated later in the same year are included.",
+  },
+  {
     date: "2026-09-10",
     ms: "Balance Sheet dan Penyata Pendapatan Terperinci Tien Hock kini mengikut susunan laporan lama pada skrin dan PDF, dengan lajur nota berasingan dan subtotal. Balance Sheet menunjukkan bahagian Dibiayai Oleh, manakala Penyata Pendapatan mengasingkan CoGM, pendapatan lain, kos kewangan dan cukai. Jumlah akhir kekal sama.",
     en: "Tien Hock's Balance Sheet and Detail Income Statement now follow the legacy report order on screen and in PDFs, with separate note columns and subtotals. The Balance Sheet shows the Financed By section, while the Income Statement separates CoGM, other income, finance costs and tax. Final totals are unchanged.",

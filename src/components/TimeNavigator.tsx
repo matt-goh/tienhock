@@ -137,8 +137,8 @@ const buildDefaultPresets = (): TimePreset[] => [
     key: "thisYear",
     label: "This year",
     getRange: () => ({
-      start: new Date(new Date().getFullYear(), 0, 1, 0, 0, 0, 0),
-      end: endOfDay(new Date()),
+      start: startOfYear(new Date()),
+      end: endOfYear(new Date()),
     }),
   },
 ];
