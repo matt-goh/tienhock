@@ -1,5 +1,8 @@
 # Jelly Polly adjustment isolation - 22 September 2026 KL
 
+**Production confirmed by user-supplied SSH output on 22 September 2026:** the combined correction completed with final `COMMIT`. JP June is DR594.10; January correction journal13499 (`JV2601-CORR-0913`) and August PCB offset journal13500 (`JV2608-PCB-OFFSET-0913`) were created. All four January account targets match. Misplaced journal `JCN-202608-0007` is cancelled; JP credit note `JP-CN-26-7` remains active with its journal link cleared. All12 monthly TB/BS differences are zero. January TB14,056,981.54/profit110,768.22; August TB18,247,230.64/profit436,996.33. Flour purchases remain19,765 and19,600. This confirms the SQL outcome, not full reconciliation of the remaining2,500/422.25/ARI31,495.55 questions. Execution timestamp was not included in the pasted output. Local evidence: `out/audit-2026-jp-ledger-isolation-2026-09-22/production-confirmation.txt`. Earlier pending/dev entries below are historical; the latest dev refresh was only rehearsed and rolled back.
+
+
 **Code fix implemented; dev data correction applied at 2026-09-22 05:44:07 KL and exact rerun verified at 2026-09-22 05:44:45. Production code deployment and SQL execution remain pending.** The user explicitly approved the proposed route fix and existing journal correction after the accounting effect was explained.
 
 ## Problem and resulting behaviour

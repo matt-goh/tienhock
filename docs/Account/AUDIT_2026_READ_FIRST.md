@@ -1,5 +1,8 @@
 # 2026 year-end audit and discrepancy reconciliation — READ FIRST
 
+**Production confirmed by user-supplied SSH output on 22 September 2026:** the combined correction completed with final `COMMIT`. JP June is DR594.10; January correction journal13499 (`JV2601-CORR-0913`) and August PCB offset journal13500 (`JV2608-PCB-OFFSET-0913`) were created. All four January account targets match. Misplaced journal `JCN-202608-0007` is cancelled; JP credit note `JP-CN-26-7` remains active with its journal link cleared. All12 monthly TB/BS differences are zero. January TB14,056,981.54/profit110,768.22; August TB18,247,230.64/profit436,996.33. Flour purchases remain19,765 and19,600. This confirms the SQL outcome, not full reconciliation of the remaining2,500/422.25/ARI31,495.55 questions. Execution timestamp was not included in the pasted output. Local evidence: `out/audit-2026-jp-ledger-isolation-2026-09-22/production-confirmation.txt`. Earlier pending/dev entries below are historical; the latest dev refresh was only rehearsed and rolled back.
+
+
 > **JP posting issue resolved in dev,22 September2026:** With explicit user approval, the shared adjustment route now excludes Jelly Polly documents from Tien Hock journal posting. The misplaced258.13 journal is cancelled while its JP credit note and invoice/customer effects stay intact. Dev applied05:44:07 KL, exact rerun05:44:45. Production deployment and SQL pending. Use the [latest combined production script and isolation verification](JP_ADJUSTMENT_ISOLATION_2026-09-22.md); older pending-permission statuses below are historical.
 
 
