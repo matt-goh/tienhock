@@ -1,5 +1,25 @@
 # 2026 year-end audit and discrepancy reconciliation — READ FIRST
 
+> **JP posting issue resolved in dev,22 September2026:** With explicit user approval, the shared adjustment route now excludes Jelly Polly documents from Tien Hock journal posting. The misplaced258.13 journal is cancelled while its JP credit note and invoice/customer effects stay intact. Dev applied05:44:07 KL, exact rerun05:44:45. Production deployment and SQL pending. Use the [latest combined production script and isolation verification](JP_ADJUSTMENT_ISOLATION_2026-09-22.md); older pending-permission statuses below are historical.
+
+
+> **Latest,22 September2026 KL:** User supplied corrected flour credit notes and a comparison sheet updated19 September. Both flour purchases already match; all eight CoGM values match. The sheet gives January TB14,056,981.54, superseding the prior handwritten targets. After another dev refresh, JP plus the confirmed January four-account correction were applied together and verified in dev; production pending. Older applied/hold/question statuses below are historical. See [latest evidence, remaining differences and combined production paste](CORE_CONFIRMATIONS_2026-09-22.md).
+
+
+> **Latest status,19 September2026:** User confirmed the January JP707.45 / CR_JP8,952 debit split was intentional. Only JP's June opening has now been corrected to594.10 in dev; production pending. All12 monthly TB/BS checks balance and JP statement/ledger/ageing agree. January-June match the confirmed red totals. Earlier dev four-account application was overwritten by the production refresh; its old SSH script remains on hold. July/August flour questions remain. See [JP split correction](JP_SPLIT_CORRECTION_2026-09-19.md) for the separate new JP-only production paste and verification. Older statuses below are historical.
+
+
+**Latest correction, 13 Sep 2026 KL:** the user supplied annotated January TB
+account rows and explicitly requested AC_TM, ACD_PCB, ACW_PCB and MBTEL corrections.
+They are applied in **dev**, with January TB now **RM14,056,981.54 per side**.
+Production is pending. January profit is **RM110,768.22**; the remaining difference
+to the legacy profit is **RM31,495.55** and ARI remains unchanged. The January
+correction includes an August offset so the existing PCB reclassification is not
+counted twice. February–August handwritten targets remain open; current residuals,
+verification and production SQL are in
+[the four-account correction](JANUARY_FOUR_ACCOUNT_CORRECTION_2026-09-13.md).
+This supersedes older requests below for the January target's account breakdown.
+
 **Created:** 2026-08-22  
 **Scope:** Tien Hock (TH) and Green Target (GT) accounting only; Jelly Polly is excluded.  
 **Working assumption:** prepare the year-end pack in December 2026 for the auditors' February 2027

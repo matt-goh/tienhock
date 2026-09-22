@@ -1,5 +1,26 @@
 # Core accounting report review - 9 September 2026 KL
 
+> **JP posting issue resolved in dev,22 September2026:** With explicit user approval, the shared adjustment route now excludes Jelly Polly documents from Tien Hock journal posting. The misplaced258.13 journal is cancelled while its JP credit note and invoice/customer effects stay intact. Dev applied05:44:07 KL, exact rerun05:44:45. Production deployment and SQL pending. Use the [latest combined production script and isolation verification](JP_ADJUSTMENT_ISOLATION_2026-09-22.md); older pending-permission statuses below are historical.
+
+
+> **Latest,22 September2026 KL:** User supplied corrected flour credit notes and a comparison sheet updated19 September. Both flour purchases already match; all eight CoGM values match. The sheet gives January TB14,056,981.54, superseding the prior handwritten targets. After another dev refresh, JP plus the confirmed January four-account correction were applied together and verified in dev; production pending. Older applied/hold/question statuses below are historical. See [latest evidence, remaining differences and combined production paste](CORE_CONFIRMATIONS_2026-09-22.md).
+
+
+> **Latest status,19 September2026:** User confirmed the January JP707.45 / CR_JP8,952 debit split was intentional. Only JP's June opening has now been corrected to594.10 in dev; production pending. All12 monthly TB/BS checks balance and JP statement/ledger/ageing agree. January-June match the confirmed red totals. Earlier dev four-account application was overwritten by the production refresh; its old SSH script remains on hold. July/August flour questions remain. See [JP split correction](JP_SPLIT_CORRECTION_2026-09-19.md) for the separate new JP-only production paste and verification. Older statuses below are historical.
+
+
+**Update, 13 Sep 2026 KL:** new user-annotated TB rows authorize corrections to
+AC_TM, ACD_PCB, ACW_PCB and MBTEL. Applied to dev: January TB now matches the
+confirmed **RM14,056,981.54**; Note 5 expenses are **RM142,737.59**, profit is
+**RM110,768.22** and Note 1 accruals are **RM268,547.69**. The RM358.30 clue is
+now resolved by the telephone correction; **RM31,495.55** remains unexplained
+against the photographed profit. ARI remains unchanged. The earlier August PCB
+correction is offset to prevent double counting. Production and later-month
+handwritten-target reconciliation are pending. See
+[the correction record and SQL](JANUARY_FOUR_ACCOUNT_CORRECTION_2026-09-13.md).
+The figures below retain the earlier review state; the old missing-January-row
+request and RM31,853.85 residual are superseded by this update.
+
 **Status:** stock correction applied to refreshed **dev at 11:32:52 KL** on
 9 September; **production applied by the user at 12:02:07 KL**, confirmed by supplied output and COMMIT. See the
 [correction and production instructions](CLOSING_STOCK_CORRECTION_2026-09-09.md).

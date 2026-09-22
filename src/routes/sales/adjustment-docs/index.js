@@ -470,8 +470,10 @@ async function applyAccountingForCreate(client, doc, invoice) {
   // Compute signed balance/credit deltas + post journal entry.
   const totalAmt = parseFloat(doc.totalamountpayable);
   const isInvoiceCreditType = invoice.paymenttype === "INVOICE";
-  // CN debits / DN credits the ORIGINAL sale's revenue ledger; JP documents
-  // post with their own source tag so one posted journal per source holds.
+  // Only Tien Hock documents post to the shared Tien Hock ledger.
+  // Jelly Polly keeps its invoice/customer updates without a shared journal.
+  /** @type {boolean} */
+  const shouldPostJournal = T.docs === DEFAULT_TABLES.docs;
   const journalOpts = {
     paymenttype: invoice.paymenttype,
     sourceType: T.docs.startsWith("jellypolly") ? "jp_adjustment" : "adjustment",
@@ -492,7 +494,9 @@ async function applyAccountingForCreate(client, doc, invoice) {
       if (isInvoiceCreditType) {
         await updateCustomerCredit(client, doc.customerid, -totalAmt);
       }
-      journalEntryId = await createCreditNoteJournalEntry(client, doc, journalOpts);
+      if (shouldPostJournal) {
+        journalEntryId = await createCreditNoteJournalEntry(client, doc, journalOpts);
+      }
       break;
     }
     case "debit_note": {
@@ -500,7 +504,9 @@ async function applyAccountingForCreate(client, doc, invoice) {
       if (isInvoiceCreditType) {
         await updateCustomerCredit(client, doc.customerid, totalAmt);
       }
-      journalEntryId = await createDebitNoteJournalEntry(client, doc, journalOpts);
+      if (shouldPostJournal) {
+        journalEntryId = await createDebitNoteJournalEntry(client, doc, journalOpts);
+      }
       break;
     }
     case "refund_note": {
@@ -509,7 +515,9 @@ async function applyAccountingForCreate(client, doc, invoice) {
       if (doc.paired_with_id) {
         await applyBalanceDelta(client, doc.original_invoice_id, totalAmt);
       }
-      journalEntryId = await createRefundNoteJournalEntry(client, doc, journalOpts);
+      if (shouldPostJournal) {
+        journalEntryId = await createRefundNoteJournalEntry(client, doc, journalOpts);
+      }
 
       // A standalone RN against an overpaid payment consumes the customer-owned
       // excess allocation of the owning receipt (remaining = amount − applied −

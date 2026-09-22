@@ -1,5 +1,42 @@
 # Migrations Applied & Removed — Ledger
 
+## Applied dev; production pending:22 Sep2026 - JP adjustment isolation
+
+User approved route and data correction. JP CN/DN/RN no longer create Tien Hock journals. Dev cleanup at05:44:07 KL cancels JCN-202608-0007 for258.13, retaining original lines and source history; active JP-CN-26-7 loses only its incorrect journal link. JP invoice, customer, payments and note amounts/status remain unchanged. Exact rerun05:44:45 is a no-op. All12 TB/BS balance; August profit436,996.33; CoGM unchanged. [Details](Account/JP_ADJUSTMENT_ISOLATION_2026-09-22.md).
+
+Deploy code first, then run the new local atomic bundle `out/audit-2026-jp-ledger-isolation-2026-09-22/paste-production-ssh.sh`, which also handles earlier confirmed corrections idempotently. Standalone SQL SHA-256 `9179134ed93bb874d05b80880870130e7dc10c8164ec4702ae74f533cf3f00da`; production bundle `5b4ba62bdb4085dc9a56b1d0af0e2b4739841630fdada5b3027787ac6e96751f`. No SQL commit or production access.
+
+
+## Applied dev; production pending:22 Sep2026 - latest confirmed core corrections
+
+Following a fresh production restore and updated19 September source sheet, reapplied JP June594.10 and the four confirmed January account corrections atomically. Dev05:33:34 KL; exact rerun05:34:07; new journals13484/13485. No flour adjustment: July net19,765 and August net19,600 already match confirmed source documents. All12 TB/BS balance; all eight CoGM targets match. January TB14,056,981.54; profit110,768.22. Other differences remain open. [Evidence and guards](Account/CORE_CONFIRMATIONS_2026-09-22.md).
+
+Local-only combined SQL/paste under `out/audit-2026-core-confirmation-2026-09-22-refreshed/`; SHA-256 `44318f8dc2eabd9cc01be8ad5bc176b2daedab191fd13ff2b1289ecbf4ef2024`. No SQL commit or production access. This latest source sheet resolves the prior four-account hold. A separate JP adjustment route fix is prepared but not applied pending permission.
+
+
+## Applied dev; production pending: 19 Sep 2026 - JP user-confirmed split
+
+Only JP's June opening changes from9,546.10 to594.10, retaining January JP707.45 and CR_JP8,952 (both debit) as explicitly confirmed by the user. Applied dev at13:05:52 KL; exact rerun at13:06:21 changes nothing. All12 actual monthly TB/BS checks balance; JP statement/ledger/ageing agree. Other openings, journals, imports, stock and mappings remain unchanged. No profit or CoGM change. Production remains pending.
+
+SQL and self-contained SSH paste are local-only under `out/audit-2026-jp-split-correction-2026-09-19/`; no SQL commit or production access. SHA-256: `2235cadc8c5a70228990aa4ad3bcfcaf780b79ef7eb583f2fbc11cc9f282ac2b`. [Details and verification](Account/JP_SPLIT_CORRECTION_2026-09-19.md).
+
+The13 September dev state below is historical and was overwritten by the user's production refresh. Its four-account script remains on hold; its result conflicts with the reaffirmed red January total. Do not confuse the new JP-only script with it.
+
+
+## Applied dev; production pending: 13 Sep 2026 - January four-account correction
+
+`2026-09-13_january_tb_four_account_correction.sql` adds `JV2601-CORR-0913`
+(31 January: DR ACW_PCB 5,785.25 / CR ACD_PCB 5,785.25; DR AC_TM 358.30 /
+CR MBTEL 358.30) from the user's annotated January TB. `JV2608-PCB-OFFSET-0913`
+(31 August: DR ACD_PCB / CR ACW_PCB 5,785.25) offsets the same correction already
+in `JV2608-12`, preserving August/later PCB balances. Original journals and all
+openings/imports/stock/mappings remain unchanged. Dev journal IDs 13211/13212;
+verified 2026-09-13 11:24:30 KL, exact rerun verified at 11:25:55 KL. January TB
+is RM14,056,981.54 per side; profit RM110,768.22. All twelve actual monthly report
+checks and protected-table fingerprints passed. Production has not been applied.
+SQL SHA-256: `23a27a1d82b7911efaae31a53f39565185213c5d86fc802b5751ffb95f357d30`.
+See [evidence, remaining differences and production steps](Account/JANUARY_FOUR_ACCOUNT_CORRECTION_2026-09-13.md).
+
 ## Applied dev + production: 9 Sep 2026 - confirmed monthly closing stock
 
 | File | What it does | Status |
