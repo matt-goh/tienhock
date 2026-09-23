@@ -4332,12 +4332,12 @@ export default function (pool, config) {
         throw new Error("This UUID is already assigned to another invoice");
       }
 
-      // Get Document returns both identity and current status, without a
-      // submission-age filter. Never infer validity merely from a long ID.
-      /** @type {{uuid?: string, status?: string, internalId?: string, typeName?: string, issuerTin?: string, receiverId?: string, totalPayableAmount?: number | string, longId?: string, submissionUid?: string, dateTimeValidated?: string}} */
+      // Use the same UUID lookup and metadata fields as /api/einvoice/submission/:uuid.
+      // Do not gate recovery on the optional receiverId metadata field.
+      /** @type {{uuid?: string, status?: string, internalId?: string, typeName?: string, issuerTin?: string, totalPayableAmount?: number | string, longId?: string, submissionUid?: string, dateTimeValidated?: string}} */
       const document = await apiClient.makeApiCall(
         "GET",
-        `/api/v1.0/documents/${encodeURIComponent(uuid.trim())}/raw`
+        `/api/v1.0/documents/${encodeURIComponent(uuid.trim())}/details`
       );
       if (document.uuid !== uuid.trim() || document.status?.toLowerCase() !== "valid") {
         throw new Error("MyInvois must confirm this UUID is a valid e-invoice before it can be linked");

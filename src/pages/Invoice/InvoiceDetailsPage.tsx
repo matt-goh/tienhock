@@ -4023,7 +4023,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <div className="text-sm text-amber-800 dark:text-amber-200">
                   <strong>{t("Warning:")}</strong>{" "}
                   {t(
-                    "MyInvois must confirm a valid invoice with the same bill number, supplier, buyer and total. This only restores the link; it does not change prices or submit a new e-Invoice."
+                    "MyInvois must confirm a valid invoice with the same bill number, supplier and total. This only restores the link; it does not change prices or submit a new e-Invoice."
                   )}
                 </div>
               </div>

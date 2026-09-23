@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-23",
+    ms: "Sambungan semula e-Invois kini menggunakan cara semakan UUID yang sama seperti semakan status sedia ada. Semakan tambahan nombor pendaftaran pembeli yang menghalang sambungan telah dibuang; nombor bil, pembekal, jumlah dan status sah masih disemak.",
+    en: "Restoring an e-Invoice link now uses the existing UUID status lookup. Removed the extra buyer registration check that blocked recovery; bill number, supplier, total and valid status are still checked.",
+  },
+  {
+    date: "2026-09-23",
     ms: "Invois Tien Hock kini boleh dipaut semula kepada e-Invois MyInvois yang sah menggunakan UUID, termasuk selepas 72 jam, selepas butiran bil disahkan sepadan. Tetapan sambungan MyInvois yang belum lengkap kini diterangkan dengan jelas. Nota kredit kini mempunyai pilihan item invois dan pengiraan beza harga untuk membetulkan harga terlebih caj.",
     en: "Tien Hock invoices can now be relinked to a valid MyInvois e-Invoice by UUID, including after 72 hours, once the bill details are verified. Missing MyInvois connection settings are now clearly explained. Credit notes now let you select an invoice item and calculate the price difference to correct an overcharge.",
   },
