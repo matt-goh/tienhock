@@ -1446,7 +1446,7 @@ const InvoiceDetailsPage: React.FC = () => {
         uuid: selectedUUID.trim(),
       });
 
-      toast.success(t("UUID updated successfully"));
+      toast.success(t("Valid e-Invoice linked successfully"));
       setIsEditingUUID(false);
       setSelectedUUID("");
 
@@ -1456,7 +1456,7 @@ const InvoiceDetailsPage: React.FC = () => {
       console.error("Error updating UUID:", error);
       const errorMessage =
         error instanceof Error ? error.message : t("Failed to update UUID");
-      toast.error(errorMessage);
+      toast.error(t(errorMessage));
     } finally {
       setIsUpdatingUUID(false);
     }
@@ -2683,7 +2683,7 @@ const InvoiceDetailsPage: React.FC = () => {
         {/* E-Invoice Details (conditional) */}
         {(invoiceData.uuid ||
           invoiceData.einvoice_status ||
-          invoiceData.consolidated_part_of) && (
+          invoiceData.consolidated_part_of || !isCancelled) && (
           <>
             <div className="border-t border-default-200 dark:border-gray-700"></div>
             <div className="p-4">
@@ -2806,23 +2806,18 @@ const InvoiceDetailsPage: React.FC = () => {
                   {t(zeroValueNote)}
                 </p>
               )}
-              {/* Manual UUID Edit - only when einvoice_status is null */}
-              {invoiceData.einvoice_status === null && (
-                <div className="mt-3 pt-3 border-t border-default-100 dark:border-gray-700 group flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                    {t("Manual UUID:")}
-                  </span>
-                  <span className="text-gray-600 dark:text-gray-400 font-mono text-sm">
-                    {invoiceData.uuid || t("Not set")}
-                  </span>
-                  <button
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded"
+              {!isCancelled && !invoiceData.is_consolidated &&
+                !invoiceData.consolidated_part_of &&
+                !["valid", "pending"].includes(invoiceData.einvoice_status || "") && (
+                <div className="mt-3 pt-3 border-t border-default-100 dark:border-gray-700">
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleOpenUUIDEdit}
-                    title={t("Set UUID manually")}
                     disabled={isLoading}
                   >
-                    <IconPencil size={12} className="text-sky-600 dark:text-sky-400" />
-                  </button>
+                    {t("Link existing e-Invoice")}
+                  </Button>
                 </div>
               )}
             </div>
@@ -3985,7 +3980,7 @@ const InvoiceDetailsPage: React.FC = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                {t("Set Manual UUID")}
+                {t("Link existing e-Invoice")}
               </h3>
               <button
                 onClick={() => {
@@ -4013,7 +4008,7 @@ const InvoiceDetailsPage: React.FC = () => {
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                 {t(
-                  "Enter the UUID from MyInvois if the system failed to record it automatically"
+                  "Enter the UUID of this bill's valid MyInvois document. Linking is available even after 72 hours and restores its e-Invoice status and share link."
                 )}
               </p>
             </div>
@@ -4028,7 +4023,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 <div className="text-sm text-amber-800 dark:text-amber-200">
                   <strong>{t("Warning:")}</strong>{" "}
                   {t(
-                    "Only use this if the e-invoice was successfully submitted to MyInvois but the UUID wasn't recorded. Setting an incorrect UUID may cause issues with e-invoice operations."
+                    "MyInvois must confirm a valid invoice with the same bill number, supplier, buyer and total. This only restores the link; it does not change prices or submit a new e-Invoice."
                   )}
                 </div>
               </div>
@@ -4050,7 +4045,7 @@ const InvoiceDetailsPage: React.FC = () => {
                 onClick={handleUUIDUpdate}
                 disabled={isUpdatingUUID || !selectedUUID.trim()}
               >
-                {isUpdatingUUID ? t("Updating...") : t("Set UUID")}
+                {isUpdatingUUID ? t("Verifying...") : t("Verify and link")}
               </Button>
             </div>
           </div>

@@ -1,5 +1,20 @@
 # Migrations Applied & Removed — Ledger
 
+## Removed 22 September 2026 - closing-stock and January four-account SQL
+
+Both files have now been removed by the user after production application was confirmed. Neither needs to be run again. This cleanup removes migration files only; it does not reverse any database correction.
+
+| Removed file | Production confirmation | Recovery |
+|---|---|---|
+| `2026-09-09_confirmed_closing_stock_jan_aug.sql` | Applied 9 September 2026 at 12:02:07 KL: 21 inserted rows, all 24 January-August values verified, final `COMMIT`. | Tracked in commit `1ba40682ba36230400fa4d0704ad662b735a07a9`; recover with `git show 1ba40682ba36230400fa4d0704ad662b735a07a9:dev/migrations/2026-09-09_confirmed_closing_stock_jan_aug.sql`. |
+| `2026-09-13_january_tb_four_account_correction.sql` | Applied through the combined production bundle confirmed 22 September 2026: journals13499/13500, four January targets verified, all12 TB/BS differences zero, final `COMMIT`. | Never committed. Correction SQL remains in the local combined bundle `out/audit-2026-jp-ledger-isolation-2026-09-22/production-corrections.sql` and its SSH paste; the four-account section follows the JP June correction. These local files are not recoverable from Git. |
+
+The application evidence, migration checksums and remaining reconciliation questions are retained below.
+
+
+**Production confirmed by user-supplied SSH output on 22 September 2026:** the combined correction completed with final `COMMIT`. JP June is DR594.10; January correction journal13499 (`JV2601-CORR-0913`) and August PCB offset journal13500 (`JV2608-PCB-OFFSET-0913`) were created. All four January account targets match. Misplaced journal `JCN-202608-0007` is cancelled; JP credit note `JP-CN-26-7` remains active with its journal link cleared. All12 monthly TB/BS differences are zero. January TB14,056,981.54/profit110,768.22; August TB18,247,230.64/profit436,996.33. Flour purchases remain19,765 and19,600. This confirms the SQL outcome, not full reconciliation of the remaining2,500/422.25/ARI31,495.55 questions. Execution timestamp was not included in the pasted output. Local evidence: `out/audit-2026-jp-ledger-isolation-2026-09-22/production-confirmation.txt`. Earlier pending/dev entries below are historical; the latest dev refresh was only rehearsed and rolled back.
+
+
 ## Applied dev; production pending:22 Sep2026 - JP adjustment isolation
 
 User approved route and data correction. JP CN/DN/RN no longer create Tien Hock journals. Dev cleanup at05:44:07 KL cancels JCN-202608-0007 for258.13, retaining original lines and source history; active JP-CN-26-7 loses only its incorrect journal link. JP invoice, customer, payments and note amounts/status remain unchanged. Exact rerun05:44:45 is a no-op. All12 TB/BS balance; August profit436,996.33; CoGM unchanged. [Details](Account/JP_ADJUSTMENT_ISOLATION_2026-09-22.md).
@@ -18,12 +33,12 @@ Local-only combined SQL/paste under `out/audit-2026-core-confirmation-2026-09-22
 
 Only JP's June opening changes from9,546.10 to594.10, retaining January JP707.45 and CR_JP8,952 (both debit) as explicitly confirmed by the user. Applied dev at13:05:52 KL; exact rerun at13:06:21 changes nothing. All12 actual monthly TB/BS checks balance; JP statement/ledger/ageing agree. Other openings, journals, imports, stock and mappings remain unchanged. No profit or CoGM change. Production remains pending.
 
-SQL and self-contained SSH paste are local-only under `out/audit-2026-jp-split-correction-2026-09-19/`; no SQL commit or production access. SHA-256: `2235cadc8c5a70228990aa4ad3bcfcaf780b79ef7eb583f2fbc11cc9f282ac2b`. [Details and verification](Account/JP_SPLIT_CORRECTION_2026-09-19.md).
+SQL and self-contained SSH paste are local-only under `out/audit-2026-jp-split-correction-2026-09-19/`; no SQL commit or production execution. SHA-256: `2235cadc8c5a70228990aa4ad3bcfcaf780b79ef7eb583f2fbc11cc9f282ac2b`. [Details and verification](Account/JP_SPLIT_CORRECTION_2026-09-19.md).
 
 The13 September dev state below is historical and was overwritten by the user's production refresh. Its four-account script remains on hold; its result conflicts with the reaffirmed red January total. Do not confuse the new JP-only script with it.
 
 
-## Applied dev; production pending: 13 Sep 2026 - January four-account correction
+## Applied dev + production; file removed 22 Sep 2026 - January four-account correction
 
 `2026-09-13_january_tb_four_account_correction.sql` adds `JV2601-CORR-0913`
 (31 January: DR ACW_PCB 5,785.25 / CR ACD_PCB 5,785.25; DR AC_TM 358.30 /
@@ -33,15 +48,17 @@ in `JV2608-12`, preserving August/later PCB balances. Original journals and all
 openings/imports/stock/mappings remain unchanged. Dev journal IDs 13211/13212;
 verified 2026-09-13 11:24:30 KL, exact rerun verified at 11:25:55 KL. January TB
 is RM14,056,981.54 per side; profit RM110,768.22. All twelve actual monthly report
-checks and protected-table fingerprints passed. Production has not been applied.
+checks and protected-table fingerprints passed. Production was subsequently applied through the
+combined bundle confirmed 22 September 2026 (journals13499/13500, final COMMIT).
+The user removed the uncommitted standalone SQL on 22 September; see recovery above.
 SQL SHA-256: `23a27a1d82b7911efaae31a53f39565185213c5d86fc802b5751ffb95f357d30`.
 See [evidence, remaining differences and production steps](Account/JANUARY_FOUR_ACCOUNT_CORRECTION_2026-09-13.md).
 
-## Applied dev + production: 9 Sep 2026 - confirmed monthly closing stock
+## Applied dev + production; file removed 22 Sep 2026 - confirmed monthly closing stock
 
 | File | What it does | Status |
 |------|--------------|--------|
-| `2026-09-09_confirmed_closing_stock_jan_aug.sql` | Inserts missing user-confirmed January-August 2026 values in `public.closing_stock_values`. Preserves matching rows/metadata and rejects conflicting amounts. Guards the reviewed context and verifies eight TB/BS/profit/CoGM controls before commit. No schema, opening, journal or allowance changes. | **Dev applied 2026-09-09 11:32:52 KL** after the user refreshed dev from production: 21 inserts, May's three rows unchanged, final COMMIT. Rollback rehearsal, conflict rejection, actual-handler comparison, unchanged protected-table fingerprints and zero-insert rerun passed. **Production applied by the user 2026-09-09 12:02:07 KL**: supplied tienhock_prod output confirms 21 inserts, 24 matching values, eight zero TB/BS differences and final COMMIT. File retained. |
+| `2026-09-09_confirmed_closing_stock_jan_aug.sql` | Inserts missing user-confirmed January-August 2026 values in `public.closing_stock_values`. Preserves matching rows/metadata and rejects conflicting amounts. Guards the reviewed context and verifies eight TB/BS/profit/CoGM controls before commit. No schema, opening, journal or allowance changes. | **Dev applied 2026-09-09 11:32:52 KL** after the user refreshed dev from production: 21 inserts, May's three rows unchanged, final COMMIT. Rollback rehearsal, conflict rejection, actual-handler comparison, unchanged protected-table fingerprints and zero-insert rerun passed. **Production applied by the user 2026-09-09 12:02:07 KL**: supplied tienhock_prod output confirms 21 inserts, 24 matching values, eight zero TB/BS differences and final COMMIT. File removed by the user on 22 September 2026; recover from Git as documented above. |
 
 Source, backup hashes, report results and shell-paste steps:
 [closing-stock correction](Account/CLOSING_STOCK_CORRECTION_2026-09-09.md).

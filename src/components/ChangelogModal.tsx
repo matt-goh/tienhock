@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-23",
+    ms: "Invois Tien Hock kini boleh dipaut semula kepada e-Invois MyInvois yang sah menggunakan UUID, termasuk selepas 72 jam, selepas butiran bil disahkan sepadan. Tetapan sambungan MyInvois yang belum lengkap kini diterangkan dengan jelas. Nota kredit kini mempunyai pilihan item invois dan pengiraan beza harga untuk membetulkan harga terlebih caj.",
+    en: "Tien Hock invoices can now be relinked to a valid MyInvois e-Invoice by UUID, including after 72 hours, once the bill details are verified. Missing MyInvois connection settings are now clearly explained. Credit notes now let you select an invoice item and calculate the price difference to correct an overcharge.",
+  },
+  {
     date: "2026-09-22",
     ms: "Nota kredit, debit dan bayaran balik Jelly Polly kini tidak lagi masuk ke dalam akaun Tien Hock. Catatan RM258.13 yang tersalah masuk telah dibetulkan; nota kredit serta baki invois dan pelanggan Jelly Polly dikekalkan. Untung Tien Hock mulai Ogos meningkat RM258.13, manakala CoGM kekal sama.",
     en: "Jelly Polly credit, debit and refund notes no longer enter Tien Hock's accounts. Corrected the misplaced RM258.13 entry while preserving the Jelly Polly credit note and invoice/customer balances. Tien Hock profit from August increases by RM258.13; CoGM is unchanged.",

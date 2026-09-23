@@ -15,6 +15,7 @@ import BackButton from "../../components/BackButton";
 import { useSmartBack } from "../../hooks/useSmartBack";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
+import CreditNotePriceCorrection from "../../components/AdjustmentDocs/CreditNotePriceCorrection";
 import { FormInput } from "../../components/FormComponents";
 import PillSelect, { PillSelectOption } from "../../components/PillSelect";
 import TimeNavigator, { type TimeRange } from "../../components/TimeNavigator";
@@ -261,6 +262,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   const [reason, setReason] = useState("");
   const [lines, setLines] = useState<LineState[]>([]);
   const [hasLineUserEdits, setHasLineUserEdits] = useState<boolean>(false);
+  const [hasPendingPriceCorrection, setHasPendingPriceCorrection] = useState<boolean>(false);
   const [rounding, setRounding] = useState<number>(0);
 
   // Refund-specific
@@ -574,6 +576,7 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
           setIssuePairedRefund(false);
         }
         setHasLineUserEdits(false);
+        setHasPendingPriceCorrection(false);
 
         // Pre-fill lines:
         //  - CN paired with RN: full original lines for full reversal/refund.
@@ -769,6 +772,9 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
   // ----- Validation -----
   const validate = (): string[] => {
     const errors: string[] = [];
+    if (hasPendingPriceCorrection) {
+      errors.push(t("Add the price correction to the line items, or clear the selected item before saving."));
+    }
     if (lines.length === 0) errors.push(t("At least one line item required"));
     const nonSub = lines.filter((l) => !l.issubtotal);
     if (nonSub.length === 0)
@@ -1421,6 +1427,22 @@ const AdjustmentDocsFormPage: React.FC<Props> = ({ company = "tienhock" }) => {
                 "Enter only the involved variance. For price corrections, use the involved quantity and per-item price difference. For returns, shortages, or damaged goods, use the involved quantity and original unit price. A Debit Note will add this amount to the invoice balance; a Credit Note will reduce it."
               )}
             </div>
+          )}
+          {company === "tienhock" && isCN && invoice && (
+            <CreditNotePriceCorrection
+              key={invoice.id}
+              products={invoice.products}
+              disabled={isSaving}
+              onEditingChange={setHasPendingPriceCorrection}
+              onAdd={(line: AdjustmentDocLine): void => {
+                const newLine: LineState = { ...line, uid: crypto.randomUUID() };
+                setLines((previous: LineState[]): LineState[] =>
+                  hasLineUserEdits ? [...previous, newLine] : [newLine]
+                );
+                setHasLineUserEdits(true);
+                if (!reason.trim()) setReason("Price correction");
+              }}
+            />
           )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-default-200 dark:divide-gray-700 border border-default-200 dark:border-gray-700 rounded-lg">
