@@ -4349,18 +4349,6 @@ export default function (pool, config) {
       ) {
         throw new Error("The MyInvois document does not match this invoice number, document type or supplier");
       }
-      const customerCheck = await client.query(
-        "SELECT id_number FROM customers WHERE id = $1",
-        [currentInvoice.customerid]
-      );
-      /** @type {string} */
-      const customerIdNumber = String(customerCheck.rows[0]?.id_number || "").trim();
-      if (
-        !customerIdNumber ||
-        String(document.receiverId || "").trim().toUpperCase() !== customerIdNumber.toUpperCase()
-      ) {
-        throw new Error("The MyInvois buyer registration number does not match this invoice's customer");
-      }
       if (
         document.totalPayableAmount == null ||
         !Number.isFinite(Number(document.totalPayableAmount)) ||
