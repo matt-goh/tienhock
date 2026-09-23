@@ -2,6 +2,7 @@
 import { Router } from "express";
 import { submitInvoicesToMyInvois } from "../../../utils/invoice/einvoice/serverSubmissionUtil.js";
 import EInvoiceApiClientFactory from "../../../utils/invoice/einvoice/EInvoiceApiClientFactory.js";
+import { TIENHOCK_INFO } from "../../../utils/invoice/einvoice/companyInfo.js";
 import {
   addMoney,
   multiplyMoney,
@@ -4245,13 +4246,35 @@ export default function (pool, config) {
     }
   });
 
-  // PUT /api/invoices/:id/uuid - Update invoice UUID manually
+  // Restore a lost link to an existing valid document; this is not a submission
+  // or cancellation, so the MyInvois cancellation window does not apply.
   router.put("/:id/uuid", async (req, res) => {
     const { id } = req.params;
     const { uuid } = req.body;
 
-    if (!uuid || !uuid.trim()) {
-      return res.status(400).json({ message: "UUID is required" });
+    if (typeof uuid !== "string" || !/^[A-Za-z0-9]{1,64}$/.test(uuid.trim())) {
+      return res.status(400).json({ message: "Enter a valid MyInvois UUID" });
+    }
+
+    // Check the actual API client before starting a database transaction.
+    // Local development can run without MyInvois configured.
+    try {
+      /** @type {URL} */
+      const apiUrl = new URL(apiClient.baseUrl);
+      if (apiUrl.protocol !== "https:" || !apiUrl.hostname) {
+        throw new Error("Invalid MyInvois API URL");
+      }
+    } catch {
+      return res.status(503).json({
+        code: "MYINVOIS_NOT_CONFIGURED",
+        message: "MyInvois is not configured on this server. Set MYINVOIS_API_BASE_URL to a complete HTTPS API address and restart the backend.",
+      });
+    }
+    if (!apiClient.clientId?.trim() || !apiClient.clientSecret?.trim()) {
+      return res.status(503).json({
+        code: "MYINVOIS_NOT_CONFIGURED",
+        message: "MyInvois credentials are missing on this server. Set MYINVOIS_CLIENT_ID and MYINVOIS_CLIENT_SECRET for the selected environment and restart the backend.",
+      });
     }
 
     const client = await pool.connect();
@@ -4259,9 +4282,16 @@ export default function (pool, config) {
     try {
       await client.query("BEGIN");
 
+      // Serialize manual links for the same UUID as well as the invoice row.
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+        `invoice-uuid:${uuid.trim()}`,
+      ]);
+
       // Check if invoice exists and get current status
       const invoiceCheck = await client.query(
-        "SELECT invoice_status, einvoice_status FROM invoices WHERE id = $1 FOR UPDATE",
+        `SELECT invoice_status, einvoice_status, uuid, is_consolidated,
+                customerid, totalamountpayable
+           FROM invoices WHERE id = $1 FOR UPDATE`,
         [id]
       );
 
@@ -4271,16 +4301,25 @@ export default function (pool, config) {
 
       const currentInvoice = invoiceCheck.rows[0];
 
-      // Only allow UUID setting for invoices with null einvoice_status
-      if (currentInvoice.einvoice_status !== null) {
+      if (["valid", "pending"].includes(currentInvoice.einvoice_status)) {
         throw new Error(
-          "Can only set UUID for invoices with null e-invoice status"
+          "This invoice already has an active e-invoice. Refresh its status instead."
         );
       }
 
       // Prevent changes for cancelled invoices
       if (currentInvoice.invoice_status === "cancelled") {
         throw new Error("Cannot set UUID for cancelled invoices");
+      }
+
+      const consolidatedCheck = await client.query(
+        `SELECT id FROM invoices
+          WHERE is_consolidated = true AND invoice_status != 'cancelled'
+            AND consolidated_invoices::jsonb ? $1 LIMIT 1`,
+        [id]
+      );
+      if (currentInvoice.is_consolidated || consolidatedCheck.rows.length > 0) {
+        throw new Error("Cannot link an individual UUID to a consolidated invoice");
       }
 
       // Check if UUID already exists in system
@@ -4293,15 +4332,62 @@ export default function (pool, config) {
         throw new Error("This UUID is already assigned to another invoice");
       }
 
+      // Get Document returns both identity and current status, without a
+      // submission-age filter. Never infer validity merely from a long ID.
+      /** @type {{uuid?: string, status?: string, internalId?: string, typeName?: string, issuerTin?: string, receiverId?: string, totalPayableAmount?: number | string, longId?: string, submissionUid?: string, dateTimeValidated?: string}} */
+      const document = await apiClient.makeApiCall(
+        "GET",
+        `/api/v1.0/documents/${encodeURIComponent(uuid.trim())}/raw`
+      );
+      if (document.uuid !== uuid.trim() || document.status?.toLowerCase() !== "valid") {
+        throw new Error("MyInvois must confirm this UUID is a valid e-invoice before it can be linked");
+      }
+      if (
+        document.internalId !== id ||
+        document.typeName?.toLowerCase() !== "invoice" ||
+        document.issuerTin !== TIENHOCK_INFO.tin
+      ) {
+        throw new Error("The MyInvois document does not match this invoice number, document type or supplier");
+      }
+      const customerCheck = await client.query(
+        "SELECT id_number FROM customers WHERE id = $1",
+        [currentInvoice.customerid]
+      );
+      /** @type {string} */
+      const customerIdNumber = String(customerCheck.rows[0]?.id_number || "").trim();
+      if (
+        !customerIdNumber ||
+        String(document.receiverId || "").trim().toUpperCase() !== customerIdNumber.toUpperCase()
+      ) {
+        throw new Error("The MyInvois buyer registration number does not match this invoice's customer");
+      }
+      if (
+        document.totalPayableAmount == null ||
+        !Number.isFinite(Number(document.totalPayableAmount)) ||
+        Math.abs(Number(document.totalPayableAmount) - Number(currentInvoice.totalamountpayable)) > 0.005
+      ) {
+        throw new Error("The MyInvois total differs from this invoice. Reconcile the original billed amount before linking or issuing a Credit Note to avoid adjusting it twice.");
+      }
+      if (
+        !document.longId || !document.submissionUid || !document.dateTimeValidated ||
+        !Number.isFinite(Date.parse(document.dateTimeValidated))
+      ) {
+        throw new Error("MyInvois returned incomplete validation details. No link was saved.");
+      }
+
       // Update the invoice
       const updateQuery = `
       UPDATE invoices 
-      SET uuid = $1
-      WHERE id = $2
+      SET uuid = $1, submission_uid = $2, long_id = $3,
+          datetime_validated = $4, einvoice_status = 'valid'
+      WHERE id = $5
       RETURNING id
     `;
 
-      const result = await client.query(updateQuery, [uuid.trim(), id]);
+      const result = await client.query(updateQuery, [
+        uuid.trim(), document.submissionUid, document.longId,
+        document.dateTimeValidated, id,
+      ]);
 
       if (result.rows.length === 0) {
         throw new Error("Failed to update invoice");
@@ -4310,7 +4396,7 @@ export default function (pool, config) {
       await client.query("COMMIT");
 
       res.json({
-        message: "UUID updated successfully",
+        message: "Valid e-Invoice linked successfully",
         invoiceId: id,
         uuid: uuid.trim(),
       });
