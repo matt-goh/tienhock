@@ -1,4 +1,7 @@
 {
+  "Clear bank-in amount": "Kosongkan amaun bank-in",
+  "Use full remaining amount": "Guna semua baki",
+  "Use full remaining amount: RM {{amount}}": "Guna semua baki: RM {{amount}}",
   "This journal is linked to a Cash Bank-In and cannot be edited here. To correct it, cancel the bank-in from Cash Bank-In and create a replacement with the correct details and a new RV number.": "Journal ini berkait dengan Cash Bank-In dan tidak boleh diedit di sini. Untuk pembetulan, batal bank-in di halaman Cash Bank-In dan buat pengganti dengan butiran yang betul serta nombor RV baharu.",
   "ADD: OTHER OPERATING INCOME": "TAMBAH: PENDAPATAN OPERASI LAIN",
   "AMOUNT DUE TO DIRECTOR": "AMAUN TERHUTANG KEPADA PENGARAH",

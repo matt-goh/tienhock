@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-24",
+    ms: "Dalam Cash Bank-In, klik baki bagi tarikh jualan atau resit untuk mengisi amaun Bank In dengan semua baki. Resit juga dipilih secara automatik. Klik butang × untuk mengosongkan amaun dan membuang pilihan resit; amaun masih boleh diubah sebelum dipos.",
+    en: "In Cash Bank-In, click a sales-date or receipt balance to fill the Bank In amount with the full remaining balance. Receipts are also selected automatically. Click × to clear an amount and unselect its receipt; you can still adjust amounts before posting.",
+  },
+  {
+    date: "2026-09-24",
     ms: "Journal yang berkait dengan Cash Bank-In kini tidak boleh diedit terus supaya amaun bank-in dan baki tunai kekal sepadan. Untuk pembetulan, batal bank-in di halaman Cash Bank-In dan buat pengganti dengan butiran yang betul serta nombor RV baharu.",
     en: "Journals linked to Cash Bank-In can no longer be edited directly, keeping bank-in amounts and outstanding cash in step. To correct a bank-in, cancel it from Cash Bank-In and create a replacement with the correct details and a new RV number.",
   },
