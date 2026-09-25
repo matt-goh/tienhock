@@ -797,8 +797,13 @@ const JournalEntryListContent: React.FC<JournalEntryListContentProps> = ({
                                 e.stopPropagation();
                                 handleEdit(entry);
                               }}
-                              className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300"
-                              title={t("Edit")}
+                              disabled={!isGreenTarget && (entry.is_bank_in || entry.source_type === "bank_in")}
+                              className="text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 disabled:opacity-40 disabled:cursor-not-allowed"
+                              title={
+                                !isGreenTarget && (entry.is_bank_in || entry.source_type === "bank_in")
+                                  ? t("This journal is linked to a Cash Bank-In and cannot be edited here. To correct it, cancel the bank-in from Cash Bank-In and create a replacement with the correct details and a new RV number.")
+                                  : t("Edit")
+                              }
                             >
                               <IconPencil size={18} />
                             </button>

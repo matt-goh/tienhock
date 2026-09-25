@@ -1084,6 +1084,11 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       const response = await api.get(`${apiBase}/journal-entries/${id}`);
       const entry = response as JournalEntry;
 
+      if (!isGreenTarget && (entry.is_bank_in || entry.source_type === "bank_in")) {
+        setError(t("This journal is linked to a Cash Bank-In and cannot be edited here. To correct it, cancel the bank-in from Cash Bank-In and create a replacement with the correct details and a new RV number."));
+        return;
+      }
+
       const lines: JournalLineFormData[] = (entry.lines || []).map((line) => ({
         id: line.id,
         line_number: line.line_number,
@@ -1135,7 +1140,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [id, apiBase, t]);
+  }, [id, apiBase, isGreenTarget, t]);
 
   // Initial data loading
   useEffect(() => {
@@ -1497,7 +1502,7 @@ const JournalEntryPage: React.FC<JournalEntryPageProps> = ({
       const errorMessage =
         err instanceof Error ? err.message : t("Unknown error");
       toast.error(
-        errorMessage ||
+        t(errorMessage) ||
           t(
             isEditMode
               ? "Failed to update journal entry"
