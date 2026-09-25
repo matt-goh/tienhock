@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-24",
+    ms: "Journal yang berkait dengan Cash Bank-In kini tidak boleh diedit terus supaya amaun bank-in dan baki tunai kekal sepadan. Untuk pembetulan, batal bank-in di halaman Cash Bank-In dan buat pengganti dengan butiran yang betul serta nombor RV baharu.",
+    en: "Journals linked to Cash Bank-In can no longer be edited directly, keeping bank-in amounts and outstanding cash in step. To correct a bank-in, cancel it from Cash Bank-In and create a replacement with the correct details and a new RV number.",
+  },
+  {
     date: "2026-09-23",
     ms: "Sambungan semula e-Invois kini menggunakan cara semakan UUID yang sama seperti semakan status sedia ada. Semakan tambahan nombor pendaftaran pembeli yang menghalang sambungan telah dibuang; nombor bil, pembekal, jumlah dan status sah masih disemak.",
     en: "Restoring an e-Invoice link now uses the existing UUID status lookup. Removed the extra buyer registration check that blocked recovery; bill number, supplier, total and valid status are still checked.",

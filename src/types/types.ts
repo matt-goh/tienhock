@@ -1220,6 +1220,7 @@ export interface JournalEntry {
   display_entry_type?: JournalEntryType | null; // Semantic legacy type; falls back to entry_type
   entry_type_name?: string | null;
   is_legacy_import?: boolean;
+  is_bank_in?: boolean; // Linked Cash Bank-In journals cannot be edited directly
   source_type?: string | null;
   source_id?: string | null;
   source?: JournalSourceLink | null; // Resolved source document link (GET /:id only)

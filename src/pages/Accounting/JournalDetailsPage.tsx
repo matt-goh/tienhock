@@ -420,18 +420,20 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
     );
   }
 
-  // Any active, non-migration Tien Hock journal is editable. Editing a
-  // system-owned journal
+  // Active Tien Hock journals except migrations and linked bank-ins are editable.
+  // Editing another system-owned journal
   // (sales/purchase/receipt/payment/adjustment/voucher) DETACHES it from its source
   // on the server — it then shows the "Manual" badge and is managed by hand.
   // Migration (IMP) journals stay immutable and cannot be edited or cancelled.
   const isLegacyImport: boolean = isLegacyImportEntry(entry);
+  const isBankIn: boolean =
+    !isGreenTarget && Boolean(entry.is_bank_in || entry.source_type === "bank_in");
   const visibleReference: string = getVisibleReference(entry);
   const displayEntryType: string = getDisplayEntryType(entry);
   // A source-owned journal is maintained by the document that created it, so
   // neither server cancels it directly (Tien Hock answers a structured 409;
   // Green Target already refused) — cancel through the source document. Tien
-  // Hock still allows a hand edit (it detaches the journal); Green Target
+  // Hock allows hand edits except for linked bank-ins; Green Target
   // refuses edits of source-owned journals outright.
   const isSourceOwned: boolean = Boolean(entry.source_type);
   const canEdit: boolean = entry.status !== "cancelled" && !isLegacyImport;
@@ -554,9 +556,11 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
                   color="sky"
                   icon={IconPencil}
                   iconPosition="left"
-                  disabled={isProcessing || (isGreenTarget && isSourceOwned)}
+                  disabled={isProcessing || isBankIn || (isGreenTarget && isSourceOwned)}
                   title={
-                    isGreenTarget && isSourceOwned
+                    isBankIn
+                      ? t("This journal is linked to a Cash Bank-In and cannot be edited here. To correct it, cancel the bank-in from Cash Bank-In and create a replacement with the correct details and a new RV number.")
+                      : isGreenTarget && isSourceOwned
                       ? t("This journal is owned by its source document - edit that document instead.")
                       : undefined
                   }
@@ -616,6 +620,11 @@ const JournalDetailsContent: React.FC<JournalDetailsContentProps> = ({
 
         {/* Line Items */}
         <div className="p-6">
+          {isBankIn && entry.status !== "cancelled" && (
+            <div className="mb-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-200">
+              {t("This journal is linked to a Cash Bank-In and cannot be edited here. To correct it, cancel the bank-in from Cash Bank-In and create a replacement with the correct details and a new RV number.")}
+            </div>
+          )}
           {entry.cheque_no && (
             <ChequeReuseWarning
               chequeNo={entry.cheque_no}

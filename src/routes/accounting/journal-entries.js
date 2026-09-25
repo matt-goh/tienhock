@@ -16,6 +16,11 @@ const PHYSICAL_CHEQUE_ENTRY_TYPE = "C";
 const LEGACY_IMPORT_SQL =
   `(je.entry_type = '${LEGACY_IMPORT_ENTRY_TYPE}' OR ` +
   `je.source_type = '${LEGACY_IMPORT_SOURCE_TYPE}')`;
+// Check the owning row too: older bank-ins may not have source_type set.
+/** @type {string} */
+const BANK_IN_SQL = `(COALESCE(je.source_type = 'bank_in', false) OR EXISTS (
+  SELECT 1 FROM bank_ins bi WHERE bi.journal_entry_id = je.id
+))`;
 // Every journal type may carry a repeatable auditor-facing display_reference
 // (legacy imports, bank-in RVs, receipts keyed with the real payment reference
 // like T130726, adjustment doc numbers, ...). reference_no stays the hidden
@@ -378,6 +383,7 @@ export default function (pool) {
           ${DISPLAY_ENTRY_TYPE_SQL} AS display_entry_type,
           je.legacy_entry_type,
           ${LEGACY_IMPORT_SQL} AS is_legacy_import,
+          ${BANK_IN_SQL} AS is_bank_in,
           je.display_reference,
           je.source_type,
           je.entry_date,
@@ -442,10 +448,10 @@ export default function (pool) {
         paramIndex++;
       }
 
-      // Get total count
+      // Match the outer FROM; the bank-in ownership check has its own FROM.
       const countQuery = query.replace(
-        /SELECT[\s\S]*?FROM/,
-        "SELECT COUNT(*) as total FROM"
+        /SELECT[\s\S]*?FROM journal_entries je/,
+        "SELECT COUNT(*) as total FROM journal_entries je"
       );
       const countResult = await pool.query(countQuery, params);
       const total = parseInt(countResult.rows[0].total);
@@ -616,6 +622,7 @@ export default function (pool) {
           ${DISPLAY_ENTRY_TYPE_SQL} AS display_entry_type,
           je.legacy_entry_type,
           ${LEGACY_IMPORT_SQL} AS is_legacy_import,
+          ${BANK_IN_SQL} AS is_bank_in,
           je.display_reference,
           je.source_type,
           je.source_id,
@@ -1140,9 +1147,10 @@ export default function (pool) {
 
       // Check if entry exists and is editable
       const checkQuery = `
-        SELECT status, entry_type, source_type, description, entry_date
-        FROM journal_entries
-        WHERE id = $1
+        SELECT je.status, je.entry_type, je.source_type, je.description, je.entry_date,
+               ${BANK_IN_SQL} AS is_bank_in
+        FROM journal_entries je
+        WHERE je.id = $1
         FOR UPDATE`;
       const checkResult = await client.query(checkQuery, [id]);
 
@@ -1166,6 +1174,16 @@ export default function (pool) {
         });
       }
 
+      // Bank-in allocations, not journal lines, determine unbanked cash.
+      // A hand edit (even an existing manual override) would leave them stale.
+      if (existing.is_bank_in) {
+        await client.query("ROLLBACK");
+        return res.status(409).json({
+          code: "BANK_IN_JOURNAL_EDIT_BLOCKED",
+          message: "This journal is linked to a Cash Bank-In and cannot be edited here. To correct it, cancel the bank-in from Cash Bank-In and create a replacement with the correct details and a new RV number.",
+        });
+      }
+
       // Both dates are checked: the entry may be neither rewritten where it
       // already sits in locked history nor moved into it from the open period.
       assertTienHockAccountingDateUnlocked(
@@ -1185,7 +1203,7 @@ export default function (pool) {
       // it (cancelSalesJournalEntry filters 'S', cancelGPJournalEntry 'GP',
       // cancelSupplierPaymentJournalEntry 'PAY', cancelAdjustmentJournalEntry
       // CN/DN/RN, …). Plain manual journals ('J' …) stay fully free-form; legacy
-      // IMP is blocked above. See syncSalesJournalEntry / updateGPJournalEntry.
+      // IMP and linked bank-ins are blocked above. See syncSalesJournalEntry / updateGPJournalEntry.
       // The entry type alone does NOT make a journal source-owned: users key
       // manual journals with system-looking types (e.g. a CN created straight
       // from the Journal page), and those stay free-form so the type can be
