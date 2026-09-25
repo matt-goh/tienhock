@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
-import { IconBuildingBank, IconPlus } from "@tabler/icons-react";
+import { IconBuildingBank, IconPlus, IconX } from "@tabler/icons-react";
 import Button from "../../components/Button";
 import Checkbox from "../../components/Checkbox";
 import { FormInput, FormListbox } from "../../components/FormComponents";
@@ -588,23 +588,54 @@ const BankInPage: React.FC = () => {
                               <td className="px-3 py-1.5 text-right">{fmtAmt(pool.collected)}</td>
                               <td className="px-3 py-1.5 text-right">{fmtAmt(pool.banked)}</td>
                               <td className="px-3 py-1.5 text-right font-medium">
-                                {fmtAmt(pool.remaining)}
+                                <button
+                                  type="button"
+                                  disabled={isSubmitting || !(pool.remaining > 0.005)}
+                                  className="rounded px-1 py-1 text-sky-600 underline decoration-dotted underline-offset-4 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:text-default-400 disabled:no-underline dark:text-sky-400 dark:hover:text-sky-300"
+                                  title={t("Use full remaining amount")}
+                                  aria-label={t("Use full remaining amount: RM {{amount}}", { amount: fmtAmt(pool.remaining) })}
+                                  onClick={(): void => {
+                                    setPoolAmounts((previous: Record<string, string>): Record<string, string> => ({
+                                      ...previous,
+                                      [pool.source_date]: Number(pool.remaining).toFixed(2),
+                                    }));
+                                  }}
+                                >
+                                  {fmtAmt(pool.remaining)}
+                                </button>
                               </td>
                               <td className="px-3 py-1.5 text-right">
-                                <input
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  className={inputCls}
-                                  value={poolAmounts[pool.source_date] || ""}
-                                  placeholder="0.00"
-                                  onChange={(e) =>
-                                    setPoolAmounts({
-                                      ...poolAmounts,
-                                      [pool.source_date]: e.target.value,
-                                    })
-                                  }
-                                />
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={isSubmitting || !poolAmounts[pool.source_date]}
+                                    className="shrink-0 rounded p-1 text-default-400 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-30 disabled:cursor-not-allowed dark:hover:text-rose-400"
+                                    title={t("Clear bank-in amount")}
+                                    aria-label={t("Clear bank-in amount")}
+                                    onClick={(): void => {
+                                      setPoolAmounts((previous: Record<string, string>): Record<string, string> => ({
+                                        ...previous,
+                                        [pool.source_date]: "",
+                                      }));
+                                    }}
+                                  >
+                                    <IconX size={16} aria-hidden="true" />
+                                  </button>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    className={inputCls}
+                                    value={poolAmounts[pool.source_date] || ""}
+                                    placeholder="0.00"
+                                    onChange={(e) =>
+                                      setPoolAmounts({
+                                        ...poolAmounts,
+                                        [pool.source_date]: e.target.value,
+                                      })
+                                    }
+                                  />
+                                </div>
                               </td>
                             </tr>
                           ))}
@@ -657,19 +688,60 @@ const BankInPage: React.FC = () => {
                               )}
                             </td>
                             <td className="px-3 py-1.5">{r.customers || "-"}</td>
-                            <td className="px-3 py-1.5 text-right font-medium">{fmtAmt(r.remaining)}</td>
+                            <td className="px-3 py-1.5 text-right font-medium">
+                              <button
+                                type="button"
+                                disabled={isSubmitting || !(r.remaining > 0.005)}
+                                className="rounded px-1 py-1 text-sky-600 underline decoration-dotted underline-offset-4 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed disabled:text-default-400 disabled:no-underline dark:text-sky-400 dark:hover:text-sky-300"
+                                title={t("Use full remaining amount")}
+                                aria-label={t("Use full remaining amount: RM {{amount}}", { amount: fmtAmt(r.remaining) })}
+                                onClick={(): void => {
+                                  setReceiptChecked((previous: Record<number, boolean>): Record<number, boolean> => ({
+                                    ...previous,
+                                    [r.id]: true,
+                                  }));
+                                  setReceiptAmounts((previous: Record<number, string>): Record<number, string> => ({
+                                    ...previous,
+                                    [r.id]: Number(r.remaining).toFixed(2),
+                                  }));
+                                }}
+                              >
+                                {fmtAmt(r.remaining)}
+                              </button>
+                            </td>
                             <td className="px-3 py-1.5 text-right">
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className={inputCls}
-                                disabled={!receiptChecked[r.id]}
-                                value={receiptAmounts[r.id] ?? String(r.remaining)}
-                                onChange={(e) =>
-                                  setReceiptAmounts({ ...receiptAmounts, [r.id]: e.target.value })
-                                }
-                              />
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  type="button"
+                                  disabled={isSubmitting || (!receiptChecked[r.id] && !(receiptAmounts[r.id] ?? String(r.remaining)))}
+                                  className="shrink-0 rounded p-1 text-default-400 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:opacity-30 disabled:cursor-not-allowed dark:hover:text-rose-400"
+                                  title={t("Clear bank-in amount")}
+                                  aria-label={t("Clear bank-in amount")}
+                                  onClick={(): void => {
+                                    setReceiptChecked((previous: Record<number, boolean>): Record<number, boolean> => ({
+                                      ...previous,
+                                      [r.id]: false,
+                                    }));
+                                    setReceiptAmounts((previous: Record<number, string>): Record<number, string> => ({
+                                      ...previous,
+                                      [r.id]: "",
+                                    }));
+                                  }}
+                                >
+                                  <IconX size={16} aria-hidden="true" />
+                                </button>
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  className={inputCls}
+                                  disabled={!receiptChecked[r.id]}
+                                  value={receiptAmounts[r.id] ?? String(r.remaining)}
+                                  onChange={(e) =>
+                                    setReceiptAmounts({ ...receiptAmounts, [r.id]: e.target.value })
+                                  }
+                                />
+                              </div>
                             </td>
                           </tr>
                         ))}
