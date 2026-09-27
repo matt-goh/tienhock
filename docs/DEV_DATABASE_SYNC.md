@@ -75,8 +75,13 @@ Any local work you need to keep should use `dev.bat` instead.
 Neither launcher refreshes data on code reload. Both use the application server's
 production-only scheduling rule: invoice status updates, automatic consolidations,
 e-Invoice clearing, daily backups, and S3 backup maintenance are disabled in dev.
-Manual operations remain available, including manual MyInvois actions using the
-credentials already configured locally.
+The startup and delayed pending-invoice checks for Tien Hock and Green Target also
+run only when `NODE_ENV=production`, as does startup e-Invoice clearing. Both
+automatic invoice and adjustment consolidation workers refuse to run outside
+production, regardless of the consolidation settings copied from production.
+The endpoint for scheduling pending checks is production-only; immediate manual
+status checks, submissions and consolidations remain available using the
+MyInvois credentials already configured locally.
 
 ## Failure and cleanup behavior
 
@@ -142,3 +147,8 @@ Use disposable local data for the destructive/interruption scenarios below.
     a production process restart. Normal backup lists and S3 objects stay unchanged.
 11. Leave development running across a scheduled-job time: no business/backup cron
     job should run. Production retains all five existing schedules.
+12. Start or reload development with pending invoices: neither pending-invoice
+    initialization message nor startup e-Invoice clearing should appear after
+    15 seconds. Updating an invoice to pending must not schedule a five-minute
+    background check. Manual status checks should still work, while
+    `POST /api/invoices/schedule-pending-checks` returns 403 outside production.

@@ -35,8 +35,11 @@ const pendingInvoiceTimeouts = new Map();
  * @param {string} invoiceId - The invoice ID to check
  * @param {object} pool - Database connection pool
  * @param {object} apiClient - E-invoice API client
+ * @returns {void}
  */
 const schedulePendingInvoiceCheck = (invoiceId, pool, apiClient) => {
+  if (process.env.NODE_ENV !== "production") return;
+
   // Clear existing timeout if any
   if (pendingInvoiceTimeouts.has(invoiceId)) {
     clearTimeout(pendingInvoiceTimeouts.get(invoiceId));
@@ -220,6 +223,8 @@ const handleEInvoiceStatusChange = (invoiceId, newStatus, pool, apiClient) => {
  * @returns {Promise<number>} Number of invoices cleared
  */
 const clearInvalidEInvoicesForNonEligibleCustomers = async (pool) => {
+  if (process.env.NODE_ENV !== "production") return 0;
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -368,15 +373,17 @@ export default function (pool, config) {
     }
   };
 
-  // Initialize on server start (delayed to allow DB to fully start)
-  setTimeout(() => {
-    initializePendingInvoiceChecks();
+  // Only production starts background checks or clears copied invoice data.
+  if (process.env.NODE_ENV === "production") {
+    setTimeout(() => {
+      initializePendingInvoiceChecks();
 
-    // Clear invalid e-invoices for non-eligible customers
-    clearInvalidEInvoicesForNonEligibleCustomers(pool).catch((error) =>
-      console.error("[E-Invoice Clearing] Error in initial clearing:", error)
-    );
-  }, 15000);
+      // Clear invalid e-invoices for non-eligible customers
+      clearInvalidEInvoicesForNonEligibleCustomers(pool).catch((error) =>
+        console.error("[E-Invoice Clearing] Error in initial clearing:", error)
+      );
+    }, 15000);
+  }
 
   // Customer data cache
   const customerCache = new Map();
@@ -6083,6 +6090,12 @@ export default function (pool, config) {
 
   // POST /api/invoices/schedule-pending-checks - Schedule checks for all pending invoices
   router.post("/schedule-pending-checks", async (req, res) => {
+    if (process.env.NODE_ENV !== "production") {
+      return res.status(403).json({
+        message: "Automatic pending invoice checks are only available in production",
+      });
+    }
+
     try {
       // Get all pending invoices
       const pendingQuery = `
