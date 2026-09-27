@@ -85,118 +85,123 @@ app.use(express.static(path.join(__dirname, "build")));
 // Setup all routes (Pass the pool)
 setupRoutes(app, pool); // Pass the pool instance here
 
-// --- Scheduled Job for Invoice Status Updates ---
-cron.schedule(
-  "0 0 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
-  async () => {
-    try {
-      // The updater function now imports and uses the pool directly
-      await updateInvoiceStatuses();
-    } catch (error) {
-      // Error is already logged within updateInvoiceStatuses
-      console.error(
-        `[${new Date().toISOString()}] Critical error during invoice status update job execution:`,
-        error
-      );
+// Business/backup schedules run only in production. Development uses copied data
+// and may have live MyInvois credentials for deliberate manual investigation.
+if (process.env.NODE_ENV === "production") {
+  // --- Scheduled Job for Invoice Status Updates ---
+  cron.schedule(
+    "0 0 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
+    async () => {
+      try {
+        // The updater function now imports and uses the pool directly
+        await updateInvoiceStatuses();
+      } catch (error) {
+        // Error is already logged within updateInvoiceStatuses
+        console.error(
+          `[${new Date().toISOString()}] Critical error during invoice status update job execution:`,
+          error
+        );
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC", // Set your desired timezone
     }
-  },
-  {
-    scheduled: true,
-    timezone: "UTC", // Set your desired timezone
-  }
-);
+  );
 
-// --- Auto-consolidation scheduler ---
-cron.schedule(
-  "0 0 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
-  async () => {
-    try {
-      // Check if any consolidations are due today
-      await checkAndProcessDueConsolidations(pool);
-      // Then process Tien Hock adjustment-doc consolidations
-      // (JP/GT to be added in their respective phases)
-      await checkAndProcessDueAdjustmentConsolidations(pool);
-    } catch (error) {
-      console.error(
-        `[${new Date().toISOString()}] Error in auto-consolidation job:`,
-        error
-      );
+  // --- Auto-consolidation scheduler ---
+  cron.schedule(
+    "0 0 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
+    async () => {
+      try {
+        // Check if any consolidations are due today
+        await checkAndProcessDueConsolidations(pool);
+        // Then process Tien Hock adjustment-doc consolidations
+        // (JP/GT to be added in their respective phases)
+        await checkAndProcessDueAdjustmentConsolidations(pool);
+      } catch (error) {
+        console.error(
+          `[${new Date().toISOString()}] Error in auto-consolidation job:`,
+          error
+        );
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
     }
-  },
-  {
-    scheduled: true,
-    timezone: "UTC",
-  }
-);
+  );
 
-// --- Daily e-invoice clearing for non-eligible customers ---
-cron.schedule(
-  "0 0 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
-  async () => {
-    try {
-      await clearInvalidEInvoicesForNonEligibleCustomers(pool);
-    } catch (error) {
-      console.error(
-        `[${new Date().toISOString()}] Error in daily e-invoice clearing job:`,
-        error
-      );
+  // --- Daily e-invoice clearing for non-eligible customers ---
+  cron.schedule(
+    "0 0 * * *", // Run daily at 8 AM Malaysia time (UTC+8, so 00:00 UTC)
+    async () => {
+      try {
+        await clearInvalidEInvoicesForNonEligibleCustomers(pool);
+      } catch (error) {
+        console.error(
+          `[${new Date().toISOString()}] Error in daily e-invoice clearing job:`,
+          error
+        );
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
     }
-  },
-  {
-    scheduled: true,
-    timezone: "UTC",
-  }
-);
+  );
 
-// --- Daily automatic backup ---
-cron.schedule(
-  "0 19 * * *", // Daily fresh backup at 03:00 Malaysia time (19:00 UTC)
-  async () => {
-    console.log(`[${new Date().toISOString()}] Starting daily automatic backup...`);
-    try {
-      await createAutoBackup();
-      console.log(`[${new Date().toISOString()}] Daily automatic backup completed`);
-    } catch (error) {
-      console.error(
-        `[${new Date().toISOString()}] Error in daily backup job:`,
-        error
-      );
+  // --- Daily automatic backup ---
+  cron.schedule(
+    "0 19 * * *", // Daily fresh backup at 03:00 Malaysia time (19:00 UTC)
+    async () => {
+      console.log(`[${new Date().toISOString()}] Starting daily automatic backup...`);
+      try {
+        await createAutoBackup();
+        console.log(`[${new Date().toISOString()}] Daily automatic backup completed`);
+      } catch (error) {
+        console.error(
+          `[${new Date().toISOString()}] Error in daily backup job:`,
+          error
+        );
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
     }
-  },
-  {
-    scheduled: true,
-    timezone: "UTC",
-  }
-);
+  );
 
-// --- Daily S3 backup sync (safety net) ---
-cron.schedule(
-  "0 2 * * *", // Run daily at 2:00 AM UTC (10:00 AM Malaysia time)
-  async () => {
-    console.log(`[${new Date().toISOString()}] Starting daily S3 backup sync...`);
-    try {
-      const env = process.env.NODE_ENV || "development";
-      const backupDir = `/var/backups/postgres/${env}`;
+  // --- Daily S3 backup sync (safety net) ---
+  cron.schedule(
+    "0 2 * * *", // Run daily at 2:00 AM UTC (10:00 AM Malaysia time)
+    async () => {
+      console.log(`[${new Date().toISOString()}] Starting daily S3 backup sync...`);
+      try {
+        const env = process.env.NODE_ENV || "development";
+        const backupDir = `/var/backups/postgres/${env}`;
 
-      // Sync local backups to S3
-      await syncLocalToS3(backupDir, env);
+        // Sync local backups to S3
+        await syncLocalToS3(backupDir, env);
 
-      // Clean up old S3 backups (3 years = 1095 days)
-      await deleteOldS3Backups(env, 1095);
+        // Clean up old S3 backups (3 years = 1095 days)
+        await deleteOldS3Backups(env, 1095);
 
-      console.log(`[${new Date().toISOString()}] Daily S3 backup sync completed`);
-    } catch (error) {
-      console.error(
-        `[${new Date().toISOString()}] Error in S3 sync job:`,
-        error
-      );
+        console.log(`[${new Date().toISOString()}] Daily S3 backup sync completed`);
+      } catch (error) {
+        console.error(
+          `[${new Date().toISOString()}] Error in S3 sync job:`,
+          error
+        );
+      }
+    },
+    {
+      scheduled: true,
+      timezone: "UTC",
     }
-  },
-  {
-    scheduled: true,
-    timezone: "UTC",
-  }
-);
+  );
+
+}
 
 // Handle react routing (Catch-all for client-side routing)
 // This should generally be AFTER your API routes

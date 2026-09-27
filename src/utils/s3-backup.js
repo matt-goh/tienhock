@@ -210,7 +210,7 @@ export async function syncLocalToS3(localBackupDir, env) {
  */
 export async function createAutoBackup() {
   const env = NODE_ENV || 'development';
-  const backup = await createLocalBackup(env, 'auto_daily');
+  const backup = await createLocalBackup(env, 'auto_daily', { waitForOperation: true });
   if (env === 'production' && !isS3BackupEnabled()) throw new Error('Off-server backup storage is not configured');
   await uploadBackupToS3(backup.filePath, backup.filename, env);
   // Retain local recovery copies for 180 days, and only prune after a successful backup.
