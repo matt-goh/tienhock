@@ -535,10 +535,15 @@ async function processGreenTargetAdjustmentConsolidation(pool, cfg) {
 }
 
 /**
- * Server cron entry point — processes adjustment doc consolidation for both
- * Tien Hock and Jelly Polly. Skips early if not in the days 3-7 window.
+ * Server cron entry point — processes adjustment doc consolidation for
+ * Tien Hock, Jelly Polly and Green Target. Production only, in the days 3-7 window.
+ * @param {Pick<import('pg').Pool, 'query' | 'connect'>} pool
+ * @returns {Promise<void>}
  */
 export async function checkAndProcessDueAdjustmentConsolidations(pool) {
+  // Copied production settings must never enable automatic submissions in dev.
+  if (process.env.NODE_ENV !== "production") return;
+
   const now = new Date();
   const window = checkIfInWindow(now);
   if (!window.inWindow) {

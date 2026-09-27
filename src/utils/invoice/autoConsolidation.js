@@ -21,8 +21,13 @@ import {
 /**
  * Checks for consolidations that should be processed and handles them
  * Now includes immediate processing for eligible invoices in the 5-day window (days 3-7) after month-end
+ * @param {Pick<import('pg').Pool, 'query' | 'connect'>} pool
+ * @returns {Promise<void>}
  */
 export const checkAndProcessDueConsolidations = async (pool) => {
+  // Copied production settings must never enable automatic submissions in dev.
+  if (process.env.NODE_ENV !== "production") return;
+
   const now = new Date();
 
   try {

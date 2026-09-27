@@ -24,8 +24,11 @@ const pendingInvoiceTimeouts = new Map();
  * @param {string} invoiceId - The invoice ID to check
  * @param {object} pool - Database connection pool
  * @param {object} apiClient - E-invoice API client
+ * @returns {void}
  */
 const schedulePendingInvoiceCheck = (invoiceId, pool, apiClient) => {
+  if (process.env.NODE_ENV !== "production") return;
+
   // Clear existing timeout if any
   if (pendingInvoiceTimeouts.has(invoiceId)) {
     clearTimeout(pendingInvoiceTimeouts.get(invoiceId));
@@ -275,8 +278,10 @@ export default function (pool, defaultConfig) {
     }
   };
 
-  // Initialize on server start (delayed to allow DB to fully start)
-  setTimeout(() => initializePendingInvoiceChecks(), 15000);
+  // Only production starts background checks against MyInvois.
+  if (process.env.NODE_ENV === "production") {
+    setTimeout(() => initializePendingInvoiceChecks(), 15000);
+  }
 
   // Generate a unique invoice number
   async function generateInvoiceNumber(client, dateIssued, receivableAccountCode) {
