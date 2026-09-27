@@ -518,7 +518,7 @@ const AdjustmentDocPDF: React.FC<Props> = ({
             {((data.amounts.subtotal || 0) + (data.amounts.tax || 0)).toFixed(2)}
           </Text>
         </View>
-        {data.doc.rounding > 0 && (
+        {data.doc.rounding !== 0 && (
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total Rounding (MYR)</Text>
             <Text style={styles.summaryValue}>

@@ -8,6 +8,8 @@
 import { GREENTARGET_INFO } from "../../invoice/einvoice/companyInfo.js";
 import { formatAdjustmentDocId } from "../../adjustments/formatDocId.js";
 import { buildGTBillingAddressLines } from "./GTBillingAddress.js";
+import { format, isValid, parseISO } from "date-fns";
+import { adjustmentIssueDateTime } from "../../invoice/einvoice/adjustmentIssueDateTime.js";
 
 const TYPE_CODE = {
   credit_note: "02",
@@ -38,21 +40,6 @@ function escapeXml(unsafe) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
-}
-
-function isDateWithinRange(dateStr, daysBack = 3) {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const earliest = new Date(today);
-    earliest.setDate(today.getDate() - daysBack);
-    const [day, month, year] = dateStr.split("/").map(Number);
-    const inputDate = new Date(year, month - 1, day);
-    inputDate.setHours(0, 0, 0, 0);
-    return inputDate >= earliest && inputDate <= today;
-  } catch {
-    return false;
-  }
 }
 
 function calculateTaxAndTotals(adjData) {
@@ -233,38 +220,34 @@ export async function GTEInvoiceAdjustmentNoteTemplate(
     };
   }
 
-  // GT date_issued is a DATE; parse YYYY-MM-DD safely (DB may also hand back a
-  // Date object via the pg driver, so accept both).
+  // Keep the accounting date for the billing period; issue the e-Invoice now.
+  /** @type {Date} */
+  const now = new Date();
+  /** @type {Date} */
   let adjDate;
   if (adjustmentDoc.date_issued instanceof Date) {
     adjDate = adjustmentDoc.date_issued;
   } else if (typeof adjustmentDoc.date_issued === "string") {
-    const iso = adjustmentDoc.date_issued.slice(0, 10);
-    const [y, m, d] = iso.split("-").map(Number);
-    adjDate = new Date(y, (m || 1) - 1, d || 1);
+    adjDate = parseISO(adjustmentDoc.date_issued);
   } else {
-    adjDate = new Date();
+    adjDate = new Date(NaN);
   }
-  const year = adjDate.getFullYear();
-  const month = String(adjDate.getMonth() + 1).padStart(2, "0");
-  const day = String(adjDate.getDate()).padStart(2, "0");
-  const formattedDate = `${year}-${month}-${day}`;
-  const validationDate = `${day}/${month}/${year}`;
-  if (!isDateWithinRange(validationDate)) {
+  if (
+    !isValid(adjDate) ||
+    format(adjDate, "yyyy-MM-dd") > format(now, "yyyy-MM-dd")
+  ) {
     throw {
       type: "validation",
       code: "DATE_VALIDATION",
-      message: "Adjustment document date must be within the last 3 days",
+      message: "Adjustment document date must be valid and not in the future",
       invoiceNo: adjustmentDoc.id,
     };
   }
 
-  // Time-of-day isn't stored for GT date-only fields — emit issue time as now.
-  const now = new Date();
-  const hours = now.getUTCHours().toString().padStart(2, "0");
-  const minutes = now.getUTCMinutes().toString().padStart(2, "0");
-  const seconds = now.getUTCSeconds().toString().padStart(2, "0");
-  const formattedTime = `${hours}:${minutes}:${seconds}Z`;
+  /** @type {string} */
+  const formattedDate = format(adjDate, "yyyy-MM-dd");
+  /** @type {{ issueDate: string, issueTime: string }} */
+  const { issueDate, issueTime } = adjustmentIssueDateTime(now);
 
   if (!Array.isArray(adjustmentDoc.lines) || adjustmentDoc.lines.length === 0) {
     throw {
@@ -296,8 +279,8 @@ export async function GTEInvoiceAdjustmentNoteTemplate(
 
   xml += `
   <cbc:ID>${escapeXml(formatAdjustmentDocId(adjustmentDoc.id))}</cbc:ID>
-  <cbc:IssueDate>${formattedDate}</cbc:IssueDate>
-  <cbc:IssueTime>${formattedTime}</cbc:IssueTime>
+  <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+  <cbc:IssueTime>${issueTime}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listVersionID="1.0">${typeCode}</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>MYR</cbc:DocumentCurrencyCode>
   <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>`;

@@ -3,11 +3,13 @@
 // spec. Forked from EInvoiceTemplate.js — differences:
 //   - InvoiceTypeCode parameterised: 02 (CN) / 03 (DN) / 04 (RN)
 //   - BillingReference populated with the referenced document's ID + UUID
-//   - Date-window check is the same 3-day rule MyInvois enforces
+//   - Current e-Invoice issuance time is separate from the accounting date
 //
 // Reuses TIENHOCK_INFO for the supplier party.
 import { TIENHOCK_INFO } from "./companyInfo.js";
 import { formatAdjustmentDocId } from "../../adjustments/formatDocId.js";
+import { format, isValid } from "date-fns";
+import { adjustmentIssueDateTime } from "./adjustmentIssueDateTime.js";
 
 const TYPE_CODE = {
   credit_note: "02",
@@ -40,21 +42,6 @@ function escapeXml(unsafe) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
-}
-
-function isDateWithinRange(dateStr, daysBack = 3) {
-  try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const earliest = new Date(today);
-    earliest.setDate(today.getDate() - daysBack);
-    const [day, month, year] = dateStr.split("/").map(Number);
-    const inputDate = new Date(year, month - 1, day);
-    inputDate.setHours(0, 0, 0, 0);
-    return inputDate >= earliest && inputDate <= today;
-  } catch {
-    return false;
-  }
 }
 
 function calculateTaxAndTotals(adjData) {
@@ -261,27 +248,30 @@ export async function EInvoiceAdjustmentNoteTemplate(
     };
   }
 
-  // Date handling
+  // Keep the accounting date for the billing period; issue the e-Invoice now.
+  /** @type {Date} */
+  const now = new Date();
+  /** @type {number} */
   const ts = Number(adjustmentDoc.createddate);
-  const adjDate = isNaN(ts) ? new Date() : new Date(ts);
-  const year = adjDate.getFullYear();
-  const month = String(adjDate.getMonth() + 1).padStart(2, "0");
-  const day = String(adjDate.getDate()).padStart(2, "0");
-  const formattedDate = `${year}-${month}-${day}`;
-  const validationDate = `${day}/${month}/${year}`;
-  if (!isDateWithinRange(validationDate)) {
+  /** @type {Date} */
+  const adjDate = new Date(ts);
+  if (
+    !adjustmentDoc.createddate ||
+    !isValid(adjDate) ||
+    format(adjDate, "yyyy-MM-dd") > format(now, "yyyy-MM-dd")
+  ) {
     throw {
       type: "validation",
       code: "DATE_VALIDATION",
-      message: "Adjustment document date must be within the last 3 days",
+      message: "Adjustment document date must be valid and not in the future",
       invoiceNo: displayId,
     };
   }
 
-  const hours = adjDate.getUTCHours().toString().padStart(2, "0");
-  const minutes = adjDate.getUTCMinutes().toString().padStart(2, "0");
-  const seconds = adjDate.getUTCSeconds().toString().padStart(2, "0");
-  const formattedTime = `${hours}:${minutes}:${seconds}Z`;
+  /** @type {string} */
+  const formattedDate = format(adjDate, "yyyy-MM-dd");
+  /** @type {{ issueDate: string, issueTime: string }} */
+  const { issueDate, issueTime } = adjustmentIssueDateTime(now);
 
   // Sanitize lines
   if (!Array.isArray(adjustmentDoc.lines) || adjustmentDoc.lines.length === 0) {
@@ -315,8 +305,8 @@ export async function EInvoiceAdjustmentNoteTemplate(
 
   xml += `
   <cbc:ID>${escapeXml(formatAdjustmentDocId(displayId))}</cbc:ID>
-  <cbc:IssueDate>${formattedDate}</cbc:IssueDate>
-  <cbc:IssueTime>${formattedTime}</cbc:IssueTime>
+  <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+  <cbc:IssueTime>${issueTime}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listVersionID="1.0">${typeCode}</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>MYR</cbc:DocumentCurrencyCode>
   <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>`;
