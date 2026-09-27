@@ -13,6 +13,7 @@
 // submit-einvoice, update-status, cancel-einvoice, clear-einvoice-status,
 // eligible-for-consolidation, submit-consolidated, consolidated-history).
 import { Router } from "express";
+import { getAdjustmentRemoteDocument, registerAdjustmentRecoveryRoutes } from "../sales/adjustment-docs/einvoice-recovery.js";
 import { determineBankAccount } from "../../utils/payment-helpers.js";
 import { formatAdjustmentDocId } from "../../utils/adjustments/formatDocId.js";
 import GTEInvoiceApiClientFactory from "../../utils/greenTarget/einvoice/GTEInvoiceApiClientFactory.js";
@@ -1736,26 +1737,22 @@ export default function (pool, myInvoisGTConfig) {
     }
     const { id } = req.params;
     const client = await pool.connect();
+    /** @type {boolean} */
+    let txActive = false;
     try {
+      await client.query("BEGIN");
+      txActive = true;
       const docResult = await client.query(
-        `SELECT id, uuid, einvoice_status, long_id, datetime_validated,
+        `SELECT id, submission_uid, uuid, einvoice_status, long_id, datetime_validated,
                 is_consolidated, consolidated_adjustments
-           FROM greentarget.adjustment_documents WHERE id = $1`,
+           FROM greentarget.adjustment_documents WHERE id = $1 FOR UPDATE`,
         [id]
       );
       if (docResult.rows.length === 0) {
         return res.status(404).json({ message: "Document not found" });
       }
       const doc = docResult.rows[0];
-      if (!doc.uuid) {
-        return res
-          .status(400)
-          .json({ message: "No MyInvois UUID — nothing to check." });
-      }
-      const remote = await apiClient.makeApiCall(
-        "GET",
-        `/api/v1.0/documents/${doc.uuid}/details`
-      );
+      const remote = await getAdjustmentRemoteDocument(apiClient, doc);
 
       let newStatus = doc.einvoice_status || "pending";
       let newLongId = doc.long_id;
@@ -1768,26 +1765,28 @@ export default function (pool, myInvoisGTConfig) {
         newStatus = "invalid";
         newLongId = null;
         newDateTimeValidated = null;
-      } else if (remote.longId) {
+      } else if (remoteStatus === "valid" || remote.longId) {
         newStatus = "valid";
         newLongId = remote.longId;
-        newDateTimeValidated = remote.dateTimeValidation
-          ? new Date(remote.dateTimeValidation).toISOString()
+        newDateTimeValidated = (remote.dateTimeValidated || remote.dateTimeValidation)
+          ? new Date(remote.dateTimeValidated || remote.dateTimeValidation).toISOString()
           : newDateTimeValidated;
       }
 
-      if (newStatus !== doc.einvoice_status) {
+      if (newStatus !== doc.einvoice_status || (remote.uuid && remote.uuid !== doc.uuid) || newLongId !== doc.long_id) {
         await client.query(
           `UPDATE greentarget.adjustment_documents
               SET einvoice_status = $1,
                   long_id = $2,
-                  datetime_validated = $3
+                  datetime_validated = $3,
+                  uuid = $5
             WHERE id = $4`,
           [
             newStatus,
             newLongId,
             newDateTimeValidated ? new Date(newDateTimeValidated) : null,
             id,
+            remote.uuid || doc.uuid,
           ]
         );
       }
@@ -1801,20 +1800,24 @@ export default function (pool, myInvoisGTConfig) {
         if (childIds.length > 0) {
           await client.query(
             `UPDATE greentarget.adjustment_documents
-                SET einvoice_status = $1
+                SET einvoice_status = $1, uuid = $4, long_id = $5, datetime_validated = $6
               WHERE id = ANY($2::text[])
-                AND uuid = $3`,
-            [newStatus, childIds, doc.uuid]
+                AND uuid IS NOT DISTINCT FROM $3
+                AND submission_uid IS NOT DISTINCT FROM $7`,
+            [newStatus, childIds, doc.uuid, remote.uuid || doc.uuid, newLongId,
+              newDateTimeValidated ? new Date(newDateTimeValidated) : null, doc.submission_uid]
           );
         }
       }
 
+      await client.query("COMMIT");
+      txActive = false;
       res.json({
         success: true,
         status: newStatus,
         longId: newLongId,
         dateTimeValidated: newDateTimeValidated,
-        updated: newStatus !== doc.einvoice_status,
+        updated: newStatus !== doc.einvoice_status || (remote.uuid && remote.uuid !== doc.uuid) || newLongId !== doc.long_id,
       });
     } catch (error) {
       console.error(`Error updating status for GT ${id}:`, error);
@@ -1822,6 +1825,7 @@ export default function (pool, myInvoisGTConfig) {
         .status(500)
         .json({ message: error?.response?.data?.message || error.message });
     } finally {
+      if (txActive) await client.query("ROLLBACK");
       client.release();
     }
   });
@@ -1947,32 +1951,7 @@ export default function (pool, myInvoisGTConfig) {
   });
 
   // --- POST /:id/clear-einvoice-status ---
-  router.post("/:id/clear-einvoice-status", async (req, res) => {
-    const { id } = req.params;
-    try {
-      const result = await pool.query(
-        `UPDATE greentarget.adjustment_documents
-            SET einvoice_status = NULL,
-                uuid = NULL,
-                submission_uid = NULL,
-                long_id = NULL,
-                datetime_validated = NULL
-          WHERE id = $1
-            AND (einvoice_status IS NULL OR einvoice_status = 'invalid')
-          RETURNING id, einvoice_status`,
-        [id]
-      );
-      if (result.rows.length === 0) {
-        return res
-          .status(400)
-          .json({ message: "Document not in a clearable e-invoice state" });
-      }
-      res.json({ message: "E-invoice status cleared", document: result.rows[0] });
-    } catch (error) {
-      console.error("Error clearing GT einvoice status:", error);
-      res.status(500).json({ message: error.message });
-    }
-  });
+  registerAdjustmentRecoveryRoutes(router, pool, apiClient, "greentarget.adjustment_documents", GREENTARGET_INFO);
 
   return router;
 }

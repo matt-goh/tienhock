@@ -2,6 +2,7 @@
 // CRUD + cancellation for Tien Hock Adjustment Documents
 // (Credit / Debit / Refund Notes). Phase 1.
 import { Router } from "express";
+import { getAdjustmentRemoteDocument, registerAdjustmentRecoveryRoutes } from "./einvoice-recovery.js";
 import {
   createCreditNoteJournalEntry,
   createDebitNoteJournalEntry,
@@ -1722,26 +1723,22 @@ async function resolveReferencedDocument(client, doc) {
     }
     const { id } = req.params;
     const client = await pool.connect();
+    /** @type {boolean} */
+    let txActive = false;
     try {
+      await client.query("BEGIN");
+      txActive = true;
       const docResult = await client.query(
-        `SELECT id, uuid, einvoice_status, long_id, datetime_validated,
+        `SELECT id, display_id, submission_uid, uuid, einvoice_status, long_id, datetime_validated,
                 is_consolidated, consolidated_adjustments
-           FROM ${T.docs} WHERE id = $1`,
+           FROM ${T.docs} WHERE id = $1 FOR UPDATE`,
         [id]
       );
       if (docResult.rows.length === 0) {
         return res.status(404).json({ message: "Document not found" });
       }
       const doc = docResult.rows[0];
-      if (!doc.uuid) {
-        return res
-          .status(400)
-          .json({ message: "No MyInvois UUID — nothing to check." });
-      }
-      const remote = await apiClient.makeApiCall(
-        "GET",
-        `/api/v1.0/documents/${doc.uuid}/details`
-      );
+      const remote = await getAdjustmentRemoteDocument(apiClient, doc);
 
       let newStatus = doc.einvoice_status || "pending";
       let newLongId = doc.long_id;
@@ -1754,26 +1751,28 @@ async function resolveReferencedDocument(client, doc) {
         newStatus = "invalid";
         newLongId = null;
         newDateTimeValidated = null;
-      } else if (remote.longId) {
+      } else if (remoteStatus === "valid" || remote.longId) {
         newStatus = "valid";
         newLongId = remote.longId;
-        newDateTimeValidated = remote.dateTimeValidation
-          ? new Date(remote.dateTimeValidation).toISOString()
+        newDateTimeValidated = (remote.dateTimeValidated || remote.dateTimeValidation)
+          ? new Date(remote.dateTimeValidated || remote.dateTimeValidation).toISOString()
           : newDateTimeValidated;
       }
 
-      if (newStatus !== doc.einvoice_status) {
+      if (newStatus !== doc.einvoice_status || (remote.uuid && remote.uuid !== doc.uuid) || newLongId !== doc.long_id) {
         await client.query(
           `UPDATE ${T.docs}
               SET einvoice_status = $1,
                   long_id = $2,
-                  datetime_validated = $3
+                  datetime_validated = $3,
+                  uuid = $5
             WHERE id = $4`,
           [
             newStatus,
             newLongId,
             newDateTimeValidated ? new Date(newDateTimeValidated) : null,
             id,
+            remote.uuid || doc.uuid,
           ]
         );
       }
@@ -1787,20 +1786,24 @@ async function resolveReferencedDocument(client, doc) {
         if (childIds.length > 0) {
           await client.query(
             `UPDATE ${T.docs}
-                SET einvoice_status = $1
+                SET einvoice_status = $1, uuid = $4, long_id = $5, datetime_validated = $6
               WHERE id = ANY($2::text[])
-                AND uuid = $3`,
-            [newStatus, childIds, doc.uuid]
+                AND uuid IS NOT DISTINCT FROM $3
+                AND submission_uid IS NOT DISTINCT FROM $7`,
+            [newStatus, childIds, doc.uuid, remote.uuid || doc.uuid, newLongId,
+              newDateTimeValidated ? new Date(newDateTimeValidated) : null, doc.submission_uid]
           );
         }
       }
 
+      await client.query("COMMIT");
+      txActive = false;
       res.json({
         success: true,
         status: newStatus,
         longId: newLongId,
         dateTimeValidated: newDateTimeValidated,
-        updated: newStatus !== doc.einvoice_status,
+        updated: newStatus !== doc.einvoice_status || (remote.uuid && remote.uuid !== doc.uuid) || newLongId !== doc.long_id,
       });
     } catch (error) {
       console.error(`Error updating status for ${id}:`, error);
@@ -1808,6 +1811,7 @@ async function resolveReferencedDocument(client, doc) {
         .status(500)
         .json({ message: error?.response?.data?.message || error.message });
     } finally {
+      if (txActive) await client.query("ROLLBACK");
       client.release();
     }
   });
@@ -2264,32 +2268,7 @@ async function resolveReferencedDocument(client, doc) {
   // --- POST /api/adjustment-docs/:id/clear-einvoice-status ---
   // Used after a failed submission to allow re-submission. Does NOT touch
   // MyInvois — only clears local einvoice_status when it's null/invalid.
-  router.post("/:id/clear-einvoice-status", async (req, res) => {
-    const { id } = req.params;
-    try {
-      const result = await pool.query(
-        `UPDATE ${T.docs}
-            SET einvoice_status = NULL,
-                uuid = NULL,
-                submission_uid = NULL,
-                long_id = NULL,
-                datetime_validated = NULL
-          WHERE id = $1
-            AND (einvoice_status IS NULL OR einvoice_status = 'invalid')
-          RETURNING id, einvoice_status`,
-        [id]
-      );
-      if (result.rows.length === 0) {
-        return res
-          .status(400)
-          .json({ message: "Document not in a clearable e-invoice state" });
-      }
-      res.json({ message: "E-invoice status cleared", document: result.rows[0] });
-    } catch (error) {
-      console.error("Error clearing einvoice status:", error);
-      res.status(500).json({ message: error.message });
-    }
-  });
+  registerAdjustmentRecoveryRoutes(router, pool, apiClient, T.docs, SUPPLIER);
 
   return router;
 }

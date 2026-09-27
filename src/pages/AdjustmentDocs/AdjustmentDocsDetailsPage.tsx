@@ -12,6 +12,7 @@ import {
   IconPrinter,
 } from "@tabler/icons-react";
 import Button from "../../components/Button";
+import AdjustmentEInvoiceRecovery from "../../components/AdjustmentDocs/AdjustmentEInvoiceRecovery";
 import BackButton from "../../components/BackButton";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import ConfirmationDialog from "../../components/ConfirmationDialog";
@@ -97,6 +98,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
   const [isCancelling, setIsCancelling] = useState(false);
   const [isSubmittingEinvoice, setIsSubmittingEinvoice] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isClearingStatus, setIsClearingStatus] = useState<boolean>(false);
   const [isCancellingEinvoice, setIsCancellingEinvoice] = useState(false);
   const [showCancelEinvoiceDialog, setShowCancelEinvoiceDialog] = useState(false);
   const [einvoiceCancelReason, setEinvoiceCancelReason] = useState("");
@@ -280,19 +282,22 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
     }
   };
 
-  const handleClearStatus = async () => {
-    if (!doc) return;
-    const toastId = toast.loading(t("Clearing e-invoice status..."));
+  const handleClearStatus = async (): Promise<void> => {
+    if (!doc || isClearingStatus) return;
+    setIsClearingStatus(true);
+    const toastId: string = toast.loading(t("Clearing e-invoice status..."));
     try {
       await api.post(`${paths.apiBase}/${doc.id}/clear-einvoice-status`);
       toast.success(t("Cleared — you can retry submission"), {
         id: toastId,
       });
-      fetchDoc();
+      await fetchDoc();
     } catch (error: any) {
       toast.error(error?.message || t("Failed to clear status"), {
         id: toastId,
       });
+    } finally {
+      setIsClearingStatus(false);
     }
   };
 
@@ -417,6 +422,7 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
                   variant="outline"
                   size="md"
                   title={t("Clear invalid status to retry")}
+                  disabled={isClearingStatus || isUpdatingStatus || isSubmittingEinvoice}
                 >
                   {t("Clear & Retry")}
                 </Button>
@@ -435,15 +441,36 @@ const AdjustmentDocsDetailsPage: React.FC<Props> = ({
               </>
             )}
             {doc.status === "active" && doc.einvoice_status === "pending" && (
-              <Button
-                onClick={handleUpdateStatus}
-                icon={IconRotateClockwise}
-                variant="outline"
-                size="md"
-                disabled={isUpdatingStatus}
-              >
-                {isUpdatingStatus ? t("Checking...") : t("Update Status")}
-              </Button>
+              <>
+                <Button
+                  onClick={handleUpdateStatus}
+                  icon={IconRotateClockwise}
+                  variant="outline"
+                  size="md"
+                  disabled={isUpdatingStatus || isClearingStatus}
+                >
+                  {isUpdatingStatus ? t("Checking...") : t("Update Status")}
+                </Button>
+                <Button
+                  onClick={handleClearStatus}
+                  icon={IconRefresh}
+                  variant="outline"
+                  size="md"
+                  disabled={isClearingStatus || isUpdatingStatus}
+                  title={t("Check MyInvois before clearing pending status")}
+                >
+                  {isClearingStatus ? t("Checking...") : t("Clear & Retry")}
+                </Button>
+              </>
+            )}
+            {doc.status === "active" && !doc.is_consolidated && doc.einvoice_status !== "valid" && (
+              <AdjustmentEInvoiceRecovery
+                apiBase={paths.apiBase}
+                documentId={doc.id}
+                currentUuid={doc.uuid}
+                disabled={isSubmittingEinvoice || isUpdatingStatus || isClearingStatus || isCancellingEinvoice}
+                onRecovered={fetchDoc}
+              />
             )}
             {doc.status === "active" &&
               (doc.einvoice_status === "valid" ||

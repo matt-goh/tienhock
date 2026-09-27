@@ -1,4 +1,12 @@
 {
+  "Enter UUID": "Masukkan UUID",
+  "Link existing e-Invoice": "Pautkan e-Invois sedia ada",
+  "Enter the UUID of this adjustment's valid MyInvois document. Its number, type, supplier and total will be checked before restoring the link.": "Masukkan UUID dokumen MyInvois yang sah bagi pelarasan ini. Nombor, jenis, pembekal dan jumlahnya akan disemak sebelum pautan dipulihkan.",
+  "Verifying...": "Sedang menyemak...",
+  "Verify and link": "Semak dan pautkan",
+  "Valid e-Invoice linked successfully": "e-Invois sah berjaya dipautkan",
+  "Failed to link e-Invoice": "Gagal memautkan e-Invois",
+  "Check MyInvois before clearing pending status": "Semak MyInvois sebelum mengosongkan status menunggu",
   "Add the price correction to the line items, or clear the selected item before saving.": "Tambah pembetulan harga ke dalam baris item, atau kosongkan pilihan item sebelum menyimpan.",
   "Correct an item's price": "Betulkan harga item",
   "Select the original item and enter the correct unit price. The credit uses only the price difference, not the full item value. The first correction replaces the untouched default discount row.": "Pilih item asal dan masukkan harga seunit yang betul. Kredit hanya menggunakan beza harga, bukan nilai penuh item. Pembetulan pertama menggantikan baris diskaun lalai yang belum diubah.",
