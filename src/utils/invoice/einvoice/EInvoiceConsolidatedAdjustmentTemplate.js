@@ -5,6 +5,7 @@
 // UUID. Phase 5.
 import { TIENHOCK_INFO } from "./companyInfo.js";
 import { formatAdjustmentDocId } from "../../adjustments/formatDocId.js";
+import { adjustmentIssueDateTime } from "./adjustmentIssueDateTime.js";
 
 const TYPE_CODE = {
   credit_note: "02",
@@ -27,21 +28,6 @@ function formatAmount(amount) {
   const n =
     typeof amount === "string" ? parseFloat(amount) : Number(amount);
   return isNaN(n) ? "0.00" : n.toFixed(2);
-}
-
-function formatDate(d) {
-  const x = d instanceof Date ? d : new Date(d);
-  const y = x.getFullYear();
-  const m = String(x.getMonth() + 1).padStart(2, "0");
-  const day = String(x.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function formatTime() {
-  const now = new Date();
-  const h = String(now.getUTCHours()).padStart(2, "0");
-  const m = String(now.getUTCMinutes()).padStart(2, "0");
-  return `${h}:${m}:00Z`;
 }
 
 function createLineXml(child, index) {
@@ -146,13 +132,14 @@ export async function EInvoiceConsolidatedAdjustmentTemplate({
   );
   const inclusive = totals.subtotal + totals.tax;
 
-  const today = formatDate(new Date());
+  /** @type {{ issueDate: string, issueTime: string }} */
+  const { issueDate, issueTime } = adjustmentIssueDateTime();
 
   let xml = `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
   <cbc:ID>${escapeXml(consolidatedId)}</cbc:ID>
-  <cbc:IssueDate>${today}</cbc:IssueDate>
-  <cbc:IssueTime>${formatTime()}</cbc:IssueTime>
+  <cbc:IssueDate>${issueDate}</cbc:IssueDate>
+  <cbc:IssueTime>${issueTime}</cbc:IssueTime>
   <cbc:InvoiceTypeCode listVersionID="1.0">${typeCode}</cbc:InvoiceTypeCode>
   <cbc:DocumentCurrencyCode>MYR</cbc:DocumentCurrencyCode>
   <cbc:TaxCurrencyCode>MYR</cbc:TaxCurrencyCode>`;

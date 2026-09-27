@@ -20,6 +20,16 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-26",
+    ms: "PDF nota kredit, debit dan bayaran balik kini memaparkan pelarasan pembundaran negatif serta positif, supaya perbezaan antara amaun asal dan jumlah akhir jelas.",
+    en: "Credit, debit and refund note PDFs now show negative as well as positive rounding adjustments, making the difference between the original amount and final total clear.",
+  },
+  {
+    date: "2026-09-26",
+    ms: "Nota kredit, debit dan bayaran balik yang melebihi tiga hari kini boleh dihantar atau dihantar semula sebagai e-Invois untuk Tien Hock, Jelly Polly dan Green Target. Tarikh dokumen asal dikekalkan, manakala e-Invois menggunakan tarikh dan masa penghantaran semasa. Tarikh dan masa e-Invois pelarasan gabungan juga dibetulkan untuk penghantaran awal pagi.",
+    en: "Credit, debit and refund notes older than three days can now be submitted or resubmitted as e-Invoices for Tien Hock, Jelly Polly and Green Target. The original document date is retained, while the e-Invoice uses the current submission date and time. Consolidated adjustment e-Invoice timestamps are also corrected for early-morning submissions.",
+  },
+  {
     date: "2026-09-24",
     ms: "Dalam Cash Bank-In, klik baki bagi tarikh jualan atau resit untuk mengisi amaun Bank In dengan semua baki. Resit juga dipilih secara automatik. Klik butang × untuk mengosongkan amaun dan membuang pilihan resit; amaun masih boleh diubah sebelum dipos.",
     en: "In Cash Bank-In, click a sales-date or receipt balance to fill the Bank In amount with the full remaining balance. Receipts are also selected automatically. Click × to clear an amount and unselect its receipt; you can still adjust amounts before posting.",
