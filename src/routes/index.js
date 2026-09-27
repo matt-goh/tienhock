@@ -7,6 +7,7 @@ import { authMiddleware } from "../middleware/auth.js";
 
 // Admin routes
 import backupRouter from "./admin/backup.js";
+import devSyncRouter from "./admin/dev-sync.js";
 
 // User routes
 import bookmarksRouter from "./user/bookmarks.js";
@@ -201,6 +202,9 @@ export default function setupRoutes(app, pool) {
 
   // Auth routes
   app.use("/api/auth", authRouter(pool));
+
+  // This router authenticates only its own export endpoints with a dedicated token.
+  app.use("/api/dev-sync", devSyncRouter(pool));
 
   // Add auth middleware to protect other routes
   app.use("/api", authMiddleware(pool));

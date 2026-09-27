@@ -41,6 +41,14 @@ It does not read the GitHub Actions secret.
 
 ## Production Restore button setup
 
+The optional development snapshot service uses a separate export-only token digest,
+`DEV_DB_SYNC_TOKEN_SHA256`, supplied by GitHub Actions. It uses the existing runtime
+database role and requires no additional sudo or database grants. Temporary exports
+live under `/var/backups/postgres/dev-sync`, outside normal production backups, and
+expire after one hour. The application account needs permission to create this
+directory under its existing backup root. Setup and rotation are documented in
+[Development database sync](../../docs/DEV_DATABASE_SYNC.md).
+
 The Restore button uses the root-owned `/usr/local/sbin/restore-tienhock-backup`
 helper. The Node process keeps its ordinary `tienhock_app` credentials. Only
 MILTI, TIMOTHY.G, HELEN and MATTHEW can start a restore through the API.

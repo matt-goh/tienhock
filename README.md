@@ -8,6 +8,13 @@ The Tien Hock ERP System is an integrated business management solution that prov
 
 ## Features
 
+### Development startup
+
+- `dev.bat` starts development using the existing local database.
+- `dev-sync.bat` first replaces the local database with a fresh production snapshot, then starts development.
+
+The sync launcher needs one-time export credential setup. See [Development database sync](docs/DEV_DATABASE_SYNC.md) for setup, recovery, and manual acceptance checks.
+
 ### User Management & Authentication
 - Staff management with role-based access
 - Secure authentication with session management
