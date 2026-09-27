@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-26",
+    ms: "Nota kredit, debit dan bayaran balik kini boleh dipautkan semula kepada e-Invois MyInvois yang sah dengan memasukkan UUID. Status menunggu boleh disemak melalui rekod penghantaran jika UUID tiada, dan boleh dikosongkan selepas MyInvois mengesahkan penghantaran gagal atau dibatalkan. Amaun dan catatan akaun dikekalkan.",
+    en: "Credit, debit and refund notes can now be linked to an existing valid MyInvois e-Invoice by entering its UUID. Pending status can be checked through the submission record when the UUID is missing, and cleared after MyInvois confirms failure or cancellation. Amounts and accounting entries stay unchanged.",
+  },
+  {
+    date: "2026-09-26",
     ms: "PDF nota kredit, debit dan bayaran balik kini memaparkan pelarasan pembundaran negatif serta positif, supaya perbezaan antara amaun asal dan jumlah akhir jelas.",
     en: "Credit, debit and refund note PDFs now show negative as well as positive rounding adjustments, making the difference between the original amount and final total clear.",
   },

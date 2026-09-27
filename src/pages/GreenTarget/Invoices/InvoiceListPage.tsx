@@ -595,7 +595,7 @@ const InvoiceCard = ({
               )}
               {/* e-Invoice Status Badge (if applicable) */}
               {invoice.einvoice_status && (
-                <div className="truncate overflow-auto">
+                <div className="text-right truncate overflow-auto">
                   {invoice.einvoice_status === "valid" ? (
                     <a
                       href={
