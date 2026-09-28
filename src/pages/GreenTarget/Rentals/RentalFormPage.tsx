@@ -8,6 +8,7 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
+import PillSelect, { type PillSelectOption } from "../../../components/PillSelect";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import {
@@ -773,10 +774,16 @@ const RentalFormPage: React.FC = () => {
     name: formatLocationLabel(l),
     phone_number: l.phone_number,
   }));
-  const driverOptions: SelectOption[] = drivers.map((d) => ({
-    id: d.id,
-    name: d.name,
-  }));
+  const driverOptions: PillSelectOption<string>[] = drivers.map(
+    (driver: { id: string; name: string }): PillSelectOption<string> => ({
+      value: driver.name,
+      label: driver.name,
+    })
+  );
+  // Historical rentals retain their saved driver even after that driver leaves.
+  if (formData.driver && !driverOptions.some((option: PillSelectOption<string>): boolean => option.value === formData.driver)) {
+    driverOptions.push({ value: formData.driver, label: formData.driver });
+  }
   interface DumpsterOption extends SelectOption {
     status: string;
     info: Dumpster;
@@ -1378,95 +1385,18 @@ const RentalFormPage: React.FC = () => {
                       )}
                   </div>
                 </div>
-                {/* Driver Listbox (Styled - condensed) */}
-                <div className="sm:col-span-3">
-                  <label
-                    htmlFor="driver-button"
-                    className="block text-sm font-medium text-default-700 dark:text-gray-200"
-                  >
+                <div className="sm:col-span-3 space-y-2">
+                  <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
                     {t("Driver")} <span className="text-red-500">*</span>
-                  </label>
-                  <div className="mt-2">
-                    <Listbox
-                      value={formData.driver}
-                      onChange={handleDriverChange}
-                      name="driver"
-                    >
-                      <div className="relative">
-                        <HeadlessListboxButton
-                          id="driver-button"
-                          className={clsx(
-                            "relative w-full cursor-default rounded-lg border border-default-300 dark:border-gray-600 bg-white dark:bg-gray-900/50 py-2 pl-3 pr-10 text-left shadow-sm",
-                            "focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 sm:text-sm"
-                          )}
-                        >
-                          <span className="block truncate">
-                            {formData.driver || t("Select Driver")}
-                          </span>
-                          <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
-                            <IconChevronDown
-                              size={20}
-                              className="text-gray-400"
-                            />
-                          </span>
-                        </HeadlessListboxButton>
-                        <Transition
-                          as={Fragment}
-                          leave="transition ease-in duration-100"
-                          leaveFrom="opacity-100"
-                          leaveTo="opacity-0"
-                        >
-                          <ListboxOptions
-                            className={clsx(
-                              "absolute z-10 max-h-60 w-full overflow-auto rounded-md bg-white dark:bg-gray-700 py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm",
-                              "mt-1"
-                            )}
-                          >
-                            <ListboxOption
-                              key="p"
-                              value=""
-                              disabled
-                              className="text-gray-400 italic py-2 pl-3 pr-10 select-none"
-                            >
-                              {t("Select Driver")}
-                            </ListboxOption>
-                            {driverOptions.map((o) => (
-                              <ListboxOption
-                                key={o.id}
-                                className={({ active }) =>
-                                  clsx(
-                                    "relative cursor-default select-none py-2 pl-3 pr-10",
-                                    active
-                                      ? "bg-sky-100 dark:bg-sky-900/50 text-sky-900 dark:text-sky-100"
-                                      : "text-gray-900 dark:text-gray-100"
-                                  )
-                                }
-                                value={o.name}
-                              >
-                                {({ selected }) => (
-                                  <>
-                                    <span
-                                      className={clsx(
-                                        "block truncate",
-                                        selected ? "font-medium" : "font-normal"
-                                      )}
-                                    >
-                                      {o.name}
-                                    </span>
-                                    {selected && (
-                                      <span className="absolute inset-y-0 right-0 flex items-center pr-3 text-sky-600 dark:text-sky-400">
-                                        <IconCheck size={20} />
-                                      </span>
-                                    )}
-                                  </>
-                                )}
-                              </ListboxOption>
-                            ))}
-                          </ListboxOptions>
-                        </Transition>
-                      </div>
-                    </Listbox>
-                  </div>
+                  </span>
+                  <PillSelect
+                    options={driverOptions}
+                    value={formData.driver}
+                    onChange={handleDriverChange}
+                    size="md"
+                    disabled={isSaving}
+                    ariaLabel={t("Driver")}
+                  />
                 </div>
                 {/* Pickup Destination Listbox - shown when there's a pickup date */}
                 {formData.date_picked && (

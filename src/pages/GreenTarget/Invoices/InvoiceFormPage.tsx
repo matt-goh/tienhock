@@ -15,6 +15,7 @@ import ConfirmationDialog from "../../../components/ConfirmationDialog";
 import BackButton from "../../../components/BackButton";
 import { useSmartBack } from "../../../hooks/useSmartBack";
 import Button from "../../../components/Button";
+import Checkbox from "../../../components/Checkbox";
 import { greenTargetApi } from "../../../routes/greentarget/api";
 import LoadingSpinner from "../../../components/LoadingSpinner";
 import { api } from "../../../routes/utils/api";
@@ -29,11 +30,21 @@ import {
   IconChevronDown,
   IconCheck,
   IconSearch,
+  IconPlus,
+  IconX,
+  IconUser,
   IconSquareCheckFilled,
   IconSquare,
 } from "@tabler/icons-react";
 import clsx from "clsx";
-import { SelectOption } from "../../../components/FormComponents";
+import { FormCombobox, SelectOption } from "../../../components/FormComponents";
+import GTInvoiceCustomerModal, {
+  type GTInvoiceCustomer as Customer,
+} from "../../../components/GreenTarget/GTInvoiceCustomerModal";
+import GTInvoiceRentalDrafts, {
+  createGTInvoiceRentalDraft,
+  type GTInvoiceRentalDraft,
+} from "../../../components/GreenTarget/GTInvoiceRentalDrafts";
 import TimeNavigator, { TimeRange } from "../../../components/TimeNavigator";
 import GTInvoiceAccountFields, {
   GT_DEFAULT_REVENUE_ACCOUNT,
@@ -51,6 +62,7 @@ import GTReceiptJoinPanel, {
   useGTReceiptJoinLookup,
 } from "../../../components/GreenTarget/GTReceiptJoinPanel";
 import { formatLocationDisplay } from "../../../utils/greenTarget/formatLocationDisplay";
+import { buildGTBillingAddressLines } from "../../../utils/greenTarget/einvoice/GTBillingAddress.js";
 import { toCents } from "../../../utils/moneyUtils";
 import SubmissionResultsModal from "../../../components/Invoice/SubmissionResultsModal";
 import { EInvoiceSubmissionResult } from "../../../types/types";
@@ -62,27 +74,29 @@ import type {
   GreenTargetPaymentMutationResponse,
   GreenTargetReceiptJoinCandidate,
   GreenTargetRevenueSplit,
+  GreenTargetNewInvoiceRental,
 } from "../../../types/greenTargetTypes";
 
 // Interfaces
-interface Customer {
-  customer_id: number;
-  tin_number: string;
-  id_number: string;
-  name: string;
-  phone_number?: string | null; // Added phone number for Combobox display
-  debtor_account_code?: string | null;
+interface InvoiceRentalLocation {
+  location_address?: string | null;
+  location_site?: string | null;
 }
 
-interface Rental {
+interface BillAddressPreview {
+  pdf: string;
+  einvoice: string;
+  error: boolean;
+  loading: boolean;
+}
+
+interface Rental extends InvoiceRentalLocation {
   rental_id: number;
   customer_id: number;
   // The dumpster and both dates are optional Green Target metadata.
   tong_no: string | null;
   date_placed: string | null;
   date_picked: string | null;
-  location_address?: string;
-  location_site?: string | null;
   driver: string;
   customer_name?: string; // For display perhaps
   invoice_info?: {
@@ -182,12 +196,13 @@ const InvoiceFormPage: React.FC = () => {
   );
   const location = useLocation();
   const rentalData = location.state; // Data passed from RentalListPage potentially
+  const initialRentalCount: number = rentalData?.customer_id ? 1 : 0;
 
   // Form State
   const [formData, setFormData] = useState<Invoice>({
     type: "regular",
     customer_id: 0,
-    amount_before_tax: 200, // Default value?
+    amount_before_tax: initialRentalCount * 200,
     tax_amount: 0,
     date_issued: format(new Date(), "yyyy-MM-dd"),
     rental_ids: [], // Changed to array
@@ -197,7 +212,7 @@ const InvoiceFormPage: React.FC = () => {
       {
         line_number: 1,
         account_code: GT_DEFAULT_REVENUE_ACCOUNT,
-        amount: 200,
+        amount: initialRentalCount * 200,
       },
     ],
   });
@@ -206,8 +221,27 @@ const InvoiceFormPage: React.FC = () => {
 
   // Reference Data State
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersLoaded, setCustomersLoaded] = useState<boolean>(false);
+  const [customersLoadFailed, setCustomersLoadFailed] = useState<boolean>(false);
+  const [customerQuery, setCustomerQuery] = useState<string>("");
+  const [showNewRentalCustomer, setShowNewRentalCustomer] = useState<boolean>(false);
+  const [showCustomerModal, setShowCustomerModal] = useState<boolean>(false);
+  const [newCustomerName, setNewCustomerName] = useState<string>("");
+  const [pendingCustomerChange, setPendingCustomerChange] = useState<number | "new" | null>(null);
+  const [newRentals, setNewRentals] = useState<GTInvoiceRentalDraft[]>((): GTInvoiceRentalDraft[] =>
+    !isEditMode && rentalData?.customer_id && !rentalData?.rental_id ? [createGTInvoiceRentalDraft()] : []
+  );
+  const billableRequestRef = useRef<number>(0);
+  const customerRequestRef = useRef<number>(0);
+  const savingRef = useRef<boolean>(false);
   const [availableRentals, setAvailableRentals] = useState<Rental[]>([]);
   const [selectedRentals, setSelectedRentals] = useState<Rental[]>([]); // Changed to array
+  const [selectedRentalError, setSelectedRentalError] = useState<boolean>(false);
+  const [selectedRentalRetry, setSelectedRentalRetry] = useState<number>(0);
+  const [rentalsLoadFailed, setRentalsLoadFailed] = useState<boolean>(false);
+  const selectedCustomer: Customer | undefined = customers.find(
+    (customer: Customer): boolean => customer.customer_id === formData.customer_id
+  );
 
   // UI State
   const [rentalQuery, setRentalQuery] = useState(""); // Rental picker search box
@@ -230,7 +264,7 @@ const InvoiceFormPage: React.FC = () => {
 
   // Editable invoice lines; amount_before_tax is derived from their total.
   const [invoiceLines, setInvoiceLines] = useState<GTInvoiceLineDraft[]>([
-    createGTInvoiceLineDraft({ unit_price: 200 }),
+    createGTInvoiceLineDraft({ quantity: initialRentalCount, unit_price: 200 }),
   ]);
   const [initialInvoiceLines, setInitialInvoiceLines] =
     useState<GTInvoiceLineDraft[] | null>(null);
@@ -293,11 +327,11 @@ const InvoiceFormPage: React.FC = () => {
 
   // Set initial form data (only once after customers load or if editing)
   useEffect(() => {
-    if (!isEditMode && customers.length > 0 && initialFormData === null) {
+    if (!isEditMode && customersLoaded && initialFormData === null) {
       const defaultInitialState: Invoice = {
         type: "regular",
         customer_id: 0,
-        amount_before_tax: 200,
+        amount_before_tax: initialRentalCount * 200,
         tax_amount: 0,
         date_issued: format(new Date(), "yyyy-MM-dd"),
         rental_ids: [], // Changed to array
@@ -307,28 +341,31 @@ const InvoiceFormPage: React.FC = () => {
           {
             line_number: 1,
             account_code: GT_DEFAULT_REVENUE_ACCOUNT,
-            amount: 200,
+            amount: initialRentalCount * 200,
           },
         ],
       };
       setInitialFormData(defaultInitialState);
+      setInitialInvoiceLines([
+        createGTInvoiceLineDraft({ description: gtInvoiceLineWording(GT_DEFAULT_REVENUE_ACCOUNT), quantity: initialRentalCount, unit_price: 200 }),
+      ]);
       // Apply rentalData if it exists
       if (rentalData?.customer_id) {
-        const rentalIds = rentalData.rental_id ? [rentalData.rental_id] : [];
-        const rentalCustomer = customers.find(
+        const rentalIds: number[] = rentalData.rental_id ? [Number(rentalData.rental_id)] : [];
+        const rentalCustomer: Customer | undefined = customers.find(
           (customer: Customer): boolean =>
             customer.customer_id === Number(rentalData.customer_id)
         );
         setFormData((prev) => ({
           ...prev,
           ...defaultInitialState,
-          customer_id: rentalData.customer_id,
+          customer_id: Number(rentalData.customer_id),
           rental_ids: rentalIds,
           debtor_account_code: rentalCustomer?.debtor_account_code || "",
         }));
         setInitialFormData((prev) => ({
           ...(prev ?? defaultInitialState),
-          customer_id: rentalData.customer_id,
+          customer_id: Number(rentalData.customer_id),
           rental_ids: rentalIds,
           debtor_account_code: rentalCustomer?.debtor_account_code || "",
         }));
@@ -339,12 +376,8 @@ const InvoiceFormPage: React.FC = () => {
     } else if (isEditMode && initialFormData === null && id) {
       // If editing, initialFormData is set after fetchInvoiceDetails
       // setLoading(false) happens in fetchInvoiceDetails
-    } else if (!isEditMode && customers.length === 0 && !loading) {
-      // Handle case where customers couldn't load in create mode
-      setError(t("Could not load customer data. Cannot create invoice."));
-      setLoading(false);
     }
-  }, [isEditMode, customers, initialFormData, rentalData, id, loading]);
+  }, [isEditMode, customers, customersLoaded, initialFormData, rentalData, id, initialRentalCount]);
 
   // Form change detection
   useEffect(() => {
@@ -352,14 +385,17 @@ const InvoiceFormPage: React.FC = () => {
       setIsFormChanged(
         JSON.stringify(formData) !== JSON.stringify(initialFormData) ||
           JSON.stringify(stripLineUids(invoiceLines)) !==
-            JSON.stringify(stripLineUids(initialInvoiceLines ?? []))
+            JSON.stringify(stripLineUids(initialInvoiceLines ?? [])) ||
+          (!isEditMode && (newRentals.length !== (rentalData?.rental_id ? 0 : initialRentalCount) ||
+            newRentals.some((draft: GTInvoiceRentalDraft): boolean => draft.edited)))
       );
     }
-  }, [formData, initialFormData, invoiceLines, initialInvoiceLines]);
+  }, [formData, initialFormData, invoiceLines, initialInvoiceLines, newRentals, isEditMode, rentalData?.rental_id, initialRentalCount]);
 
   // Fetch customers on mount
   useEffect(() => {
-    fetchCustomers();
+    void fetchCustomers();
+    return (): void => { customerRequestRef.current += 1; };
   }, []);
 
   // Fetch invoice details if editing
@@ -371,15 +407,8 @@ const InvoiceFormPage: React.FC = () => {
 
   // Update submitAsEinvoice when customer changes
   useEffect(() => {
-    if (formData.customer_id > 0 && customers.length > 0) {
-      const customer = customers.find(
-        (c) => c.customer_id === formData.customer_id
-      );
-      if (customer) {
-        setSubmitAsEinvoice(!!(customer.tin_number && customer.id_number));
-      }
-    }
-  }, [formData.customer_id, customers]);
+    setSubmitAsEinvoice(!!(selectedCustomer?.tin_number && selectedCustomer.id_number && selectedCustomer.phone_number));
+  }, [formData.customer_id, selectedCustomer?.tin_number, selectedCustomer?.id_number, selectedCustomer?.phone_number]);
 
   // Edit mode keeps the customer-scoped list so the invoice's own rentals show.
   useEffect(() => {
@@ -388,12 +417,11 @@ const InvoiceFormPage: React.FC = () => {
     }
   }, [isEditMode, formData.customer_id]);
 
-  // The selection is authoritative and must survive paging and searching, so a
-  // rental is only ever added here — never dropped because the page it came
-  // from is no longer loaded. Ids that arrive from outside the picker (edit
-  // mode, or a rental handed over by another page) are hydrated from whichever
-  // page happens to contain them.
-  useEffect(() => {
+  // A rental handed over by another page may be outside the picker's first
+  // page. Hydrate by ID, and discard responses after the selection changes.
+  useEffect((): (() => void) | void => {
+    let active: boolean = true;
+    setSelectedRentalError(false);
     const rentalIds: number[] = formData.rental_ids || [];
     if (rentalIds.length === 0) {
       if (selectedRentals.length > 0) setSelectedRentals([]);
@@ -404,16 +432,27 @@ const InvoiceFormPage: React.FC = () => {
         !selectedRentals.some((r: Rental): boolean => r.rental_id === rentalId)
     );
     if (missingIds.length === 0) return;
-    const hydrated: Rental[] = availableRentals.filter((r: Rental): boolean =>
-      missingIds.includes(r.rental_id)
-    );
-    if (hydrated.length > 0) {
-      setSelectedRentals((current: Rental[]): Rental[] => [
-        ...current,
-        ...hydrated,
-      ]);
-    }
-  }, [availableRentals, formData.rental_ids, selectedRentals]);
+    const hydrate = async (): Promise<void> => {
+      try {
+        const hydrated: Rental[] = await Promise.all(missingIds.map((rentalId: number): Promise<Rental> => greenTargetApi.getRental(rentalId)));
+        if (!active) return;
+        if (hydrated.some((rental: Rental): boolean => rental.customer_id !== formData.customer_id)) {
+          setSelectedRentalError(true);
+          return;
+        }
+        setSelectedRentals((current: Rental[]): Rental[] => [
+          ...current,
+          ...hydrated.filter((rental: Rental): boolean =>
+            rental.customer_id === formData.customer_id && !current.some((row: Rental): boolean => row.rental_id === rental.rental_id)
+          ),
+        ]);
+      } catch (fetchError: unknown) {
+        if (active) setSelectedRentalError(true);
+      }
+    };
+    void hydrate();
+    return (): void => { active = false; };
+  }, [formData.rental_ids, formData.customer_id, selectedRentalRetry]);
 
   // The revenue account behind the current splits (null when they are mixed)
   // decides the prefilled line description.
@@ -426,6 +465,45 @@ const InvoiceFormPage: React.FC = () => {
     return codes.size === 1 ? Array.from(codes)[0] : null;
   }, [formData.revenue_splits]);
 
+  // Mirror the PDF's rental-ID order and the submission route's preference for
+  // the first nonblank address. New rental IDs follow existing ones at save.
+  const billAddressPreview: BillAddressPreview = useMemo((): BillAddressPreview => {
+    const billingAddress: string = selectedCustomer?.billing_address?.trim() || "";
+    const rentals: InvoiceRentalLocation[] = [
+      ...selectedRentals.filter((rental: Rental): boolean => (formData.rental_ids || []).includes(rental.rental_id))
+        .sort((a: Rental, b: Rental): number => a.rental_id - b.rental_id),
+      ...newRentals,
+    ];
+    const pdfLocations: string[] = Array.from(new Set(
+      rentals.map((rental: InvoiceRentalLocation): string => formatLocationDisplay(rental.location_site, rental.location_address)).filter(Boolean)
+    ));
+    const orderedLocations: InvoiceRentalLocation[] = [...rentals].sort((a: InvoiceRentalLocation, b: InvoiceRentalLocation): number =>
+      Number(!a.location_address?.trim()) - Number(!b.location_address?.trim())
+    );
+    const sites: string[] = Array.from(new Map(
+      orderedLocations.map((rental: InvoiceRentalLocation): string => rental.location_site?.trim() || "")
+        .filter(Boolean).map((site: string): [string, string] => [site.toLocaleLowerCase("en-MY"), site])
+    ).values());
+    const preview: BillAddressPreview = {
+      pdf: billingAddress || pdfLocations.join("\n") || "-",
+      einvoice: "",
+      error: false,
+      loading: !selectedCustomer || (!billingAddress && (
+        newRentals.some((draft: GTInvoiceRentalDraft): boolean => !draft.locationInitialized) ||
+        (formData.rental_ids || []).some((rentalId: number): boolean => !selectedRentals.some((rental: Rental): boolean => rental.rental_id === rentalId))
+      )),
+    };
+    try {
+      preview.einvoice = buildGTBillingAddressLines(
+        billingAddress || orderedLocations[0]?.location_address || "Tong Location",
+        billingAddress ? [] : sites
+      ).filter(Boolean).join("\n");
+    } catch {
+      preview.error = true;
+    }
+    return preview;
+  }, [selectedCustomer, selectedRentals, formData.rental_ids, newRentals]);
+
   // Create mode: prefill one line from the revenue account wording and the
   // selected rental count until the user edits the lines by hand. Adding,
   // removing or editing a line sets linesManuallyEditedRef and stops this.
@@ -434,11 +512,11 @@ const InvoiceFormPage: React.FC = () => {
     setInvoiceLines([
       createGTInvoiceLineDraft({
         description: gtInvoiceLineWording(currentRevenueAccount),
-        quantity: selectedRentals.length,
+        quantity: (formData.rental_ids?.length || 0) + newRentals.length,
         unit_price: 200,
       }),
     ]);
-  }, [isEditMode, currentRevenueAccount, selectedRentals.length]);
+  }, [isEditMode, currentRevenueAccount, formData.rental_ids?.length, newRentals.length]);
 
   // Amount (Excl. Tax) is derived from the line items, never keyed directly.
   useEffect(() => {
@@ -476,18 +554,28 @@ const InvoiceFormPage: React.FC = () => {
 
   // --- DATA FETCHING ---
 
-  const fetchCustomers = async () => {
+  const fetchCustomers = async (): Promise<void> => {
+    const requestId: number = ++customerRequestRef.current;
     try {
-      const data = await greenTargetApi.getCustomers();
+      const data: Customer[] = await greenTargetApi.getCustomers();
+      if (requestId !== customerRequestRef.current) return;
       setCustomers(data || []);
+      setCustomersLoadFailed(false);
     } catch (err) {
+      if (requestId !== customerRequestRef.current) return;
       console.error("Error fetching customers:", err);
       toast.error(t("Failed load customers."));
+      setCustomersLoadFailed(true);
+    } finally {
+      if (requestId === customerRequestRef.current) setCustomersLoaded(true);
     }
   };
 
   const fetchBillableRentals = useCallback(async (): Promise<void> => {
+    const requestId: number = ++billableRequestRef.current;
+    setRentalsLoadFailed(false);
     setRentalsLoading(true);
+    setAvailableRentals([]);
     try {
       const params = new URLSearchParams({
         no_invoice: "true",
@@ -495,14 +583,13 @@ const InvoiceFormPage: React.FC = () => {
         limit: RENTALS_PER_PAGE.toString(),
       });
       if (appliedRentalQuery) params.set("search", appliedRentalQuery);
-      // Once the first rental fixes the customer, only their rentals can be
-      // added, so the list narrows instead of paging past everyone else's.
       if (formData.customer_id > 0) {
         params.set("customer_id", formData.customer_id.toString());
       }
       const response: PaginatedRentals = await api.get(
         `/greentarget/api/rentals?${params.toString()}`
       );
+      if (requestId !== billableRequestRef.current) return;
       // A narrowing filter can leave us past the end of the result set.
       const lastPage: number = Math.max(1, response.pagination.totalPages);
       if (rentalPage > lastPage) {
@@ -513,22 +600,25 @@ const InvoiceFormPage: React.FC = () => {
       setRentalTotal(response.pagination.total);
       setRentalTotalPages(lastPage);
     } catch (err) {
+      if (requestId !== billableRequestRef.current) return;
       console.error("Error fetching billable rentals:", err);
       toast.error(t("Failed load rentals."));
+      setRentalsLoadFailed(true);
       setAvailableRentals([]);
       setRentalTotal(0);
       setRentalTotalPages(1);
     } finally {
-      setRentalsLoading(false);
+      if (requestId === billableRequestRef.current) setRentalsLoading(false);
     }
   }, [appliedRentalQuery, formData.customer_id, rentalPage]);
 
-  // Create mode lists every rental that can still be invoiced, across all
-  // customers, so the user picks the work first and the customer follows.
+  // Start with all unbilled rentals for quick selection. A selected customer
+  // narrows the list to preserve the one-customer-per-invoice rule.
   useEffect(() => {
     if (!isEditMode) {
-      fetchBillableRentals();
+      void fetchBillableRentals();
     }
+    return (): void => { billableRequestRef.current += 1; };
   }, [isEditMode, fetchBillableRentals]);
 
   // Searching is server-side, so it must reach every page, not just the one
@@ -541,7 +631,7 @@ const InvoiceFormPage: React.FC = () => {
     return () => clearTimeout(timer);
   }, [rentalQuery]);
 
-  const fetchAvailableRentals = async (customerId: number) => {
+  const fetchAvailableRentals = async (customerId: number): Promise<void> => {
     if (!customerId || customerId <= 0) {
       setAvailableRentals([]);
       setSelectedRentals([]);
@@ -549,6 +639,7 @@ const InvoiceFormPage: React.FC = () => {
       return;
     }
     setRentalsLoading(true);
+    setRentalsLoadFailed(false);
     try {
       const params = new URLSearchParams({
         customer_id: customerId.toString(),
@@ -566,26 +657,11 @@ const InvoiceFormPage: React.FC = () => {
           (r.invoice_info && r.invoice_info.status === "cancelled")
       );
       setAvailableRentals(available);
-      // Reset selections if current ones are no longer valid
-      const validSelectedRentals = selectedRentals.filter(
-        (selectedRental) =>
-          available.some((r) => r.rental_id === selectedRental.rental_id) ||
-          (isEditMode &&
-            initialFormData?.rental_ids?.includes(selectedRental.rental_id))
-      );
-
-      if (validSelectedRentals.length !== selectedRentals.length) {
-        setSelectedRentals(validSelectedRentals);
-        setFormData((prev) => ({
-          ...prev,
-          rental_ids: validSelectedRentals.map((r) => r.rental_id),
-        }));
-      }
     } catch (err) {
       console.error("Error fetching rentals:", err);
-      toast.error("Failed load rentals.");
+      toast.error(t("Failed load rentals."));
+      setRentalsLoadFailed(true);
       setAvailableRentals([]);
-      setSelectedRentals([]);
     } finally {
       setRentalsLoading(false);
     }
@@ -631,6 +707,7 @@ const InvoiceFormPage: React.FC = () => {
       };
       setFormData(parsed);
       setInitialFormData(parsed);
+      setSelectedRentals(Array.isArray(inv.rental_details) ? inv.rental_details : []);
       const storedLines: GreenTargetInvoiceLine[] = Array.isArray(
         inv.invoice_lines
       )
@@ -805,33 +882,76 @@ const InvoiceFormPage: React.FC = () => {
     }));
   };
 
-  // Apply a new rental selection and keep the derived customer in sync.
+  const selectCustomer = (customer: Customer | null, startWithNewRental: boolean = true): void => {
+    billableRequestRef.current += 1;
+    setSelectedRentals([]);
+    setAvailableRentals([]);
+    setNewRentals(startWithNewRental ? [createGTInvoiceRentalDraft()] : []);
+    setRentalQuery("");
+    setAppliedRentalQuery("");
+    setRentalPage(1);
+    setCustomerQuery("");
+    setShowNewRentalCustomer(false);
+    setFormData((current: Invoice): Invoice => ({
+      ...current,
+      customer_id: customer?.customer_id || 0,
+      rental_ids: [],
+      debtor_account_code: customer?.debtor_account_code || "",
+    }));
+  };
+
+  const applyCustomerChange = (next: number | "new"): void => {
+    if (next === "new") {
+      setShowCustomerModal(true);
+    } else if (next === 0) {
+      selectCustomer(null, false);
+    } else {
+      const customer: Customer | undefined = customers.find((row: Customer): boolean => row.customer_id === next);
+      if (customer) selectCustomer(customer);
+    }
+    setPendingCustomerChange(null);
+  };
+
+  const requestCustomerChange = (next: number | "new"): void => {
+    if (isSaving || isEditMode || next === formData.customer_id) return;
+    if (next === "new") setNewCustomerName(customerQuery.trim());
+    if (formData.customer_id > 0 && ((formData.rental_ids?.length || 0) > 0 || newRentals.length > 0)) {
+      setPendingCustomerChange(next);
+    } else {
+      applyCustomerChange(next);
+    }
+  };
+
+  const handleCustomerCreated = (customer: Customer): void => {
+    setCustomers((current: Customer[]): Customer[] => [...current, customer]);
+    selectCustomer(customer);
+    setShowCustomerModal(false);
+    void fetchCustomers();
+  };
+
+  // Customer selection is independent of the rentals, including an empty list.
   const applyRentalSelection = (nextSelectedRentals: Rental[]): void => {
     setSelectedRentals(nextSelectedRentals);
-    const nextCustomerId: number =
-      nextSelectedRentals.length > 0 ? nextSelectedRentals[0].customer_id : 0;
-    // The list narrows to (or reopens from) the selected customer, so start
-    // that new result set at its first page.
-    if (nextCustomerId !== formData.customer_id) setRentalPage(1);
-    setFormData((p: Invoice): Invoice => {
-      if (nextCustomerId === p.customer_id) {
-        return { ...p, rental_ids: nextSelectedRentals.map((r) => r.rental_id) };
-      }
-      const nextCustomer = customers.find(
-        (customer: Customer): boolean =>
-          customer.customer_id === nextCustomerId
-      );
-      return {
-        ...p,
-        customer_id: nextCustomerId,
-        rental_ids: nextSelectedRentals.map((r) => r.rental_id),
-        debtor_account_code: nextCustomer?.debtor_account_code || "",
-      };
-    });
+    setFormData((current: Invoice): Invoice => ({
+      ...current,
+      rental_ids: nextSelectedRentals.map((rental: Rental): number => rental.rental_id),
+    }));
   };
 
   // Handle multiple rental selection
-  const handleRentalToggle = (rental: Rental) => {
+  const handleRentalToggle = (rental: Rental): void => {
+    if (isEditMode || isSaving) return;
+    if (formData.customer_id === 0) {
+      const customer: Customer | undefined = customers.find((row: Customer): boolean => row.customer_id === rental.customer_id);
+      if (!customer) {
+        toast.error(t("Failed load customers."));
+        void fetchCustomers();
+        return;
+      }
+      selectCustomer(customer, false);
+      applyRentalSelection([rental]);
+      return;
+    }
     const isSelected = selectedRentals.some(
       (r) => r.rental_id === rental.rental_id
     );
@@ -843,15 +963,10 @@ const InvoiceFormPage: React.FC = () => {
       return;
     }
 
-    // One invoice bills one customer, so a rental from another customer can
-    // only be added after the current selection is cleared.
-    if (
-      formData.customer_id > 0 &&
-      rental.customer_id !== formData.customer_id
-    ) {
+    if (rental.customer_id !== formData.customer_id) {
       toast.error(
         t(
-          "An invoice covers a single customer. Clear the selected rentals to bill another customer."
+          "This rental belongs to a different customer."
         )
       );
       return;
@@ -861,18 +976,8 @@ const InvoiceFormPage: React.FC = () => {
   };
 
   const handleClearRentals = (): void => {
+    if (isEditMode || isSaving) return;
     applyRentalSelection([]);
-    // Clearing the selection re-arms the line prefill.
-    linesManuallyEditedRef.current = false;
-    if (!isEditMode) {
-      setInvoiceLines([
-        createGTInvoiceLineDraft({
-          description: gtInvoiceLineWording(currentRevenueAccount),
-          quantity: 0,
-          unit_price: 200,
-        }),
-      ]);
-    }
   };
 
   const handleInvoiceLinesChange = (nextLines: GTInvoiceLineDraft[]): void => {
@@ -914,13 +1019,27 @@ const InvoiceFormPage: React.FC = () => {
 
     if (
       formData.type === "regular" &&
-      (!formData.rental_ids || formData.rental_ids.length === 0)
+      (formData.rental_ids?.length || 0) + newRentals.length === 0
     ) {
-      toast.error(t("Select at least one rental"));
+      toast.error(t("Add or select at least one rental"));
       return false;
     }
     if (!formData.customer_id || formData.customer_id <= 0) {
-      toast.error(t("Select a rental to set the customer"));
+      toast.error(t("Select a customer"));
+      return false;
+    }
+    if (newRentals.some((draft: GTInvoiceRentalDraft): boolean => !draft.driver.trim())) {
+      toast.error(t("Please select a driver"));
+      return false;
+    }
+    if (newRentals.some((draft: GTInvoiceRentalDraft): boolean => !draft.locationInitialized)) {
+      toast.error(t("Wait for service locations to load, or select no specific location."));
+      return false;
+    }
+    if ((formData.rental_ids || []).some((rentalId: number): boolean =>
+      !selectedRentals.some((rental: Rental): boolean => rental.rental_id === rentalId)
+    )) {
+      toast.error(t("Wait for the selected rentals to load."));
       return false;
     }
     const invoiceTotalCents: number = toCents(
@@ -1064,7 +1183,9 @@ const InvoiceFormPage: React.FC = () => {
     return true;
   };
   const submitForm = async (): Promise<void> => {
+    if (savingRef.current) return;
     if (!validateForm()) return;
+    savingRef.current = true;
     setIsSaving(true);
     const totalAmount = formData.amount_before_tax + formData.tax_amount;
     try {
@@ -1104,10 +1225,18 @@ const InvoiceFormPage: React.FC = () => {
         total_amount: number;
         invoice_id?: number;
         lines?: GreenTargetInvoiceLineInput[];
+        new_rentals?: GreenTargetNewInvoiceRental[];
       } = {
         type: formData.type,
         customer_id: Number(formData.customer_id),
         rental_ids: formData.rental_ids || [],
+        ...(!isEditMode ? {
+          new_rentals: newRentals.map((draft: GTInvoiceRentalDraft): GreenTargetNewInvoiceRental => ({
+            driver: draft.driver.trim(),
+            location_id: draft.location_id,
+            tong_no: draft.tong_no,
+          })),
+        } : {}),
         amount_before_tax: Number(formData.amount_before_tax),
         tax_amount: Number(formData.tax_amount),
         total_amount: Number(totalAmount),
@@ -1308,6 +1437,7 @@ const InvoiceFormPage: React.FC = () => {
       const msg = error instanceof Error ? error.message : t("Unknown error");
       toast.error(t("Error: {{message}}", { message: msg }));
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
       // One-shot: a fresh advance needs a fresh confirmation.
       advancePaymentConfirmedRef.current = false;
@@ -1360,9 +1490,6 @@ const InvoiceFormPage: React.FC = () => {
     );
   }
 
-  const selectedCustomer: Customer | undefined = customers.find(
-    (c) => c.customer_id === formData.customer_id
-  );
   const selectedCustomerForEinvoice = selectedCustomer;
   const canSubmitEinvoice = !!(
     selectedCustomerForEinvoice?.tin_number &&
@@ -1376,7 +1503,7 @@ const InvoiceFormPage: React.FC = () => {
         <div className="p-6 border-b border-default-200 dark:border-gray-700">
           <div className="flex items-center gap-4">
             <BackButton onClick={handleBackClick} />
-            <div className="h-6 w-px bg-default-300"></div>
+            <div className="h-6 w-px bg-default-300 dark:bg-gray-600" aria-hidden="true"></div>
             <div>
               <h1 className="text-xl font-semibold text-default-900 dark:text-gray-100">
                 {isEditMode
@@ -1518,68 +1645,152 @@ const InvoiceFormPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Second row: the customer is derived from the selected rentals */}
-          <div className="mt-6">
-            <div className="space-y-2">
-              <span className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                {t("Customer")} <span className="text-red-500">*</span>
-              </span>
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-default-300 dark:border-gray-600 bg-default-50 dark:bg-gray-900/50 px-3 py-2">
-                {selectedCustomer ? (
-                  <div className="min-w-0">
-                    <div className="truncate font-medium text-default-900 dark:text-gray-100">
-                      {selectedCustomer.name}
-                    </div>
-                    {selectedCustomer.phone_number && (
-                      <div className="text-xs text-default-500 dark:text-gray-400">
-                        {selectedCustomer.phone_number}
-                      </div>
-                    )}
+          {formData.customer_id > 0 && (
+            <div className="mt-6 rounded-xl border border-default-200 bg-white dark:border-gray-700 dark:bg-gray-900/20">
+              <div className="flex flex-col gap-3 rounded-t-xl bg-default-50/80 px-4 py-3 dark:bg-gray-800/60 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                    <IconUser size={20} aria-hidden="true" />
                   </div>
-                ) : (
-                  <span className="text-sm text-default-500 dark:text-gray-400">
-                    {t(
-                      "Select a rental below — the customer is set from your selection."
-                    )}
-                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-default-500 dark:text-gray-400">{t("Customer")}</p>
+                    <p className="break-words text-base font-semibold text-default-900 dark:text-gray-100">
+                      {selectedCustomer?.name || selectedRentals[0]?.customer_name}
+                    </p>
+                  </div>
+                </div>
+                {!isEditMode && (
+                  <Button type="button" variant="outline" size="sm" icon={IconSearch}
+                    disabled={isSaving} onClick={(): void => requestCustomerChange(0)}
+                    className="shrink-0 self-start sm:self-center">
+                    {t("Browse all unbilled rentals")}
+                  </Button>
                 )}
-                {!isEditMode &&
-                  !documentIdentityLocked &&
-                  formData.customer_id > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleClearRentals}
-                      className="shrink-0 text-sm text-sky-600 hover:text-sky-700 hover:underline dark:text-sky-400"
-                >
-                  {t("Change customer")}
-                </button>
-                  )}
+              </div>
+              {!isEditMode && (
+                <GTInvoiceRentalDrafts
+                  key={formData.customer_id}
+                  customerId={formData.customer_id}
+                  customerPhone={selectedCustomer?.phone_number || ""}
+                  drafts={newRentals}
+                  onChange={setNewRentals}
+                  disabled={isSaving}
+                />
+              )}
+              <div className="space-y-3 border-t border-default-200 p-4 dark:border-gray-700 sm:p-5">
+                <div className="space-y-1">
+                  <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">{t("Address on the bill")}</h2>
+                  <p className="text-xs text-default-500 dark:text-gray-400">
+                    {selectedCustomer?.billing_address?.trim()
+                      ? t("The customer's billing address is used on both documents instead of rental locations.")
+                      : t("The PDF lists rental locations. The e-Invoice uses the first available rental address and all site names.")}
+                  </p>
+                </div>
+                {billAddressPreview.loading ? (
+                  <p className="text-sm text-default-500 dark:text-gray-400">{t("Waiting for customer and rental locations to load.")}</p>
+                ) : (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-default-200 bg-default-50/60 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+                      <h3 className="mb-2 text-xs font-medium text-default-500 dark:text-gray-400">{t("Invoice / PDF")}</h3>
+                      <p className="whitespace-pre-line break-words text-sm text-default-800 dark:text-gray-200">{billAddressPreview.pdf}</p>
+                    </div>
+                    <div className="rounded-lg border border-default-200 bg-default-50/60 p-3 dark:border-gray-700 dark:bg-gray-800/40">
+                      <h3 className="mb-2 text-xs font-medium text-default-500 dark:text-gray-400">{t("e-Invoice")}</h3>
+                      {billAddressPreview.error ? (
+                        <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">{t("The billing address and site names exceed the e-Invoice address limit. Shorten them before submitting.")}</p>
+                      ) : (
+                        <p className="whitespace-pre-line break-words text-sm text-default-800 dark:text-gray-200">{billAddressPreview.einvoice}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
+          )}
+          {customersLoadFailed && (
+            <div className="mt-2 flex items-center gap-3 text-sm text-amber-700 dark:text-amber-300" role="alert">
+              <span>{t("Failed load customers.")}</span>
+              <Button type="button" variant="outline" disabled={isSaving} onClick={(): void => { void fetchCustomers(); }}>{t("Retry")}</Button>
+            </div>
+          )}
 
           {/* Conditional Fields (Regular Invoice - Multiple Rental Selection) */}
+          {selectedRentalError && (
+            <div className="mt-4 flex items-center gap-3 text-sm text-amber-700 dark:text-amber-300" role="alert">
+              <span>{t("Failed load rentals.")}</span>
+              <Button type="button" variant="outline" disabled={isSaving}
+                onClick={(): void => setSelectedRentalRetry((current: number): number => current + 1)}>
+                {t("Retry")}
+              </Button>
+            </div>
+          )}
           {formData.type === "regular" && (
             <div
               className={clsx(
-                "mt-6",
-                documentIdentityLocked && "pointer-events-none opacity-60"
+                "mt-6 rounded-xl border border-default-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/20 sm:p-5",
+                (documentIdentityLocked || isSaving) && "pointer-events-none opacity-60"
               )}
               aria-disabled={documentIdentityLocked}
             >
-              <div className="space-y-2">
-                <label className="block text-sm font-medium text-default-700 dark:text-gray-200">
-                  {t("Select Rentals")} <span className="text-red-500">*</span>
-                  <span className="text-sm font-normal text-default-500 dark:text-gray-400 ml-1">
-                    {isEditMode
-                      ? t(
-                          "(Rentals cannot be changed after the invoice is created)"
-                        )
-                      : t(
-                          "(Every rental still waiting to be invoiced — pick one or more from the same customer)"
-                        )}
-                  </span>
-                </label>
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-semibold text-default-800 dark:text-gray-100">
+                      {isEditMode ? t("Select Rentals") : t("Existing unbilled rentals")}
+                    </h2>
+                    <p className="text-sm text-default-500 dark:text-gray-400">
+                      {isEditMode
+                        ? t("(Rentals cannot be changed after the invoice is created)")
+                        : formData.customer_id === 0
+                        ? t("Select a rental to automatically select its customer.")
+                        : t("Select existing rentals to include with any new rentals above.")}
+                    </p>
+                  </div>
+                  {!isEditMode && formData.customer_id === 0 && (
+                    <Button type="button" variant="outline" color="sky" size="sm"
+                      icon={showNewRentalCustomer ? IconX : IconPlus}
+                      className="shrink-0 self-start sm:self-center"
+                      disabled={isSaving}
+                      aria-expanded={showNewRentalCustomer}
+                      aria-controls="new-rental-customer"
+                      onClick={(): void => {
+                        setShowNewRentalCustomer((current: boolean): boolean => !current);
+                        setCustomerQuery("");
+                      }}>
+                      {showNewRentalCustomer ? t("Cancel") : t("Add new rental")}
+                    </Button>
+                  )}
+                </div>
+                {!isEditMode && formData.customer_id === 0 && showNewRentalCustomer && (
+                  <div id="new-rental-customer" className="relative z-20 space-y-3 rounded-xl border border-sky-200 bg-sky-50/60 p-4 dark:border-sky-800 dark:bg-sky-950/30">
+                    <p className="text-sm text-default-600 dark:text-gray-300">{t("Choose or create a customer for the new rental.")}</p>
+                    <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto]">
+                      <FormCombobox
+                        name="invoice_customer"
+                        label={t("Customer")}
+                        value={undefined}
+                        onChange={(value: string | string[] | null): void => {
+                          if (typeof value === "string") requestCustomerChange(Number(value));
+                        }}
+                        options={customers.map((customer: Customer): SelectOption => ({
+                          id: customer.customer_id,
+                          name: customer.name,
+                          phone_number: customer.phone_number,
+                          searchText: `${customer.name} ${customer.phone_number || ""}`,
+                        }))}
+                        mode="single"
+                        query={customerQuery}
+                        setQuery={setCustomerQuery}
+                        placeholder={t("Search customer name or phone...")}
+                        required
+                        disabled={isSaving}
+                      />
+                      <Button type="button" variant="outline" disabled={isSaving} onClick={(): void => requestCustomerChange("new")}>
+                        {t("Create customer")}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {!isEditMode && (
                   <>
@@ -1607,7 +1818,7 @@ const InvoiceFormPage: React.FC = () => {
                     {formData.customer_id > 0 && (
                       <p className="text-xs text-default-500 dark:text-gray-400">
                         {t(
-                          `Showing only {{name}}'s rentals. Use "Change customer" above to browse every customer again.`,
+                          "Showing rentals for {{name}}.",
                           {
                             name:
                               selectedCustomer?.name || t("this customer"),
@@ -1618,6 +1829,18 @@ const InvoiceFormPage: React.FC = () => {
                   </>
                 )}
 
+                {rentalsLoadFailed && (
+                  <div className="flex items-center gap-3 text-sm text-amber-700 dark:text-amber-300" role="alert">
+                    <span>{t("Failed load rentals.")}</span>
+                    <Button type="button" variant="outline" disabled={isSaving}
+                      onClick={(): void => {
+                        if (isEditMode) void fetchAvailableRentals(formData.customer_id);
+                        else void fetchBillableRentals();
+                      }}>
+                      {t("Retry")}
+                    </Button>
+                  </div>
+                )}
                 {rentalsLoading ? (
                   <div className="p-4 border border-default-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400 text-center">
                     {t("Loading rentals...")}
@@ -1826,10 +2049,13 @@ const InvoiceFormPage: React.FC = () => {
 
                 {selectedRentals.length > 0 && (
                   <div className="mt-4">
-                    <div className="text-sm font-medium text-default-700 dark:text-gray-200 mb-2">
-                      {t("Selected Rentals ({{count}})", {
-                        count: selectedRentals.length,
-                      })}
+                    <div className="mb-2 flex items-center justify-between gap-3 text-sm font-medium text-default-700 dark:text-gray-200">
+                      <span>{t("Selected Rentals ({{count}})", { count: selectedRentals.length })}</span>
+                      {!isEditMode && (
+                        <button type="button" onClick={handleClearRentals} disabled={isSaving} className="text-sky-600 hover:underline dark:text-sky-400">
+                          {t("Clear selection")}
+                        </button>
+                      )}
                     </div>
                     <div className="space-y-2">
                       {selectedRentals.map((rental) => (
@@ -2317,28 +2543,14 @@ const InvoiceFormPage: React.FC = () => {
               </h2>
               {canSubmitEinvoice ? (
                 isInvoiceDateEligibleForEinvoice(formData.date_issued) ? (
-                  <div className="flex items-center space-x-2">
-                    <button
-                      type="button"
-                      onClick={() => setSubmitAsEinvoice(!submitAsEinvoice)}
-                      className="flex items-center cursor-pointer group p-1"
-                    >
-                      {submitAsEinvoice ? (
-                        <IconSquareCheckFilled
-                          className="text-sky-600 dark:text-sky-400 group-hover:text-sky-700"
-                          size={20}
-                        />
-                      ) : (
-                        <IconSquare
-                          className="text-default-400 group-hover:text-default-500 dark:text-gray-400"
-                          size={20}
-                        />
-                      )}
-                      <span className="ml-2 text-sm font-medium text-default-700 group-hover:text-default-900 dark:text-gray-100">
-                        {t("Submit e-Invoice upon saving")}
-                      </span>
-                    </button>
-                  </div>
+                  <Checkbox
+                    checked={submitAsEinvoice}
+                    onChange={setSubmitAsEinvoice}
+                    checkedColor="text-sky-600 dark:text-sky-400"
+                    label={t("Submit e-Invoice upon saving")}
+                    ariaLabel={t("Submit e-Invoice upon saving")}
+                    className="p-1"
+                  />
                 ) : (
                   <div className="text-sm text-amber-600">
                     {t("Cannot submit e-Invoice for dates older than 3 days.")}
@@ -2404,6 +2616,24 @@ const InvoiceFormPage: React.FC = () => {
         isLoading={isSubmittingEInvoice}
       />
       {/* Dialogs */}
+      {showCustomerModal && (
+        <GTInvoiceCustomerModal
+          initialName={newCustomerName}
+          onClose={(): void => setShowCustomerModal(false)}
+          onCreated={handleCustomerCreated}
+        />
+      )}
+      <ConfirmationDialog
+        isOpen={pendingCustomerChange !== null}
+        onClose={(): void => setPendingCustomerChange(null)}
+        onConfirm={(): void => {
+          if (pendingCustomerChange !== null) applyCustomerChange(pendingCustomerChange);
+        }}
+        title={t("Change customer")}
+        message={t("Changing the customer clears the new rentals and selected existing rentals on this invoice.")}
+        confirmButtonText={t("Change customer")}
+        variant="default"
+      />
       <ConfirmationDialog
         isOpen={showBackConfirmation}
         onClose={() => setShowBackConfirmation(false)}
