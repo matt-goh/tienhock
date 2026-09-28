@@ -1,5 +1,8 @@
 # ARI Balance Sheet review - 8 September 2026
 
+> **Latest,28 September2026 KL:** Document143.pdf directly shows January ARI -31,495.55 in APPX5 and total expenses111,242.04. The report fix and ARI Note5/AE restoration plus worker-advance correction are now applied in dev; January and February core totals match the supplied sheet. Production deployment/new SQL pending. The old ARI evidence hold and worker-prepared statuses below are superseded. March onward still differs422.25; March payments remain MBTEL. The user deferred obtaining March, so do not request it again now. See [January Note5 resolution and current production handoff](JANUARY_NOTE5_RESOLUTION_2026-09-28.md).
+
+
 **Reopened 9 September 2026 KL:** the user now says **CL_AFI is under receivables and
 ARI is under expenses**. Keep CL_AFI unchanged. The earlier receivables classification
 was an inference from the schedule heading; balancing the BS did not establish the

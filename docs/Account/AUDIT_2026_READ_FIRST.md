@@ -1,5 +1,11 @@
 # 2026 year-end audit and discrepancy reconciliation — READ FIRST
 
+> **Latest,28 September2026 KL:** Document143.pdf directly shows January ARI -31,495.55 in APPX5 and total expenses111,242.04. The report fix and ARI Note5/AE restoration plus worker-advance correction are now applied in dev; January and February core totals match the supplied sheet. Production deployment/new SQL pending. The old ARI evidence hold and worker-prepared statuses below are superseded. March onward still differs422.25; March payments remain MBTEL. The user deferred obtaining March, so do not request it again now. See [January Note5 resolution and current production handoff](JANUARY_NOTE5_RESOLUTION_2026-09-28.md).
+
+
+> **Latest accountant replies,22 September2026:** RM2,500 in PV007/02 belongs to CA_WA; a separate correction is prepared and rollback-verified, not applied. All three March payments are confirmed MBTEL and stay unchanged. ARI is confirmed again as January opening credit31,495.55, already matching ERP. Do not re-ask these source-account/opening questions. Latest legacy January/March Note5 breakdown is still needed for the report-treatment difference and422.25 residual. See [confirmed replies and worker-advance correction](WORKER_ADVANCE_CONFIRMATION_2026-09-22.md). Earlier hypotheses below are historical.
+
+
 **Production confirmed by user-supplied SSH output on 22 September 2026:** the combined correction completed with final `COMMIT`. JP June is DR594.10; January correction journal13499 (`JV2601-CORR-0913`) and August PCB offset journal13500 (`JV2608-PCB-OFFSET-0913`) were created. All four January account targets match. Misplaced journal `JCN-202608-0007` is cancelled; JP credit note `JP-CN-26-7` remains active with its journal link cleared. All12 monthly TB/BS differences are zero. January TB14,056,981.54/profit110,768.22; August TB18,247,230.64/profit436,996.33. Flour purchases remain19,765 and19,600. This confirms the SQL outcome, not full reconciliation of the remaining2,500/422.25/ARI31,495.55 questions. Execution timestamp was not included in the pasted output. Local evidence: `out/audit-2026-jp-ledger-isolation-2026-09-22/production-confirmation.txt`. Earlier pending/dev entries below are historical; the latest dev refresh was only rehearsed and rolled back.
 
 

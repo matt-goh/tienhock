@@ -1,5 +1,19 @@
 # Migrations Applied & Removed — Ledger
 
+## Applied dev; production pending: 28 September 2026 - January APPX5 ARI and worker advance
+
+Direct January expense PDF evidence now resolves the ARI treatment. Restored ARI to AE/level2/Note5, preserving its31,495.55 credit opening and all journals; matching report code includes that exact2026 fiscal opening once in IS/BS profit. Added the confirmed worker advance journal13664 (`JV2602-WA-CORR-0922`,19 February, DR CA_WA/CR ACW_SAL2,500). Dev committed state verified 2026-09-28 13:15:28 KL; atomic rollback rehearsal and full-bundle no-op rerun passed. January and February core totals match; all12 TB/BS balance, CoGM unchanged. March422.25 remains unresolved; no telephone reclassification.
+
+Deploy the report code first, then use the new local-only `out/audit-2026-january-note5-2026-09-28/paste-production-ssh.sh`. Earlier September production corrections are already present and are not repeated. This replaces the older pending worker-only paste for the new ARI mapping. SQL is not committed. Bundle SHA-256: `050e99325298a3fe918efedac98c3f2a255dc9fe859034a0dc3fccc7cb455fa2`. [Evidence, verification and production sequence](Account/JANUARY_NOTE5_RESOLUTION_2026-09-28.md).
+
+
+## Prepared; not applied: 22 September 2026 - confirmed worker advance
+
+User confirms PV007/02 on19 February: RM2,500 belongs to CA_WA. New local-only correction `JV2602-WA-CORR-0922` debits CA_WA and credits ACW_SAL, preserving the imported voucher. Rollback verification, exact no-op rerun, altered-source rejection and altered-correction rejection passed at13:01:43 KL. All12 TB/BS balance; February TB14,585,854.01; income/CoGM and BS net assets unchanged. The current dev snapshot predates the prior production corrections; those were reconstructed only inside the rolled-back test. No new correction was committed in dev or executed in production.
+
+Production paste: `out/audit-2026-worker-advance-correction-2026-09-22/paste-production-ssh.sh`. This new script contains only the RM2,500 reclassification. Earlier confirmed production corrections need not be rerun. March telephone payments stay MBTEL as confirmed; ARI opening already matches the auditor. [Evidence and remaining report questions](Account/WORKER_ADVANCE_CONFIRMATION_2026-09-22.md).
+
+
 ## Removed 22 September 2026 - closing-stock and January four-account SQL
 
 Both files have now been removed by the user after production application was confirmed. Neither needs to be run again. This cleanup removes migration files only; it does not reverse any database correction.
