@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-28",
+    ms: "Laporan Tien Hock 2026 kini mengambil kira baki awal ARI dalam belanja mengikut lampiran program lama, supaya untung dan Balance Sheet menggunakan kiraan yang sama. Pendahuluan pekerja RM2,500 bagi Februari dipindahkan ke CA_WA; bayaran telefon Mac dan CoGM dikekalkan.",
+    en: "Tien Hock's 2026 reports now include the ARI opening balance in expenses as shown in the legacy appendix, keeping profit and the Balance Sheet consistent. February's RM2,500 worker advance is moved to CA_WA; March telephone postings and CoGM are unchanged.",
+  },
+  {
     date: "2026-09-26",
     ms: "Nota kredit, debit dan bayaran balik kini boleh dipautkan semula kepada e-Invois MyInvois yang sah dengan memasukkan UUID. Status menunggu boleh disemak melalui rekod penghantaran jika UUID tiada, dan boleh dikosongkan selepas MyInvois mengesahkan penghantaran gagal atau dibatalkan. Amaun dan catatan akaun dikekalkan.",
     en: "Credit, debit and refund notes can now be linked to an existing valid MyInvois e-Invoice by entering its UUID. Pending status can be checked through the submission record when the UUID is missing, and cleared after MyInvois confirms failure or cancellation. Amounts and accounting entries stay unchanged.",

@@ -1,5 +1,8 @@
 # Core accounting report review - 9 September 2026 KL
 
+> **Latest,28 September2026 KL:** Document143.pdf directly shows January ARI -31,495.55 in APPX5 and total expenses111,242.04. The report fix and ARI Note5/AE restoration plus worker-advance correction are now applied in dev; January and February core totals match the supplied sheet. Production deployment/new SQL pending. The old ARI evidence hold and worker-prepared statuses below are superseded. March onward still differs422.25; March payments remain MBTEL. The user deferred obtaining March, so do not request it again now. See [January Note5 resolution and current production handoff](JANUARY_NOTE5_RESOLUTION_2026-09-28.md).
+
+
 > **JP posting issue resolved in dev,22 September2026:** With explicit user approval, the shared adjustment route now excludes Jelly Polly documents from Tien Hock journal posting. The misplaced258.13 journal is cancelled while its JP credit note and invoice/customer effects stay intact. Dev applied05:44:07 KL, exact rerun05:44:45. Production deployment and SQL pending. Use the [latest combined production script and isolation verification](JP_ADJUSTMENT_ISOLATION_2026-09-22.md); older pending-permission statuses below are historical.
 
 

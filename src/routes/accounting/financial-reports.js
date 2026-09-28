@@ -108,8 +108,8 @@ export default function (pool) {
   /** @type {string[]} */
   const COGM_OPENING_STOCK_NOTES = ["3-3", "3-7"];
 
-  // Profit-and-loss reports consume only the exact fiscal-year opening-stock
-  // anchors. This is deliberately separate from the latest-anchor semantics
+  // Opening stock uses only the exact fiscal-year anchors. This is deliberately
+  // separate from the latest-anchor semantics
   // used by the Trial Balance and Balance Sheet account balances: a later
   // checkpoint must never replace opening stock in the Income Statement or
   // CoGM.
@@ -126,6 +126,23 @@ export default function (pool) {
           WHERE aob.as_of_date = $1::date
             AND efn.fs_note = ANY($3::varchar[])
           GROUP BY efn.fs_note
+        )`;
+
+  // Confirmed January 2026 APPX5 includes ARI's fiscal opening credit.
+  // Keep this legacy migration exception separate from stock and later years.
+  /** @type {string} */
+  const LEGACY_2026_ARI_OPENING_CTE = `
+        legacy_ari_opening AS (
+          SELECT efn.fs_note,
+            CASE WHEN aob.amount > 0 THEN aob.amount ELSE 0 END AS total_debit,
+            CASE WHEN aob.amount < 0 THEN -aob.amount ELSE 0 END AS total_credit,
+            aob.amount AS net
+          FROM account_opening_balances aob
+          JOIN effective_fs_notes efn ON efn.code = aob.account_code
+          WHERE aob.account_code = 'ARI'
+            AND aob.as_of_date = $1::date
+            AND aob.as_of_date = DATE '2026-01-01'
+            AND efn.fs_note = '5'
         )`;
 
   /** @type {string[]} */
@@ -741,6 +758,7 @@ export default function (pool) {
       const query = `
         WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
         ${EXACT_FISCAL_OPENING_STOCK_CTE},
+        ${LEGACY_2026_ARI_OPENING_CTE},
         period_activity AS (
           SELECT
             efn.fs_note,
@@ -755,6 +773,8 @@ export default function (pool) {
           UNION ALL
           SELECT fs_note, total_debit, total_credit
           FROM fiscal_opening_stock
+          UNION ALL
+          SELECT fs_note, total_debit, total_credit FROM legacy_ari_opening
         ),
         period_balances AS (
           SELECT
@@ -892,11 +912,13 @@ export default function (pool) {
       // Balance Sheet notes use each account's latest applicable opening
       // anchor plus subsequent posted movement. Current Year Profit follows
       // the Income Statement: exact fiscal-year opening stock plus posted YTD
-      // movement. Later checkpoint anchors do not replace fiscal opening stock.
+      // movement, plus the confirmed 2026 ARI opening in Note 5. Later checkpoints
+      // never substitute for fiscal opening stock or the legacy ARI opening.
       const query = `
         WITH RECURSIVE ${EFFECTIVE_FS_NOTES_CTES},
         ${ANCHORED_ACCOUNT_BALANCES_CTES},
         ${EXACT_FISCAL_OPENING_STOCK_CTE},
+        ${LEGACY_2026_ARI_OPENING_CTE},
         statement_balances AS (
           SELECT
             efn.fs_note,
@@ -924,6 +946,8 @@ export default function (pool) {
           UNION ALL
           SELECT fs_note, net
           FROM fiscal_opening_stock
+          UNION ALL
+          SELECT fs_note, net FROM legacy_ari_opening
         ),
         pnl_movements AS (
           SELECT fs_note, SUM(net) AS net
