@@ -1,5 +1,12 @@
 # Migrations Applied & Removed — Ledger
 
+## Applied dev; production pending: 30 September 2026 KL - March telephone allocation
+
+Document146.pdf directly places PV002/03 debit85.15+168.55 and PBE037/03 debit168.55 under AC_TM. This supersedes the earlier verbal MBTEL confirmation and resolves the remaining422.25 discrepancy. Added journal13720 / JV2603-TM-CORR-0929 dated31 March: DR AC_TM / CR MBTEL422.25. Original vouchers, payments, imported staging, openings and bill accruals are preserved. No schema or report-code change. Dev committed state verified 2026-09-30 01:56:14 KL; all96 March expenses and January-August TB/profit/BS/CoGM targets match, all12 TB/BS balance.
+
+New local paste: out/audit-2026-march-telephone-detail/paste-production-ssh.sh. Requires the September28 ARI/worker correction and report code first. Do not rerun the older September28 bundle after this March adjustment; its baseline predates the correction. SQL remains uncommitted. SHA-256: 3fb7ca9ca1b7999cb0ad7f775bb5202a04a0700a5d7fd6c826712f206206d417. [Source evidence, safeguards, validation and production sequence](Account/MARCH_TELEPHONE_CORRECTION_2026-09-29.md).
+
+
 ## Applied dev; production pending: 28 September 2026 - January APPX5 ARI and worker advance
 
 Direct January expense PDF evidence now resolves the ARI treatment. Restored ARI to AE/level2/Note5, preserving its31,495.55 credit opening and all journals; matching report code includes that exact2026 fiscal opening once in IS/BS profit. Added the confirmed worker advance journal13664 (`JV2602-WA-CORR-0922`,19 February, DR CA_WA/CR ACW_SAL2,500). Dev committed state verified 2026-09-28 13:15:28 KL; atomic rollback rehearsal and full-bundle no-op rerun passed. January and February core totals match; all12 TB/BS balance, CoGM unchanged. March422.25 remains unresolved; no telephone reclassification.

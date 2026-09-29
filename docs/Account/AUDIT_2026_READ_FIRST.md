@@ -1,5 +1,9 @@
 # 2026 year-end audit and discrepancy reconciliation — READ FIRST
 
+> **Latest, Document146 received (29 September2026 US / 30 September2026 KL):** The March MBTEL/AC_TM ledgers directly show all three payments under AC_TM. This supersedes the earlier MBTEL reply and closes the422.25 evidence question. Guarded correction JV2603-TM-CORR-0929 applied in dev, journal13720, verified 2026-09-30 01:56:14 KL. January-August all four core totals match; all96 March expenses match and all12 TB/BS balance. Production pending. No further accountant clarification is needed. See [March telephone correction and production handoff](MARCH_TELEPHONE_CORRECTION_2026-09-29.md).
+
+> **Latest,29 September2026 KL:** Document145.pdf (March APPX5) has now been received. All96 nonzero expense rows were compared:95 match; only MBTEL differs, legacy4,523.45 versus dev4,945.70. This explains the full422.25 residual. The same March invoice appears in a payment and a month-end bill entry, but the earlier MBTEL payment confirmation remains in force; no March correction was made. Request only the latest March MBTEL/AC_TM transaction detail, including balances/adjustments. This supersedes the earlier March-deferred/request-summary statuses below. See [March Note5 evidence and remaining question](MARCH_NOTE5_REVIEW_2026-09-29.md).
+
 > **Latest,28 September2026 KL:** Document143.pdf directly shows January ARI -31,495.55 in APPX5 and total expenses111,242.04. The report fix and ARI Note5/AE restoration plus worker-advance correction are now applied in dev; January and February core totals match the supplied sheet. Production deployment/new SQL pending. The old ARI evidence hold and worker-prepared statuses below are superseded. March onward still differs422.25; March payments remain MBTEL. The user deferred obtaining March, so do not request it again now. See [January Note5 resolution and current production handoff](JANUARY_NOTE5_RESOLUTION_2026-09-28.md).
 
 

@@ -1,5 +1,7 @@
 # January Note5 resolution and worker advance - 28 September 2026 KL
 
+> **Later March resolution:** Document146.pdf now proves that the three telephone payments belong to AC_TM. The March422.25 hold below is historical. Apply the September28 bundle before the separate March correction if still pending; do not rerun this older bundle after the March correction because its baseline guards predate it. See [March telephone correction](MARCH_TELEPHONE_CORRECTION_2026-09-29.md).
+
 **Implemented and applied in dev. Committed state verified at 2026-09-28 13:15:28 KL, worker journal 13664. Production code deployment and this new SQL remain pending.** The user supplied the latest production data in dev and asked to continue the core-report reconciliation. Earlier September production corrections are already present; they were not recreated.
 
 ## Direct source evidence resolves the ARI question
@@ -35,7 +37,7 @@ April-July have the same422.25 remaining differences. All12 monthly TB/BS checks
 
 The accountant's newly repeated differences (February2,500; March2,077.75) describe the **before-correction** state. Once2,500 is corrected, February agrees, while March's signed target-minus-ERP difference changes from+2,077.75 to-422.25. These are not two additional adjustments. The previously suggested telephone reclassification is ruled out by the explicit MBTEL confirmation; all three March payments stay where they are.
 
-The accountant offered March, but the user said January was sufficient for now. **Do not request March again at this stage.** Retain the422.25 discrepancy for later evidence; it does not block the now-evidenced January/February corrections.
+The user subsequently supplied March's `Document 145.pdf`. The29 September read-only comparison localizes the full422.25 difference to MBTEL: legacy4,523.45 versus current4,945.70; the other95 nonzero expense accounts match. The remaining request is now legacy March MBTEL/AC_TM transaction detail, not another Note5 summary or a repeated payment-code question. See [March Note5 review](MARCH_NOTE5_REVIEW_2026-09-29.md). No March correction is included in the production bundle.
 
 ## Validation
 

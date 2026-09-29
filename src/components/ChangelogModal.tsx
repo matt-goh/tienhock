@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-30",
+    ms: "Pembetulan akaun telefon Mac 2026 disediakan mengikut rekod program lama: RM422.25 dipindahkan daripada MBTEL ke AC_TM supaya belanja dan untung tidak mengira bayaran yang sama dua kali. Pembetulan ini perlu dimasukkan ke pangkalan data sebelum jumlah laporan berubah.",
+    en: "A March 2026 telephone correction is prepared from the legacy records: RM422.25 moves from MBTEL to AC_TM so expenses and profit do not count the same payments twice. The correction must be applied to the database before report totals change.",
+  },
+  {
     date: "2026-09-29",
     ms: "Pecahan umur baki penyata pelanggan Green Target yang dicetak dari Invois kini mengambil kira baki awal dan sepadan dengan penyata Akaun > Penghutang. Penyata Akaun > Penghutang kini turut memaparkan nota faedah lewat bayar, butiran bank, maklumat penyata dan nota tanpa tandatangan.",
     en: "Green Target customer statements printed from Invoices now include opening balances in the ageing boxes and match Accounting > Debtors. Accounting > Debtors statements now also show the overdue-interest note, bank details, statement information and no-signature note.",
