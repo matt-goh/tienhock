@@ -1,6 +1,7 @@
 import { isSecurityAdmin, logSecurityAction } from "../../middleware/security.js";
 // src/routes/staff.js
 import { Router } from "express";
+import { format } from "date-fns";
 import cache, { CACHE_TTL, CACHE_KEYS } from "../utils/memory-cache.js";
 
 export default function (pool) {
@@ -121,15 +122,15 @@ export default function (pool) {
               ...staff,
               job: Array.isArray(staff.job) ? staff.job : [],
               location: Array.isArray(staff.location) ? staff.location : [],
-              // Format dates
+              // Preserve local calendar dates from PostgreSQL DATE columns.
               birthdate: staff.birthdate
-                ? staff.birthdate.toISOString().split("T")[0]
+                ? format(new Date(staff.birthdate), "yyyy-MM-dd")
                 : "",
               dateJoined: staff.dateJoined
-                ? staff.dateJoined.toISOString().split("T")[0]
+                ? format(new Date(staff.dateJoined), "yyyy-MM-dd")
                 : "",
               dateResigned: staff.dateResigned
-                ? staff.dateResigned.toISOString().split("T")[0]
+                ? format(new Date(staff.dateResigned), "yyyy-MM-dd")
                 : "",
             }));
 
@@ -236,11 +237,11 @@ export default function (pool) {
         email || null,
         gender,
         nationality,
-        birthdate ? new Date(birthdate) : null,
+        birthdate || null,
         address,
         JSON.stringify(job),
         JSON.stringify(location),
-        dateJoined ? new Date(dateJoined) : null,
+        dateJoined || null,
         icNo,
         bankAccountNumber,
         epfNo,
@@ -251,7 +252,7 @@ export default function (pool) {
         paymentPreference,
         race,
         agama,
-        dateResigned ? new Date(dateResigned) : null,
+        dateResigned || null,
         maritalStatus || "Single",
         spouseEmploymentStatus || null,
         numberOfChildren || 0,
@@ -491,9 +492,10 @@ export default function (pool) {
 
       const staff = result.rows[0];
 
-      // Format dates
+      // Preserve local calendar dates from PostgreSQL DATE columns.
+      /** @param {Date | string | null} date @returns {string} */
       const formatDate = (date) =>
-        date ? new Date(date).toISOString().split("T")[0] : "";
+        date ? format(new Date(date), "yyyy-MM-dd") : "";
 
       // Convert null values to empty strings and format dates
       const formattedStaff = Object.entries(staff).reduce(
@@ -787,11 +789,11 @@ export default function (pool) {
           email || null,
           gender,
           nationality,
-          birthdate ? new Date(birthdate) : null,
+          birthdate || null,
           address,
           JSON.stringify(job),
           JSON.stringify(location),
-          dateJoined ? new Date(dateJoined) : null,
+          dateJoined || null,
           icNo,
           bankAccountNumber,
           epfNo,
@@ -802,7 +804,7 @@ export default function (pool) {
           paymentPreference,
           race,
           agama,
-          dateResigned ? new Date(dateResigned) : null,
+          dateResigned || null,
           maritalStatus || "Single",
           spouseEmploymentStatus || null,
           numberOfChildren || 0,
