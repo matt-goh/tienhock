@@ -1084,6 +1084,7 @@ export async function buildAccountLedger(pool, accountCode, startStr, endStr) {
       ledger_type: account.ledger_type,
       fs_note: account.fs_note,
       parent_code: account.parent_code,
+      is_subledger: isSubledger,
     },
     opening_balance: openingBalance,
     opening_source: openingSource,

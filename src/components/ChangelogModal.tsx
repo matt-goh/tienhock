@@ -20,6 +20,11 @@ type ChangelogEntry = {
 
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
+    date: "2026-09-29",
+    ms: "Pecahan umur baki penyata pelanggan Green Target yang dicetak dari Invois kini mengambil kira baki awal dan sepadan dengan penyata Akaun > Penghutang. Penyata Akaun > Penghutang kini turut memaparkan nota faedah lewat bayar, butiran bank, maklumat penyata dan nota tanpa tandatangan.",
+    en: "Green Target customer statements printed from Invoices now include opening balances in the ageing boxes and match Accounting > Debtors. Accounting > Debtors statements now also show the overdue-interest note, bank details, statement information and no-signature note.",
+  },
+  {
     date: "2026-09-28",
     ms: "Tarikh mula bekerja, lahir dan berhenti kerja kakitangan Tien Hock dan Jelly Polly kini kekal pada tarikh yang dimasukkan selepas disimpan dan dibuka semula, tanpa berubah ke hari sebelumnya.",
     en: "Tien Hock and Jelly Polly staff joining dates, birthdates and resignation dates now keep the entered date after saving and reopening, without shifting to the previous day.",

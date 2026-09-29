@@ -10,7 +10,7 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import TienHockLogo from "../tienhock.png";
-import { type CompanyInfo, TIENHOCK_INFO } from "../invoice/einvoice/companyInfo";
+import { type CompanyInfo, TIENHOCK_INFO, GREENTARGET_INFO } from "../invoice/einvoice/companyInfo";
 import { printPdfFrameWithFallback } from "../pdfPrintFallback";
 
 // Types for the statement data
@@ -223,6 +223,36 @@ const styles = StyleSheet.create({
   agingValueText: {
     fontSize: 9,
   },
+  interestNote: {
+    marginTop: 8,
+    fontSize: 8,
+    textAlign: "center",
+    color: colors.textSecondary,
+  },
+  paymentAndInfo: {
+    flexDirection: "row",
+    marginTop: 10,
+    gap: 16,
+  },
+  infoColumn: {
+    flex: 1,
+  },
+  infoHeading: {
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 6,
+  },
+  infoText: {
+    fontSize: 8,
+    lineHeight: 1.4,
+    marginBottom: 3,
+  },
+  signatureNote: {
+    marginTop: 12,
+    fontSize: 8,
+    textAlign: "center",
+    color: colors.textSecondary,
+  },
   // Page Number
   pageNumber: {
     position: "absolute",
@@ -309,6 +339,7 @@ const CustomerStatementPDF: React.FC<{
   companyName?: string;
 }> = ({ data, companyInfo = TIENHOCK_INFO, companyName }) => {
   const { customer, statement_date, previous_balance, transactions, total_amount_due, aging, unapplied_overpayment } = data;
+  const isGreenTarget: boolean = companyInfo.name === GREENTARGET_INFO.name;
 
   // Build customer address string
   const addressLines: string[] = [];
@@ -399,43 +430,80 @@ const CustomerStatementPDF: React.FC<{
           )}
         </View>
 
-        {/* Divider before Aging */}
-        <View style={styles.doubleDivider} />
+        <View wrap={!isGreenTarget}>
+          {isGreenTarget && (
+            <Text style={styles.interestNote}>
+              We reserve the rights to charge interest at the rate of 1.5% per
+              month on overdue accounts.
+            </Text>
+          )}
 
-        {/* Aging Section */}
-        <View style={styles.agingSection}>
-          <View style={styles.agingHeader}>
-            <View style={styles.agingCell}>
-              <Text style={styles.agingHeaderText}>CURRENT MONTH</Text>
+          {/* Divider before Aging */}
+          <View style={styles.doubleDivider} />
+
+          {/* Aging Section */}
+          <View style={styles.agingSection}>
+            <View style={styles.agingHeader}>
+              <View style={styles.agingCell}>
+                <Text style={styles.agingHeaderText}>CURRENT MONTH</Text>
+              </View>
+              <View style={styles.agingCell}>
+                <Text style={styles.agingHeaderText}>ONE MONTH</Text>
+              </View>
+              <View style={styles.agingCell}>
+                <Text style={styles.agingHeaderText}>TWO MONTHS</Text>
+              </View>
+              <View style={styles.agingCellLast}>
+                <Text style={styles.agingHeaderText}>THREE MONTHS & OVER</Text>
+              </View>
             </View>
-            <View style={styles.agingCell}>
-              <Text style={styles.agingHeaderText}>ONE MONTH</Text>
-            </View>
-            <View style={styles.agingCell}>
-              <Text style={styles.agingHeaderText}>TWO MONTHS</Text>
-            </View>
-            <View style={styles.agingCellLast}>
-              <Text style={styles.agingHeaderText}>THREE MONTHS & OVER</Text>
+            <View style={styles.agingRow}>
+              <View style={styles.agingCell}>
+                <Text style={styles.agingValueText}>{formatCurrency(aging.current_month)}</Text>
+              </View>
+              <View style={styles.agingCell}>
+                <Text style={styles.agingValueText}>{formatCurrency(aging.one_month)}</Text>
+              </View>
+              <View style={styles.agingCell}>
+                <Text style={styles.agingValueText}>{formatCurrency(aging.two_months)}</Text>
+              </View>
+              <View style={styles.agingCellLast}>
+                <Text style={styles.agingValueText}>{formatCurrency(aging.three_months_plus)}</Text>
+              </View>
             </View>
           </View>
-          <View style={styles.agingRow}>
-            <View style={styles.agingCell}>
-              <Text style={styles.agingValueText}>{formatCurrency(aging.current_month)}</Text>
+
+          {/* Divider after Aging */}
+          <View style={styles.doubleDivider} />
+
+          {isGreenTarget && (
+            <View>
+              <View style={styles.paymentAndInfo}>
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoHeading}>Payment</Text>
+                  <Text style={styles.infoText}>
+                    Account Name: Green Target Waste Treatment Industries S/B
+                  </Text>
+                  <Text style={styles.infoText}>Bank: Public Bank Berhad</Text>
+                  <Text style={styles.infoText}>Account No: 3137836814</Text>
+                </View>
+                <View style={styles.infoColumn}>
+                  <Text style={styles.infoHeading}>Information</Text>
+                  <Text style={styles.infoText}>
+                    This statement reflects your account status as of {statement_date}.
+                  </Text>
+                  <Text style={styles.infoText}>
+                    If you have already made a payment, please disregard this
+                    statement with our thanks.
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.signatureNote}>
+                This is a computer-generated statement and requires no signature.
+              </Text>
             </View>
-            <View style={styles.agingCell}>
-              <Text style={styles.agingValueText}>{formatCurrency(aging.one_month)}</Text>
-            </View>
-            <View style={styles.agingCell}>
-              <Text style={styles.agingValueText}>{formatCurrency(aging.two_months)}</Text>
-            </View>
-            <View style={styles.agingCellLast}>
-              <Text style={styles.agingValueText}>{formatCurrency(aging.three_months_plus)}</Text>
-            </View>
-          </View>
+          )}
         </View>
-
-        {/* Divider after Aging */}
-        <View style={styles.doubleDivider} />
 
         {/* Page Number */}
         <Text
