@@ -746,7 +746,7 @@ export default function createGreenTargetDebtorsRouter(pool) {
   // opening anchor and receipts keyed straight into the journal. Transactions
   // are re-sorted chronologically (the engine's legacy month/sequence print
   // order reads oddly on a customer statement) and running balances are
-  // recomputed. Aging is a monthly FIFO from the latest subledger snapshot.
+  // recomputed. Aging uses the account's GL opening or sundry subledger snapshot.
   router.get("/ledger-statement/:code", async (req, res) => {
     const { code } = req.params;
     const startStr = req.query.start_date;
@@ -789,49 +789,56 @@ export default function createGreenTargetDebtorsRouter(pool) {
       const periodYear = Number(endStr.slice(0, 4));
       const periodMonth = Number(endStr.slice(5, 7));
 
-      // Subledger twin of computeAccountFifoAging: openings anchor on the
-      // debtor_subledger_snapshots monthly closes and movements match the
-      // independently-tagged debtor_subledger_code lines.
-      const anchorResult = await pool.query(
-        `SELECT to_char((as_of_month + INTERVAL '1 month')::date, 'YYYY-MM-DD') AS anchor_date,
-                to_char(as_of_month, 'YYYY-MM') AS anchor_month,
-                closing_balance AS amount
-           FROM greentarget.debtor_subledger_snapshots
-          WHERE account_code = $1
-            AND (as_of_month + INTERVAL '1 month')::date <= $2::date
-          ORDER BY as_of_month DESC
-          LIMIT 1`,
-        [code, endStr]
-      );
-      const anchor = anchorResult.rows[0] || null;
-      const movementStart = anchor?.anchor_date || LEGACY_LEDGER_START;
-      const monthlyResult = await pool.query(
-        `SELECT EXTRACT(YEAR FROM je.entry_date)::integer AS y,
-                EXTRACT(MONTH FROM je.entry_date)::integer AS m,
-                SUM(jel.debit_amount) AS debit,
-                SUM(jel.credit_amount) AS credit
-           FROM greentarget.journal_entry_lines jel
-           JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
-          WHERE je.status = 'posted'
-            AND (jel.debtor_subledger_code = $1 OR jel.account_code = $1)
-            AND je.entry_date >= $2::date
-            AND je.entry_date <= $3::date
-          GROUP BY EXTRACT(YEAR FROM je.entry_date),
-                   EXTRACT(MONTH FROM je.entry_date)`,
-        [code, movementStart, endStr]
-      );
-      const months = new Map();
-      if (anchor) {
-        getMonthlyAgingMovement(months, anchor.anchor_month).openingCents +=
-          cents(anchor.amount);
+      /** @type {ReturnType<typeof ageMonthlyCents>} */
+      let aging;
+      if (!ledger.account.is_subledger) {
+        // GL debtors must use the same openings and FIFO as Accounting > Debtors.
+        aging = await computeAccountFifoAging(code, endStr, periodYear, periodMonth);
+      } else {
+        // Subledger twin of computeAccountFifoAging: openings anchor on the
+        // debtor_subledger_snapshots monthly closes and movements match the
+        // independently-tagged debtor_subledger_code lines.
+        const anchorResult = await pool.query(
+          `SELECT to_char((as_of_month + INTERVAL '1 month')::date, 'YYYY-MM-DD') AS anchor_date,
+                  to_char(as_of_month, 'YYYY-MM') AS anchor_month,
+                  closing_balance AS amount
+             FROM greentarget.debtor_subledger_snapshots
+            WHERE account_code = $1
+              AND (as_of_month + INTERVAL '1 month')::date <= $2::date
+            ORDER BY as_of_month DESC
+            LIMIT 1`,
+          [code, endStr]
+        );
+        const anchor = anchorResult.rows[0] || null;
+        const movementStart = anchor?.anchor_date || LEGACY_LEDGER_START;
+        const monthlyResult = await pool.query(
+          `SELECT EXTRACT(YEAR FROM je.entry_date)::integer AS y,
+                  EXTRACT(MONTH FROM je.entry_date)::integer AS m,
+                  SUM(jel.debit_amount) AS debit,
+                  SUM(jel.credit_amount) AS credit
+             FROM greentarget.journal_entry_lines jel
+             JOIN greentarget.journal_entries je ON je.id = jel.journal_entry_id
+            WHERE je.status = 'posted'
+              AND (jel.debtor_subledger_code = $1 OR jel.account_code = $1)
+              AND je.entry_date >= $2::date
+              AND je.entry_date <= $3::date
+            GROUP BY EXTRACT(YEAR FROM je.entry_date),
+                     EXTRACT(MONTH FROM je.entry_date)`,
+          [code, movementStart, endStr]
+        );
+        const months = new Map();
+        if (anchor) {
+          getMonthlyAgingMovement(months, anchor.anchor_month).openingCents +=
+            cents(anchor.amount);
+        }
+        for (const row of monthlyResult.rows) {
+          const key = `${row.y}-${pad2(row.m)}`;
+          const movement = getMonthlyAgingMovement(months, key);
+          movement.debitCents += cents(row.debit);
+          movement.creditCents += cents(row.credit);
+        }
+        aging = ageMonthlyCents(months, periodYear, periodMonth);
       }
-      for (const row of monthlyResult.rows) {
-        const key = `${row.y}-${pad2(row.m)}`;
-        const movement = getMonthlyAgingMovement(months, key);
-        movement.debitCents += cents(row.debit);
-        movement.creditCents += cents(row.credit);
-      }
-      const aging = ageMonthlyCents(months, periodYear, periodMonth);
 
       res.json({
         customer: {
