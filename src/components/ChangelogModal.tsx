@@ -21,6 +21,11 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-28",
+    ms: "Tarikh mula bekerja, lahir dan berhenti kerja kakitangan Tien Hock dan Jelly Polly kini kekal pada tarikh yang dimasukkan selepas disimpan dan dibuka semula, tanpa berubah ke hari sebelumnya.",
+    en: "Tien Hock and Jelly Polly staff joining dates, birthdates and resignation dates now keep the entered date after saving and reopening, without shifting to the previous day.",
+  },
+  {
+    date: "2026-09-28",
     ms: "Borang invois Green Target kini memaparkan preview alamat pada PDF dan e-Invois. Preview berubah mengikut lokasi sewaan yang dipilih dan menunjukkan bila alamat bil pelanggan digunakan.",
     en: "The Green Target invoice form now previews the address shown on the PDF and e-Invoice. The preview follows your selected rental locations and shows when the customer's billing address takes priority.",
   },

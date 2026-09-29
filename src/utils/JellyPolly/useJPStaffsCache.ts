@@ -8,7 +8,8 @@ interface CacheData {
   timestamp: number;
 }
 
-const CACHE_KEY = "jpAllStaffsData";
+// Discard cached dates returned by the old UTC-based staff API.
+const CACHE_KEY: string = "jpAllStaffsData:local-dates-v2";
 const CACHE_DURATION = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
 let memoryCache: CacheData | null = null;
