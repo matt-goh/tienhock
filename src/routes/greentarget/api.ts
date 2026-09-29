@@ -8,6 +8,8 @@ import {
   CACHE_EXPIRY,
 } from "../../utils/greenTarget/cacheUtils";
 import type {
+  CreateGreenTargetInvoiceInput,
+  CreateGreenTargetInvoiceResponse,
   CreateGreenTargetPaymentBatchInput,
   CreateGreenTargetPaymentInput,
   GreenTargetPayment,
@@ -179,7 +181,17 @@ export const greenTargetApi = {
     if (!ids || ids.length === 0) return Promise.resolve([]);
     return api.get(`/greentarget/api/invoices/batch?ids=${ids.join(",")}`);
   },
-  createInvoice: (data: any) => api.post("/greentarget/api/invoices", data),
+  createInvoice: async (
+    data: CreateGreenTargetInvoiceInput
+  ): Promise<CreateGreenTargetInvoiceResponse> => {
+    const response: CreateGreenTargetInvoiceResponse = await api.post(
+      "/greentarget/api/invoices",
+      data
+    );
+    // Invoice creation can save the customer's first debtor-account default.
+    invalidateCache(CACHE_KEYS.CUSTOMERS);
+    return response;
+  },
   updateInvoice: (id: any, data: any) =>
     api.put(`/greentarget/api/invoices/${id}`, data),
   cancelInvoice: (id: number, reason?: string) =>
@@ -338,8 +350,8 @@ export const greenTargetApi = {
     ),
 
   // Location endpoints
-  getLocationsByCustomer: (customerId: any) =>
-    api.get(`/greentarget/api/customers/${customerId}/locations`),
+  getLocationsByCustomer: (customerId: number) =>
+    api.get(`/greentarget/api/locations?customer_id=${customerId}`),
   createLocation: async (data: any) => {
     const response = await api.post("/greentarget/api/locations", data);
     // Invalidate customers cache since locations are related

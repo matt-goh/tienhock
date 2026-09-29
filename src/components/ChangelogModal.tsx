@@ -21,6 +21,16 @@ type ChangelogEntry = {
 const CHANGELOG_ENTRIES: ChangelogEntry[] = [
   {
     date: "2026-09-28",
+    ms: "Borang invois Green Target kini memaparkan preview alamat pada PDF dan e-Invois. Preview berubah mengikut lokasi sewaan yang dipilih dan menunjukkan bila alamat bil pelanggan digunakan.",
+    en: "The Green Target invoice form now previews the address shown on the PDF and e-Invoice. The preview follows your selected rental locations and shows when the customer's billing address takes priority.",
+  },
+  {
+    date: "2026-09-28",
+    ms: "Invois Green Target kini boleh dibuat pada satu halaman. Pilih sewaan belum diinvois untuk memilih pelanggan secara automatik, atau tambah sewaan baharu dan pilih atau cipta pelanggan di situ. Tambah lokasi tanpa meninggalkan halaman; lokasi dan tong kekal pilihan. Sewaan baharu disimpan bersama invois. Pilihan pemandu menggunakan butang terus pada borang invois dan sewaan. Senarai pilihan lokasi dan tong tidak lagi bertindih dengan tajuk senarai sewaan.",
+    en: "Create Green Target invoices on one page. Pick an unbilled rental to select its customer automatically, or add a new rental and choose or create its customer there. Add locations without leaving the page; locations and dumpsters remain optional. New rentals save together with the invoice. Drivers use direct selection buttons on both forms. Location and dumpster dropdowns now display above the rental list headers.",
+  },
+  {
+    date: "2026-09-28",
     ms: "Laporan Tien Hock 2026 kini mengambil kira baki awal ARI dalam belanja mengikut lampiran program lama, supaya untung dan Balance Sheet menggunakan kiraan yang sama. Pendahuluan pekerja RM2,500 bagi Februari dipindahkan ke CA_WA; bayaran telefon Mac dan CoGM dikekalkan.",
     en: "Tien Hock's 2026 reports now include the ARI opening balance in expenses as shown in the legacy appendix, keeping profit and the Balance Sheet consistent. February's RM2,500 worker advance is moved to CA_WA; March telephone postings and CoGM are unchanged.",
   },

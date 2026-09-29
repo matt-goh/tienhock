@@ -37,6 +37,38 @@ export interface GreenTargetInvoiceLineInput {
   unit_price: number;
 }
 
+/** Minimal, dateless rental created atomically with its invoice. */
+export interface GreenTargetNewInvoiceRental {
+  driver: string;
+  location_id: number | null;
+  tong_no: string | null;
+}
+
+export interface CreateGreenTargetInvoiceInput {
+  type: "regular";
+  customer_id: number;
+  rental_ids?: number[];
+  new_rentals?: GreenTargetNewInvoiceRental[];
+  amount_before_tax: number;
+  tax_amount?: number;
+  total_amount?: number;
+  date_issued: string;
+  invoice_number?: string;
+  debtor_account_code: string;
+  revenue_account_code?: GreenTargetRevenueSplitAccountCode;
+  revenue_splits?: GreenTargetRevenueSplit[];
+  delivery_order?: string;
+  lines?: GreenTargetInvoiceLineInput[];
+}
+
+export interface CreateGreenTargetInvoiceResponse {
+  message: string;
+  invoice: {
+    invoice_id: number;
+    invoice_number: string;
+  };
+}
+
 export interface GreenTargetDebtorSubledgerIdentity {
   code: string;
   description: string;

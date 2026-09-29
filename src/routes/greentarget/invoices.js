@@ -207,7 +207,8 @@ const assertRentalLinksValid = async (
   };
 
   const rentalResult = await client.query(
-    `SELECT rental_id, customer_id FROM greentarget.rentals WHERE rental_id = ANY($1)`,
+    `SELECT rental_id, customer_id FROM greentarget.rentals
+     WHERE rental_id = ANY($1) ORDER BY rental_id FOR UPDATE`,
     [rentalIds]
   );
   const rentalsById = new Map(rentalResult.rows.map((row) => [row.rental_id, row]));
@@ -982,7 +983,8 @@ export default function (pool, defaultConfig) {
     const {
       type,
       customer_id,
-      rental_ids,
+      rental_ids = [],
+      new_rentals = [],
       amount_before_tax,
       tax_amount = 0, // Default tax to 0 if not provided
       date_issued,
@@ -1008,9 +1010,32 @@ export default function (pool, defaultConfig) {
       if (!["regular"].includes(type)) {
         throw new Error("Invalid invoice type specified.");
       }
-      if (type === "regular" && (!rental_ids || !Array.isArray(rental_ids) || rental_ids.length === 0)) {
-        throw new Error("At least one rental ID is required for regular invoices.");
+      /** @param {string} message @returns {never} */
+      const badRequest = (message) => {
+        throw Object.assign(new Error(message), { status: 400 });
+      };
+      if (!Array.isArray(rental_ids) || !Array.isArray(new_rentals)) {
+        badRequest("Invalid rental list.");
       }
+      if (rental_ids.length + new_rentals.length === 0) {
+        badRequest("At least one new or existing rental is required.");
+      }
+      /** @type {number[]} */
+      const linkedRentalIds = rental_ids.map(Number);
+      if (
+        linkedRentalIds.some((rentalId) => !Number.isSafeInteger(rentalId) || rentalId <= 0) ||
+        new Set(linkedRentalIds).size !== linkedRentalIds.length
+      ) {
+        badRequest("Invalid or duplicate rental IDs.");
+      }
+      if (!Number.isSafeInteger(Number(customer_id)) || Number(customer_id) <= 0) {
+        badRequest("Invalid customer ID.");
+      }
+      const customerResult = await client.query(
+        `SELECT customer_id FROM greentarget.customers WHERE customer_id = $1 FOR KEY SHARE`,
+        [customer_id]
+      );
+      if (customerResult.rows.length === 0) badRequest("Customer not found.");
       const numAmountBeforeTax = parseFloat(amount_before_tax);
       const numTaxAmount = parseFloat(tax_amount);
       if (isNaN(numAmountBeforeTax) || numAmountBeforeTax < 0) {
@@ -1029,7 +1054,56 @@ export default function (pool, defaultConfig) {
       // Rentals must belong to this customer and must not already be billed on
       // another non-cancelled invoice (was enforced client-side only).
       if (type === "regular") {
-        await assertRentalLinksValid(client, customer_id, rental_ids);
+        await assertRentalLinksValid(client, customer_id, linkedRentalIds);
+      }
+      // These rentals are billing metadata only: no dates, reservations or
+      // dumpster-status changes. They roll back with the invoice and journal.
+      if (new_rentals.length > 0) {
+        const destinationResult = await client.query(
+          `SELECT code FROM greentarget.pickup_destinations
+           WHERE is_active = true AND is_default = true
+           ORDER BY sort_order, code LIMIT 1`
+        );
+        /** @type {string | null} */
+        const pickupDestination = destinationResult.rows[0]?.code || null;
+        for (const draft of new_rentals) {
+          if (!draft || typeof draft !== "object" || Array.isArray(draft)) {
+            badRequest("Invalid new rental.");
+          }
+          /** @type {string} */
+          const driver = typeof draft.driver === "string" ? draft.driver.trim() : "";
+          if (!driver || driver.length > 50) badRequest("A valid driver is required for every new rental.");
+          /** @type {number | null} */
+          const locationId = draft.location_id == null ? null : Number(draft.location_id);
+          if (locationId !== null) {
+            if (!Number.isSafeInteger(locationId) || locationId <= 0) badRequest("Invalid rental location.");
+            const locationResult = await client.query(
+              `SELECT location_id FROM greentarget.locations
+               WHERE location_id = $1 AND customer_id = $2 FOR SHARE`,
+              [locationId, customer_id]
+            );
+            if (locationResult.rows.length === 0) badRequest("Rental location does not belong to this customer.");
+          }
+          if (draft.tong_no != null && typeof draft.tong_no !== "string") {
+            badRequest("Invalid dumpster number.");
+          }
+          /** @type {string | null} */
+          const tongNo = draft.tong_no?.trim() || null;
+          if (tongNo) {
+            const dumpsterResult = await client.query(
+              `SELECT tong_no FROM greentarget.dumpsters WHERE tong_no = $1 FOR KEY SHARE`,
+              [tongNo]
+            );
+            if (dumpsterResult.rows.length === 0) badRequest("Dumpster not found.");
+          }
+          const rentalResult = await client.query(
+            `INSERT INTO greentarget.rentals
+             (customer_id, location_id, tong_no, driver, date_placed, date_picked, remarks, pickup_destination)
+             VALUES ($1, $2, $3, $4, NULL, NULL, NULL, $5) RETURNING rental_id`,
+            [customer_id, locationId, tongNo, driver, pickupDestination]
+          );
+          linkedRentalIds.push(rentalResult.rows[0].rental_id);
+        }
       }
       const total_amount = numAmountBeforeTax + numTaxAmount;
       const debtorAssignment = await resolveGTDebtorAssignment(client, {
@@ -1063,7 +1137,7 @@ export default function (pool, defaultConfig) {
           ? normalizeGTInvoiceLines(lines, numAmountBeforeTax)
           : generateGTInvoiceLines(
               { revenue_account_code: headerRevenueAccount },
-              Array.isArray(rental_ids) ? rental_ids.length : 0,
+              linkedRentalIds.length,
               numAmountBeforeTax
             );
       await client.query(
@@ -1138,8 +1212,8 @@ export default function (pool, defaultConfig) {
       createdInvoice.invoice_lines = normalizedInvoiceLines;
 
       // Insert rental associations in junction table
-      if (type === "regular" && rental_ids && Array.isArray(rental_ids) && rental_ids.length > 0) {
-        for (const rentalId of rental_ids) {
+      if (type === "regular") {
+        for (const rentalId of linkedRentalIds) {
           await client.query(
             `INSERT INTO greentarget.invoice_rentals (invoice_id, rental_id) VALUES ($1, $2)`,
             [invoiceId, rentalId]
